@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="es"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Gestor de papers</title><link rel="stylesheet" href="style.css"><link rel="manifest" href="manifest.json"><meta name="theme-color" content="#2457c5"><link rel="icon" href="icon-192.png"></head>
+<body>
+<header>
+  <h1 id="appName">Papers</h1><span id="fname"></span>
+  <div class="row">
+    <button onclick="doOpen()" oncontextmenu="openMenu(event)" title="Clic: abrir archivo · Clic derecho: importar referencias" aria-label="Abrir">📂</button>
+    <button id="reopen" onclick="reopenLast()" title="Reabrir el último archivo" hidden>Reabrir<br>último</button>
+    <button onclick="save(false)" title="Guardar" aria-label="Guardar">💾</button>
+    <button onclick="save(true)">Guardar como</button>
+    <button class="pri" onclick="openEx()">Exportar citas</button>
+    <label><input type="checkbox" id="auto" onchange="setAuto(this)"> Autoguardado</label>
+  </div>
+</header>
+<div id="app">
+  <aside id="side">
+    <button class="sh" onclick="sbToggle()" title="Plegar / desplegar menú"><span class="ic">☰</span><span class="lbl">Menú</span></button>
+    <div class="sg" id="sg-search"><button class="sh" onclick="sbGroup('search')" title="Buscar"><span class="ic">🔍</span><span class="lbl">Buscar</span><span class="dot" id="d-search" hidden></span></button>
+      <div class="sb"><input id="q" type="search" placeholder="Título, autor o año" oninput="F.q=this.value;render()"><label><input type="checkbox" onchange="F.inNotes=this.checked;render()"> Incluir notas y citas editadas</label></div></div>
+    <div class="sg" id="sg-sort"><button class="sh" onclick="sbGroup('sort')" title="Ordenar"><span class="ic">⇅</span><span class="lbl">Ordenar</span></button>
+      <div class="sb"><div id="sortUI"></div><label><input type="checkbox" id="grpChk" onchange="F.group=this.checked;render()"> Agrupar por sección</label></div></div>
+    <div class="sg" id="sg-sec"><button class="sh" onclick="sbGroup('sec')" title="Secciones"><span class="ic">📁</span><span class="lbl">Secciones</span><span class="dot" id="d-sec" hidden></span></button>
+      <div class="sb"><div id="secF"></div><button onclick="svOpen(F.sec)">📄 Ver notas de la sección</button><button onclick="openMg('sections')">✎ Gestionar secciones</button></div></div>
+    <div class="sg" id="sg-tags"><button class="sh" onclick="sbGroup('tags')" title="Etiquetas"><span class="ic">🏷️</span><span class="lbl">Etiquetas</span><span class="dot" id="d-tags" hidden></span></button>
+      <div class="sb"><div id="tagF"></div><label>Etiquetas en cada paper <select onchange="F.tagPos=this.value;render()"><option value="beside">Al lado del título</option><option value="above">Encima del título</option></select></label><button onclick="openMg('tags')">✎ Gestionar etiquetas</button></div></div>
+    <div class="sg" id="sg-read"><button class="sh" onclick="sbGroup('read')" title="Lectura"><span class="ic">📖</span><span class="lbl">Lectura</span><span class="dot" id="d-read" hidden></span></button>
+      <div class="sb"><div id="readF"></div><label>Valoración mínima <select id="minR" onchange="F.minRating=+this.value;render()"><option value="0">Cualquiera</option><option value="1">Al menos ★1</option><option value="2">Al menos ★2</option><option value="3">Al menos ★3</option><option value="4">Al menos ★4</option><option value="5">Al menos ★5</option></select></label></div></div>
+    <div class="sg" id="sg-sel"><button class="sh" onclick="sbGroup('sel')" title="Selección y exportación"><span class="ic">☑️</span><span class="lbl">Selección</span><span class="dot" id="d-sel" hidden></span></button>
+      <div class="sb"><small id="selN"></small><button onclick="selVisible()">Seleccionar visibles</button><button onclick="selNone()">Quitar selección</button><button class="pri" onclick="openEx()">Exportar citas…</button></div></div>
+  <button class="sh" onclick="grOpen()" title="Gráfico de relaciones entre papers"><span class="ic">🕸️</span><span class="lbl">Relaciones</span></button>
+  <button class="sh trb" onclick="trOpen()" title="Papelera"><span class="ic">🗑️</span><span class="lbl" id="trLbl">Papelera</span><span class="dot" id="d-tr" hidden></span></button>
+  <button class="sh cfgb" onclick="openCfg()" title="Configuración"><span class="ic">⚙️</span><span class="lbl">Configuración</span></button>
+  </aside>
+  <main>
+    <div class="row"><button class="pri" onclick="openPaper()">+ Nuevo paper</button><button id="tbView" class="tg" onclick="setView(db.settings.view==='table'?'cards':'table')" title="Cambiar entre tarjetas y tabla compacta"></button><div class="bar"><button id="tbSec" class="tg" onclick="F.tbSec=!F.tbSec;render()" oncontextmenu="groupMenu(event)" title="Clic: mostrar u ocultar las secciones · Clic derecho: agrupar por sección"></button><div id="secF2" class="chips" hidden></div></div><div class="bar"><button id="tbTag" class="tg" onclick="F.tbTag=!F.tbTag;render()" oncontextmenu="modeMenu(event)" title="Clic: mostrar u ocultar las etiquetas · Clic derecho: cómo combinarlas"></button><div id="tagF2" class="chips"></div></div><span id="count"></span></div>
+    <div id="list"></div>
+  </main>
+</div>
+<div id="ctx" hidden></div><dialog id="dlg"></dialog><dialog id="mg"></dialog><dialog id="ex"></dialog><dialog id="nv"></dialog><dialog id="cfg"></dialog><dialog id="imp"></dialog><dialog id="rv"></dialog><dialog id="sv"></dialog><dialog id="lk"></dialog><dialog id="tr"></dialog><dialog id="gr"></dialog>
+<script src="app.js"></script></body></html>

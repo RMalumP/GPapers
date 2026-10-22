@@ -1,0 +1,153 @@
+{
+  "version": 1,
+  "settings": {
+    "palette": "azul",
+    "appName": "Papers",
+    "showFile": true,
+    "shortcuts": {
+      "open": "Ctrl+O",
+      "save": "Ctrl+S",
+      "find": "Ctrl+F",
+      "newPaper": "Alt+N",
+      "undo": "Ctrl+Z",
+      "redo": "Ctrl+Shift+Z",
+      "exportCites": "Ctrl+Shift+E",
+      "import": "Alt+I",
+      "bold": "Ctrl+B",
+      "italic": "Ctrl+I"
+    },
+    "export": {
+      "fmt": "txt",
+      "style": "apa",
+      "order": "auto",
+      "num": false,
+      "notes": false,
+      "particles": false,
+      "title": ""
+    },
+    "templates": [
+      {
+        "id": "t_res",
+        "name": "Resumen del paper",
+        "text": "**Objetivo:** \n**Método:** \n**Resultados:** \n**Limitaciones:** "
+      },
+      {
+        "id": "t_cit",
+        "name": "Cita textual",
+        "text": "**Cita:** \n**Página:** \n**Comentario:** "
+      },
+      {
+        "id": "t_ide",
+        "name": "Idea propia",
+        "text": "**Idea:** \n**Relación con mi tema:** \n**Siguiente paso:** "
+      }
+    ],
+    "fmtOpen": false,
+    "view": "cards"
+  },
+  "sections": [
+    {
+      "id": "s1",
+      "name": "Marco teórico",
+      "description": "Base conceptual",
+      "color": "#2457c5"
+    }
+  ],
+  "tags": [
+    {
+      "id": "t1",
+      "name": "Leer de nuevo",
+      "color": "#e67e22"
+    },
+    {
+      "id": "t2",
+      "name": "Clave",
+      "color": "#27ae60"
+    }
+  ],
+  "papers": [
+    {
+      "id": "p1",
+      "title": "Ejemplo de título de paper",
+      "authors": [
+        "Pérez, Juan Carlos",
+        "Gómez, Lucía"
+      ],
+      "year": 2021,
+      "url": "https://example.org/paper",
+      "type": "articulo",
+      "venue": "Revista de Ejemplo",
+      "doi": "10.1000/xyz123",
+      "accessed": "2026-10-20",
+      "general": "Notas generales del paper.",
+      "tagIds": [
+        "t2"
+      ],
+      "sectionIds": [
+        "s1"
+      ],
+      "reading": "leyendo",
+      "rating": 4,
+      "related": [],
+      "history": [
+        {
+          "t": "2026-10-21T10:00:00.000Z",
+          "s": "Creado"
+        }
+      ],
+      "notes": [
+        {
+          "id": "n1",
+          "sectionId": "s1",
+          "content": "**Idea clave:** define el concepto central.\n- Primer punto\n- Segundo punto con *énfasis*"
+        }
+      ],
+      "cites": {
+        "vancouver": "Cita editada a mano (solo se guarda si el usuario la modifica)."
+      },
+      "refTo": []
+    },
+    {
+      "id": "p2",
+      "title": "Segundo paper de ejemplo",
+      "authors": [
+        "Gómez, Lucía"
+      ],
+      "year": 2022,
+      "url": "",
+      "type": "articulo",
+      "venue": "Otra Revista",
+      "doi": "",
+      "accessed": "",
+      "general": "",
+      "tagIds": [],
+      "sectionIds": [
+        "s1"
+      ],
+      "reading": "por_leer",
+      "rating": 0,
+      "related": [],
+      "history": [
+        {
+          "t": "2026-10-21T10:05:00.000Z",
+          "s": "Creado"
+        }
+      ],
+      "created": "2026-10-21T10:05:00.000Z",
+      "sortKey": "",
+      "alias": "",
+      "notes": [
+        {
+          "id": "n2",
+          "sectionId": "s1",
+          "content": "Ver también [[p:p1]] y la nota [[n:n1]]."
+        }
+      ],
+      "cites": {},
+      "refTo": [
+        "p1"
+      ]
+    }
+  ],
+  "trash": []
+}

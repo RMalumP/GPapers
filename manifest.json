@@ -1,0 +1,15 @@
+{
+  "name": "Gestor de papers",
+  "short_name": "Papers",
+  "description": "Gestor de papers académicos con citas, notas, secciones y etiquetas",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f7f8fa",
+  "theme_color": "#2457c5",
+  "lang": "es",
+  "icons": [
+    {"src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any"},
+    {"src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any"}
+  ]
+}
