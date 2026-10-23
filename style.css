@@ -36,7 +36,7 @@ aside.min .dot{position:absolute;top:6px;right:6px}.sb .chip{margin:2px 4px 2px 
 #ctx{position:fixed;z-index:50;display:flex;flex-direction:column;min-width:180px;padding:4px;background:var(--card);border:1px solid var(--bd);border-radius:8px;box-shadow:0 4px 16px #0004}
 #ctx[hidden]{display:none}#ctx button{border:0;background:none;text-align:left}#ctx button:hover{background:var(--bg)}.ctxh{font-size:12px;opacity:.7;padding:4px 8px}
 .ct{display:flex;align-items:center;gap:10px;margin-bottom:4px}
-.sm,.ct button{font-size:13px;padding:1px 8px}.ct .x{margin-left:auto;border:0;background:none;color:var(--red);font-size:16px;line-height:1;padding:2px 6px}
+.sm,.ct button{font-size:13px;padding:1px 8px}.ct .rd{margin-left:auto}.ct .x{margin-left:0;border:0;background:none;color:var(--red);font-size:16px;line-height:1;padding:2px 6px}
 .nts{margin-top:8px;display:flex;flex-direction:column;gap:8px;border-left:3px solid var(--bd);padding-left:10px}.ntx{white-space:pre-wrap;margin-top:2px}
 .tabs{gap:18px;margin:8px 0 12px;border-bottom:1px solid var(--bd)}
 .tabs button{border:0;border-bottom:2px solid transparent;border-radius:0;background:none;padding:6px 2px;opacity:.65}
@@ -83,3 +83,5 @@ a.nl{color:var(--pri);cursor:pointer;text-decoration:underline dotted}a.nl:hover
 .tbl tr.rn td{background:var(--bg)}.tbl .chip{font-size:11px;padding:0 7px;margin:1px 3px 1px 0}.tbl .x{border:1px solid var(--red);color:var(--red);border-radius:6px;background:none;padding:0 7px}
 .rw.over{background:color-mix(in srgb,var(--pri) 10%,transparent)}.rw.drag{opacity:.45}.rw[draggable=true]{cursor:grab}
 #gr{width:min(920px,96vw)}#gr svg{width:100%;height:auto;max-height:70vh;border:1px solid var(--bd);border-radius:8px;background:var(--card)}#gr .nd{cursor:pointer}#gr .nd:hover circle{stroke:var(--pri);stroke-width:3}#gr text{fill:var(--fg);font-size:11px;pointer-events:none;paint-order:stroke;stroke:var(--card);stroke-width:4px;stroke-linejoin:round}
+
+.stv.none{opacity:.35}.ct .x{flex-shrink:0}

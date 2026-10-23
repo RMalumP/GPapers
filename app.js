@@ -11,7 +11,7 @@ const uid = () => Math.random().toString(36).slice(2, 9) + Date.now().toString(3
 const SC_NAMES = {open: 'Abrir archivo', save: 'Guardar', find: 'Buscar', newPaper: 'Nuevo paper', undo: 'Deshacer', redo: 'Rehacer', exportCites: 'Exportar citas', import: 'Importar referencias', bold: 'Negrita (dentro de una nota)', italic: 'Cursiva (dentro de una nota)'};
 // Alt+N en lugar de Ctrl+N: Chrome reserva Ctrl+N, Ctrl+T y Ctrl+W y no permite cambiarlos
 const SC_DEF = {open: 'Ctrl+O', save: 'Ctrl+S', find: 'Ctrl+F', newPaper: 'Alt+N', undo: 'Ctrl+Z', redo: 'Ctrl+Shift+Z', exportCites: 'Ctrl+Shift+E', import: 'Alt+I', bold: 'Ctrl+B', italic: 'Ctrl+I'};
-const TRASH_DAYS = 30;   // días que un paper eliminado permanece en la papelera
+const TRASH_DAYS = 5;   // días que un paper eliminado permanece en la papelera
 const trashLeft = t => Math.max(0, Math.ceil(TRASH_DAYS - (Date.now() - new Date(t.at)) / 864e5));
 const TPL_DEF = [   // plantillas de nota de serie; {fecha} y {paper} se sustituyen al insertarlas
   {id: 't_res', name: 'Resumen del paper', text: '**Objetivo:** \n**Método:** \n**Resultados:** \n**Limitaciones:** '},
@@ -550,10 +550,11 @@ function validate(d) {
   if (!d || typeof d !== 'object' || !['papers', 'tags', 'sections'].every(k => Array.isArray(d[k])))
     throw Error('faltan las listas "papers", "tags" o "sections"');
   d.papers.forEach((p, i) => { if (!p.id || typeof p.title !== 'string' || !Array.isArray(p.authors)) throw Error(`el paper n.º ${i + 1} no tiene id, título o autores válidos`);
-    p.tagIds ??= []; p.notes ??= []; p.cites ??= {}; p.notes.forEach(n => { n.id ??= uid(); n.content ??= ''; }); p.created ??= ''; p.sortKey ??= ''; p.related = Array.isArray(p.related) ? p.related : []; p.history = Array.isArray(p.history) ? p.history.filter(h => h && typeof h.s === 'string').slice(-50) : []; p.reading = Object.hasOwn(READ, p.reading) ? p.reading : 'por_leer'; p.rating = Number.isInteger(p.rating) && p.rating >= 0 && p.rating <= 5 ? p.rating : 0; p.sectionIds ??= [...new Set(p.notes.map(n => n.sectionId).filter(Boolean))]; NEWF(p); });
+    p.tagIds ??= []; p.notes ??= []; p.cites ??= {}; p.notes.forEach(n => { n.id ??= uid(); n.content ??= ''; }); p.created ??= ''; p.sortKey ??= ''; p.related = Array.isArray(p.related) ? p.related : []; p.history = [];   // el historial es solo de la sesión: no se lee del JSON
+    p.reading = Object.hasOwn(READ, p.reading) ? p.reading : 'por_leer'; p.rating = Number.isInteger(p.rating) && p.rating >= 0 && p.rating <= 5 ? p.rating : 0; p.sectionIds ??= [...new Set(p.notes.map(n => n.sectionId).filter(Boolean))]; NEWF(p); });
   const byId = new Map(d.papers.map(p => [p.id, p]));   // relaciones: sin ids rotos ni repetidos y siempre simétricas
   d.papers.forEach(p => { p.related = [...new Set(p.related)].filter(i => i !== p.id && byId.has(i)); p.refTo = [...new Set(Array.isArray(p.refTo) ? p.refTo : [])].filter(i => i !== p.id && byId.has(i)); });
-  d.trash = (Array.isArray(d.trash) ? d.trash : []).filter(t => t && t.at && t.paper && t.paper.id && typeof t.paper.title === 'string' && Array.isArray(t.paper.authors) && trashLeft(t) > 0);   // la papelera caduca a los 30 días
+  d.trash = (Array.isArray(d.trash) ? d.trash : []).filter(t => t && t.at && t.paper && t.paper.id && typeof t.paper.title === 'string' && Array.isArray(t.paper.authors) && trashLeft(t) > 0);   // la papelera caduca a los 5 días
   d.papers.forEach(p => p.related.forEach(i => { const q = byId.get(i); if (!q.related.includes(p.id)) q.related.push(p.id); }));
   [...d.tags, ...d.sections].forEach((x, i) => { if (!x.id || typeof x.name !== 'string') throw Error(`etiqueta/sección n.º ${i + 1} sin id o nombre`); });
   d.sections.forEach(s => s.tagIds ??= []);  // compatibilidad con archivos antiguos
@@ -591,7 +592,7 @@ async function reopenLast() {   // Chrome pide confirmar el acceso al archivo en
 async function writeTo(h, text) { const w = await h.createWritable(); await w.write(text); await w.close(); }   // el archivo solo cambia al cerrar: escritura segura
 function download(text, name, type) { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], {type})); a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000); }
 async function save(asNew) {
-  const text = JSON.stringify(db, null, 2);
+  const text = dbJSON();
   try {
     if (FSA) { if (!handle || asNew) { handle = await showSaveFilePicker({suggestedName: path || 'papers.json', types: JSON_T}); rememberHandle(); path = handle.name; }
       await writeTo(handle, text); }
@@ -903,8 +904,12 @@ const EXP = new Set();   // papers con las notas desplegadas en la lista
 const notesHTML = (p, hl) => `<div class="nts">${p.notes.filter(n => n.content.trim()).map(n => { const s = db.sections.find(x => x.id === n.sectionId);
   return `<div class="nt${n.id === hl ? ' hl' : ''}">${s ? chip(s, 1) : '<span class="chip on" style="--c:#888888">Sin sección</span>'}<div class="ntx md">${md(n.content)}</div></div>`; }).join('') || '<small>Este paper no tiene notas.</small>'}</div>`;
 function toggleNotes(id) { EXP.has(id) ? EXP.delete(id) : EXP.add(id); render(); }
-const card = (p, from) => `<article class="card" data-id="${p.id}" ${F.group ? `draggable="true" data-from="${from || ''}"` : ''}><div class="ct"><label class="sel"><input type="checkbox" ${SEL.has(p.id) ? 'checked' : ''} onchange="toggleSel('${p.id}')"> Seleccionar</label><button class="sm" onclick="openPaper('${p.id}')">Editar</button><button class="x" title="Eliminar" onclick="delPaper('${p.id}')">✕</button></div>${F.tagPos === 'above' ? `<div class="tl">${tagsOf(p)}</div>` : ''}<div class="th"><h3>${esc(p.alias || p.title)}</h3>${F.tagPos === 'beside' ? `<span class="tl">${tagsOf(p)}</span>` : ''}</div>${p.alias ? `<div class="sub">${esc(p.title)}</div>` : ''}
-    <div class="au"><span>${esc(p.authors.join('; '))} ${p.year ? '(' + esc(p.year) + ')' : ''}</span><span class="rd"><button class="rst" style="--c:${READ_C[p.reading]}" title="Clic: cambiar el estado de lectura" onclick="cycleRead('${p.id}')">${READ[p.reading]}</button>${p.rating ? `<span class="stv" title="Valoración ${p.rating} de 5">${'★'.repeat(p.rating)}${'☆'.repeat(5 - p.rating)}</span>` : ''}</span></div>
+const starsHTML = p => `<span class="stv${p.rating ? '' : ' none'}" oncontextmenu="starMenu(event,'${p.id}')" title="Valoración ${p.rating} de 5 · Clic derecho: cambiar">${'★'.repeat(p.rating)}${'☆'.repeat(5 - p.rating)}</span>`;
+const rdHTML = p => `<span class="rd"><button class="rst" style="--c:${READ_C[p.reading]}" title="Clic: cambiar el estado de lectura" onclick="cycleRead('${p.id}')">${READ[p.reading]}</button>${starsHTML(p)}</span>`;
+function starMenu(e, id) { ctxShow(e, '<div class="ctxh">Valoración</div>' + [5, 4, 3, 2, 1, 0].map(n => `<button onclick="setRating('${id}',${n})">${n ? '★'.repeat(n) + '☆'.repeat(5 - n) : 'Sin valorar'}</button>`).join('')); }
+function setRating(id, n) { const p = db.papers.find(x => x.id === id); ctxClose(); if (!p || p.rating === n) return; logChange(p, `Valoración: ${p.rating || '—'} → ${n || '—'}`); p.rating = n; markDirty(); render(); }
+const card = (p, from) => `<article class="card" data-id="${p.id}" ${F.group ? `draggable="true" data-from="${from || ''}"` : ''}><div class="ct"><label class="sel"><input type="checkbox" ${SEL.has(p.id) ? 'checked' : ''} onchange="toggleSel('${p.id}')"> Seleccionar</label><button class="sm" onclick="openPaper('${p.id}')">Editar</button>${rdHTML(p)}<button class="x" title="Eliminar" onclick="delPaper('${p.id}')">✕</button></div>${F.tagPos === 'above' ? `<div class="tl">${tagsOf(p)}</div>` : ''}<div class="th"><h3>${esc(p.alias || p.title)}</h3>${F.tagPos === 'beside' ? `<span class="tl">${tagsOf(p)}</span>` : ''}</div>${p.alias ? `<div class="sub">${esc(p.title)}</div>` : ''}
+    <div class="au"><span>${esc(p.authors.join('; '))} ${p.year ? '(' + esc(p.year) + ')' : ''}</span></div>
     ${/^https?:/i.test(p.url) ? `<a href="${esc(p.url)}" target="_blank" rel="noopener noreferrer">${esc(p.url)}</a>` : ''}
     
     <div class="row"><button class="sm" onclick="toggleNotes('${p.id}')" oncontextmenu="viewNotes(event,'${p.id}')" title="Clic: desplegar notas · Clic derecho: abrir el visor de notas">Notas (${p.notes.filter(n => n.content.trim()).length}) ${EXP.has(p.id) ? '▾' : '▸'}</button>${relCount(p) ? `<button class="sm" onclick="viewRel('${p.id}')" title="Relaciones: relacionados, cita a y citado por">🔗 ${relCount(p)}</button>` : ''}</div>${EXP.has(p.id) ? notesHTML(p) : ''}</article>`;
@@ -915,7 +920,7 @@ function thSort(k) {   // clic en una cabecera: ese criterio pasa a ser el princ
 const rowHTML = (p, from) => `<tr class="rw" data-id="${p.id}" ${F.group ? `draggable="true" data-from="${from || ''}"` : ''}>
   <td><input type="checkbox" aria-label="Seleccionar" ${SEL.has(p.id) ? 'checked' : ''} onchange="toggleSel('${p.id}')"></td>
   <td class="tt"><a class="tl2" onclick="openPaper('${p.id}')" title="Editar">${esc(p.alias || p.title)}</a></td><td>${esc(p.authors.join('; '))}</td><td>${esc(p.year)}</td><td>${esc(p.venue)}</td>
-  <td><button class="rst" style="--c:${READ_C[p.reading]}" title="Clic: cambiar el estado de lectura" onclick="cycleRead('${p.id}')">${READ[p.reading]}</button></td><td class="stv">${p.rating ? '★'.repeat(p.rating) : ''}</td>
+  <td><button class="rst" style="--c:${READ_C[p.reading]}" title="Clic: cambiar el estado de lectura" onclick="cycleRead('${p.id}')">${READ[p.reading]}</button></td><td>${starsHTML(p)}</td>
   <td>${tagsOf(p)}</td>
   <td class="nw"><button class="sm" onclick="toggleNotes('${p.id}')" oncontextmenu="viewNotes(event,'${p.id}')" title="Clic: desplegar · Clic derecho: visor de notas">${p.notes.filter(n => n.content.trim()).length} ${EXP.has(p.id) ? '▾' : '▸'}</button>${relCount(p) ? `<button class="sm" onclick="viewRel('${p.id}')" title="Relaciones">🔗 ${relCount(p)}</button>` : ''}</td>
   <td><button class="x" title="Eliminar" onclick="delPaper('${p.id}')">✕</button></td></tr>${EXP.has(p.id) ? `<tr class="rn"><td></td><td colspan="9">${notesHTML(p)}</td></tr>` : ''}`;
@@ -1200,7 +1205,7 @@ function drawD() {
       <div style="margin-top:6px"><small>Citado por (otros papers que lo citan)</small></div><div>${chips(by, '#888888') || '<small>Ninguno.</small>'}</div>
       <div class="row" style="margin-top:8px;flex-wrap:nowrap"><select style="width:auto" onchange="RELT=this.value;relSearch()"><option value="rel" ${RELT === 'rel' ? 'selected' : ''}>Relacionar con</option><option value="ref" ${RELT === 'ref' ? 'selected' : ''}>Cita a</option></select><input id="relQ" placeholder="Buscar un paper…" oninput="relSearch()" style="flex:1;min-width:0"></div><div id="relRes"></div>`;
   }
-  if (tab === 'hist') h += `<div class="hist">${[...D.history].reverse().map(e => `<div class="he"><small>${new Date(e.t).toLocaleString('es-ES')}</small> ${esc(e.s)}</div>`).join('') || '<small>Sin cambios registrados.</small>'}</div><small>Solo lectura. Se conservan las últimas ${HMAX()} entradas.</small>`;
+  if (tab === 'hist') h += `<div class="hist">${D.history.filter(e => isToday(e.t)).reverse().map(e => `<div class="he"><small>${new Date(e.t).toLocaleString('es-ES')}</small> ${esc(e.s)}</div>`).join('') || '<small>Sin cambios hoy.</small>'}</div><small>Solo lectura. Solo muestra los cambios de hoy y no se guarda en el archivo. Creado el ${D.created ? new Date(D.created).toLocaleDateString('es-ES') : '—'}.</small>`;
   $('#dlg').innerHTML = h;
 }
 let bdDown = false;   // clic fuera del cuadro de edición = guardar y salir (un paper nuevo en blanco solo se cierra)
@@ -1415,7 +1420,9 @@ function setView(v) { db.settings.view = v; lastSnap = JSON.stringify(db); dirty
 
 /* ===== Historial de cambios y relaciones ===== */
 const shortTxt = v => { v = String(v ?? '').replace(/\s+/g, ' ').trim(); return !v ? '—' : v.length > 60 ? v.slice(0, 57) + '…' : v; };
-const HMAX = () => db.papers.length > 250 ? 20 : 50;   // con muchos papers el historial se acorta para que el archivo no crezca
+const HMAX = () => 50;   // el historial no se guarda en el JSON: solo vive en memoria durante el día
+const dbJSON = () => JSON.stringify(db, (k, v) => k === 'history' ? undefined : v, 2);   // en el JSON solo queda la fecha de creación (created)
+const isToday = t => new Date(t).toDateString() === new Date().toDateString();
 function logChange(p, ...msgs) {
   const t = new Date().toISOString(); p.history ??= [];
   msgs.filter(Boolean).forEach(s => p.history.push({t, s}));
