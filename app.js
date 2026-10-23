@@ -872,16 +872,18 @@ function setCfg(k, v) { db.settings[k] = v; applySettings(); markDirty(); }
 function openCfg() { drawCfg(); $('#cfg').showModal(); }
 function drawCfg() {
   const c = db.settings;
-  $('#cfg').innerHTML = `<h2>Configuración</h2>
+  $('#cfg').innerHTML = `<div class="dh"><h2>Configuración</h2><div class="dbtn"><button onclick="$('#cfg').close()">Cerrar ✕</button></div></div>
     <label>Nombre de la aplicación<input value="${esc(c.appName)}" maxlength="30" oninput="setCfg('appName', this.value)"></label>
-    <div>Paleta de colores</div><div style="margin:6px 0 10px">${Object.entries(PAL).map(([k, p]) => chip({name: p.n, color: p.c}, c.palette === k, `setCfg('palette','${k}');drawCfg()`)).join('')}${chip({name: 'Personalizada', color: c.custom?.pri || '#888888'}, c.palette === 'custom', 'pickCustom()')}</div>${c.palette === 'custom' && c.custom ? `<div class="cpick">${LAB.map(([k, t]) => `<label class="row"><input type="color" value="${c.custom[k]}" oninput="setCustom('${k}', this.value)"> ${t}</label>`).join('')}<button onclick="resetPal()">Restablecer a Azul</button></div>` : ''}
+    ${cfgSec('pal', 'Paleta de colores', `<div style="margin:6px 0 10px">${Object.entries(PAL).map(([k, p]) => chip({name: p.n, color: p.c}, c.palette === k, `setCfg('palette','${k}');drawCfg()`)).join('')}${chip({name: 'Personalizada', color: c.custom?.pri || '#888888'}, c.palette === 'custom', 'pickCustom()')}</div>${c.palette === 'custom' && c.custom ? `<div class="cpick">${LAB.map(([k, t]) => `<label class="row"><input type="color" value="${c.custom[k]}" oninput="setCustom('${k}', this.value)"> ${t}</label>`).join('')}<button onclick="resetPal()">Restablecer a Azul</button></div>` : ''}`)}
     <label class="row"><input type="checkbox" ${c.showFile ? 'checked' : ''} onchange="setCfg('showFile', this.checked)"> Mostrar el archivo abierto en la cabecera</label>
     <label class="row"><input type="checkbox" ${c.fmtOpen ? 'checked' : ''} onchange="setFmtDefault(this.checked)"> Barra de formato de las notas desplegada por defecto</label>
     <label class="row"><input type="checkbox" ${c.export.inText ? 'checked' : ''} onchange="setInText(this.checked)"> Mostrar la cita en el texto y las notas (Chicago) en la pestaña «Cita» de cada paper</label>
-    ${tplUI()}<div class="sct"><div>Atajos de teclado <small>(clic en una combinación para cambiarla; Retroceso la quita)</small></div>${Object.keys(SC_NAMES).map(a => `<div class="scr"><span>${SC_NAMES[a]}</span><span class="scb"><button class="${recAct === a ? 'rec' : ''}" onclick="recAct='${a}';drawCfg()">${recAct === a ? 'Pulsa una tecla… (Esc cancela)' : esc(c.shortcuts[a]) || 'Sin asignar'}</button>${c.shortcuts[a] ? `<button title="Quitar" onclick="setSC('${a}','')">✕</button>` : ''}</span></div>`).join('')}<button onclick="resetSC()">Restablecer atajos</button></div>
+    ${cfgSec('tpl', 'Plantillas de nota', tplUI())}${cfgSec('sc', 'Atajos de teclado', `<div class="sct"><small>(clic en una combinación para cambiarla; Retroceso la quita)</small>${Object.keys(SC_NAMES).map(a => `<div class="scr"><span>${SC_NAMES[a]}</span><span class="scb"><button class="${recAct === a ? 'rec' : ''}" onclick="recAct='${a}';drawCfg()">${recAct === a ? 'Pulsa una tecla… (Esc cancela)' : esc(c.shortcuts[a]) || 'Sin asignar'}</button>${c.shortcuts[a] ? `<button title="Quitar" onclick="setSC('${a}','')">✕</button>` : ''}</span></div>`).join('')}<button onclick="resetSC()">Restablecer atajos</button></div>`)}
     <small>Estos ajustes se guardan en el mismo archivo JSON.</small>
-    <div class="row" style="margin-top:12px"><button onclick="$('#cfg').close()">Cerrar</button></div>`;
+`;
 }
+const CFG_OPEN = new Set();   // apartados de Configuración desplegados (se conservan al redibujar)
+const cfgSec = (id, title, body) => `<details class="cs" ${CFG_OPEN.has(id) ? 'open' : ''} ontoggle="this.open ? CFG_OPEN.add('${id}') : CFG_OPEN.delete('${id}')"><summary>${title}</summary><div class="csb">${body}</div></details>`;
 
 /* ===== Lista principal ===== */
 const chip = (t, on, click, drag, ctx) => `<span class="chip ${on ? 'on' : ''}" style="--c:${esc(t.color || '#888888')}" ${click ? `onclick="${click}"` : ''} ${drag ? `draggable="true" data-tag="${t.id}"` : ''} ${ctx ? `oncontextmenu="${ctx}"` : ''}>${esc(t.name)}</span>`;
@@ -1266,7 +1268,7 @@ function addNote(tid) { const t = tid && db.settings.templates.find(x => x.id ==
 function addNoteMenu(e) {
   ctxShow(e, '<div class="ctxh">Nueva nota con plantilla</div>' + (db.settings.templates.map(t => `<button onclick="ctxClose();addNote('${t.id}')">${esc(t.name)}</button>`).join('') || '<div class="ctxh">No hay plantillas (créalas en Configuración)</div>'));
 }
-const tplUI = () => `<div class="sct"><div>Plantillas de nota <small>({fecha} y {paper} se sustituyen al insertar)</small></div>${db.settings.templates.map(t => `<div class="tplr"><div class="row" style="flex-wrap:nowrap"><input style="flex:1;min-width:0" value="${esc(t.name)}" oninput="setTpl('${t.id}','name',this.value)"><button title="Borrar" onclick="delTpl('${t.id}')">✕</button></div><textarea rows="3" oninput="setTpl('${t.id}','text',this.value)">${esc(t.text)}</textarea></div>`).join('')}<div class="row"><button onclick="addTpl()">+ Nueva plantilla</button><button onclick="resetTpl()">Restablecer las de serie</button></div></div>`;
+const tplUI = () => `<div class="sct"><small>({fecha} y {paper} se sustituyen al insertar)</small>${db.settings.templates.map(t => `<div class="tplr"><div class="row" style="flex-wrap:nowrap"><input style="flex:1;min-width:0" value="${esc(t.name)}" oninput="setTpl('${t.id}','name',this.value)"><button title="Borrar" onclick="delTpl('${t.id}')">✕</button></div><textarea rows="3" oninput="setTpl('${t.id}','text',this.value)">${esc(t.text)}</textarea></div>`).join('')}<div class="row"><button onclick="addTpl()">+ Nueva plantilla</button><button onclick="resetTpl()">Restablecer las de serie</button></div></div>`;
 function setTpl(id, k, v) { const t = db.settings.templates.find(x => x.id === id); if (t) { t[k] = v; markDirty(); } }
 function addTpl() { db.settings.templates.push({id: uid(), name: 'Nueva plantilla', text: ''}); markDirty(); drawCfg(); }
 function delTpl(id) { if (!confirm('¿Borrar esta plantilla?')) return; db.settings.templates = db.settings.templates.filter(x => x.id !== id); markDirty(); drawCfg(); }
@@ -1557,3 +1559,7 @@ else { $('#auto').disabled = true; $('#auto').parentElement.title = 'El autoguar
 if ('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('sw.js').catch(() => {});   // PWA (no aplica en file://)
 $('#cfg').addEventListener('close', () => { recAct = null; });
 if (location.protocol.startsWith('http')) fetch('ejemplo_papers.json').then(r => r.ok ? r.text() : Promise.reject()).then(t => { if (!dirty && !db.papers.length) loadText(t, 'ejemplo_papers.json'); }).catch(() => {});   // en la web se abre el ejemplo por defecto
+document.addEventListener('scroll', e => {   // la cabecera fija de un diálogo se estrecha al bajar (con histéresis para que no parpadee)
+  const d = e.target, h = d.tagName === 'DIALOG' && d.querySelector(':scope > .dh'); if (!h) return;
+  if (d.scrollTop > 40) h.classList.add('sm'); else if (d.scrollTop < 10) h.classList.remove('sm');
+}, true);

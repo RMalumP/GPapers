@@ -91,3 +91,13 @@ aside{background:color-mix(in srgb,var(--fg) 6%,var(--bg));border:1px solid var(
 .sgh{display:flex;align-items:center;min-width:0}.sgh .sh{width:auto;flex:0 0 auto}.sgh .dot{margin-left:6px}
 .mgb{flex:1 1 0;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;text-align:center;font-size:12px;padding:2px 6px;margin-right:4px}
 aside.min .mgb{display:none}aside.min .sgh .sh{width:100%}
+
+/* F3: cabecera fija de los diálogos (sin hueco por encima) que se estrecha al hacer scroll; apartados plegables de Configuración */
+dialog{padding:0 16px 16px}dialog>:first-child:not(.dh){margin-top:16px}
+dialog>.dh{margin:0 -16px 8px;padding:16px 16px 8px;align-items:center;border-bottom:1px solid transparent;transition:padding .2s,margin .2s,border-color .2s,box-shadow .2s}
+dialog>.dh>*{min-height:34px;display:flex;align-items:center}.dh h2{line-height:1.2;transition:font-size .2s}
+dialog>.dh.sm{padding-top:4px;padding-bottom:4px;margin-bottom:20px;border-color:var(--bd);box-shadow:0 2px 6px #0002}dialog>.dh.sm h2{font-size:15px}
+details.cs{border:1px solid var(--bd);border-radius:8px;margin:10px 0;background:var(--card)}
+details.cs>summary{cursor:pointer;font-size:16px;font-weight:700;padding:9px 12px;list-style:none;display:flex;align-items:center;gap:8px;color:var(--pri)}
+details.cs>summary::-webkit-details-marker{display:none}details.cs>summary::before{content:"▸";transition:transform .15s;display:inline-block}details.cs[open]>summary::before{transform:rotate(90deg)}
+details.cs[open]>summary{border-bottom:1px solid var(--bd)}.csb{padding:6px 12px 10px}.csb .sct{margin-top:4px}
