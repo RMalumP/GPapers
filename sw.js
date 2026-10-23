@@ -1,8 +1,9 @@
-// Service worker: red primero (para ver siempre la última versión) y caché como respaldo sin conexión.
-const V = 'papers-v24', FILES = ['./', 'index.html', 'style.css', 'app.js', 'manifest.json', 'icon-192.png', 'icon-512.png', 'ejemplo_papers.json'];
-self.addEventListener('install', e => { e.waitUntil(caches.open(V).then(c => c.addAll(FILES))); self.skipWaiting(); });
+// Service worker: red primero (revalida siempre, para ver la última versión sin vaciar nada) y caché como respaldo sin conexión.
+// Solo toca sus cachés: los datos de la aplicación (copia de sesión, estado de la interfaz) viven en IndexedDB y sobreviven a las actualizaciones.
+const V = 'papers-v25', FILES = ['./', 'index.html', 'style.css', 'app.js', 'manifest.json', 'icon-192.png', 'icon-512.png', 'ejemplo_papers.json'];
+self.addEventListener('install', e => { e.waitUntil(caches.open(V).then(c => c.addAll(FILES.map(f => new Request(f, {cache: 'reload'}))))); self.skipWaiting(); });
 self.addEventListener('activate', e => e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== V).map(k => caches.delete(k)))).then(() => clients.claim())));
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
-  e.respondWith(fetch(e.request).then(r => { const c = r.clone(); caches.open(V).then(ca => ca.put(e.request, c)); return r; }).catch(() => caches.match(e.request)));
+  e.respondWith(fetch(e.request, {cache: 'no-cache'}).then(r => { const c = r.clone(); caches.open(V).then(ca => ca.put(e.request, c)); return r; }).catch(() => caches.match(e.request)));
 });

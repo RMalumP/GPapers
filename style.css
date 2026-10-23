@@ -147,3 +147,7 @@ aside{border-left:0;border-radius:0 10px 10px 0;padding-left:6px}
 #help{width:min(860px,96vw)}#hpq{width:100%;margin:6px 0 4px}.hp h4{margin:14px 0 4px}.hp p,.hp ul,.hp ol{margin:6px 0}.hp li{margin:3px 0}.hp code,kbd{background:var(--bg);border:1px solid var(--bd);border-radius:4px;padding:0 4px;font-size:.9em}
 .hpt{border-collapse:collapse;width:100%;margin:6px 0}.hpt th,.hpt td{border-top:1px solid var(--bd);padding:4px 8px;text-align:left;vertical-align:top;font-weight:400}.hpt th{white-space:nowrap;width:1%}
 #hpb>details{scroll-margin-top:64px}
+
+/* F13: aviso (toast) */
+#toast{position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:100;display:flex;align-items:center;gap:10px;max-width:min(92vw,640px);background:var(--fg);color:var(--bg);padding:10px 14px;border-radius:10px;box-shadow:0 4px 16px #0005}
+#toast[hidden]{display:none}#toast button{background:var(--bg);color:var(--fg);border-color:transparent}

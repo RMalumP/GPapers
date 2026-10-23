@@ -716,9 +716,9 @@ function validate(d) {
 }
 const pickFile = (acc = '.json') => new Promise(res => { const i = document.createElement('input'); i.type = 'file'; i.accept = acc;
   i.onchange = () => i.files[0] ? i.files[0].text().then(text => res({path: i.files[0].name, text})) : res(null); i.click(); });
-async function loadText(text, name) {
-  try { db = validate(JSON.parse(text)); path = name; dirty = false; F.tags.clear(); F.sec = ''; SEL.clear(); UNDO.length = 0; REDO.length = 0; lastSnap = JSON.stringify(db); fmtPinned = db.settings.fmtOpen; applySettings(); render(); return true; }
-  catch (e) { alert('Archivo no válido (se mantienen los datos actuales): ' + e.message); return false; }
+async function loadText(text, name, quiet) {
+  try { db = validate(JSON.parse(text)); path = name; dirty = false; F.tags.clear(); F.sec = ''; SEL.clear(); UNDO.length = 0; REDO.length = 0; lastSnap = JSON.stringify(db); fmtPinned = db.settings.fmtOpen; applySettings(); render(); sessionSoon(); return true; }
+  catch (e) { if (!quiet) alert('Archivo no válido (se mantienen los datos actuales): ' + e.message); return false; }
 }
 async function doOpen() {
   if (dirty && !confirm('Hay cambios sin guardar. ¿Descartarlos y abrir otro archivo?')) return;
@@ -740,10 +740,11 @@ function download(text, name, type) { const a = document.createElement('a'); a.h
 async function save(asNew) {
   const text = dbJSON();
   try {
+    if (FSA && handle && !asNew && handle.queryPermission && await handle.queryPermission({mode: 'readwrite'}) !== 'granted' && await handle.requestPermission({mode: 'readwrite'}) !== 'granted') handle = null;   // enlace recuperado de la sesión anterior: pide permiso o elige archivo
     if (FSA) { if (!handle || asNew) { handle = await showSaveFilePicker({suggestedName: path || 'papers.json', types: JSON_T}); rememberHandle(); path = handle.name; }
       await writeTo(handle, text); }
     else { path = path || 'papers.json'; download(text, path, 'application/json'); }
-    dirty = false; hdr();
+    dirty = false; hdr(); sessionSoon();
   } catch (e) { if (e.name !== 'AbortError') alert('Error al guardar: ' + e.message); }
 }
 async function setAuto(c) {
@@ -759,7 +760,7 @@ function record() {   // antes de cada cambio guarda el estado anterior; los cam
   if (!(Date.now() - lastRecAt < 1500 && UNDO.length)) { UNDO.push(lastSnap); if (UNDO.length > MAXU) UNDO.shift(); }
   lastRecAt = Date.now(); REDO.length = 0; lastSnap = cur;
 }
-function touch() { hdr(); clearTimeout(timer); if (auto && handle) timer = setTimeout(() => save(false), 1000); }
+function touch() { hdr(); sessionSoon(); clearTimeout(timer); if (auto && handle) timer = setTimeout(() => save(false), 1000); }
 function markDirty() { record(); dirty = true; touch(); }
 function undo() { if (UNDO.length) { REDO.push(JSON.stringify(db)); restore(UNDO.pop()); } }
 function redo() { if (REDO.length) { UNDO.push(JSON.stringify(db)); restore(REDO.pop()); } }
@@ -1220,7 +1221,7 @@ function cuModIns(m) {
 }
 /* ===== Ayuda: botón ❓ de la cabecera (o F1) ===== */
 const HELP_OPEN = new Set(['inicio']);
-const helpSec = (id, title, body) => `<details class="cs" id="hp_${id}" ${HELP_OPEN.has(id) ? 'open' : ''} ontoggle="this.open ? HELP_OPEN.add('${id}') : HELP_OPEN.delete('${id}')"><summary>${title}</summary><div class="csb hp">${body}</div></details>`;
+const helpSec = (id, title, body) => `<details class="cs" id="hp_${id}" ${HELP_OPEN.has(id) ? 'open' : ''} ontoggle="this.open ? HELP_OPEN.add('${id}') : HELP_OPEN.delete('${id}');uiSoon()"><summary>${title}</summary><div class="csb hp">${body}</div></details>`;
 const helpTbl = rows => `<table class="hpt">${rows.map(r => `<tr>${r.map((c, i) => i ? `<td>${c}</td>` : `<th>${c}</th>`).join('')}</tr>`).join('')}</table>`;
 function helpHTML() {
   const sc = db.settings.shortcuts, kb = a => `<kbd>${esc(sc[a] || 'sin asignar')}</kbd>`;
@@ -1292,6 +1293,12 @@ function helpHTML() {
       <h4>Cita en el texto</h4><p>Una plantilla opcional para la cita corta, con <code>{authorsShort}</code>, <code>{year}</code> y <code>{loc}</code> (la página citada). Se ve en la pestaña Cita si activas la cita en el texto en Configuración.</p>
       <h4>Vista previa</h4><p>Se actualiza al escribir. Elige «Un ejemplo» (con la opción «Ver el ejemplo en todos los tipos») o uno de tus papers para comprobar cómo queda.</p>
       <h4>Ejemplo</h4><p><code>[{authors}. ]({year|s.f.}). {title:i}. [{edition}. ][{place}: ]{venue}. [{link}]</code><br>→ «Pérez, J. C. (2021). <i>Título del libro</i>. 2.ª ed. Madrid: Editorial. https://…»</p>`],
+    pwa: ['Aplicación instalada (PWA), sesión y actualizaciones', `<p>Puedes instalar la aplicación desde el navegador (icono de instalar en la barra de direcciones o «Instalar aplicación» en el menú). Funciona sin conexión.</p>
+      <ul><li><b>Datos de la aplicación</b>: además de tu JSON, la aplicación guarda en el almacenamiento del navegador una <b>copia de la sesión</b> (tus datos tal como los tienes ahora, aunque no hayas guardado) y el <b>estado de la interfaz</b> (filtros, orden, barra lateral plegada, bloques abiertos). Al volver a abrirla sigues donde lo dejaste; si había cambios sin guardar, un aviso te lo recuerda.</li>
+      <li><b>Tu archivo JSON sigue siendo el original</b>: la copia de sesión no lo sustituye. Guarda (${kb('save')}) para escribir en el archivo; si la aplicación recuerda el archivo, te pedirá permiso para escribir en él.</li>
+      <li><b>Actualizaciones</b>: la aplicación busca versiones nuevas sola (al abrirla, al volver a ella y cada media hora). Cuando hay una, aparece un aviso «Hay una versión nueva» con el botón <b>Recargar ahora</b>; antes de recargar guarda la copia de sesión. <b>No hace falta borrar los datos de la aplicación</b>: se guardan aparte de lo que se actualiza.</li>
+      <li>Versión instalada: <b>v${APP_V}</b>. <button onclick="checkUpdate()">Buscar actualizaciones</button> <button class="danger" onclick="forgetAppData()" title="No toca tu archivo JSON">Olvidar la copia de sesión</button></li>
+      <li>El navegador puede borrar los datos de los sitios si se queda sin espacio; la aplicación pide almacenamiento persistente para evitarlo, pero tu <b>JSON</b> sigue siendo la copia que debes conservar.</li></ul>`],
     atajos: ['Atajos de teclado', helpTbl(Object.keys(SC_NAMES).map(a => [esc(SC_NAMES[a]), kb(a)]).concat([['Esta ayuda', '<kbd>F1</kbd>'], ['Cerrar menús y ventanas', '<kbd>Esc</kbd>']])) + '<p>Se cambian en Configuración → Atajos de teclado. Dentro de campos de texto solo funciona «Guardar»; negrita y cursiva actúan dentro de una nota.</p>'],
     datos: ['Datos, privacidad y consejos', `<ul><li>Todo se queda en tu navegador y en tu archivo JSON. La aplicación solo sale a internet para <b>buscar un DOI en CrossRef</b> y para mostrar <b>imágenes por URL</b>.</li>
       <li>Funciona sin conexión una vez cargada (se puede instalar como aplicación). Las imágenes por URL y la búsqueda de DOI necesitan internet.</li>
@@ -1354,7 +1361,7 @@ function typeChange(v) {   // desplegable «Tipo» del paper; la última opción
 }
 $('#cfg').addEventListener('close', () => { if ($('#dlg').open) drawD(); });   // al volver del editor de tipos, el formulario se pone al día
 const CFG_OPEN = new Set();   // apartados de Configuración desplegados (se conservan al redibujar)
-const cfgSec = (id, title, body) => `<details class="cs" ${CFG_OPEN.has(id) ? 'open' : ''} ontoggle="this.open ? CFG_OPEN.add('${id}') : CFG_OPEN.delete('${id}')"><summary>${title}</summary><div class="csb">${body}</div></details>`;
+const cfgSec = (id, title, body) => `<details class="cs" ${CFG_OPEN.has(id) ? 'open' : ''} ontoggle="this.open ? CFG_OPEN.add('${id}') : CFG_OPEN.delete('${id}');uiSoon()"><summary>${title}</summary><div class="csb">${body}</div></details>`;
 
 /* ===== Lista principal ===== */
 const chip = (t, on, click, drag, ctx) => `<span class="chip ${on ? 'on' : ''}" style="--c:${esc(t.color || '#888888')}" ${click ? `onclick="${click}"` : ''} ${drag ? `draggable="true" data-tag="${t.id}"` : ''} ${ctx ? `oncontextmenu="${ctx}"` : ''}>${esc(t.name)}</span>`;
@@ -1493,7 +1500,7 @@ function render() {
     + `<button onclick="F.sorts.push({k:'${nextKey}',d:1});render()">+ Añadir criterio</button>`;
   const L = visible();
   $('#list').innerHTML = listHTML(L) || '<p class="empty">No hay papers que mostrar. Crea uno con «Nuevo paper» o ajusta los filtros.</p>';
-  fitTags(); hydrateImgs();
+  fitTags(); hydrateImgs(); uiSoon();
   $('#count').textContent = `${L.length} de ${db.papers.length} papers · ${SEL.size} seleccionados`;
 }
 function toggleF(id) { F.tags.has(id) ? F.tags.delete(id) : F.tags.add(id); render(); }
@@ -1513,11 +1520,11 @@ document.addEventListener('click', e => { if (!e.target.closest('#ctx')) ctxClos
 document.addEventListener('keydown', e => { if (e.key === 'Escape') ctxClose(); });
 document.addEventListener('contextmenu', e => { if (!e.target.closest('[oncontextmenu]')) ctxClose(); });   // clic derecho en otro sitio también cierra
 function setSecF(id) { F.sec = id && F.sec === id ? '' : id; render(); }   // '' = Todas; pulsar la sección activa también vuelve a «Todas»
-function sbToggle() { $('#side').classList.toggle('min'); }
+function sbToggle() { $('#side').classList.toggle('min'); uiSoon(); }
 function sbGroup(g) {   // con la barra plegada, pulsar un icono la despliega en ese grupo
   const a = $('#side'), el = $('#sg-' + g), wasMin = a.classList.contains('min');
   a.classList.remove('min'); wasMin ? el.classList.remove('fold') : el.classList.toggle('fold');
-  if (g === 'search' && !el.classList.contains('fold')) $('#q').focus();
+  if (g === 'search' && !el.classList.contains('fold')) $('#q').focus(); uiSoon();
 }
 function cycleRead(id) { const p = db.papers.find(x => x.id === id); if (!p) return; const k = Object.keys(READ); const was = p.reading; p.reading = k[(k.indexOf(p.reading) + 1) % k.length]; logChange(p, `Lectura: ${READ[was]} → ${READ[p.reading]}`); markDirty(); render(); }
 function setRead(k) { F.read = k; render(); }
@@ -1711,7 +1718,7 @@ function pubSync() {   // fecha de publicación → rellena «Año» si está va
 function drawD() {
   if (!TYPES[D.type]) D.type = 'articulo';
   const T = {all: 'Ver todo', data: 'Datos', cite: 'Cita', notes: 'Notas', cls: 'Secciones, etiquetas y relacionados', hist: 'Historial'};
-  const blk = (id, t, body, always) => tab === 'all' || tab === 'cls' ? `<details class="cs" ${ALL_FOLD.has(id) ? '' : 'open'} ontoggle="this.open ? ALL_FOLD.delete('${id}') : ALL_FOLD.add('${id}')"><summary>${t}</summary><div class="csb">${body}</div></details>`   // en «Ver todo» cada bloque lleva su título y se pliega
+  const blk = (id, t, body, always) => tab === 'all' || tab === 'cls' ? `<details class="cs" ${ALL_FOLD.has(id) ? '' : 'open'} ontoggle="this.open ? ALL_FOLD.delete('${id}') : ALL_FOLD.add('${id}');uiSoon()"><summary>${t}</summary><div class="csb">${body}</div></details>`   // en «Ver todo» cada bloque lleva su título y se pliega
     : (always ? `<h2 class="grp">${t}</h2>` : '') + body;
   let h = `<div class="dh"><h2>${esc(D.alias || D.title) || 'Nuevo paper'}</h2><div class="dbtn"><button class="pri" onclick="commit()">Guardar paper</button><button onclick="$('#dlg').close()">Cancelar</button></div></div><div class="tabs">${Object.entries(T).map(([k, v]) => `<button class="${tab === k ? 'on' : ''}" onclick="tab='${k}';drawD()">${v}</button>`).join('')}</div>`;
   if (tab === 'data' || tab === 'all') h += blk('data', 'Datos', `<div class="grid"><div class="w titlerow"><div class="pimgbox">${pimgHTML(D, 'big', `role="button" tabindex="0" onclick="imgOpen()" title="Imagen del paper (opcional): pulsa para poner una URL o un archivo, o pega una imagen copiada con Ctrl+V"`)}</div><div class="titlecol">${inp('title', 'Título *')}${inp('alias', 'Título personalizado (opcional; solo para mostrar, la cita usa el título original)')}</div></div>
@@ -2209,14 +2216,72 @@ function delM(id) {
   else { db.papers.forEach(p => { p.notes = p.notes.filter(n => n.sectionId !== id); p.sectionIds = p.sectionIds.filter(x => x !== id); }); if (F.sec === id) F.sec = ''; }
   markDirty(); drawMg();
 }
+/* ===== Datos de la aplicación (PWA): copia de la sesión y estado de la interfaz, en IndexedDB =====
+   Aparte del JSON, la app guarda (1) una copia de trabajo, para reabrir justo donde lo dejaste aunque no hayas guardado, y
+   (2) el estado de la interfaz (filtros, orden, barra lateral, bloques plegados). Viven fuera de la caché de la aplicación,
+   así que las actualizaciones no los tocan y no hace falta borrar datos para recibir una versión nueva. */
+const APP_V = '25';   // debe coincidir con la versión de sw.js
+let BOOTED = false, RELOADING = false, SWREG = null, tSes = 0, tUi = 0, lastUi = '';
+const sessionNow = () => { clearTimeout(tSes); if (!BOOTED) return Promise.resolve();
+  return idb('readwrite', st => st.put({v: 1, path, dirty, at: new Date().toISOString(), json: dbJSON()}, 'session')).catch(() => {}); };
+const sessionSoon = () => { clearTimeout(tSes); tSes = setTimeout(sessionNow, 700); };
+const uiState = () => ({v: 1, F: {sorts: F.sorts, group: F.group, sec: F.sec, tags: [...F.tags], read: F.read, minRating: F.minRating, inNotes: F.inNotes, mode: F.mode, tbSec: F.tbSec, tbTag: F.tbTag},
+  side: {min: $('#side').classList.contains('min'), fold: [...document.querySelectorAll('#side .sg.fold')].map(e => e.id)}, cite: CITE_SEL, allFold: [...ALL_FOLD], cfg: [...CFG_OPEN], help: [...HELP_OPEN]});
+const uiNow = () => { clearTimeout(tUi); if (!BOOTED) return Promise.resolve(); const s = JSON.stringify(uiState()); if (s === lastUi) return Promise.resolve(); lastUi = s; return idb('readwrite', st => st.put(JSON.parse(s), 'ui')).catch(() => {}); };
+const uiSoon = () => { clearTimeout(tUi); tUi = setTimeout(uiNow, 500); };
+function applyUI(u) {   // lo guardado nunca se fía: cada dato se valida contra el estado actual (un paper o etiqueta borrados no rompen nada)
+  if (!u || u.v !== 1) return; const f = u.F || {}, strs = a => (Array.isArray(a) ? a : []).filter(x => typeof x === 'string' && x.length < 40).slice(0, 40);
+  const so = (Array.isArray(f.sorts) ? f.sorts : []).filter(x => x && Object.hasOwn(SORTS, x.k) && (x.d === 1 || x.d === -1)).slice(0, 3); if (so.length) F.sorts = so.map(x => ({k: x.k, d: x.d}));
+  F.group = !!f.group; F.sec = db.sections.some(s => s.id === f.sec) ? f.sec : ''; F.tags = new Set(strs(f.tags).filter(id => db.tags.some(t => t.id === id)));
+  F.read = Object.hasOwn(READ, f.read) ? f.read : ''; F.minRating = Number.isInteger(f.minRating) && f.minRating >= 0 && f.minRating <= 5 ? f.minRating : 0; F.inNotes = !!f.inNotes; F.mode = f.mode === 'all' ? 'all' : 'any'; F.tbSec = !!f.tbSec; F.tbTag = f.tbTag !== false;
+  const sd = u.side || {}; $('#side').classList.toggle('min', !!sd.min); document.querySelectorAll('#side .sg').forEach(e => e.classList.toggle('fold', strs(sd.fold).includes(e.id)));
+  CITE_SEL = typeof u.cite === 'string' && STYLES[u.cite] ? u.cite : ''; strs(u.allFold).forEach(x => ALL_FOLD.add(x)); strs(u.cfg).forEach(x => CFG_OPEN.add(x)); strs(u.help).forEach(x => HELP_OPEN.add(x));
+  $('#grpChk').checked = F.group; render();
+}
+function toast(msg, acts = [], ms = 8000) {
+  let t = $('#toast'); if (!t) { t = document.createElement('div'); t.id = 'toast'; t.setAttribute('role', 'status'); document.body.appendChild(t); }
+  t.innerHTML = `<span>${esc(msg)}</span>${acts.map((a, i) => `<button data-i="${i}">${esc(a.t)}</button>`).join('')}<button data-x aria-label="Cerrar">✕</button>`; t.hidden = false; clearTimeout(t.tm);
+  t.onclick = e => { const b = e.target.closest('button'); if (!b) return; if (b.dataset.x != null) t.hidden = true; else acts[+b.dataset.i].fn(); };
+  if (ms) t.tm = setTimeout(() => t.hidden = true, ms);
+}
+async function forgetAppData() {
+  if (!confirm('Se borrará la copia de sesión y el estado de la interfaz guardados por la aplicación (tu archivo JSON no se toca). ¿Continuar?')) return;
+  BOOTED = false; clearTimeout(tSes); clearTimeout(tUi); await idb('readwrite', st => { st.delete('session'); return st.delete('ui'); }).catch(() => {}); BOOTED = true; lastUi = '';
+  toast('Datos de sesión borrados. La próxima vez la aplicación arrancará limpia.');
+}
+const reloadApp = async () => { RELOADING = true; await sessionNow(); await uiNow(); location.reload(); };
+function checkUpdate() {
+  if (!SWREG) return toast('Las actualizaciones solo funcionan con la aplicación instalada o abierta desde la web (no desde un archivo local).');
+  SWREG.update().then(() => toast('Buscando versión nueva… si la hay, aparecerá un aviso para recargar.', [], 4000)).catch(() => toast('No se pudo comprobar (¿sin conexión?).'));
+}
+async function bootApp() {
+  navigator.storage?.persist?.().catch(() => {});   // pide que el navegador no borre estos datos por falta de espacio
+  let ses = null, ui = null; try { ses = await idb('readonly', st => st.get('session')); ui = await idb('readonly', st => st.get('ui')); } catch (e) {}
+  let restored = false;
+  if (ses && ses.v === 1 && typeof ses.json === 'string' && await loadText(ses.json, typeof ses.path === 'string' ? ses.path : null, true)) {
+    restored = true; dirty = !!ses.dirty; hdr();
+    try { const h = FSA && await idb('readonly', st => st.get('last')); if (h && ses.path && h.name === ses.path) handle = h; } catch (e) {}
+    toast(dirty ? `Sesión recuperada con cambios sin guardar${ses.path ? ' de «' + ses.path + '»' : ''}. Guarda para no perderlos.` : `Sesión recuperada${ses.path ? ': «' + ses.path + '»' : ''}.`, [], 6000);
+  } else if (location.protocol.startsWith('http')) {
+    try { const r = await fetch('ejemplo_papers.json'); if (r.ok && !dirty && !db.papers.length) await loadText(await r.text(), 'ejemplo_papers.json', true); } catch (e) {}   // la primera vez se abre el ejemplo
+  }
+  applyUI(ui); BOOTED = true; lastUi = JSON.stringify(uiState()); if (restored) uiNow();
+}
+document.addEventListener('visibilitychange', () => { if (document.hidden) { sessionNow(); uiNow(); } });
+addEventListener('pagehide', () => { sessionNow(); uiNow(); });
+if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {   // PWA (no aplica en file://); se comprueba si hay versión nueva al volver a la aplicación y cada media hora
+  const had = !!navigator.serviceWorker.controller;
+  navigator.serviceWorker.register('sw.js', {updateViaCache: 'none'}).then(reg => { SWREG = reg; setInterval(() => reg.update().catch(() => {}), 30 * 60 * 1000);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) reg.update().catch(() => {}); }); }).catch(() => {});
+  navigator.serviceWorker.addEventListener('controllerchange', () => { if (had && !RELOADING) toast('Hay una versión nueva de la aplicación.', [{t: 'Recargar ahora', fn: reloadApp}], 0); });
+}
+bootApp();
 render();
 lastSnap = JSON.stringify(db);
 applySettings();
 if (FSA) idb('readonly', st => st.get('last')).then(h => $('#reopen').hidden = !h).catch(() => {});
 else { $('#auto').disabled = true; $('#auto').parentElement.title = 'El autoguardado solo está disponible en Chrome o Edge de escritorio'; }
-if ('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('sw.js').catch(() => {});   // PWA (no aplica en file://)
 $('#cfg').addEventListener('close', () => { recAct = null; });
-if (location.protocol.startsWith('http')) fetch('ejemplo_papers.json').then(r => r.ok ? r.text() : Promise.reject()).then(t => { if (!dirty && !db.papers.length) loadText(t, 'ejemplo_papers.json'); }).catch(() => {});   // en la web se abre el ejemplo por defecto
 document.addEventListener('scroll', e => {   // la cabecera fija de un diálogo se estrecha al bajar (con histéresis para que no parpadee)
   const d = e.target, h = d.tagName === 'DIALOG' && d.querySelector(':scope > .dh'); if (!h) return;
   if (d.scrollTop > 40) h.classList.add('sm'); else if (d.scrollTop < 10) h.classList.remove('sm');
