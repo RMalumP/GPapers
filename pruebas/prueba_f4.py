@@ -12,7 +12,7 @@ with sync_playwright() as pw:
     b = pw.chromium.launch(); ctx = b.new_context(permissions=['clipboard-read', 'clipboard-write']); pg = ctx.new_page(); errs = []
     pg.on('pageerror', lambda e: errs.append(str(e))); pg.on('console', lambda m: errs.append(m.text) if m.type == 'error' else None); pg.on('dialog', lambda d: d.dismiss())
     pg.goto('file://' + str(folder / 'index.html')); pg.wait_for_timeout(300)
-    pg.evaluate("""() => { db.papers.length = 0; db.papers.push(NEWF({id:'p1', title:'Inside the Presidential Debates: Their Improbable Past', authors:['Minow, Newton N.', 'LaMay, Craig L.'], year:2008, venue:'University of Chicago Press', place:'Chicago', type:'libro', doi:'', url:'', accessed:'', general:'', tagIds:[], notes:[], cites:{}, related:[], refTo:[], history:[], reading:'por_leer', rating:0, sectionIds:[]})); UNDO.length = 0; REDO.length = 0; lastSnap = JSON.stringify(db); render(); openPaper('p1'); tab = 'cite'; drawD(); }""")
+    pg.evaluate("""() => { db.papers.length = 0; db.papers.push(NEWF({id:'p1', title:'Inside the Presidential Debates: Their Improbable Past', authors:['Minow, Newton N.', 'LaMay, Craig L.'], year:2008, venue:'University of Chicago Press', place:'Chicago', type:'libro', doi:'', url:'', accessed:'', general:'', tagIds:[], notes:[], cites:{}, related:[], refTo:[], history:[], reading:'por_leer', rating:0, sectionIds:[]})); UNDO.length = 0; REDO.length = 0; lastSnap = JSON.stringify(db); render(); openPaper('p1'); tab = 'cls'; drawD(); }""")
     eq('por defecto el ajuste está desactivado', pg.evaluate("ex().inText"), False)
     eq('desactivado: no hay cita en el texto ni campo de página', (pg.locator('.itx').count(), pg.locator('#locIn').count()), (0, 0))
     eq('JSON antiguo: el ajuste se rellena a false', pg.evaluate("(d => { validate(d); return d.settings.export.inText })({papers: [], tags: [], sections: []})"), False)
@@ -20,7 +20,7 @@ with sync_playwright() as pw:
     eq('Configuración ofrece el ajuste', 'Mostrar la cita en el texto' in pg.inner_text('#cfg'), True)
     pg.locator('#cfg input[onchange^="setInText"]').check()
     eq('activar guarda el ajuste', (pg.evaluate("ex().inText"), pg.evaluate("JSON.parse(JSON.stringify(db)).settings.export.inText")), (True, True))
-    pg.evaluate("$('#cfg').close(); openPaper('p1'); tab = 'cite'; drawD()")
+    pg.evaluate("$('#cfg').close(); openPaper('p1'); tab = 'cls'; drawD()")
     eq('activado: una zona por estilo y el campo de página', (pg.locator('.itx').count(), pg.locator('#locIn').count()), (10, 1))
     t = lambda k: pg.inner_text('#it_' + k)
     eq('APA: paréntesis y narrativa', ('(Minow y LaMay, 2008)' in t('apa'), 'Minow y LaMay (2008)' in t('apa')), (True, True))
@@ -45,7 +45,7 @@ with sync_playwright() as pw:
     eq('en inglés: & entre paréntesis y «and» en narrativa', ('(Minow & LaMay, 2008)' in t('apa'), 'Minow and LaMay (2008)' in t('apa')), (True, True))
     pg.evaluate("ex().lang = 'es'; drawD()")
     # desactivar la oculta de nuevo
-    pg.evaluate("$('#dlg').close(); setInText(false); openPaper('p1'); tab = 'cite'; drawD()")
+    pg.evaluate("$('#dlg').close(); setInText(false); openPaper('p1'); tab = 'cls'; drawD()")
     eq('desactivar vuelve a ocultarla', (pg.locator('.itx').count(), pg.locator('#locIn').count()), (0, 0))
     # el ajuste no cambia la exportación de referencias
     a = pg.evaluate("(() => { const L = db.papers, o = ex(); o.style = 'apa'; o.fmt = 'txt'; return exText(L, o); })()")

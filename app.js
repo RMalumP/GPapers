@@ -1168,10 +1168,11 @@ function pubSync() {   // fecha de publicación → rellena «Año» si está va
   if (okDate(D.pubDate) && !D.year) { D.year = +D.pubDate.slice(0, 4); const y = $('#dlg input[data-k="year"]'); if (y) y.value = D.year; }
   const w = $('#pdWarn'); if (w) w.textContent = pdWarn(); }
 function drawD() {
-  const T = {all: 'Ver todo', data: 'Datos', secs: 'Secciones', cite: 'Cita', notes: 'Notas', tags: 'Etiquetas', rel: 'Relacionados', hist: 'Historial'};
-  const hd = t => tab === 'all' ? `<h2 class="grp">${t}</h2>` : '';   // en «Ver todo» cada bloque lleva su título
+  const T = {all: 'Ver todo', data: 'Datos', notes: 'Notas', cls: 'Secciones, cita y etiquetas', rel: 'Relacionados', hist: 'Historial'};
+  const blk = (id, t, body, always) => tab === 'all' ? `<details class="cs" ${ALL_FOLD.has(id) ? '' : 'open'} ontoggle="this.open ? ALL_FOLD.delete('${id}') : ALL_FOLD.add('${id}')"><summary>${t}</summary><div class="csb">${body}</div></details>`   // en «Ver todo» cada bloque lleva su título y se pliega
+    : (always ? `<h2 class="grp">${t}</h2>` : '') + body;
   let h = `<div class="dh"><h2>${esc(D.alias || D.title) || 'Nuevo paper'}</h2><div class="dbtn"><button class="pri" onclick="commit()">Guardar paper</button><button onclick="$('#dlg').close()">Cancelar</button></div></div><div class="tabs">${Object.entries(T).map(([k, v]) => `<button class="${tab === k ? 'on' : ''}" onclick="tab='${k}';drawD()">${v}</button>`).join('')}</div>`;
-  if (tab === 'data' || tab === 'all') h += hd('Datos') + `<div class="grid">${inp('title', 'Título *', 'text', 'w')}${inp('alias', 'Título personalizado (opcional; solo para mostrar, la cita usa el título original)', 'text', 'w')}
+  if (tab === 'data' || tab === 'all') h += blk('data', 'Datos', `<div class="grid">${inp('title', 'Título *', 'text', 'w')}${inp('alias', 'Título personalizado (opcional; solo para mostrar, la cita usa el título original)', 'text', 'w')}
     <label class="w">Autores (uno por línea: «Apellido, Nombre»)<textarea oninput="D.authors=this.value.split('\\n').map(s=>s.trim()).filter(Boolean)">${esc(D.authors.join('\n'))}</textarea></label>
     ${inp('sortKey', 'Clave de orden en la bibliografía (opcional): p. ej. «Torre» para «de la Torre, Ana»', 'text', 'w')}<label>Año<input type="number" data-k="year" value="${esc(D.year)}" oninput="D.year=this.value;pubSync()"></label><label>Tipo<select onchange="D.type=this.value;drawD()">${Object.entries(TYPES).map(([k, v]) => `<option value="${k}" ${D.type === k ? 'selected' : ''}>${v}</option>`).join('')}</select></label>
     ${inp('url', 'URL', 'url', 'w')}${inp('venue', lbl('venue', 'Revista / editorial / sitio'))}<label>DOI (sin https://doi.org/)<span class="row" style="flex-wrap:nowrap"><input style="flex:1;min-width:0" value="${esc(D.doi)}" oninput="D.doi=this.value"><button onclick="doiFill()" title="Rellenar con los datos de CrossRef">Buscar</button></span></label>${inp('accessed', 'Fecha de consulta', 'date')}
@@ -1188,24 +1189,30 @@ function drawD() {
     ${shows('thesisType', D.type) ? `<label>Tipo de trabajo<select onchange="D.thesisType=this.value"><option value="">(sin especificar)</option>${THESIS.map(v => `<option ${D.thesisType === v ? 'selected' : ''}>${v}</option>`).join('')}</select></label>` : ''}
     <div class="w"><small>Lectura</small><div class="seg">${Object.entries(READ).map(([k, v]) => `<button class="${D.reading === k ? 'on' : ''}" onclick="D.reading='${k}';drawD()">${v}</button>`).join('')}</div></div>
     <div class="w"><small>Valoración</small><div class="stars">${[1, 2, 3, 4, 5].map(n => `<button class="${D.rating >= n ? 'on' : ''}" aria-label="Valorar con ${n} de 5" onclick="D.rating=D.rating===${n}?0:${n};drawD()">★</button>`).join('')}</div></div>
-    <label class="w">Notas generales<textarea oninput="D.general=this.value">${esc(D.general)}</textarea></label></div>`;
-  if (tab === 'secs' || tab === 'all') h += hd('Secciones') + (db.sections.map(s => chip(s, D.sectionIds.includes(s.id), `toggleS('${s.id}')`)).join('') || '<p class="empty">No hay secciones. Créalas con «Gestionar secciones».</p>');
-  if (tab === 'cite' || tab === 'all') h += hd('Cita') + `<small>Cursiva: *texto*. Un asterisco literal se escribe \\*. El idioma y el formato de fecha se eligen en «Exportar».</small>${ex().inText ? `<label>Página o parte citada (opcional, para la cita en el texto y las notas)<input id="locIn" value="${esc(CLOC)}" placeholder="p. ej. 87 o 87-90" oninput="CLOC=this.value;drawIT()"></label>` : ''}` + Object.entries(STYLES).map(([k, s]) => `<h3>${s.name}${D.cites[k] != null ? ' (editada a mano)' : ''}</h3>${typeWarn(k, D.type) ? `<small>⚠ ${esc(typeWarn(k, D.type))}</small>` : ''}
-    <textarea id="c_${k}" oninput="D.cites['${k}']=this.value">${esc(D.cites[k] ?? s.fn(D))}</textarea>
-    <div class="row"><button onclick="copyC('${k}',0,this)">Copiar</button><button onclick="copyC('${k}',1,this)" title="Con cursiva, para pegar en Word o Docs">Copiar con formato</button><button onclick="delete D.cites['${k}'];drawD()">Regenerar desde los datos</button></div>${ex().inText ? `<div class="itx" id="it_${k}">${itHtml(k)}</div>` : ''}`).join('');
-  if (tab === 'notes' || tab === 'all') h += hd('Notas por sección') + (db.sections.length ? '' : '<p class="empty">Crea primero una sección con «Gestionar secciones».</p>') +
+    </div>`);
+  if (tab === 'notes' || tab === 'all') h += blk('gen', 'Notas generales', `<label class="w"><textarea oninput="D.general=this.value">${esc(D.general)}</textarea></label>`, true);
+  
+  if (tab === 'notes' || tab === 'all') h += blk('notes', 'Notas por sección', (db.sections.length ? '' : '<p class="empty">Crea primero una sección con «Gestionar secciones».</p>') +
     D.notes.map((n, i) => `<div class="card"><div class="row"><select onchange="D.notes[${i}].sectionId=this.value;drawD()">${db.sections.map(s => `<option value="${s.id}" ${n.sectionId === s.id ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}</select>
       <button class="danger" onclick="D.notes.splice(${i},1);drawD()">Quitar</button></div><div class="fmtw ${fmtPinned || FMT_OPEN.has(n.id) ? 'open' : ''}" id="fb${i}" data-id="${n.id}"><button class="fmth" title="Mostrar u ocultar la barra de formato" onclick="toggleFmt(${i})">Aa</button><div class="fmtc"><div class="fmt"><button title="Negrita (${db.settings.shortcuts.bold})" onclick="fmtWrap(${i},'**')"><b>N</b></button><button title="Cursiva (${db.settings.shortcuts.italic})" onclick="fmtWrap(${i},'*')"><i>K</i></button><button title="Lista con viñetas" onclick="fmtList(${i},'- ')">•</button><button title="Lista numerada" onclick="fmtList(${i},'1. ')">1.</button><button onclick="tplMenu(event,${i})">Plantilla ▾</button><button title="Insertar enlace a un paper o a una nota" onclick="lkOpen(${i})">🔗</button><button class="${PREV.has(n.id) ? 'on' : ''}" title="Vista previa" onclick="togglePrev(${i})">👁</button><button class="pin ${fmtPinned ? 'on' : ''}" title="Chincheta: mantiene la barra desplegada en todas las notas" onclick="togglePin()">📌</button></div></div></div>
       <textarea id="nt${i}" oninput="noteInput(${i},this.value)">${esc(n.content)}</textarea><div class="ntx md prev" id="pv${i}" ${PREV.has(n.id) ? '' : 'hidden'}>${md(n.content)}</div></div>`).join('') +
-    (db.sections.length ? `<button onclick="addNote()" oncontextmenu="addNoteMenu(event)" title="Clic derecho: nueva nota con plantilla">+ Añadir nota</button><button onclick="addNoteMenu(event)" title="Nueva nota con plantilla">▾</button>` : '');
-  if (tab === 'tags' || tab === 'all') h += hd('Etiquetas') + (db.tags.map(t => chip(t, D.tagIds.includes(t.id), `toggleT('${t.id}')`)).join('') || '<p class="empty">No hay etiquetas. Créalas con «Gestionar etiquetas».</p>');
+    (db.sections.length ? `<button onclick="addNote()" oncontextmenu="addNoteMenu(event)" title="Clic derecho: nueva nota con plantilla">+ Añadir nota</button><button onclick="addNoteMenu(event)" title="Nueva nota con plantilla">▾</button>` : ''), true);
+  const citeOne = (k, s) => `<h3>${s.name}${D.cites[k] != null ? ' (editada a mano)' : ''}</h3>${typeWarn(k, D.type) ? `<small>⚠ ${esc(typeWarn(k, D.type))}</small>` : ''}
+    <textarea id="c_${k}" oninput="D.cites['${k}']=this.value">${esc(D.cites[k] ?? s.fn(D))}</textarea>
+    <div class="row"><button onclick="copyC('${k}',0,this)">Copiar</button><button onclick="copyC('${k}',1,this)" title="Con cursiva, para pegar en Word o Docs">Copiar con formato</button><button onclick="delete D.cites['${k}'];drawD()">Regenerar desde los datos</button></div>${ex().inText ? `<div class="itx" id="it_${k}">${itHtml(k)}</div>` : ''}`;
+  if (tab === 'cls' || tab === 'all') {
+    h += blk('secs', 'Secciones', db.sections.map(s => chip(s, D.sectionIds.includes(s.id), `toggleS('${s.id}')`)).join('') || '<p class="empty">No hay secciones. Créalas con «Gestionar secciones».</p>', true);
+    h += blk('cite', 'Cita', `<small>Cursiva: *texto*. Un asterisco literal se escribe \\*. El idioma y el formato de fecha se eligen en «Exportar».</small>${ex().inText ? `<label>Página o parte citada (opcional, para la cita en el texto y las notas)<input id="locIn" value="${esc(CLOC)}" placeholder="p. ej. 87 o 87-90" oninput="CLOC=this.value;drawIT()"></label>` : ''}`
+      + (tab === 'all' ? `<label>Estilo<select onchange="CITE_SEL=this.value;drawD()">${Object.entries(STYLES).map(([k, s]) => `<option value="${k}" ${citeSel() === k ? 'selected' : ''}>${s.name}</option>`).join('')}</select></label>` + citeOne(citeSel(), STYLES[citeSel()]) : Object.entries(STYLES).map(([k, s]) => citeOne(k, s)).join('')), true);
+    h += blk('tags', 'Etiquetas', db.tags.map(t => chip(t, D.tagIds.includes(t.id), `toggleT('${t.id}')`)).join('') || '<p class="empty">No hay etiquetas. Créalas con «Gestionar etiquetas».</p>', true);
+  }
   if (tab === 'rel' || tab === 'all') {
     const chips = (ids, color, del) => ids.map(id => db.papers.find(p => p.id === id)).filter(Boolean).map(p => chip({name: shortTxt(p.alias || p.title) + (del ? ' ✕' : ''), color}, 1, del ? `${del}('${p.id}')` : '')).join('');
     const by = db.papers.filter(q => (q.refTo || []).includes(D.id)).map(q => q.id);
-    h += hd('Relacionados') + `<div><small>Relacionados</small></div><div>${chips(D.related, '#6b45c2', 'relDel') || '<small>Ninguno.</small>'}</div>
+    h += blk('rel', 'Relacionados', `<div><small>Relacionados</small></div><div>${chips(D.related, '#6b45c2', 'relDel') || '<small>Ninguno.</small>'}</div>
       <div style="margin-top:6px"><small>Este paper cita a</small></div><div>${chips(D.refTo, '#0f8b8d', 'refDel') || '<small>Ninguno.</small>'}</div>
       <div style="margin-top:6px"><small>Citado por (otros papers que lo citan)</small></div><div>${chips(by, '#888888') || '<small>Ninguno.</small>'}</div>
-      <div class="row" style="margin-top:8px;flex-wrap:nowrap"><select style="width:auto" onchange="RELT=this.value;relSearch()"><option value="rel" ${RELT === 'rel' ? 'selected' : ''}>Relacionar con</option><option value="ref" ${RELT === 'ref' ? 'selected' : ''}>Cita a</option></select><input id="relQ" placeholder="Buscar un paper…" oninput="relSearch()" style="flex:1;min-width:0"></div><div id="relRes"></div>`;
+      <div class="row" style="margin-top:8px;flex-wrap:nowrap"><select style="width:auto" onchange="RELT=this.value;relSearch()"><option value="rel" ${RELT === 'rel' ? 'selected' : ''}>Relacionar con</option><option value="ref" ${RELT === 'ref' ? 'selected' : ''}>Cita a</option></select><input id="relQ" placeholder="Buscar un paper…" oninput="relSearch()" style="flex:1;min-width:0"></div><div id="relRes"></div>`);
   }
   if (tab === 'hist') h += `<div class="hist">${D.history.filter(e => isToday(e.t)).reverse().map(e => `<div class="he"><small>${new Date(e.t).toLocaleString('es-ES')}</small> ${esc(e.s)}</div>`).join('') || '<small>Sin cambios hoy.</small>'}</div><small>Solo lectura. Solo muestra los cambios de hoy y no se guarda en el archivo. Creado el ${D.created ? new Date(D.created).toLocaleDateString('es-ES') : '—'}.</small>`;
   $('#dlg').innerHTML = h;
@@ -1239,7 +1246,10 @@ function paintFmt() {   // cambia solo las clases, sin redibujar la ventana, par
 function toggleFmt(i) { if (fmtPinned) return; const id = D.notes[i].id; FMT_OPEN.has(id) ? FMT_OPEN.delete(id) : FMT_OPEN.add(id); paintFmt(); }
 function togglePin() { fmtPinned = !fmtPinned; paintFmt(); }
 function setFmtDefault(v) { setCfg('fmtOpen', v); fmtPinned = v; paintFmt(); }
-const PREV = new Set();   // notas con la vista previa abierta (por id)
+const PREV = new Set();
+const ALL_FOLD = new Set();   // bloques plegados en «Ver todo»
+let CITE_SEL = '';   // estilo de cita mostrado en «Ver todo»
+const citeSel = () => STYLES[CITE_SEL] ? CITE_SEL : STYLES[ex().style] ? ex().style : 'apa';   // notas con la vista previa abierta (por id)
 function noteInput(i, v) { D.notes[i].content = v; const pv = $('#pv' + i); if (pv && !pv.hidden) pv.innerHTML = md(v); }
 function togglePrev(i) { const id = D.notes[i].id; PREV.has(id) ? PREV.delete(id) : PREV.add(id); drawD(); }
 function fmtWrap(i, mk) {   // pone o quita las marcas alrededor de la selección (o en el cursor)
