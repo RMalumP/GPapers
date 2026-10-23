@@ -1109,6 +1109,7 @@ function imgOpen() {
   const i = D.image;
   $('#img').innerHTML = `<div class="dh"><h2>Imagen del paper</h2><div class="dbtn"><button onclick="$('#img').close()">Cerrar</button></div></div>
     <div class="pimgprev">${pimgHTML(D, 'big')}</div>
+    <div class="pastez" tabindex="0">📋 Pega aquí una imagen copiada (Ctrl+V), p. ej. con «Copiar imagen» en Google Imágenes</div>
     <label>URL de la imagen<span class="row" style="flex-wrap:nowrap"><input id="imgUrl" type="url" placeholder="https://…" style="flex:1;min-width:0" value="${i?.kind === 'url' ? esc(i.url) : ''}" onkeydown="if(event.key==='Enter')imgSetUrl()"><button class="pri" onclick="imgSetUrl()">Usar</button></span></label>
     <div class="row" style="margin-top:8px"><button onclick="imgPickLinked()" ${FSA ? '' : 'disabled'} title="${FSA ? 'No se copia: se guarda solo el nombre y el enlace queda en este navegador' : 'Solo disponible en Chrome o Edge de escritorio'}">📎 Archivo local (enlazado)</button>
     <button onclick="imgPickEmbed()" title="Guarda una copia reducida dentro del JSON: viaja con el archivo">📥 Incrustar copia reducida</button><button class="danger" onclick="imgClear()" ${i ? '' : 'disabled'}>Quitar imagen</button></div>
@@ -1119,13 +1120,33 @@ function imgSet(v) { D.image = v; imgBox(); if ($('#img').open) imgOpen(); }
 function imgSetUrl() { const u = $('#imgUrl').value.trim(); if (!u) return imgClear(); if (!/^https?:\/\//i.test(u)) return alert('La URL debe empezar por http:// o https://'); PEND.delete(D.id); imgSet({kind: 'url', url: u}); }
 function imgClear() { PEND.delete(D.id); imgSet(null); }
 async function imgPickLinked() { try { const [h] = await showOpenFilePicker({types: FILE_IMG_T}); PEND.set(D.id, h); imgSet({kind: 'file', name: h.name}); } catch (e) { if (e.name !== 'AbortError') alert('No se pudo elegir el archivo: ' + e.message); } }
+async function imgEmbedBlob(f) {   // copia reducida (máx. 480 px, JPEG) para guardarla dentro del JSON
+  const b = await createImageBitmap(f), k = Math.min(1, 480 / Math.max(b.width, b.height)), c = document.createElement('canvas');
+  c.width = Math.max(1, Math.round(b.width * k)); c.height = Math.max(1, Math.round(b.height * k)); c.getContext('2d').drawImage(b, 0, 0, c.width, c.height);
+  PEND.delete(D.id); imgSet({kind: 'data', data: c.toDataURL('image/jpeg', .82)});
+}
 function imgPickEmbed() {
   const i = document.createElement('input'); i.type = 'file'; i.accept = 'image/*';
-  i.onchange = async () => { const f = i.files[0]; if (!f) return; try { const b = await createImageBitmap(f), k = Math.min(1, 480 / Math.max(b.width, b.height)), c = document.createElement('canvas');
-    c.width = Math.max(1, Math.round(b.width * k)); c.height = Math.max(1, Math.round(b.height * k)); c.getContext('2d').drawImage(b, 0, 0, c.width, c.height);
-    PEND.delete(D.id); imgSet({kind: 'data', data: c.toDataURL('image/jpeg', .82)}); } catch (e) { alert('No se pudo leer la imagen: ' + e.message); } };
+  i.onchange = async () => { const f = i.files[0]; if (f) try { await imgEmbedBlob(f); } catch (e) { alert('No se pudo leer la imagen: ' + e.message); } };
   i.click();
 }
+function imgFromClipboard(e, inField) {   // imagen copiada (p. ej. «Copiar imagen» en Google Imágenes): archivo, <img> en el HTML o, fuera de un campo, una URL suelta
+  const dt = e.clipboardData; if (!dt || !D) return false;
+  const file = [...dt.files].find(f => /^image\//.test(f.type));
+  const m = /<img[^>]+src=["']([^"']+)["']/i.exec(dt.getData('text/html') || ''), txt = (dt.getData('text/plain') || '').trim();
+  const u = m ? m[1].replace(/&amp;/g, '&') : !inField && /^https?:\/\/\S+$/i.test(txt) ? txt : '';
+  if (!file && !/^(https?:|data:image\/)/i.test(u)) return false;
+  e.preventDefault();
+  if (file) imgEmbedBlob(file).catch(err => alert('No se pudo leer la imagen: ' + err.message));
+  else if (u.startsWith('data:')) fetch(u).then(r => r.blob()).then(imgEmbedBlob).catch(err => alert('No se pudo leer la imagen: ' + err.message));
+  else { PEND.delete(D.id); imgSet({kind: 'url', url: u}); }
+  return true;
+}
+document.addEventListener('paste', e => {
+  const t = e.target, field = !!t.closest?.('input,textarea,[contenteditable]');
+  if (t.closest?.('.ned')) return;
+  if (t.closest?.('#img') || ($('#dlg').open && $('#dlg .pimgbox') && !$('#img').open)) imgFromClipboard(e, field);
+});
 const starsHTML = p => `<span class="stv${p.rating ? '' : ' none'}" oncontextmenu="starMenu(event,'${p.id}')" title="Valoración ${p.rating} de 5 · Clic derecho: cambiar">${'★'.repeat(p.rating)}${'☆'.repeat(5 - p.rating)}</span>`;
 const rdHTML = p => `<span class="rd"><button class="rst" style="--c:${READ_C[p.reading]}" title="Clic: cambiar el estado de lectura" onclick="cycleRead('${p.id}')">${READ[p.reading]}</button>${starsHTML(p)}</span>`;
 function starMenu(e, id) { ctxShow(e, '<div class="ctxh">Valoración</div>' + [5, 4, 3, 2, 1, 0].map(n => `<button onclick="setRating('${id}',${n})">${n ? '★'.repeat(n) + '☆'.repeat(5 - n) : 'Sin valorar'}</button>`).join('')); }
@@ -1135,17 +1156,18 @@ const card = (p, from) => `<article class="card" data-id="${p.id}" ${F.group ? `
     ${/^https?:/i.test(p.url) ? `<a href="${esc(p.url)}" target="_blank" rel="noopener noreferrer">${esc(p.url)}</a>` : ''}
     
     <div class="row"><button class="sm" onclick="toggleNotes('${p.id}')" oncontextmenu="viewNotes(event,'${p.id}')" title="Clic: desplegar notas · Clic derecho: abrir el visor de notas">Notas (${p.notes.filter(n => n.content.trim()).length}) ${EXP.has(p.id) ? '▾' : '▸'}</button>${relCount(p) ? `<button class="sm" onclick="viewRel('${p.id}')" title="Relaciones: relacionados, cita a y citado por">🔗 ${relCount(p)}</button>` : ''}</div>${EXP.has(p.id) ? notesHTML(p) : ''}</article>`;
-const TH = [['title', 'Título'], ['author', 'Autores'], ['year', 'Año'], ['venue', 'Revista / editorial'], ['reading', 'Lectura'], ['rating', '★'], [null, 'Secciones'], [null, 'Etiquetas'], [null, 'Notas'], [null, '']];
+const TH = [[null, ''], ['title', 'Título'], ['author', 'Autores'], ['year', 'Año'], ['venue', 'Revista / editorial'], ['reading', 'Lectura'], ['rating', '★'], [null, 'Secciones'], [null, 'Etiquetas'], [null, 'Notas'], [null, '']];
 function thSort(k) {   // clic en una cabecera: ese criterio pasa a ser el principal; otro clic invierte el sentido
   F.sorts = F.sorts[0]?.k === k ? [{k, d: -F.sorts[0].d}, ...F.sorts.slice(1)] : [{k, d: 1}, ...F.sorts.filter(x => x.k !== k).slice(0, 2)]; render();
 }
 const rowHTML = (p, from) => `<tr class="rw" data-id="${p.id}" ${F.group ? `draggable="true" data-from="${from || ''}"` : ''}>
   <td><input type="checkbox" aria-label="Seleccionar" ${SEL.has(p.id) ? 'checked' : ''} onchange="toggleSel('${p.id}')"></td>
-  <td class="tt">${thumbHTML(p, 'xs')}<a class="tl2" onclick="openPaper('${p.id}')" title="Editar">${esc(p.alias || p.title)}</a></td><td>${esc(p.authors.join('; '))}</td><td>${esc(p.year)}</td><td>${esc(p.venue)}</td>
+  <td class="timg">${thumbHTML(p, 'xs')}</td>
+  <td class="tt"><a class="tl2" onclick="openPaper('${p.id}')" title="Editar">${esc(p.alias || p.title)}</a></td><td>${esc(p.authors.join('; '))}</td><td>${esc(p.year)}</td><td>${esc(p.venue)}</td>
   <td><button class="rst" style="--c:${READ_C[p.reading]}" title="Clic: cambiar el estado de lectura" onclick="cycleRead('${p.id}')">${READ[p.reading]}</button></td><td>${starsHTML(p)}</td>
   <td>${p.sectionIds.map(id => db.sections.find(s => s.id === id)).filter(Boolean).map(s => chip(s, 1)).join('')}</td><td>${tagsOf(p)}</td>
   <td class="nw"><button class="sm" onclick="toggleNotes('${p.id}')" oncontextmenu="viewNotes(event,'${p.id}')" title="Clic: desplegar · Clic derecho: visor de notas">${p.notes.filter(n => n.content.trim()).length} ${EXP.has(p.id) ? '▾' : '▸'}</button>${relCount(p) ? `<button class="sm" onclick="viewRel('${p.id}')" title="Relaciones">🔗 ${relCount(p)}</button>` : ''}</td>
-  <td><button class="x" title="Eliminar" onclick="delPaper('${p.id}')">✕</button></td></tr>${EXP.has(p.id) ? `<tr class="rn"><td></td><td colspan="10">${notesHTML(p)}</td></tr>` : ''}`;
+  <td><button class="x" title="Eliminar" onclick="delPaper('${p.id}')">✕</button></td></tr>${EXP.has(p.id) ? `<tr class="rn"><td></td><td colspan="11">${notesHTML(p)}</td></tr>` : ''}`;
 const tableHTML = (L, from) => `<div class="twrap"><table class="tbl"><thead><tr><th></th>${TH.map(([k, t]) => k ? `<th class="sortable" onclick="thSort('${k}')">${t}${F.sorts[0]?.k === k ? (F.sorts[0].d > 0 ? ' ▲' : ' ▼') : ''}</th>` : `<th>${t}</th>`).join('')}</tr></thead><tbody>${L.map(p => rowHTML(p, from)).join('')}</tbody></table></div>`;
 const items = (l, from) => db.settings.view === 'table' ? (l.length ? tableHTML(l, from) : '') : l.map(p => card(p, from)).join('');
 function listHTML(L) {
@@ -1399,7 +1421,7 @@ function drawD() {
   const blk = (id, t, body, always) => tab === 'all' || tab === 'cls' ? `<details class="cs" ${ALL_FOLD.has(id) ? '' : 'open'} ontoggle="this.open ? ALL_FOLD.delete('${id}') : ALL_FOLD.add('${id}')"><summary>${t}</summary><div class="csb">${body}</div></details>`   // en «Ver todo» cada bloque lleva su título y se pliega
     : (always ? `<h2 class="grp">${t}</h2>` : '') + body;
   let h = `<div class="dh"><h2>${esc(D.alias || D.title) || 'Nuevo paper'}</h2><div class="dbtn"><button class="pri" onclick="commit()">Guardar paper</button><button onclick="$('#dlg').close()">Cancelar</button></div></div><div class="tabs">${Object.entries(T).map(([k, v]) => `<button class="${tab === k ? 'on' : ''}" onclick="tab='${k}';drawD()">${v}</button>`).join('')}</div>`;
-  if (tab === 'data' || tab === 'all') h += blk('data', 'Datos', `<div class="grid"><div class="w imgrow"><div class="pimgbox">${pimgHTML(D, 'big', `role="button" tabindex="0" onclick="imgOpen()" title="Añadir o cambiar la imagen"`)}</div><small>Imagen del paper (opcional): pulsa el recuadro para poner una URL o un archivo local.</small></div>${inp('title', 'Título *', 'text', 'w')}${inp('alias', 'Título personalizado (opcional; solo para mostrar, la cita usa el título original)', 'text', 'w')}
+  if (tab === 'data' || tab === 'all') h += blk('data', 'Datos', `<div class="grid"><div class="w titlerow"><div class="pimgbox">${pimgHTML(D, 'big', `role="button" tabindex="0" onclick="imgOpen()" title="Imagen del paper (opcional): pulsa para poner una URL o un archivo, o pega una imagen copiada con Ctrl+V"`)}</div><div class="titlecol">${inp('title', 'Título *')}${inp('alias', 'Título personalizado (opcional; solo para mostrar, la cita usa el título original)')}</div></div>
     <label class="w">Autores (uno por línea: «Apellido, Nombre»)<textarea oninput="D.authors=this.value.split('\\n').map(s=>s.trim()).filter(Boolean)">${esc(D.authors.join('\n'))}</textarea></label>
     ${inp('sortKey', 'Clave de orden en la bibliografía (opcional): p. ej. «Torre» para «de la Torre, Ana»', 'text', 'w')}<label>Año<input type="number" data-k="year" value="${esc(D.year)}" oninput="D.year=this.value;pubSync()"></label><label>Tipo<select onchange="D.type=this.value;drawD()">${Object.entries(TYPES).map(([k, v]) => `<option value="${k}" ${D.type === k ? 'selected' : ''}>${v}</option>`).join('')}</select></label>
     ${inp('url', 'URL', 'url', 'w')}${inp('venue', lbl('venue', 'Revista / editorial / sitio'))}<label>DOI (sin https://doi.org/)<span class="row" style="flex-wrap:nowrap"><input style="flex:1;min-width:0" value="${esc(D.doi)}" oninput="D.doi=this.value"><button onclick="doiFill()" title="Rellenar con los datos de CrossRef">Buscar</button></span></label>${inp('accessed', 'Fecha de consulta', 'date')}
@@ -1586,11 +1608,11 @@ $('#dlg').addEventListener('paste', e => { const el = e.target.closest?.('.ned')
   const w = document.createElement('div'); w.appendChild(s.getRangeAt(0).cloneContents());
   e.clipboardData.setData('text/plain', serEd(w)); e.clipboardData.setData('text/html', w.innerHTML); e.preventDefault();
   if (ev === 'cut') { document.execCommand('delete'); edSync(el); } }));
-const edBox = (key, text) => `<div class="nbox" data-key="${key}"><div class="ned md" id="ed_${key}" data-key="${key}" contenteditable="true" role="textbox" aria-multiline="true">${mdEdit(text)}</div>
+const edBox = (key, text) => `<div class="nbox" data-key="${key}">
   <div class="fmtw ${fmtPinned || FMT_OPEN.has(key) ? 'open' : ''}" data-id="${key}" onmousedown="event.preventDefault()"><button class="fmth" title="Mostrar u ocultar la barra de formato" onclick="toggleFmt('${key}')">Aa</button><div class="fmtc"><div class="fmt">
     <button title="Negrita (${db.settings.shortcuts.bold})" onclick="edCmd('${key}','bold')"><b>N</b></button><button title="Cursiva (${db.settings.shortcuts.italic})" onclick="edCmd('${key}','italic')"><i>K</i></button><button title="Tachado" onclick="edCmd('${key}','strikeThrough')"><s>T</s></button><button title="Subrayado" onclick="edCmd('${key}','underline')"><u>S</u></button>
     <button title="Lista con viñetas" onclick="edCmd('${key}','insertUnorderedList')">•</button><button title="Lista numerada" onclick="edCmd('${key}','insertOrderedList')">1.</button><button onclick="tplMenu(event,'${key}')">Plantilla ▾</button><button title="Insertar enlace a un paper o a una nota" onclick="lkOpen('${key}')">🔗</button>
-    <button class="pin ${fmtPinned ? 'on' : ''}" title="Chincheta: mantiene la barra desplegada en todas las notas" onclick="togglePin()">📌</button></div></div></div></div>`;
+    <button class="pin ${fmtPinned ? 'on' : ''}" title="Chincheta: mantiene la barra desplegada en todas las notas" onclick="togglePin()">📌</button></div></div></div><div class="ned md" id="ed_${key}" data-key="${key}" contenteditable="true" role="textbox" aria-multiline="true">${mdEdit(text)}</div></div>`;
 
 let fmtPinned = false;   // chincheta: barras desplegadas en TODAS las notas (valor inicial: Configuración)
 const FMT_OPEN = new Set();   // notas cuya barra se desplegó una a una, sin chincheta

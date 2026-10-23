@@ -127,3 +127,10 @@ aside{border-left:0;border-radius:0 10px 10px 0;padding-left:6px}
 .cuh{font-weight:700;margin:12px 0 2px}.cuh small{font-weight:400}#cuT{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px;min-height:80px}
 .cuf{display:flex;flex-wrap:wrap;gap:4px}.cuf button{font-size:12px;padding:1px 8px}.cuprev{border:1px dashed var(--bd);border-radius:8px;padding:8px 10px;display:flex;flex-direction:column;gap:6px}
 .culn{overflow-wrap:anywhere}.culn small{opacity:.7}.cuhelp code{background:var(--bg);padding:0 3px;border-radius:3px}
+
+/* F10: barra de formato arriba, imagen junto a los títulos, columna de imagen en la tabla */
+.nbox .fmtw{padding:6px 6px 0}.ned{padding:6px 10px 8px}
+.titlerow{display:flex;gap:12px;align-items:stretch}.titlecol{flex:1;min-width:0;display:flex;flex-direction:column;gap:8px}.titlecol label{margin:0}
+.titlerow .pimgbox{display:flex}.titlerow .pimg.big{width:104px;height:auto;min-height:104px;align-self:stretch;font-size:36px}
+.pastez{border:1px dashed var(--bd);border-radius:8px;padding:10px;text-align:center;margin:8px 0;opacity:.8}.pastez:focus{outline:2px solid var(--pri);opacity:1}
+.tbl td.timg{width:1%;padding:2px 6px}.tbl td.timg .pimg.xs{margin:0;width:36px;height:36px}
