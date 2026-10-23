@@ -1,5 +1,5 @@
 # Pruebas de interfaz (Chromium): papelera, historial, estrellas, barra lateral, diálogos, editor de notas.
-import sys, json, os, pathlib
+import sys, json, os, pathlib, subprocess, time
 from playwright.sync_api import sync_playwright
 folder = pathlib.Path(sys.argv[1] if len(sys.argv) > 1 else '.').resolve()
 n = fail = 0
@@ -14,7 +14,7 @@ SEED = """() => { db.papers.length = 0; db.sections.length = 0; db.tags.length =
   UNDO.length = 0; REDO.length = 0; lastSnap = JSON.stringify(db); render(); }"""
 with sync_playwright() as pw:
     kw = {'executable_path': '/opt/pw-browsers/chromium'} if os.path.exists('/opt/pw-browsers/chromium') else {}
-    b = pw.chromium.launch(**kw); ctx = b.new_context(permissions=['clipboard-read', 'clipboard-write'], viewport={'width': 1200, 'height': 800}); pg = ctx.new_page(); errs = []
+    b = pw.chromium.launch(**kw); ctx = b.new_context(permissions=['clipboard-read', 'clipboard-write'], viewport={'width': 1200, 'height': 800}, service_workers='block'); pg = ctx.new_page(); errs = []
     pg.on('pageerror', lambda e: errs.append(str(e))); pg.on('console', lambda m: errs.append(m.text) if m.type == 'error' else None); pg.on('dialog', lambda d: d.accept())
     pg.goto('file://' + str(folder / 'index.html')); pg.wait_for_timeout(300)
     pg.evaluate(SEED)
@@ -156,6 +156,40 @@ with sync_playwright() as pw:
     eq('valoración mínima está en Ordenar', pg.evaluate("!!document.querySelector('#sg-sort #minR') && !document.querySelector('#sg-read #minR')"), True)
     pg.select_option('#minR', '4'); eq('y sigue filtrando; marca el punto de Ordenar', pg.evaluate("[document.querySelectorAll('#list article.card').length, !$('#d-sort').hidden, $('#d-read').hidden]"), [0, True, True])
     pg.select_option('#minR', '0')
+    # ---- Fase 8
+    # (el almacenamiento privado del navegador y los enlaces a archivos necesitan http, no file://)
+    srv = subprocess.Popen([sys.executable, '-I', '-m', 'http.server', '8791', '-d', str(folder)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL); time.sleep(1)
+    pg = ctx.new_page(); pg.on('pageerror', lambda e: errs.append(str(e))); pg.on('dialog', lambda d: d.accept())
+    pg.goto('http://localhost:8791/index.html'); pg.wait_for_timeout(600); pg.evaluate(SEED)
+    PNG = str(folder / 'pruebas' / 'img_prueba.png')
+    pg.evaluate("openPaper('p1'); tab = 'data'; drawD()")
+    eq('Datos: recuadro con el icono de imagen', pg.inner_text('#dlg .pimgbox .pimg.big').strip(), '🖼️')
+    pg.click('#dlg .pimgbox .pimg')
+    eq('al pulsar se abre el selector de imagen', pg.evaluate("$('#img').open"), True)
+    pg.fill('#imgUrl', 'javascript:alert(1)'); pg.click('#img button:has-text("Usar")')
+    eq('una URL que no es http(s) se rechaza', pg.evaluate("D.image"), None)
+    pg.fill('#imgUrl', 'https://example.org/foto.png'); pg.click('#img button:has-text("Usar")')
+    eq('URL de imagen', (pg.evaluate("D.image"), pg.evaluate("document.querySelector('#dlg .pimgbox img')?.getAttribute('src')")), ({'kind': 'url', 'url': 'https://example.org/foto.png'}, 'https://example.org/foto.png'))
+    with pg.expect_file_chooser() as fc: pg.click('#img button:has-text("Incrustar")')
+    fc.value.set_files(PNG); pg.wait_for_timeout(400)
+    eq('copia incrustada reducida (máx. 480 px, JPEG)', pg.evaluate("[D.image.kind, D.image.data.startsWith('data:image/jpeg;base64,'), D.image.data.length < 60000]"), ['data', True, True])
+    eq('y se ve en el recuadro', pg.evaluate("document.querySelector('#dlg .pimgbox img').src.startsWith('data:image/jpeg')"), True)
+    # archivo local enlazado (se simula el selector con un archivo del almacenamiento privado del navegador)
+    pg.evaluate("""async () => { const d = await navigator.storage.getDirectory(), h = await d.getFileHandle('foto.png', {create: true}), w = await h.createWritable(); await w.write(await (await fetch('/pruebas/img_prueba.png')).blob()); await w.close(); window.showOpenFilePicker = async () => [h]; }""")
+    pg.click('#img button:has-text("Archivo local")'); pg.wait_for_timeout(500)
+    eq('archivo enlazado: solo se guarda el nombre', pg.evaluate("D.image"), {'kind': 'file', 'name': 'foto.png'})
+    eq('y se muestra desde el archivo', pg.evaluate("document.querySelector('#dlg .pimgbox img')?.src.startsWith('blob:')"), True)
+    pg.evaluate("$('#img').close()"); pg.click('#dlg button:has-text("Guardar paper")'); pg.wait_for_timeout(500)
+    eq('el JSON guarda la imagen enlazada sin datos del archivo', pg.evaluate("JSON.parse(dbJSON()).papers[0].image"), {'kind': 'file', 'name': 'foto.png'})
+    eq('la tarjeta muestra la miniatura leída del archivo enlazado', pg.evaluate("document.querySelector('#list .card .pimg.sm img')?.src.startsWith('blob:')"), True)
+    pg.evaluate("setView('table')"); pg.wait_for_timeout(300)
+    eq('la tabla también', pg.evaluate("!!document.querySelector('.tbl .pimg.xs img')"), True); pg.evaluate("setView('cards')")
+    pg.evaluate("db.settings.showImg = false; render()")
+    eq('opción para ocultar la imagen en tarjetas', pg.locator('#list .pimg').count(), 0); pg.evaluate("db.settings.showImg = true; render()")
+    eq('al reabrir el JSON la imagen se limpia: solo http(s), copias pequeñas y nombres', pg.evaluate("validate({papers: [{id:'a', title:'x', authors:[], image:{kind:'url', url:'javascript:alert(1)'}}, {id:'b', title:'y', authors:[], image:{kind:'data', data:'data:text/html;base64,AAAA'}}, {id:'c', title:'z', authors:[], image:{kind:'url', url:'https://a.b/c.png'}}], tags:[], sections:[]}).papers.map(p => p.image)"), [None, None, {'kind': 'url', 'url': 'https://a.b/c.png'}])
+    pg.evaluate("openPaper('p1'); tab = 'data'; drawD()"); pg.click('#dlg .pimgbox .pimg'); pg.click('#img button:has-text("Quitar")')
+    eq('quitar la imagen', (pg.evaluate("D.image"), pg.inner_text('#dlg .pimgbox .pimg').strip()), (None, '🖼️')); pg.evaluate("$('#img').close(); $('#dlg').close()")
+    srv.terminate()
     eq('sin errores de consola', errs, [])
     b.close()
 print(f'{n - fail}/{n} pruebas correctas'); sys.exit(1 if fail else 0)

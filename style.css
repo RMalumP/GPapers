@@ -114,3 +114,10 @@ aside{border-left:0;border-radius:0 10px 10px 0;padding-left:6px}
 #sg-search.fold .sgh input,aside.min #sg-search .sgh input{display:none}
 .ct .tl{display:flex;flex-wrap:nowrap;align-items:center;margin:0 6px;flex:0 0 auto}.ct .tl .chip{white-space:nowrap}
 #app{padding:0}main{padding:16px 16px 16px 0}aside{border-radius:0;border-top:0;border-bottom:0}
+
+/* F8: imagen del paper */
+.pimg{display:flex;align-items:center;justify-content:center;overflow:hidden;background:var(--bg);border:1px dashed var(--bd);border-radius:8px;flex:0 0 auto;font-size:22px;opacity:1}
+.pimg img{width:100%;height:100%;object-fit:cover;display:block}.pimg.big{width:120px;height:120px;font-size:44px;cursor:pointer}.pimg.sm{width:48px;height:48px;font-size:20px}.pimg.xs{width:28px;height:28px;font-size:14px;display:inline-flex;vertical-align:middle;margin-right:8px}
+.pimg.locked{cursor:pointer;opacity:.6}.pimg:has(img){border-style:solid}.imgx{font-size:18px;color:var(--red)}
+.imgrow{display:flex;align-items:center;gap:12px}.pimgprev{display:flex;justify-content:center;margin:8px 0}.pimgbox .pimg.big:hover{border-color:var(--pri)}
+.card .th .pimg.sm{margin-right:2px}
