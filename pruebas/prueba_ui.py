@@ -67,7 +67,7 @@ with sync_playwright() as pw:
     pg.evaluate("$('#dlg').close()")
     # ---- Fase 4
     pg.evaluate("openPaper('p1')")
-    eq('pestañas: secciones, cita y etiquetas unidas', pg.evaluate("[...document.querySelectorAll('#dlg .tabs button')].map(b => b.textContent)"), ['Ver todo', 'Datos', 'Notas', 'Secciones, etiquetas y relacionados', 'Cita', 'Historial'])
+    eq('pestañas: secciones, cita y etiquetas unidas', pg.evaluate("[...document.querySelectorAll('#dlg .tabs button')].map(b => b.textContent)"), ['Ver todo', 'Datos', 'Cita', 'Notas', 'Secciones, etiquetas y relacionados', 'Historial'])
     eq('Ver todo: orden de bloques con las notas por sección bajo la general', pg.evaluate("[...document.querySelectorAll('#dlg details.cs > summary')].map(s => s.textContent)"), ['Datos', 'Notas generales', 'Notas por sección', 'Secciones', 'Cita', 'Etiquetas', 'Relacionados'])
     eq('Ver todo: una sola variante de cita', pg.locator('#dlg textarea[id^=c_]').count(), 1)
     pg.select_option('#dlg select:has(option[value=mla])', 'mla')
@@ -148,6 +148,14 @@ with sync_playwright() as pw:
     pg.set_viewport_size({'width': 2600, 'height': 800}); pg.wait_for_timeout(300)
     eq('al haber sitio vuelven a la barra', pg.evaluate("!!document.querySelector('.card .ct > .tl') && !document.querySelector('.card > .tl')"), True)
     pg.set_viewport_size({'width': 1200, 'height': 800}); pg.evaluate("db.papers[0].tagIds = []; render()")
+    # ---- Fase 7
+    pg.evaluate("db.papers[0].sectionIds = ['s1', 's2']; db.papers[0].tagIds = []; setView('table')")
+    eq('tabla: columna Secciones con las secciones del paper', pg.evaluate("[[...document.querySelectorAll('.tbl th')].map(t => t.textContent.replace(/[ ▲▼]/g, '')).includes('Secciones'), [...document.querySelectorAll('.tbl tbody tr.rw')][0].querySelectorAll('.chip').length]"), [True, 2])
+    pg.evaluate("toggleNotes('p1')"); eq('la fila de notas cubre todas las columnas', pg.evaluate("document.querySelector('tr.rn td:last-child').colSpan === document.querySelectorAll('.tbl thead th').length - 1"), True)
+    pg.evaluate("F.group = true; render()"); eq('agrupar por sección sigue funcionando en tabla', pg.locator('.gbox').count() > 0, True); pg.evaluate("F.group = false; setView('cards')")
+    eq('valoración mínima está en Ordenar', pg.evaluate("!!document.querySelector('#sg-sort #minR') && !document.querySelector('#sg-read #minR')"), True)
+    pg.select_option('#minR', '4'); eq('y sigue filtrando; marca el punto de Ordenar', pg.evaluate("[document.querySelectorAll('#list article.card').length, !$('#d-sort').hidden, $('#d-read').hidden]"), [0, True, True])
+    pg.select_option('#minR', '0')
     eq('sin errores de consola', errs, [])
     b.close()
 print(f'{n - fail}/{n} pruebas correctas'); sys.exit(1 if fail else 0)

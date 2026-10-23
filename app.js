@@ -915,7 +915,7 @@ const card = (p, from) => `<article class="card" data-id="${p.id}" ${F.group ? `
     ${/^https?:/i.test(p.url) ? `<a href="${esc(p.url)}" target="_blank" rel="noopener noreferrer">${esc(p.url)}</a>` : ''}
     
     <div class="row"><button class="sm" onclick="toggleNotes('${p.id}')" oncontextmenu="viewNotes(event,'${p.id}')" title="Clic: desplegar notas · Clic derecho: abrir el visor de notas">Notas (${p.notes.filter(n => n.content.trim()).length}) ${EXP.has(p.id) ? '▾' : '▸'}</button>${relCount(p) ? `<button class="sm" onclick="viewRel('${p.id}')" title="Relaciones: relacionados, cita a y citado por">🔗 ${relCount(p)}</button>` : ''}</div>${EXP.has(p.id) ? notesHTML(p) : ''}</article>`;
-const TH = [['title', 'Título'], ['author', 'Autores'], ['year', 'Año'], ['venue', 'Revista / editorial'], ['reading', 'Lectura'], ['rating', '★'], [null, 'Etiquetas'], [null, 'Notas'], [null, '']];
+const TH = [['title', 'Título'], ['author', 'Autores'], ['year', 'Año'], ['venue', 'Revista / editorial'], ['reading', 'Lectura'], ['rating', '★'], [null, 'Secciones'], [null, 'Etiquetas'], [null, 'Notas'], [null, '']];
 function thSort(k) {   // clic en una cabecera: ese criterio pasa a ser el principal; otro clic invierte el sentido
   F.sorts = F.sorts[0]?.k === k ? [{k, d: -F.sorts[0].d}, ...F.sorts.slice(1)] : [{k, d: 1}, ...F.sorts.filter(x => x.k !== k).slice(0, 2)]; render();
 }
@@ -923,9 +923,9 @@ const rowHTML = (p, from) => `<tr class="rw" data-id="${p.id}" ${F.group ? `drag
   <td><input type="checkbox" aria-label="Seleccionar" ${SEL.has(p.id) ? 'checked' : ''} onchange="toggleSel('${p.id}')"></td>
   <td class="tt"><a class="tl2" onclick="openPaper('${p.id}')" title="Editar">${esc(p.alias || p.title)}</a></td><td>${esc(p.authors.join('; '))}</td><td>${esc(p.year)}</td><td>${esc(p.venue)}</td>
   <td><button class="rst" style="--c:${READ_C[p.reading]}" title="Clic: cambiar el estado de lectura" onclick="cycleRead('${p.id}')">${READ[p.reading]}</button></td><td>${starsHTML(p)}</td>
-  <td>${tagsOf(p)}</td>
+  <td>${p.sectionIds.map(id => db.sections.find(s => s.id === id)).filter(Boolean).map(s => chip(s, 1)).join('')}</td><td>${tagsOf(p)}</td>
   <td class="nw"><button class="sm" onclick="toggleNotes('${p.id}')" oncontextmenu="viewNotes(event,'${p.id}')" title="Clic: desplegar · Clic derecho: visor de notas">${p.notes.filter(n => n.content.trim()).length} ${EXP.has(p.id) ? '▾' : '▸'}</button>${relCount(p) ? `<button class="sm" onclick="viewRel('${p.id}')" title="Relaciones">🔗 ${relCount(p)}</button>` : ''}</td>
-  <td><button class="x" title="Eliminar" onclick="delPaper('${p.id}')">✕</button></td></tr>${EXP.has(p.id) ? `<tr class="rn"><td></td><td colspan="9">${notesHTML(p)}</td></tr>` : ''}`;
+  <td><button class="x" title="Eliminar" onclick="delPaper('${p.id}')">✕</button></td></tr>${EXP.has(p.id) ? `<tr class="rn"><td></td><td colspan="10">${notesHTML(p)}</td></tr>` : ''}`;
 const tableHTML = (L, from) => `<div class="twrap"><table class="tbl"><thead><tr><th></th>${TH.map(([k, t]) => k ? `<th class="sortable" onclick="thSort('${k}')">${t}${F.sorts[0]?.k === k ? (F.sorts[0].d > 0 ? ' ▲' : ' ▼') : ''}</th>` : `<th>${t}</th>`).join('')}</tr></thead><tbody>${L.map(p => rowHTML(p, from)).join('')}</tbody></table></div>`;
 const items = (l, from) => db.settings.view === 'table' ? (l.length ? tableHTML(l, from) : '') : l.map(p => card(p, from)).join('');
 function listHTML(L) {
@@ -951,7 +951,7 @@ function render() {
   tg('#tbSec', F.tbSec, 'Sección', F.sec); tg('#tbTag', F.tbTag, 'Etiquetas', F.tags.size);
   $('#secF2').hidden = !F.tbSec; $('#tagF2').hidden = !F.tbTag; $('#grpChk').checked = F.group;
   $('#selN').textContent = SEL.size ? `${SEL.size} seleccionados` : 'Ningún paper seleccionado';
-  $('#d-search').hidden = !F.q; $('#d-sec').hidden = !F.sec; $('#d-tags').hidden = !F.tags.size; $('#d-sel').hidden = !SEL.size; $('#d-read').hidden = !F.read && !F.minRating; $('#d-tr').hidden = !db.trash.length; $('#trLbl').textContent = 'Papelera' + (db.trash.length ? ` (${db.trash.length})` : ''); $('#tbView').textContent = db.settings.view === 'table' ? '▦ Tarjetas' : '☰ Tabla';
+  $('#d-search').hidden = !F.q; $('#d-sec').hidden = !F.sec; $('#d-tags').hidden = !F.tags.size; $('#d-sel').hidden = !SEL.size; $('#d-read').hidden = !F.read; $('#d-sort').hidden = !F.minRating; $('#d-tr').hidden = !db.trash.length; $('#trLbl').textContent = 'Papelera' + (db.trash.length ? ` (${db.trash.length})` : ''); $('#tbView').textContent = db.settings.view === 'table' ? '▦ Tarjetas' : '☰ Tabla';
   $('#readF').innerHTML = [['', 'Todos'], ...Object.entries(READ)].map(([k, v]) => chip({name: v, color: k ? READ_C[k] : '#888888'}, F.read === k, `setRead('${k}')`)).join(''); $('#minR').value = F.minRating;   // puntos de filtro activo
   const nextKey = Object.keys(SORTS).find(k => !F.sorts.some(s => s.k === k)) || 'title';
   $('#sortUI').innerHTML = F.sorts.map((s, i) => `<div class="row"><select onchange="F.sorts[${i}].k=this.value;render()">${Object.entries(SORTS).map(([k, v]) => `<option value="${k}" ${s.k === k ? 'selected' : ''}>${v}</option>`).join('')}</select>
@@ -1175,7 +1175,7 @@ function pubSync() {   // fecha de publicación → rellena «Año» si está va
   if (okDate(D.pubDate) && !D.year) { D.year = +D.pubDate.slice(0, 4); const y = $('#dlg input[data-k="year"]'); if (y) y.value = D.year; }
   const w = $('#pdWarn'); if (w) w.textContent = pdWarn(); }
 function drawD() {
-  const T = {all: 'Ver todo', data: 'Datos', notes: 'Notas', cls: 'Secciones, etiquetas y relacionados', cite: 'Cita', hist: 'Historial'};
+  const T = {all: 'Ver todo', data: 'Datos', cite: 'Cita', notes: 'Notas', cls: 'Secciones, etiquetas y relacionados', hist: 'Historial'};
   const blk = (id, t, body, always) => tab === 'all' || tab === 'cls' ? `<details class="cs" ${ALL_FOLD.has(id) ? '' : 'open'} ontoggle="this.open ? ALL_FOLD.delete('${id}') : ALL_FOLD.add('${id}')"><summary>${t}</summary><div class="csb">${body}</div></details>`   // en «Ver todo» cada bloque lleva su título y se pliega
     : (always ? `<h2 class="grp">${t}</h2>` : '') + body;
   let h = `<div class="dh"><h2>${esc(D.alias || D.title) || 'Nuevo paper'}</h2><div class="dbtn"><button class="pri" onclick="commit()">Guardar paper</button><button onclick="$('#dlg').close()">Cancelar</button></div></div><div class="tabs">${Object.entries(T).map(([k, v]) => `<button class="${tab === k ? 'on' : ''}" onclick="tab='${k}';drawD()">${v}</button>`).join('')}</div>`;
