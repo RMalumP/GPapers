@@ -121,3 +121,9 @@ aside{border-left:0;border-radius:0 10px 10px 0;padding-left:6px}
 .pimg.locked{cursor:pointer;opacity:.6}.pimg:has(img){border-style:solid}.imgx{font-size:18px;color:var(--red)}
 .imgrow{display:flex;align-items:center;gap:12px}.pimgprev{display:flex;justify-content:center;margin:8px 0}.pimgbox .pimg.big:hover{border-color:var(--pri)}
 .card .th .pimg.sm{margin-right:2px}
+
+/* F9: estilos de cita personalizados */
+.cugrid{display:grid;grid-template-columns:1fr 1fr;gap:2px 12px}.cugrid label{margin:4px 0}@media(max-width:560px){.cugrid{grid-template-columns:1fr}}
+.cuh{font-weight:700;margin:12px 0 2px}.cuh small{font-weight:400}#cuT{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px;min-height:80px}
+.cuf{display:flex;flex-wrap:wrap;gap:4px}.cuf button{font-size:12px;padding:1px 8px}.cuprev{border:1px dashed var(--bd);border-radius:8px;padding:8px 10px;display:flex;flex-direction:column;gap:6px}
+.culn{overflow-wrap:anywhere}.culn small{opacity:.7}.cuhelp code{background:var(--bg);padding:0 3px;border-radius:3px}

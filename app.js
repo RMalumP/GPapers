@@ -17,7 +17,7 @@ const TPL_DEF = [   // plantillas de nota de serie; {fecha} y {paper} se sustitu
   {id: 't_res', name: 'Resumen del paper', text: '**Objetivo:** \n**Método:** \n**Resultados:** \n**Limitaciones:** '},
   {id: 't_cit', name: 'Cita textual', text: '**Cita:** \n**Página:** \n**Comentario:** '},
   {id: 't_ide', name: 'Idea propia', text: '**Idea:** \n**Relación con mi tema:** \n**Siguiente paso:** '}];
-const defSettings = () => ({palette: 'azul', appName: 'Papers', showFile: true, showImg: true, shortcuts: {...SC_DEF}, fmtOpen: false, view: 'cards', templates: TPL_DEF.map(t => ({...t})), export: {fmt: 'txt', style: 'apa', order: 'auto', num: false, notes: false, particles: false, title: '', lang: 'es', dateFmt: 'long', vanAll: false, ppChap: true, numFmt: 'auto', disamb: true, inText: false}});   // ajustes por defecto (se guardan en el JSON)
+const defSettings = () => ({palette: 'azul', appName: 'Papers', showFile: true, showImg: true, customStyles: [], shortcuts: {...SC_DEF}, fmtOpen: false, view: 'cards', templates: TPL_DEF.map(t => ({...t})), export: {fmt: 'txt', style: 'apa', order: 'auto', num: false, notes: false, particles: false, title: '', lang: 'es', dateFmt: 'long', vanAll: false, ppChap: true, numFmt: 'auto', disamb: true, inText: false}});   // ajustes por defecto (se guardan en el JSON)
 let db = {version: 1, sections: [], tags: [], papers: [], trash: [], settings: defSettings()}, path = null, dirty = false, auto = false, D, tab = 'data', MG, timer;
 const F = {q: '', sorts: [{k: 'title', d: 1}], group: false, sec: '', tags: new Set(), read: '', minRating: 0, inNotes: false, mode: 'any', tbSec: false, tbTag: true};
 const SEL = new Set();   // ids de papers seleccionados
@@ -528,9 +528,109 @@ const TYPE_WARN = {
     une_nf: 'UNE-ISO 690: la guía no cubre la prensa impresa; en línea sigue el ejemplo de periódico (la fecha sustituye a volumen y número). Verificar.', une_num: 'UNE-ISO 690: la guía no cubre la prensa impresa; en línea sigue el ejemplo de periódico (la fecha sustituye a volumen y número). Verificar.'},
   blog: {vancouver: 'Vancouver: solo se cita la contribución (autor, título, fecha) y «En: blog [Internet]»; lugar y editorial del blog no se guardan. Verificar.', vancouver2: 'Vancouver: solo se cita la contribución (autor, título, fecha) y «En: blog [Internet]»; lugar y editorial del blog no se guardan. Verificar.',
     ieee: 'IEEE: la guía no trae plantilla de blog; se usa la de Internet. Verificar.', une_nf: 'UNE-ISO 690: la guía no trae plantilla de blog; se usa la de sitio web con «Entrada de blog.» tras el título. Verificar.', une_num: 'UNE-ISO 690: la guía no trae plantilla de blog; se usa la de sitio web con «Entrada de blog.» tras el título. Verificar.'}};
-const typeWarn = (style, type) => TYPE_WARN[type]?.[style] || (XTYPES.has(type) ? xWarn(style, type) : '');
+const typeWarn = (style, type) => STYLES[style]?.custom ? '' : TYPE_WARN[type]?.[style] || (XTYPES.has(type) ? xWarn(style, type) : '');
 // estilo con numeración propia (IEEE, UNE numérico…): numbered: true · idioma fijo: fixedLang: 'en' · aviso en Exportar: note
 const BASADO = 'Basado en: Chicago 17.ª ed., MLA 8.ª/9.ª, APA 7.ª, UNE-ISO 690:2024, IEEE (guía fuente), Vancouver (variante con nombre completo).';
+/* ===== Estilos de cita personalizados (Configuración → se guardan en settings.customStyles del JSON) =====
+   Plantilla por tipo de documento: texto con {campos}, [grupos opcionales] (solo salen si todos sus campos tienen valor) y modificadores
+   {campo:i:q|alternativa}. Un estilo propio se comporta como los de serie: sale en Exportar y en la pestaña Cita. */
+const CU_F = [['authors', 'Autores'], ['author1', 'Primer autor'], ['authorsShort', 'Apellidos (cita en el texto)'], ['editors', 'Editores'], ['title', 'Título'], ['year', 'Año (con a/b si hace falta)'],
+  ['date', 'Fecha completa de publicación'], ['venue', 'Revista / editorial / sitio'], ['publisher', 'Editorial del libro o actas'], ['place', 'Lugar de edición'], ['edition', 'Edición'], ['volume', 'Volumen'], ['issue', 'Número'],
+  ['pages', 'Páginas'], ['loc', 'Página citada (solo cita en el texto)'], ['doi', 'DOI (sin https://doi.org/)'], ['doiurl', 'DOI como enlace'], ['url', 'URL'], ['link', 'Enlace (DOI o URL según el paper)'], ['accessed', 'Fecha de consulta'],
+  ['isbn', 'ISBN'], ['issn', 'ISSN'], ['institution', 'Institución'], ['docNumber', 'Número de documento'], ['series', 'Serie o colección'], ['seriesNumber', 'Número en la serie'], ['conferenceName', 'Nombre del congreso'],
+  ['conferencePlace', 'Lugar del congreso'], ['conferenceDates', 'Fechas del congreso'], ['subtype', 'Designación'], ['authorRole', 'Función del autor'], ['userHandle', 'Usuario (@)'], ['thesisType', 'Tipo de trabajo'], ['type', 'Tipo de documento']];
+const CU_M = {i: 'Cursiva', b: 'Negrita', q: '«Comillas»', qq: '“Comillas inglesas”', par: '(Paréntesis)', br: '[Corchetes]', up: 'MAYÚSCULAS', low: 'minúsculas', cap: 'Primera en mayúscula', nodot: 'Quitar punto final', dot: 'Añadir punto final', pp: 'Páginas con p./pp.', dash: 'Rango con raya (–)'};
+const CU_AU = {ap_ini: 'Apellido, N. N.', ap_ini_sp: 'Apellido NN (Vancouver)', ap_nom: 'Apellido, Nombre', nom_ap: 'Nombre Apellido', ini_ap: 'N. N. Apellido', ap: 'Solo el apellido'};
+const CU_LAST = {auto: 'Según idioma (y / &)', ' y ': ' y ', ' & ': ' & ', ' and ': ' and ', ', & ': ', & ', ', ': ', (solo coma)', ' / ': ' / ', '; ': '; '};
+const CU_DATE = {long: '24 de octubre de 2017', export: 'Como en Exportar', iso: '2017-10-24', dmy: '24-10-2017', my: 'octubre 2017'};
+const cuNew = (name = 'Mi estilo') => ({id: uid(), name, order: 'alpha', numbered: false, numFmt: 'br', dis: true, dateFmt: 'long',
+  au: {fmt: 'ap_ini', sep: ', ', last: 'auto', max: 0, show: 1, etAl: 'et al.', upper: false, firstOnly: false},
+  tpl: {'*': '[{authors}. ]({year|s.f.}). {title}. [{venue:i}][, {volume}][({issue})][, {pages:pp}]. [{link}]'}, inText: '({authorsShort}, {year|s.f.}[, {loc:pp}])'});
+function cuClean(c) {   // lo que viene de un JSON no se fía: forma y límites
+  if (!c || typeof c !== 'object') return null;
+  const d = cuNew(String(c.name || 'Estilo').slice(0, 60)); d.id = String(c.id || uid()).replace(/[^\w-]/g, '') || uid();
+  d.order = c.order === 'list' ? 'list' : 'alpha'; d.numbered = !!c.numbered; d.numFmt = ['dot', 'br', 'par'].includes(c.numFmt) ? c.numFmt : 'br'; d.dis = c.dis !== false; d.dateFmt = Object.hasOwn(CU_DATE, c.dateFmt) ? c.dateFmt : 'long';
+  const a = c.au && typeof c.au === 'object' ? c.au : {};
+  d.au = {fmt: Object.hasOwn(CU_AU, a.fmt) ? a.fmt : 'ap_ini', sep: typeof a.sep === 'string' ? a.sep.slice(0, 10) : ', ', last: typeof a.last === 'string' ? a.last.slice(0, 12) : 'auto', max: Math.max(0, Math.min(99, +a.max || 0)),
+    show: Math.max(1, Math.min(99, +a.show || 1)), etAl: typeof a.etAl === 'string' ? a.etAl.slice(0, 20) : 'et al.', upper: !!a.upper, firstOnly: !!a.firstOnly};
+  d.tpl = {}; if (c.tpl && typeof c.tpl === 'object') for (const [k, v] of Object.entries(c.tpl)) if ((k === '*' || Object.hasOwn(TYPES, k)) && typeof v === 'string') d.tpl[k] = v.slice(0, 2000);
+  d.inText = typeof c.inText === 'string' ? c.inText.slice(0, 500) : ''; return d;
+}
+function cuParse(s, i = 0, close = false) {   // → [nodos, posición]; \ escapa el carácter siguiente
+  const out = []; let txt = ''; const flush = () => { if (txt) { out.push({t: 'x', v: txt}); txt = ''; } };
+  while (i < s.length) {
+    const c = s[i];
+    if (c === '\\' && i + 1 < s.length) { txt += s[i + 1]; i += 2; continue; }
+    if (c === '{') { const j = s.indexOf('}', i); if (j > 0) { flush(); const body = s.slice(i + 1, j), bar = body.indexOf('|'), spec = (bar < 0 ? body : body.slice(0, bar)).split(':').map(x => x.trim());
+      out.push({t: 'f', k: spec[0], m: spec.slice(1), fb: bar < 0 ? '' : body.slice(bar + 1)}); i = j + 1; continue; } }
+    if (c === '[') { flush(); const r = cuParse(s, i + 1, true); out.push({t: 'g', n: r[0]}); i = r[1]; continue; }
+    if (c === ']' && close) { flush(); return [out, i + 1]; }
+    txt += c; i++;
+  }
+  flush(); return [out, i];
+}
+function cuRender(nodes, get) {
+  let s = ''; for (const n of nodes) {
+    if (n.t === 'x') s += n.v; else if (n.t === 'f') s += get(n);
+    else { const r = cuRender(n.n, get), f = nodesFields(n.n); if (!f.some(x => !get(x))) s += r; }   // el grupo sale solo si todos sus campos directos tienen valor
+  } return s;
+}
+const nodesFields = ns => ns.filter(n => n.t === 'f');
+const cuMod = (v, m) => ({i: v => '*' + v + '*', b: v => '**' + v + '**', q: v => '«' + v + '»', qq: v => '“' + v + '”', par: v => '(' + v + ')', br: v => '[' + v + ']', up: v => v.toUpperCase(), low: v => v.toLowerCase(),
+  cap: v => v.charAt(0).toUpperCase() + v.slice(1), nodot: v => v.replace(/\.(\*{0,2})$/, '$1'), dot: endDot, dash: v => v.replace(/\s*[-–—]+\s*/g, '–')}[m]?.(v) ?? v);
+const cuTidy = s => s.replace(/\s+/g, ' ').replace(/ +([,.;:)\]»”])/g, '$1').replace(/([(\[«“]) +/g, '$1').replace(/([.,;:])(\s*\1)+/g, '$1').trim();
+function cuDate(s, fmt, o) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s || ''); if (!m || !okDate(s)) return s || ''; const [, y, mo, d] = m, i = +mo - 1, en = o.lang === 'en';
+  return fmt === 'export' ? fdate(s, o) : fmt === 'iso' ? s : fmt === 'dmy' ? `${d}-${mo}-${y}` : fmt === 'my' ? `${MESF[en ? 'en' : 'es'][i]} ${y}` : en ? `${MESF.en[i]} ${+d}, ${y}` : `${+d} de ${MESF.es[i]} de ${y}`;
+}
+function cuAuthors(P, o, a) {
+  if (!P.length) return '';
+  let list = P, etal = false; if (a.max && P.length > a.max) { list = P.slice(0, a.show); etal = true; }
+  const one = (x, k) => { if (x.org || !x.g) return ea(x.l); const l = ea(a.upper ? x.l.toUpperCase() : x.l); let f = a.fmt;
+    if (a.firstOnly && k > 0) f = f === 'ap_nom' ? 'nom_ap' : f === 'ap' ? 'ap' : 'ini_ap';
+    return f === 'ap_ini' ? `${l}, ${ini(x.g, 1)}` : f === 'ap_ini_sp' ? `${l} ${ini(x.g, 0)}` : f === 'ap_nom' ? `${l}, ${ea(x.g)}` : f === 'nom_ap' ? `${ea(x.g)} ${l}` : f === 'ini_ap' ? `${ini(x.g, 1)} ${l}` : l; };
+  const A = list.map(one);
+  if (etal) return A.join(a.sep) + (/^[,;]/.test(a.etAl) ? '' : ' ') + ea(a.etAl);
+  if (A.length === 1) return A[0];
+  const conj = a.last === 'auto' ? (o.lang === 'en' ? ' & ' : yE(list.at(-1).l) + ' ') : a.last;
+  return A.slice(0, -1).join(a.sep) + conj + A.at(-1);
+}
+function cuShort(P, o) {
+  const L = P.map(x => ea(x.l)); if (L.length < 3) return L.length === 2 ? L[0] + (o.lang === 'en' ? ' & ' : yE(P[1].l) + ' ') + L[1] : L[0] || '';
+  return L[0] + ' et al.';
+}
+function cuValue(k, p, o, cs) {
+  switch (k) {
+    case 'authors': return cuAuthors(pAuthP(p), o, cs.au);
+    case 'author1': return cuAuthors(pAuthP(p).slice(0, 1), o, {...cs.au, max: 0});
+    case 'authorsShort': return cuShort(pAuthP(p), o);
+    case 'editors': return cuAuthors(parse(p.editors || []), o, cs.au);
+    case 'title': return ea(p.title || '');
+    case 'year': return p.year ? ea(p.year + (o.ys || '')) : '';
+    case 'date': return okDate(p.pubDate) ? cuDate(p.pubDate, cs.dateFmt, o) : '';
+    case 'venue': return ea(p.venue || '');
+    case 'edition': return ea(edLbl(p.edition, o.lang === 'en' ? 'en' : 'es'));
+    case 'doi': return p.doi ? ea(normDoi(p.doi)) : '';
+    case 'doiurl': return p.doi ? 'https://doi.org/' + normDoi(p.doi) : '';
+    case 'url': return p.url || '';
+    case 'link': return citeLink(p);
+    case 'accessed': return p.accessed && !p.hideAccessed ? cuDate(p.accessed, cs.dateFmt, o) : '';
+    case 'type': return TYPES[p.type] || '';
+    case 'loc': return ea(o.loc || '');
+    default: return CU_F.some(f => f[0] === k) && STR_F.includes(k) ? ea(String(p[k] || '')) : '';
+  }
+}
+const cuGet = (n, p, o, cs) => { let v = cuValue(n.k, p, o, cs); if (!v) return n.fb ? ea(n.fb) : '';
+  if ((n.k === 'pages' || n.k === 'loc') && n.m.includes('pp')) v = ea(pgs(n.k === 'pages' ? p.pages : o.loc, 1)); for (const m of n.m) v = cuMod(v, m); return v; };
+const cuRun = (tpl, p, o, cs) => cuTidy(cuRender(cuParse(tpl || '')[0], n => cuGet(n, p, o, cs)));
+function syncStyles(list, exp) {   // registra los estilos propios junto a los de serie (clave cu_<id>)
+  for (const k of Object.keys(STYLES)) if (k.startsWith('cu_')) delete STYLES[k];
+  for (const c of list || []) STYLES['cu_' + c.id] = {name: c.name + ' ✎', custom: true, order: c.order, numbered: c.numbered, numFmt: c.numFmt, dis: c.dis,
+    fn: (p, o = ex()) => cuRun(c.tpl[p.type] ?? c.tpl['*'] ?? '', p, o, c) || ea(p.title || ''),
+    inText: (p, o = ex(), loc = '') => c.inText ? [{k: 'En el texto', t: cuRun(c.inText, p, {...o, loc}, c)}] : [],
+    note: 'Estilo personalizado: se edita en Configuración → Estilos de cita personalizados.'};
+  if (exp && !STYLES[exp.style]) exp.style = 'apa';
+}
 const isNum = o => !!(o.num || STYLES[o.style]?.numbered);
 
 const numLbl = (i, o) => { const f = !o.numFmt || o.numFmt === 'auto' ? STYLES[o.style]?.numFmt || 'dot' : o.numFmt; return {dot: `${i}. `, br: `[${i}] `, par: `(${i}) `}[f] || `${i}. `; };   // etiqueta de numeración
@@ -573,6 +673,8 @@ function validate(d) {
   d.settings.fmtOpen = !!d.settings.fmtOpen; d.settings.view = d.settings.view === 'table' ? 'table' : 'cards';
   if (!Array.isArray(d.settings.templates)) d.settings.templates = defSettings().templates;
   d.settings.templates = d.settings.templates.filter(t => t && typeof t.name === 'string' && typeof t.text === 'string').map(t => ({id: t.id || uid(), name: t.name, text: t.text}));
+  d.settings.customStyles = [...new Map((Array.isArray(sIn.customStyles) ? sIn.customStyles : []).map(cuClean).filter(Boolean).map(c => [c.id, c])).values()];
+  syncStyles(d.settings.customStyles, d.settings.export);
   if (sIn.shortcuts && typeof sIn.shortcuts === 'object') for (const k of Object.keys(SC_DEF)) if (typeof sIn.shortcuts[k] === 'string') d.settings.shortcuts[k] = sIn.shortcuts[k];
   return d;
 }
@@ -626,7 +728,7 @@ function markDirty() { record(); dirty = true; touch(); }
 function undo() { if (UNDO.length) { REDO.push(JSON.stringify(db)); restore(UNDO.pop()); } }
 function redo() { if (REDO.length) { UNDO.push(JSON.stringify(db)); restore(REDO.pop()); } }
 function restore(json) {
-  db = JSON.parse(json); lastSnap = json; lastRecAt = 0;
+  db = JSON.parse(json); lastSnap = json; lastRecAt = 0; syncStyles(db.settings.customStyles, db.settings.export);
   for (const id of [...SEL]) if (!db.papers.some(p => p.id === id)) SEL.delete(id);
   dirty = true; applySettings(); render(); if ($('#cfg').open) drawCfg(); touch();
 }
@@ -887,9 +989,78 @@ function drawCfg() {
     <label class="row"><input type="checkbox" ${c.showFile ? 'checked' : ''} onchange="setCfg('showFile', this.checked)"> Mostrar el archivo abierto en la cabecera</label>
     <label class="row"><input type="checkbox" ${c.fmtOpen ? 'checked' : ''} onchange="setFmtDefault(this.checked)"> Barra de formato de las notas desplegada por defecto</label>
     <label class="row"><input type="checkbox" ${c.export.inText ? 'checked' : ''} onchange="setInText(this.checked)"> Mostrar la cita en el texto y las notas (Chicago) en la pestaña «Cita» de cada paper</label>
-    ${cfgSec('tpl', 'Plantillas de nota', tplUI())}${cfgSec('sc', 'Atajos de teclado', `<div class="sct"><small>(clic en una combinación para cambiarla; Retroceso la quita)</small>${Object.keys(SC_NAMES).map(a => `<div class="scr"><span>${SC_NAMES[a]}</span><span class="scb"><button class="${recAct === a ? 'rec' : ''}" onclick="recAct='${a}';drawCfg()">${recAct === a ? 'Pulsa una tecla… (Esc cancela)' : esc(c.shortcuts[a]) || 'Sin asignar'}</button>${c.shortcuts[a] ? `<button title="Quitar" onclick="setSC('${a}','')">✕</button>` : ''}</span></div>`).join('')}<button onclick="resetSC()">Restablecer atajos</button></div>`)}
+    ${cfgSec('cu', 'Estilos de cita personalizados', cuUI())}${cfgSec('tpl', 'Plantillas de nota', tplUI())}${cfgSec('sc', 'Atajos de teclado', `<div class="sct"><small>(clic en una combinación para cambiarla; Retroceso la quita)</small>${Object.keys(SC_NAMES).map(a => `<div class="scr"><span>${SC_NAMES[a]}</span><span class="scb"><button class="${recAct === a ? 'rec' : ''}" onclick="recAct='${a}';drawCfg()">${recAct === a ? 'Pulsa una tecla… (Esc cancela)' : esc(c.shortcuts[a]) || 'Sin asignar'}</button>${c.shortcuts[a] ? `<button title="Quitar" onclick="setSC('${a}','')">✕</button>` : ''}</span></div>`).join('')}<button onclick="resetSC()">Restablecer atajos</button></div>`)}
     <small>Estos ajustes se guardan en el mismo archivo JSON.</small>
 `;
+}
+/* ---- Editor de estilos personalizados (Configuración) ---- */
+let CU = {id: '', type: '*', prev: 'ej'};
+const cuCur = () => db.settings.customStyles.find(c => c.id === CU.id) || db.settings.customStyles[0] || null;
+const cuSample = ty => NEWF({id: 'ej', title: 'Ejemplo de título del documento', authors: ['Pérez, Juan Carlos', 'Gómez Ruiz, Ana', 'Lee, Min-ho'], editors: ['Martín, Luis'], year: 2021, type: ty, venue: 'Revista de Ejemplo', publisher: 'Editorial Ejemplo',
+  place: 'Madrid', edition: '2', volume: '12', issue: '3', pages: '45-67', doi: '10.1000/xyz123', url: 'https://example.org/doc', accessed: '2026-01-15', pubDate: '2021-03-09', isbn: '978-3-16-148410-0', issn: '1234-5678', institution: 'Universidad de Ejemplo',
+  docNumber: 'ABC-123', series: 'Serie Ejemplo', seriesNumber: '7', conferenceName: 'Congreso de Ejemplo', conferencePlace: 'Sevilla', conferenceDates: '3-5 de mayo de 2021', subtype: 'Informe técnico', authorRole: 'Director', userHandle: 'ejemplo',
+  thesisType: 'Tesis doctoral', notes: [], tagIds: [], cites: {}, sectionIds: [], related: [], refTo: [], history: [], general: ''});
+function cuPrev() {
+  const el = $('#cuPrev'), c = cuCur(), st = c && STYLES['cu_' + c.id]; if (!el || !st) return;
+  const o = {...ex(), ys: ''}, real = CU.prev !== 'ej' && db.papers.find(p => p.id === CU.prev), line = (p, lab) => `<div class="culn">${lab ? `<small>${esc(lab)}</small> ` : ''}${citeHtml(st.fn(p, o)) || '<small>(vacío)</small>'}</div>`;
+  const p = real || cuSample(CU.type === '*' ? 'articulo' : CU.type), it = st.inText(p, o, '24');
+  el.innerHTML = line(p, real ? '' : TYPES[p.type]) + (it.length ? `<div class="culn"><small>En el texto:</small> ${citeHtml(it[0].t)}</div>` : '')
+    + (real ? '' : `<details><summary>Ver el ejemplo en todos los tipos</summary>${Object.entries(TYPES).map(([k, v]) => line(cuSample(k), v)).join('')}</details>`);
+}
+function cuUI() {
+  const L = db.settings.customStyles, c = cuCur(); if (c) CU.id = c.id;
+  let h = `<small>Crea tu propio estilo: una plantilla por tipo de documento con los campos de los papers. Sale en Exportar y en la pestaña Cita, y se guarda en el JSON.</small>
+    <div class="row" style="margin:8px 0">${L.length ? `<select onchange="CU.id=this.value;CU.type='*';drawCfg()">${L.map(x => `<option value="${x.id}" ${c.id === x.id ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select>` : ''}
+      <button onclick="cuAdd()">+ Nuevo estilo</button>${c ? '<button onclick="cuDup()">Duplicar</button><button class="danger" onclick="cuDel()">Eliminar</button>' : ''}</div>`;
+  if (!c) return h + '<p class="empty">Aún no hay estilos personalizados.</p>';
+  const sel = (k, o, v, f) => `<select onchange="${f}('${k}',this.value)">${Object.entries(o).map(([a, b]) => `<option value="${esc(a)}" ${String(v) === a ? 'selected' : ''}>${esc(b)}</option>`).join('')}</select>`;
+  const au = c.au, tpl = c.tpl[CU.type] ?? c.tpl['*'] ?? '', over = CU.type !== '*' && c.tpl[CU.type] != null;
+  h += `<div class="cugrid">
+    <label>Nombre<input value="${esc(c.name)}" maxlength="60" oninput="cuSet('name',this.value)"></label>
+    <label>Orden de la bibliografía${sel('order', {alpha: 'Alfabético por autor', list: 'Orden de la lista'}, c.order, 'cuSet')}</label>
+    <label class="row"><input type="checkbox" ${c.numbered ? 'checked' : ''} onchange="cuSet('numbered',this.checked)"> Numerada</label>
+    <label>Formato del número${sel('numFmt', {dot: '1.', br: '[1]', par: '(1)'}, c.numFmt, 'cuSet')}</label>
+    <label class="row"><input type="checkbox" ${c.dis ? 'checked' : ''} onchange="cuSet('dis',this.checked)"> Distinguir 2020a / 2020b</label>
+    <label>Formato de fechas${sel('dateFmt', CU_DATE, c.dateFmt, 'cuSet')}</label></div>
+    <div class="cuh">Autores y editores</div><div class="cugrid">
+    <label>Cada autor${sel('fmt', CU_AU, au.fmt, 'cuAu')}</label><label>Entre autores<input value="${esc(au.sep)}" maxlength="10" oninput="cuAu('sep',this.value)"></label>
+    <label>Antes del último${sel('last', CU_LAST, au.last, 'cuAu')}</label><label>Más de N autores (0 = todos)<input type="number" min="0" max="99" value="${au.max}" oninput="cuAu('max',+this.value)"></label>
+    <label>Autores que se muestran<input type="number" min="1" max="99" value="${au.show}" oninput="cuAu('show',+this.value)"></label><label>Texto de «y otros»<input value="${esc(au.etAl)}" maxlength="20" oninput="cuAu('etAl',this.value)"></label>
+    <label class="row"><input type="checkbox" ${au.upper ? 'checked' : ''} onchange="cuAu('upper',this.checked)"> Apellidos en mayúsculas</label><label class="row"><input type="checkbox" ${au.firstOnly ? 'checked' : ''} onchange="cuAu('firstOnly',this.checked)"> Solo el primero va «Apellido, …»</label></div>
+    <div class="cuh">Plantilla</div>
+    <label>Tipo de documento<select onchange="CU.type=this.value;drawCfg()"><option value="*" ${CU.type === '*' ? 'selected' : ''}>Por defecto (todos los tipos)</option>${Object.entries(TYPES).map(([k, v]) => `<option value="${k}" ${CU.type === k ? 'selected' : ''}>${esc(v)}${c.tpl[k] != null ? ' ✎' : ''}</option>`).join('')}</select></label>
+    <textarea id="cuT" rows="4" spellcheck="false" oninput="cuTpl(this.value)" placeholder="p. ej. [{authors}. ]({year|s.f.}). {title:i}.">${esc(tpl)}</textarea>
+    ${CU.type !== '*' ? `<small>${over ? 'Plantilla propia de este tipo.' : 'Este tipo usa la plantilla por defecto; si la editas aquí, se crea una propia.'}</small>${over ? '<button onclick="cuTplClear()">Quitar la de este tipo</button>' : ''}` : ''}
+    <div class="cuh">Campos <small>(clic para insertar en la plantilla)</small></div><div class="cuf">${CU_F.map(([k, l]) => `<button title="{${k}}" onclick="cuIns('{${k}}')">${esc(l)}</button>`).join('')}</div>
+    <div class="row" style="margin:6px 0"><button onclick="cuGroup()" title="Lo de dentro solo sale si todos sus campos tienen valor">[ ] Grupo opcional</button>
+      <select onchange="cuModIns(this.value);this.value=''" title="Se aplica al campo bajo el cursor"><option value="">Formato del campo…</option>${Object.entries(CU_M).map(([k, v]) => `<option value="${k}">${esc(v)}</option>`).join('')}</select></div>
+    <details class="cuhelp"><summary>Cómo se escribe</summary><small>El texto va tal cual. <code>{campo}</code> inserta un dato; <code>{campo:i}</code> lo pone en cursiva (se pueden encadenar: <code>{title:i:q}</code>); <code>{year|s.f.}</code> usa «s.f.» si está vacío.
+      <code>[ … ]</code> es un grupo opcional: solo sale si todos los campos de dentro tienen valor. <code>\\</code> escapa el siguiente carácter (<code>\\[</code>). Los puntos y espacios repetidos se limpian solos.</small></details>
+    <label>Cita en el texto (opcional)<input value="${esc(c.inText)}" maxlength="500" oninput="cuSet('inText',this.value)" placeholder="({authorsShort}, {year})"></label>
+    <div class="cuh">Vista previa</div><label>Con<select onchange="CU.prev=this.value;cuPrev()"><option value="ej" ${CU.prev === 'ej' ? 'selected' : ''}>Un ejemplo</option>${db.papers.map(p => `<option value="${p.id}" ${CU.prev === p.id ? 'selected' : ''}>${esc(shortTxt(p.alias || p.title))}</option>`).join('')}</select></label>
+    <div id="cuPrev" class="cuprev"></div>`;
+  setTimeout(cuPrev); return h;
+}
+const cuTouch = () => { markDirty(); syncStyles(db.settings.customStyles, db.settings.export); cuPrev(); };
+function cuSet(k, v) { const c = cuCur(); if (!c) return; c[k] = v; cuTouch(); }
+function cuAu(k, v) { const c = cuCur(); if (!c) return; c.au[k] = v; cuTouch(); }
+function cuTpl(v) { const c = cuCur(); if (!c) return; c.tpl[CU.type] = v; cuTouch(); }
+function cuTplClear() { const c = cuCur(); delete c.tpl[CU.type]; cuTouch(); drawCfg(); }
+function cuAdd() { const c = cuNew('Mi estilo ' + (db.settings.customStyles.length + 1)); db.settings.customStyles.push(c); CU = {id: c.id, type: '*', prev: 'ej'}; cuTouch(); drawCfg(); }
+function cuDup() { const c = cuCur(), d = structuredClone(c); d.id = uid(); d.name += ' (copia)'; db.settings.customStyles.push(d); CU.id = d.id; cuTouch(); drawCfg(); }
+function cuDel() {
+  const c = cuCur(); if (!c || !confirm(`¿Eliminar el estilo «${c.name}»? Las citas que lo usen en Exportar volverán a APA.`)) return;
+  db.settings.customStyles = db.settings.customStyles.filter(x => x.id !== c.id); CU.id = ''; cuTouch(); drawCfg();
+}
+function cuEdit(f) {   // aplica f(textarea) sobre la plantilla y guarda el resultado
+  const t = $('#cuT'); if (!t) return; t.focus(); f(t); cuTpl(t.value);
+}
+function cuIns(txt) { cuEdit(t => { const s = t.selectionStart; t.setRangeText(txt, s, t.selectionEnd, 'end'); }); }
+function cuGroup() { cuEdit(t => { const s = t.selectionStart, e = t.selectionEnd; t.setRangeText('[' + t.value.slice(s, e) + ']', s, e, 'end'); if (s === e) t.setSelectionRange(s + 1, s + 1); }); }
+function cuModIns(m) {
+  if (!m) return; cuEdit(t => { const v = t.value, s = t.selectionStart, o = v.lastIndexOf('{', s - 1), c = o < 0 ? -1 : v.indexOf('}', o);
+    if (o < 0 || c < s - 1 || v.slice(o, s).includes('}')) return alert('Coloca el cursor dentro de un campo, p. ej. {title}.');
+    const bar = v.indexOf('|', o), at = bar > 0 && bar < c ? bar : c; t.setRangeText(':' + m, at, at, 'end'); });
 }
 const CFG_OPEN = new Set();   // apartados de Configuración desplegados (se conservan al redibujar)
 const cfgSec = (id, title, body) => `<details class="cs" ${CFG_OPEN.has(id) ? 'open' : ''} ontoggle="this.open ? CFG_OPEN.add('${id}') : CFG_OPEN.delete('${id}')"><summary>${title}</summary><div class="csb">${body}</div></details>`;
