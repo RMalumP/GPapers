@@ -17,14 +17,14 @@
 <div id="app">
   <aside id="side">
     <button class="sh" onclick="sbToggle()" title="Plegar / desplegar menú"><span class="ic">☰</span><span class="lbl">Menú</span></button>
-    <div class="sg" id="sg-search"><button class="sh" onclick="sbGroup('search')" title="Buscar"><span class="ic">🔍</span><span class="lbl">Buscar</span><span class="dot" id="d-search" hidden></span></button>
-      <div class="sb"><input id="q" type="search" placeholder="Título, autor o año" oninput="F.q=this.value;render()"><label><input type="checkbox" onchange="F.inNotes=this.checked;render()"> Incluir notas y citas editadas</label></div></div>
+    <div class="sg" id="sg-search"><div class="sgh"><button class="sh" onclick="sbGroup('search')" title="Buscar" aria-label="Buscar"><span class="ic">🔍</span><span class="dot" id="d-search" hidden></span></button><input id="q" type="search" placeholder="Título, autor o año" aria-label="Buscar" oninput="F.q=this.value;render()"></div>
+      <div class="sb"><label><input type="checkbox" onchange="F.inNotes=this.checked;render()"> Incluir notas y citas editadas</label></div></div>
     <div class="sg" id="sg-sort"><button class="sh" onclick="sbGroup('sort')" title="Ordenar"><span class="ic">⇅</span><span class="lbl">Ordenar</span></button>
       <div class="sb"><div id="sortUI"></div><label><input type="checkbox" id="grpChk" onchange="F.group=this.checked;render()"> Agrupar por sección</label></div></div>
     <div class="sg" id="sg-sec"><div class="sgh"><button class="sh" onclick="sbGroup('sec')" title="Secciones"><span class="ic">📁</span><span class="lbl">Secciones</span><span class="dot" id="d-sec" hidden></span></button><button class="mgb" onclick="openMg('sections')" title="Gestionar secciones">✎ Gestionar</button></div>
       <div class="sb"><div id="secF"></div><button onclick="svOpen(F.sec)">📄 Ver notas de la sección</button></div></div>
     <div class="sg" id="sg-tags"><div class="sgh"><button class="sh" onclick="sbGroup('tags')" title="Etiquetas"><span class="ic">🏷️</span><span class="lbl">Etiquetas</span><span class="dot" id="d-tags" hidden></span></button><button class="mgb" onclick="openMg('tags')" title="Gestionar etiquetas">✎ Gestionar</button></div>
-      <div class="sb"><div id="tagF"></div><label>Etiquetas en cada paper <select onchange="F.tagPos=this.value;render()"><option value="beside">Al lado del título</option><option value="above">Encima del título</option></select></label></div></div>
+      <div class="sb"><div id="tagF"></div></div></div>
     <div class="sg" id="sg-read"><button class="sh" onclick="sbGroup('read')" title="Lectura"><span class="ic">📖</span><span class="lbl">Lectura</span><span class="dot" id="d-read" hidden></span></button>
       <div class="sb"><div id="readF"></div><label>Valoración mínima <select id="minR" onchange="F.minRating=+this.value;render()"><option value="0">Cualquiera</option><option value="1">Al menos ★1</option><option value="2">Al menos ★2</option><option value="3">Al menos ★3</option><option value="4">Al menos ★4</option><option value="5">Al menos ★5</option></select></label></div></div>
     <div class="sg" id="sg-sel"><button class="sh" onclick="sbGroup('sel')" title="Selección y exportación"><span class="ic">☑️</span><span class="lbl">Selección</span><span class="dot" id="d-sel" hidden></span></button>
