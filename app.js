@@ -1549,3 +1549,4 @@ if (FSA) idb('readonly', st => st.get('last')).then(h => $('#reopen').hidden = !
 else { $('#auto').disabled = true; $('#auto').parentElement.title = 'El autoguardado solo está disponible en Chrome o Edge de escritorio'; }
 if ('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('sw.js').catch(() => {});   // PWA (no aplica en file://)
 $('#cfg').addEventListener('close', () => { recAct = null; });
+if (location.protocol.startsWith('http')) fetch('ejemplo_papers.json').then(r => r.ok ? r.text() : Promise.reject()).then(t => { if (!dirty && !db.papers.length) loadText(t, 'ejemplo_papers.json'); }).catch(() => {});   // en la web se abre el ejemplo por defecto
