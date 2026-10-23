@@ -17,7 +17,7 @@ const TPL_DEF = [   // plantillas de nota de serie; {fecha} y {paper} se sustitu
   {id: 't_res', name: 'Resumen del paper', text: '**Objetivo:** \n**Método:** \n**Resultados:** \n**Limitaciones:** '},
   {id: 't_cit', name: 'Cita textual', text: '**Cita:** \n**Página:** \n**Comentario:** '},
   {id: 't_ide', name: 'Idea propia', text: '**Idea:** \n**Relación con mi tema:** \n**Siguiente paso:** '}];
-const defSettings = () => ({palette: 'azul', appName: 'Papers', showFile: true, showImg: true, customStyles: [], shortcuts: {...SC_DEF}, fmtOpen: false, view: 'cards', templates: TPL_DEF.map(t => ({...t})), export: {fmt: 'txt', style: 'apa', order: 'auto', num: false, notes: false, particles: false, title: '', lang: 'es', dateFmt: 'long', vanAll: false, ppChap: true, numFmt: 'auto', disamb: true, inText: false}});   // ajustes por defecto (se guardan en el JSON)
+const defSettings = () => ({palette: 'azul', appName: 'Papers', showFile: true, showImg: true, customTypes: [], customStyles: [], shortcuts: {...SC_DEF}, fmtOpen: false, view: 'cards', templates: TPL_DEF.map(t => ({...t})), export: {fmt: 'txt', style: 'apa', order: 'auto', num: false, notes: false, particles: false, title: '', lang: 'es', dateFmt: 'long', vanAll: false, ppChap: true, numFmt: 'auto', disamb: true, inText: false}});   // ajustes por defecto (se guardan en el JSON)
 let db = {version: 1, sections: [], tags: [], papers: [], trash: [], settings: defSettings()}, path = null, dirty = false, auto = false, D, tab = 'data', MG, timer;
 const F = {q: '', sorts: [{k: 'title', d: 1}], group: false, sec: '', tags: new Set(), read: '', minRating: 0, inNotes: false, mode: 'any', tbSec: false, tbTag: true};
 const SEL = new Set();   // ids de papers seleccionados
@@ -55,7 +55,7 @@ const FLBL = {
   issue: {legislacion: 'Número del boletín'}};
 const FSUB = {mapa: ['Mapa'], dataset: ['Dataset', 'Conjunto de datos'], software: ['Software', 'Videojuego', 'Programa', 'Aplicación'], audiovisual: ['Película', 'Serie de TV', 'Capítulo de serie de televisión', 'Video'], audio: ['Audio podcast', 'Episodio de audio podcast', 'Canción'],
   redsocial: ['Post de X', 'Fotografía', 'Video', 'Actualización de estado', 'Historia de Instagram'], ia: ['Modelo de lenguaje de gran tamaño', 'Chat de IA generativa'], presentacion: ['Presentación de PowerPoint', 'Conferencia'], personal: ['Correo electrónico', 'Entrevista', 'Carta', 'Mensaje', 'Llamada telefónica']};
-const shows = (k, t) => FLD_T[k].includes(t);
+const shows = (k, t) => CTYPES.has(t) ? CTYPES.get(t).fields.includes(k) : FLD_T[k].includes(t);
 const IMG_RX = /^data:image\/(png|jpe?g|webp|gif);base64,[A-Za-z0-9+/=]+$/;
 function imgOk(i) {   // imagen del paper: URL, archivo local enlazado (solo el nombre; el enlace vive en este navegador) o copia reducida incrustada
   if (!i || typeof i !== 'object') return null;
@@ -528,9 +528,31 @@ const TYPE_WARN = {
     une_nf: 'UNE-ISO 690: la guía no cubre la prensa impresa; en línea sigue el ejemplo de periódico (la fecha sustituye a volumen y número). Verificar.', une_num: 'UNE-ISO 690: la guía no cubre la prensa impresa; en línea sigue el ejemplo de periódico (la fecha sustituye a volumen y número). Verificar.'},
   blog: {vancouver: 'Vancouver: solo se cita la contribución (autor, título, fecha) y «En: blog [Internet]»; lugar y editorial del blog no se guardan. Verificar.', vancouver2: 'Vancouver: solo se cita la contribución (autor, título, fecha) y «En: blog [Internet]»; lugar y editorial del blog no se guardan. Verificar.',
     ieee: 'IEEE: la guía no trae plantilla de blog; se usa la de Internet. Verificar.', une_nf: 'UNE-ISO 690: la guía no trae plantilla de blog; se usa la de sitio web con «Entrada de blog.» tras el título. Verificar.', une_num: 'UNE-ISO 690: la guía no trae plantilla de blog; se usa la de sitio web con «Entrada de blog.» tras el título. Verificar.'}};
-const typeWarn = (style, type) => STYLES[style]?.custom ? '' : TYPE_WARN[type]?.[style] || (XTYPES.has(type) ? xWarn(style, type) : '');
+const typeWarn = (style, type) => STYLES[style]?.custom ? '' : TYPE_WARN[baseT(type)]?.[style] || (XTYPES.has(baseT(type)) ? xWarn(style, baseT(type)) : '');
 // estilo con numeración propia (IEEE, UNE numérico…): numbered: true · idioma fijo: fixedLang: 'en' · aviso en Exportar: note
 const BASADO = 'Basado en: Chicago 17.ª ed., MLA 8.ª/9.ª, APA 7.ª, UNE-ISO 690:2024, IEEE (guía fuente), Vancouver (variante con nombre completo).';
+/* ===== Tipos de documento propios (Configuración → settings.customTypes del JSON) =====
+   Un tipo propio (clave ct_<id>) decide qué campos enseña el formulario y cómo se llaman; los estilos de serie lo tratan como
+   el tipo predefinido en «Se cita como» y los estilos propios pueden tener plantilla específica para él. */
+const CT_NAMES = {volume: 'Volumen', issue: 'Número', pages: 'Páginas', publisher: 'Editorial (del libro o actas)', place: 'Lugar de edición', edition: 'Edición', editors: 'Editores del libro', pubDate: 'Fecha de publicación completa', thesisType: 'Tipo de trabajo',
+  isbn: 'ISBN', issn: 'ISSN', institution: 'Institución', series: 'Serie o colección', seriesNumber: 'Número en la serie', docNumber: 'Número de documento', conferenceName: 'Nombre del congreso', conferencePlace: 'Lugar del congreso', conferenceDates: 'Fechas del congreso',
+  subtype: 'Designación', authorRole: 'Función del autor', userHandle: 'Usuario (@)'};
+const CTYPES = new Map();   // clave ct_<id> → {id, name, like, fields, labels}
+const baseT = t => CTYPES.get(t)?.like || t;
+const effP = p => CTYPES.has(p.type) ? {...p, type: CTYPES.get(p.type).like} : p;   // los estilos de serie ven el tipo predefinido equivalente
+const ctFieldsOf = like => Object.keys(CT_NAMES).filter(k => FLD_T[k].includes(like));
+function ctClean(c) {
+  if (!c || typeof c !== 'object') return null; const like = Object.hasOwn(TYPES, c.like) && !c.like.startsWith('ct_') ? c.like : 'articulo';
+  const d = {id: String(c.id || uid()).replace(/[^\w-]/g, '') || uid(), name: String(c.name || 'Tipo propio').slice(0, 60), like, fields: Array.isArray(c.fields) ? [...new Set(c.fields.filter(k => Object.hasOwn(CT_NAMES, k)))] : ctFieldsOf(like), labels: {}};
+  if (c.labels && typeof c.labels === 'object') for (const [k, v] of Object.entries(c.labels)) if ((k === 'venue' || Object.hasOwn(CT_NAMES, k)) && typeof v === 'string' && v.trim()) d.labels[k] = v.slice(0, 120);
+  return d;
+}
+function syncTypes(list) {
+  for (const k of [...CTYPES.keys()]) delete TYPES[k]; CTYPES.clear();
+  for (const t of list || []) { CTYPES.set('ct_' + t.id, t); TYPES['ct_' + t.id] = t.name; }
+}
+for (const k of Object.keys(STYLES)) { const s = STYLES[k], f = s.fn, it = s.inText, om = s.omit;   // estilos de serie: aceptan tipos propios
+  s.fn = (p, o) => f(effP(p), o); s.inText = (p, o, loc) => it(effP(p), o, loc); if (om) s.omit = p => om(effP(p)); }
 /* ===== Estilos de cita personalizados (Configuración → se guardan en settings.customStyles del JSON) =====
    Plantilla por tipo de documento: texto con {campos}, [grupos opcionales] (solo salen si todos sus campos tienen valor) y modificadores
    {campo:i:q|alternativa}. Un estilo propio se comporta como los de serie: sale en Exportar y en la pestaña Cita. */
@@ -685,6 +707,8 @@ function validate(d) {
   d.settings.fmtOpen = !!d.settings.fmtOpen; d.settings.view = d.settings.view === 'table' ? 'table' : 'cards';
   if (!Array.isArray(d.settings.templates)) d.settings.templates = defSettings().templates;
   d.settings.templates = d.settings.templates.filter(t => t && typeof t.name === 'string' && typeof t.text === 'string').map(t => ({id: t.id || uid(), name: t.name, text: t.text}));
+  d.settings.customTypes = [...new Map((Array.isArray(sIn.customTypes) ? sIn.customTypes : []).map(ctClean).filter(Boolean).map(c => [c.id, c])).values()];
+  syncTypes(d.settings.customTypes); d.papers.concat(d.trash.map(t => t.paper)).forEach(p => { if (/^ct_/.test(p.type) && !CTYPES.has(p.type)) p.type = 'articulo'; });
   d.settings.customStyles = [...new Map((Array.isArray(sIn.customStyles) ? sIn.customStyles : []).map(cuClean).filter(Boolean).map(c => [c.id, c])).values()];
   syncStyles(d.settings.customStyles, d.settings.export);
   if (sIn.shortcuts && typeof sIn.shortcuts === 'object') for (const k of Object.keys(SC_DEF)) if (typeof sIn.shortcuts[k] === 'string') d.settings.shortcuts[k] = sIn.shortcuts[k];
@@ -740,7 +764,7 @@ function markDirty() { record(); dirty = true; touch(); }
 function undo() { if (UNDO.length) { REDO.push(JSON.stringify(db)); restore(UNDO.pop()); } }
 function redo() { if (REDO.length) { UNDO.push(JSON.stringify(db)); restore(REDO.pop()); } }
 function restore(json) {
-  db = JSON.parse(json); lastSnap = json; lastRecAt = 0; syncStyles(db.settings.customStyles, db.settings.export);
+  db = JSON.parse(json); lastSnap = json; lastRecAt = 0; syncTypes(db.settings.customTypes); syncStyles(db.settings.customStyles, db.settings.export);
   for (const id of [...SEL]) if (!db.papers.some(p => p.id === id)) SEL.delete(id);
   dirty = true; applySettings(); render(); if ($('#cfg').open) drawCfg(); touch();
 }
@@ -1001,7 +1025,7 @@ function drawCfg() {
     <label class="row"><input type="checkbox" ${c.showFile ? 'checked' : ''} onchange="setCfg('showFile', this.checked)"> Mostrar el archivo abierto en la cabecera</label>
     <label class="row"><input type="checkbox" ${c.fmtOpen ? 'checked' : ''} onchange="setFmtDefault(this.checked)"> Barra de formato de las notas desplegada por defecto</label>
     <label class="row"><input type="checkbox" ${c.export.inText ? 'checked' : ''} onchange="setInText(this.checked)"> Mostrar la cita en el texto y las notas (Chicago) en la pestaña «Cita» de cada paper</label>
-    ${cfgSec('cu', 'Estilos de cita personalizados', cuUI())}${cfgSec('tpl', 'Plantillas de nota', tplUI())}${cfgSec('sc', 'Atajos de teclado', `<div class="sct"><small>(clic en una combinación para cambiarla; Retroceso la quita)</small>${Object.keys(SC_NAMES).map(a => `<div class="scr"><span>${SC_NAMES[a]}</span><span class="scb"><button class="${recAct === a ? 'rec' : ''}" onclick="recAct='${a}';drawCfg()">${recAct === a ? 'Pulsa una tecla… (Esc cancela)' : esc(c.shortcuts[a]) || 'Sin asignar'}</button>${c.shortcuts[a] ? `<button title="Quitar" onclick="setSC('${a}','')">✕</button>` : ''}</span></div>`).join('')}<button onclick="resetSC()">Restablecer atajos</button></div>`)}
+    ${cfgSec('ct', 'Tipos de documento propios', ctUI())}${cfgSec('cu', 'Estilos de cita personalizados', cuUI())}${cfgSec('tpl', 'Plantillas de nota', tplUI())}${cfgSec('sc', 'Atajos de teclado', `<div class="sct"><small>(clic en una combinación para cambiarla; Retroceso la quita)</small>${Object.keys(SC_NAMES).map(a => `<div class="scr"><span>${SC_NAMES[a]}</span><span class="scb"><button class="${recAct === a ? 'rec' : ''}" onclick="recAct='${a}';drawCfg()">${recAct === a ? 'Pulsa una tecla… (Esc cancela)' : esc(c.shortcuts[a]) || 'Sin asignar'}</button>${c.shortcuts[a] ? `<button title="Quitar" onclick="setSC('${a}','')">✕</button>` : ''}</span></div>`).join('')}<button onclick="resetSC()">Restablecer atajos</button></div>`)}
     <small>Estos ajustes se guardan en el mismo archivo JSON.</small>
 `;
 }
@@ -1140,7 +1164,7 @@ function cuPrev() {
 }
 function cuUI() {
   const L = db.settings.customStyles, c = cuCur(); if (c) CU.id = c.id;
-  let h = `<small>Crea tu propio estilo: una plantilla por tipo de documento con los campos de los papers. Sale en Exportar y en la pestaña Cita, y se guarda en el JSON.</small>
+  let h = `<small>Crea tu propio estilo: una plantilla por tipo de documento con los campos de los papers. Sale en Exportar y en la pestaña Cita, y se guarda en el JSON. <a onclick="openHelp('estilos')">Ver la ayuda</a></small>
     <div class="row" style="margin:8px 0">${L.length ? `<select onchange="CU.id=this.value;CU.type='*';drawCfg()">${L.map(x => `<option value="${x.id}" ${c.id === x.id ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select>` : ''}
       <button onclick="cuAdd()">+ Nuevo estilo</button><select onchange="cuFromBase(this.value);this.value=''" title="Empieza con las plantillas de uno de los estilos de serie y modifícalas"><option value="">+ Nuevo a partir de…</option>${Object.entries(CU_BASE).map(([k, b]) => `<option value="${k}">${esc(b.name)}</option>`).join('')}</select>${c ? '<button onclick="cuDup()">Duplicar</button><button class="danger" onclick="cuDel()">Eliminar</button>' : ''}</div>`;
   if (!c) return h + '<p class="empty">Aún no hay estilos personalizados.</p>';
@@ -1194,6 +1218,141 @@ function cuModIns(m) {
     if (o < 0 || c < s - 1 || v.slice(o, s).includes('}')) return alert('Coloca el cursor dentro de un campo, p. ej. {title}.');
     const bar = v.indexOf('|', o), at = bar > 0 && bar < c ? bar : c; t.setRangeText(':' + m, at, at, 'end'); });
 }
+/* ===== Ayuda: botón ❓ de la cabecera (o F1) ===== */
+const HELP_OPEN = new Set(['inicio']);
+const helpSec = (id, title, body) => `<details class="cs" id="hp_${id}" ${HELP_OPEN.has(id) ? 'open' : ''} ontoggle="this.open ? HELP_OPEN.add('${id}') : HELP_OPEN.delete('${id}')"><summary>${title}</summary><div class="csb hp">${body}</div></details>`;
+const helpTbl = rows => `<table class="hpt">${rows.map(r => `<tr>${r.map((c, i) => i ? `<td>${c}</td>` : `<th>${c}</th>`).join('')}</tr>`).join('')}</table>`;
+function helpHTML() {
+  const sc = db.settings.shortcuts, kb = a => `<kbd>${esc(sc[a] || 'sin asignar')}</kbd>`;
+  const S = {
+    inicio: ['Primeros pasos', `<p>Esta aplicación guarda tus papers, secciones, etiquetas, notas y ajustes en <b>un único archivo JSON</b> que tú eliges. No hay cuenta ni servidor: todo está en tu navegador y en ese archivo.</p>
+      <ul><li><b>Abrir 📂</b> (${kb('open')}): carga un archivo JSON. Clic derecho en 📂 para <i>importar</i> referencias (.bib, .ris, texto o DOI).</li>
+      <li><b>Guardar 💾</b> (${kb('save')}) y <b>Guardar como</b>: en Chrome y Edge de escritorio escriben directamente en el archivo; en otros navegadores se descarga una copia.</li>
+      <li><b>Autoguardado</b> (solo Chrome/Edge): guarda solo, un segundo después de cada cambio. La primera vez pide el archivo.</li>
+      <li><b>Reabrir último</b>: aparece tras abrir un archivo y vuelve a cargarlo en la siguiente sesión (el navegador pide permiso).</li>
+      <li>En la versión web se abre al principio <code>ejemplo_papers.json</code> para que pruebes; guarda tu trabajo con «Guardar como».</li>
+      <li>Deshacer ${kb('undo')} y rehacer ${kb('redo')} funcionan sobre los cambios de la sesión.</li></ul>
+      <p>Qué se guarda en el JSON: papers (con su fecha de creación, notas e imagen), secciones, etiquetas, papelera y todos los ajustes (paleta, atajos, plantillas de nota, tipos y estilos de cita propios). <b>No</b> se guarda el historial de cambios del día ni los enlaces a archivos de imagen locales.</p>`],
+    lista: ['Lista principal', `<ul><li><b>Tarjetas o tabla</b>: el botón «Tabla / Tarjetas» cambia la vista. La tabla muestra imagen, título, autores, año, revista, lectura, valoración, secciones, etiquetas y notas.</li>
+      <li><b>En cada tarjeta</b>: casilla para seleccionar, <i>Editar</i>, las etiquetas del paper, el estado de lectura, las estrellas y la ✕ (a la papelera). Si las etiquetas no caben en la barra, pasan a su propia línea.</li>
+      <li><b>Estado de lectura</b>: un clic lo cambia (por leer → leyendo → leído). <b>Estrellas</b>: clic derecho para elegir la valoración.</li>
+      <li><b>Etiquetas</b>: clic derecho sobre una etiqueta del paper para quitársela.</li>
+      <li><b>Notas</b>: el botón «Notas (n)» las despliega; clic derecho abre el visor de notas del paper. 🔗 muestra sus relaciones.</li>
+      <li><b>Agrupar por sección</b>: en «Ordenar». Puedes arrastrar papers entre grupos para cambiarlos de sección.</li></ul>`],
+    lateral: ['Barra lateral', `<ul><li>☰ pliega o despliega la barra; con la barra plegada, cada icono la abre en su grupo.</li>
+      <li><b>Buscar 🔍</b> (${kb('find')}): por título, autor o año; la casilla amplía a notas y citas editadas.</li>
+      <li><b>Ordenar ⇅</b>: varios criterios en cascada (título, autor, año, revista, lectura, valoración, fecha de creación o modificación…), cada uno ascendente o descendente. Aquí también está «Agrupar por sección» y la <b>valoración mínima</b>.</li>
+      <li><b>Secciones 📁</b> y <b>Etiquetas 🏷️</b>: filtran la lista. «✎ Gestionar» crea, renombra, recolorea, ordena y borra. Las etiquetas se pueden combinar con «al menos una» o «todas». Clic derecho en una sección abre sus notas.</li>
+      <li><b>Lectura 📖</b>: filtra por estado. <b>Selección ☑️</b>: seleccionar visibles/quitar y exportar.</li>
+      <li><b>Relaciones 🕸️</b>: gráfico de los papers relacionados o que se citan entre sí. <b>Papelera 🗑️</b>: los papers eliminados se guardan <b>5 días</b> y se pueden restaurar.</li></ul>`],
+    paper: ['Editar un paper', `<p>«+ Nuevo paper» o «Editar». Pestañas: <b>Ver todo</b> (todos los bloques, plegables y con una sola variante de cita), <b>Datos</b>, <b>Cita</b>, <b>Notas</b>, <b>Secciones, etiquetas y relacionados</b> e <b>Historial</b>. «Guardar paper» confirma; «Cancelar» o cerrar sin guardar descarta el borrador.</p>
+      <h4>Datos</h4><ul><li><b>Imagen</b> (recuadro junto a los títulos): una <i>URL</i>, un <i>archivo local enlazado</i> (solo Chrome/Edge: el JSON guarda el nombre y el enlace queda en ese navegador) o una <i>copia reducida incrustada</i> en el JSON. También puedes <b>pegar con Ctrl+V</b> una imagen copiada (por ejemplo de Google Imágenes).</li>
+      <li><b>Título</b> y <b>título personalizado</b> (solo para mostrar; la cita usa el original). <b>Autores</b>: uno por línea, «Apellido, Nombre»; una entidad se escribe sin coma. <b>Clave de orden</b>: para ordenar «de la Torre» por «Torre».</li>
+      <li><b>Tipo</b>: decide qué campos aparecen. Incluye tus <i>tipos propios</i> y la opción «➕ Crear un tipo propio…».</li>
+      <li><b>DOI → Buscar</b> rellena los datos desde CrossRef (internet). <b>Enlace en la cita</b>: DOI, URL, automático o ninguno. <b>Fecha de consulta</b>: se escribe en la cita salvo que la omitas.</li></ul>
+      <h4>Cita</h4><p>Muestra la cita del paper en <b>todos los estilos</b> (los de serie y los tuyos). Puedes <i>editarla a mano</i> (queda marcada «editada a mano»), <i>Regenerar desde los datos</i>, <i>Copiar</i> (texto) o <i>Copiar con formato</i> (cursiva real, para pegar en Word o Docs). Con la opción de Configuración «Mostrar la cita en el texto», aparece también la cita en el texto y las notas de Chicago, con el campo de página.</p>
+      <h4>Notas</h4><p>Hay una <b>nota general</b> y <b>notas por sección</b>. El editor muestra el formato al escribir, como WhatsApp: <code>*cursiva*</code>, <code>**negrita**</code>, <code>~~tachado~~</code>, <code>__subrayado__</code>, listas con «- » o «1. ». La barra «Aa» (arriba del cuadro) trae esos botones, plantillas y enlaces 🔗 a otros papers o notas; la chincheta la mantiene desplegada. Se guardan y se copian con los símbolos, y al exportar solo se ve el formato.</p>
+      <h4>Secciones, etiquetas y relacionados</h4><p>Marca las secciones y etiquetas del paper. En «Relacionados» enlazas papers entre sí (relación simétrica) o indicas que <i>este paper cita a</i> otro; el otro mostrará «citado por».</p>
+      <h4>Historial</h4><p>Lista los cambios hechos <b>hoy</b> en ese paper. Solo vive en memoria: no se guarda en el JSON.</p>`],
+    exportar: ['Exportar citas', `<p>«Exportar citas» (${kb('exportCites')}) abre la ventana de exportación de los papers <b>seleccionados</b> (o de los visibles si no hay selección).</p>
+      <ul><li><b>Formato</b>: texto, Word (.doc o .docx), BibTeX o RIS. En los dos últimos no hay estilo de cita.</li>
+      <li><b>Estilo de cita</b>: APA 7, Vancouver, MLA, IEEE, Chicago (autor-fecha y notas-bibliografía), UNE-ISO 690 (nombre-fecha y numérico) y <b>tus estilos personalizados</b> (marcados con ✎). Algunos estilos avisan de los tipos que la guía no cubre.</li>
+      <li><b>Orden</b>: automático (alfabético o por lista según el estilo), lista, alfabético o por año. <b>Numerar</b>, formato del número, idioma de los conectores (es/en), formato de la fecha de consulta, incluir notas, listar todos los autores en Vancouver…</li>
+      <li>El texto de la vista previa es editable. <b>Copiar</b> copia texto; <b>Copiar con formato</b> conserva cursiva y sangría francesa para Word o Docs. También puedes guardar el archivo.</li></ul>`],
+    importar: ['Importar referencias', `<p>Clic derecho en 📂 (o ${kb('import')}): desde un archivo <code>.bib</code>/<code>.ris</code>, pegando texto BibTeX/RIS o buscando por <b>DOI</b>. Antes de añadir se revisa la lista, y puedes asignar sección, etiqueta y estado de lectura a todas. Dentro de un paper, «Buscar» junto al DOI propone rellenar solo los campos vacíos o los que marques.</p>`],
+    config: ['Configuración', `<p>⚙️ en la barra lateral. Todo se guarda en el JSON.</p><ul><li><b>Nombre de la aplicación</b>, <b>paleta de colores</b> (o personalizada) y mostrar el archivo abierto en la cabecera.</li>
+      <li><b>Mostrar la imagen</b> del paper en tarjetas y tabla. <b>Barra de formato</b> de las notas desplegada por defecto. <b>Cita en el texto</b> (Chicago) en la pestaña Cita.</li>
+      <li><b>Tipos de documento propios</b> y <b>Estilos de cita personalizados</b>: ver las dos secciones siguientes.</li>
+      <li><b>Plantillas de nota</b>: textos de partida para las notas; <code>{fecha}</code> y <code>{paper}</code> se sustituyen al insertarlas.</li>
+      <li><b>Atajos de teclado</b>: clic en una combinación para cambiarla (Retroceso la quita).</li></ul>`],
+    tipos: ['Tipos de documento propios', `<p>Los tipos predefinidos (${Object.entries(TYPES).filter(([k]) => !CTYPES.has(k)).map(([, v]) => esc(v)).join(', ')}) no cubren todo. Un <b>tipo propio</b> sirve para situaciones no contempladas: una carta, un pódcast local, un documento interno, un apunte de clase…</p>
+      <h4>Crear uno</h4><ol><li>Configuración → <b>Tipos de documento propios</b> → «+ Nuevo tipo». O, dentro de un paper, abre el desplegable <b>Tipo</b> y elige «➕ Crear un tipo propio…» (se crea y se asigna al paper).</li>
+      <li><b>Nombre</b>: el que verás en el desplegable (aparece en el grupo «Tipos propios»).</li>
+      <li><b>Se cita como</b>: el tipo predefinido que usarán los estilos de serie (APA, MLA…) y BibTeX/RIS para dar formato. Elige el más parecido.</li>
+      <li><b>Campos del formulario</b>: marca cuáles se muestran (volumen, páginas, editorial, ISBN, institución, congreso, fecha completa, función del autor…). «Usar los campos de…» marca los del tipo elegido. Siempre están título, autores, año, URL, DOI y fecha de consulta.</li>
+      <li><b>Etiquetas propias</b>: renombra cualquier campo para este tipo (por ejemplo «Revista / editorial / sitio» → «Canal»).</li></ol>
+      <h4>Cómo se cita</h4><ul><li><b>Estilos de serie</b>: tratan el tipo propio como su «Se cita como». Solo ven los campos que ese tipo predefinido usa.</li>
+      <li><b>Estilos propios</b>: ven <i>todos</i> los campos y pueden tener una <b>plantilla específica</b> para el tipo (en «Tipo de documento» del editor del estilo, el tipo propio aparece en la lista). Si no la hay, usan la plantilla por defecto.</li>
+      <li><b>Eliminar</b> un tipo pasa sus papers al tipo «Se cita como» y quita las plantillas que tuvieran los estilos propios.</li></ul>`],
+    estilos: ['Estilos de cita personalizados', `<p>Crea tu propio estilo de cita: una <b>plantilla por tipo de documento</b> con los campos del paper. Sale en Exportar y en la pestaña Cita junto a los de serie. Configuración → <b>Estilos de cita personalizados</b>.</p>
+      <h4>Empezar</h4><ul><li><b>+ Nuevo estilo</b>: parte de una plantilla de artículo sencilla. <b>+ Nuevo a partir de…</b>: copia las plantillas de APA 7, Vancouver, MLA, IEEE, Chicago, UNE-ISO 690… (artículo, libro, capítulo, congreso, tesis, web y prensa; el resto usa la plantilla por defecto) para que las modifiques. <b>Duplicar</b> y <b>Eliminar</b> (si estaba en uso en Exportar, vuelve a APA).</li></ul>
+      <h4>Opciones del estilo</h4><ul><li><b>Orden</b> de la bibliografía (alfabético o en el de la lista), <b>numerada</b> y formato del número, distinguir 2020a/2020b, formato de fechas y <b>idioma</b> de conectores y fechas.</li>
+      <li><b>Autores y editores</b>: formato de cada persona (${Object.values(CU_AU).map(esc).join(' · ')}), separador, texto antes del último, límite «más de N autores» con cuántos se muestran y el texto «et al.», apellidos en mayúsculas y «solo el primero invertido».</li></ul>
+      <h4>La plantilla</h4><p>Se escribe una por tipo de documento («Por defecto» vale para los que no tienen la suya). El texto sale tal cual y los datos se insertan así:</p>
+      ${helpTbl([['<code>{campo}</code>', 'inserta el dato. Ej.: <code>{title}</code>'], ['<code>{campo:i}</code>', 'aplica un formato; se encadenan: <code>{title:i:q}</code>'], ['<code>{campo|texto}</code>', 'si el campo está vacío, usa «texto». Ej.: <code>{year|s.f.}</code>'],
+        ['<code>[ … ]</code>', '<b>grupo opcional</b>: solo sale si todos los campos de dentro tienen valor. Ej.: <code>[, vol. {volume}]</code>'], ['<code>\\</code>', 'escapa el carácter siguiente: <code>\\[Internet\\]</code> escribe corchetes literales']])}
+      <p>Los puntos, comas y espacios repetidos se limpian solos. Los asteriscos de los datos se escapan.</p>
+      <h4>Campos disponibles</h4>${helpTbl(CU_F.map(([k, l]) => [`<code>{${k}}</code>`, esc(l)]))}
+      <h4>Formatos (<code>{campo:formato}</code>)</h4>${helpTbl(Object.entries(CU_M).map(([k, v]) => [`<code>${k}</code>`, esc(v)]))}
+      <h4>Opciones propias de cada campo</h4><p><b>Botón derecho sobre un campo</b> de la plantilla (o sobre su botón en la lista de campos) abre un panel con las opciones de ese campo y las escribe por ti como <code>{campo:opción=valor}</code>:</p>
+      <ul><li><b>Autores y editores</b>: <code>fmt</code> (formato de cada persona), <code>sep</code>, <code>last</code> (antes del último), <code>max</code> y <code>show</code> (límite y cuántos se muestran), <code>etal</code> (texto «et al.»), <code>upper</code>, <code>fo</code> (solo el primero invertido) y los <b>formatos por autor</b> <code>first</code> y <code>each</code>, donde <code>{l}</code> es el apellido, <code>{L}</code> APELLIDO, <code>{g}</code> el nombre, <code>{i}</code> las iniciales con punto y <code>{n}</code> sin punto. Ej.: <code>first={L}, {g}</code> y <code>each={g} {L}</code> dan «PÉREZ, Juan y Ana GÓMEZ».</li>
+      <li><b>Fechas</b> (<code>date</code>, <code>datey</code>, <code>accessed</code>): <code>fmt</code> (largo, ISO, d-m-a, mes año, como en Exportar) o un <code>pat</code> propio con <code>YYYY YY MMMM MMM MM M DD D</code>. Ej.: <code>{date:pat=D de MMMM de YYYY}</code>.</li>
+      <li><b>Páginas</b>: <code>pp</code> («p.»/«pp.»), <code>dash</code> (raya) y <code>first</code> (solo la primera). <b>Edición</b>: <code>raw</code>.</li>
+      <li><b>Cualquier campo</b>: <code>pre</code> y <code>suf</code> (texto antes y después que solo sale si hay valor) y los formatos de la tabla anterior.</li></ul>
+      <h4>Cita en el texto</h4><p>Una plantilla opcional para la cita corta, con <code>{authorsShort}</code>, <code>{year}</code> y <code>{loc}</code> (la página citada). Se ve en la pestaña Cita si activas la cita en el texto en Configuración.</p>
+      <h4>Vista previa</h4><p>Se actualiza al escribir. Elige «Un ejemplo» (con la opción «Ver el ejemplo en todos los tipos») o uno de tus papers para comprobar cómo queda.</p>
+      <h4>Ejemplo</h4><p><code>[{authors}. ]({year|s.f.}). {title:i}. [{edition}. ][{place}: ]{venue}. [{link}]</code><br>→ «Pérez, J. C. (2021). <i>Título del libro</i>. 2.ª ed. Madrid: Editorial. https://…»</p>`],
+    atajos: ['Atajos de teclado', helpTbl(Object.keys(SC_NAMES).map(a => [esc(SC_NAMES[a]), kb(a)]).concat([['Esta ayuda', '<kbd>F1</kbd>'], ['Cerrar menús y ventanas', '<kbd>Esc</kbd>']])) + '<p>Se cambian en Configuración → Atajos de teclado. Dentro de campos de texto solo funciona «Guardar»; negrita y cursiva actúan dentro de una nota.</p>'],
+    datos: ['Datos, privacidad y consejos', `<ul><li>Todo se queda en tu navegador y en tu archivo JSON. La aplicación solo sale a internet para <b>buscar un DOI en CrossRef</b> y para mostrar <b>imágenes por URL</b>.</li>
+      <li>Funciona sin conexión una vez cargada (se puede instalar como aplicación). Las imágenes por URL y la búsqueda de DOI necesitan internet.</li>
+      <li>Haz copias del JSON de vez en cuando: es tu única base de datos. La papelera guarda 5 días; el historial no se guarda.</li>
+      <li>Las imágenes <b>enlazadas</b> solo se ven en el navegador donde las elegiste; si vas a llevar el JSON a otro equipo, usa la <b>copia incrustada</b> o una URL.</li>
+      <li>Los estilos y tipos propios viajan dentro del JSON, así que se ven igual en cualquier navegador que lo abra.</li></ul>`]
+  };
+  return `<div class="dh"><h2>Ayuda</h2><div class="dbtn"><button onclick="$('#help').close()">Cerrar ✕</button></div></div>
+    <input id="hpq" type="search" placeholder="Buscar en la ayuda…" oninput="helpFilter(this.value)" aria-label="Buscar en la ayuda">
+    <div id="hpb">${Object.entries(S).map(([id, [t, b]]) => helpSec(id, t, b)).join('')}</div>`;
+}
+function helpFilter(q) {
+  q = norm(q).trim(); let n = 0;
+  document.querySelectorAll('#hpb > details').forEach(d => { const hit = !q || norm(d.textContent).includes(q); d.hidden = !hit; if (hit) n++; if (q && hit) d.open = true; });
+  $('#hpEmpty')?.remove(); if (!n) $('#hpb').insertAdjacentHTML('beforeend', '<p class="empty" id="hpEmpty">Nada encontrado.</p>');
+}
+function openHelp(id) {
+  if (id) HELP_OPEN.add(id); $('#help').innerHTML = helpHTML(); if (!$('#help').open) $('#help').showModal();
+  if (id) setTimeout(() => document.getElementById('hp_' + id)?.scrollIntoView({block: 'start'}));
+}
+document.addEventListener('keydown', e => { if (e.key === 'F1') { e.preventDefault(); openHelp(); } });
+/* ---- Editor de tipos propios (Configuración) ---- */
+let CTS = {id: ''};
+const ctCur = () => db.settings.customTypes.find(c => c.id === CTS.id) || db.settings.customTypes[0] || null;
+const ctTouch = () => { markDirty(); syncTypes(db.settings.customTypes); };
+function ctNew(name = 'Tipo propio') {
+  const c = ctClean({name: name + (db.settings.customTypes.length ? ' ' + (db.settings.customTypes.length + 1) : ''), like: 'articulo'}); db.settings.customTypes.push(c); CTS.id = c.id; ctTouch(); return c;
+}
+function ctUI() {
+  const L = db.settings.customTypes, c = ctCur(); if (c) CTS.id = c.id;
+  let h = `<small>Crea tipos de documento para lo que los predefinidos no contemplan. Eliges qué campos muestra el formulario y cómo se llaman, y aparecen en el desplegable «Tipo» de cada paper. <a onclick="openHelp('tipos')">Ver la ayuda</a></small>
+    <div class="row" style="margin:8px 0">${L.length ? `<select onchange="CTS.id=this.value;drawCfg()">${L.map(x => `<option value="${x.id}" ${c.id === x.id ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select>` : ''}
+    <button onclick="ctNew();drawCfg()">+ Nuevo tipo</button>${c ? '<button onclick="ctDup()">Duplicar</button><button class="danger" onclick="ctDel()">Eliminar</button>' : ''}</div>`;
+  if (!c) return h + '<p class="empty">Aún no hay tipos propios.</p>';
+  const inUse = db.papers.filter(p => p.type === 'ct_' + c.id).length;
+  h += `<div class="cugrid"><label>Nombre<input value="${esc(c.name)}" maxlength="60" oninput="ctSet('name',this.value)"></label>
+    <label>Se cita como (para los estilos de serie)<select onchange="ctSet('like',this.value);drawCfg()">${Object.entries(TYPES).filter(([k]) => !CTYPES.has(k)).map(([k, v]) => `<option value="${k}" ${c.like === k ? 'selected' : ''}>${esc(v)}</option>`).join('')}</select></label></div>
+    <div class="row" style="margin:6px 0"><small>${inUse ? `${inUse} paper${inUse > 1 ? 's usan' : ' usa'} este tipo.` : 'Ningún paper usa este tipo todavía.'}</small><button onclick="ctReset()" title="Marca los campos que muestra el tipo «${esc(TYPES[c.like])}»">Usar los campos de «${esc(TYPES[c.like])}»</button></div>
+    <div class="cuh">Campos del formulario <small>(siempre están título, autores, año, URL, DOI y fecha de consulta)</small></div>
+    <div class="ctf"><div class="ctr"><span>Revista / editorial / sitio</span><input value="${esc(c.labels.venue || '')}" placeholder="Etiqueta propia (p. ej. Medio, Canal, Emisora)" oninput="ctLabel('venue',this.value)"></div>
+    ${Object.entries(CT_NAMES).map(([k, n]) => `<div class="ctr"><label class="row"><input type="checkbox" ${c.fields.includes(k) ? 'checked' : ''} onchange="ctField('${k}',this.checked)"> ${esc(n)}</label><input value="${esc(c.labels[k] || '')}" placeholder="Etiqueta propia" ${c.fields.includes(k) ? '' : 'disabled'} oninput="ctLabel('${k}',this.value)"></div>`).join('')}</div>
+    <small>En un estilo propio puedes usar todos los campos con <code>{campo}</code> y darle a este tipo su plantilla (Configuración → Estilos de cita personalizados → «Tipo de documento»).</small>`;
+  return h;
+}
+function ctSet(k, v) { const c = ctCur(); if (!c) return; c[k] = v; ctTouch(); }
+function ctField(k, on) { const c = ctCur(); c.fields = on ? [...new Set([...c.fields, k])] : c.fields.filter(x => x !== k); ctTouch(); drawCfg(); }
+function ctLabel(k, v) { const c = ctCur(); if (v.trim()) c.labels[k] = v; else delete c.labels[k]; ctTouch(); }
+function ctReset() { const c = ctCur(); c.fields = ctFieldsOf(c.like); ctTouch(); drawCfg(); }
+function ctDup() { const c = structuredClone(ctCur()); c.id = uid(); c.name += ' (copia)'; db.settings.customTypes.push(c); CTS.id = c.id; ctTouch(); drawCfg(); }
+function ctDel() {
+  const c = ctCur(), k = 'ct_' + c.id, n = db.papers.filter(p => p.type === k).length;
+  if (!c || !confirm(`¿Eliminar el tipo «${c.name}»?${n ? ` ${n} paper${n > 1 ? 's pasarán' : ' pasará'} a «${TYPES[c.like]}».` : ''}`)) return;
+  for (const p of db.papers.concat(db.trash.map(t => t.paper))) if (p.type === k) p.type = c.like;
+  for (const s of db.settings.customStyles) delete s.tpl[k];
+  db.settings.customTypes = db.settings.customTypes.filter(x => x.id !== c.id); CTS.id = ''; ctTouch(); syncStyles(db.settings.customStyles, db.settings.export); render(); drawCfg();
+}
+function typeChange(v) {   // desplegable «Tipo» del paper; la última opción crea un tipo propio al vuelo
+  if (v === '__new') { const c = ctNew(); D.type = 'ct_' + c.id; CFG_OPEN.add('ct'); drawD(); openCfg(); return; }
+  D.type = v; drawD();
+}
+$('#cfg').addEventListener('close', () => { if ($('#dlg').open) drawD(); });   // al volver del editor de tipos, el formulario se pone al día
 const CFG_OPEN = new Set();   // apartados de Configuración desplegados (se conservan al redibujar)
 const cfgSec = (id, title, body) => `<details class="cs" ${CFG_OPEN.has(id) ? 'open' : ''} ontoggle="this.open ? CFG_OPEN.add('${id}') : CFG_OPEN.delete('${id}')"><summary>${title}</summary><div class="csb">${body}</div></details>`;
 
@@ -1446,6 +1605,7 @@ const STOPW = new Set(['the', 'and', 'for', 'del', 'los', 'las', 'una', 'con', '
 const texEsc = s => String(s).replace(/([&%$#_])/g, '\\$1');
 const bibName = (p, x) => { x = x.trim(); return p.authorType === 'entidad' || (p.authorType !== 'persona' && isOrg(x)) ? `{${texEsc(x)}}` : texEsc(x); };   // entidades entre llaves
 function bibtex(L) {
+  L = L.map(effP);
   const used = new Map();
   return L.map(p => {
     const au = p.authorType === 'sin_autor' ? [] : p.authors, ty = p.type;
@@ -1464,7 +1624,7 @@ function bibtex(L) {
 }
 const RISK = {articulo: 'JOUR', libro: 'BOOK', capitulo: 'CHAP', congreso: 'CONF', tesis: 'THES', web: 'ELEC', prensa: 'NEWS', blog: 'BLOG', informe: 'RPRT', norma: 'STAND', patente: 'PAT', mapa: 'MAP', dataset: 'DATA', software: 'COMP', basedatos: 'DBASE', audiovisual: 'VIDEO', audio: 'SOUND', redsocial: 'GEN', ia: 'GEN', diccionario: 'DICT', presentacion: 'SLIDE', personal: 'PCOMM', legislacion: 'STAT'};
 const RISV = {libro: 'PB', tesis: 'PB', capitulo: 'T2', congreso: 'T2', web: 'T2', blog: 'T2', diccionario: 'T2', informe: 'PB', norma: 'PB', patente: 'PB', mapa: 'PB', dataset: 'PB', software: 'PB', basedatos: 'PB', audiovisual: 'PB', audio: 'PB', redsocial: 'PB', ia: 'PB', presentacion: 'PB', personal: 'PB', legislacion: 'PB'};   // etiqueta RIS donde va «venue» (por defecto JO)
-const ris = L => L.map(p => { const ty = p.type, pg = /^(.+?)\s*[-–—]\s*(.+)$/.exec(String(p.pages || '')) || [0, p.pages || ''], dd = d => d.replace(/-/g, '/') + '/';
+const ris = L => L.map(effP).map(p => { const ty = p.type, pg = /^(.+?)\s*[-–—]\s*(.+)$/.exec(String(p.pages || '')) || [0, p.pages || ''], dd = d => d.replace(/-/g, '/') + '/';
   return ['TY  - ' + (RISK[ty] || 'GEN'), ...(p.authorType === 'sin_autor' ? [] : p.authors.map(a => 'AU  - ' + a)), ...(p.editors || []).map(e => 'A2  - ' + e), 'TI  - ' + p.title, p.year && 'PY  - ' + p.year, okDate(p.pubDate) && 'DA  - ' + dd(p.pubDate),
     p.venue && `${RISV[ty] || 'JO'}  - ${p.venue}`, ['capitulo', 'congreso'].includes(ty) && p.publisher && 'PB  - ' + p.publisher, ty === 'articulo' && p.volume && 'VL  - ' + p.volume, ty === 'articulo' && p.issue && 'IS  - ' + p.issue,
     shows('pages', ty) && pg[1] && 'SP  - ' + pg[1], shows('pages', ty) && pg[2] && 'EP  - ' + pg[2], shows('place', ty) && p.place && 'CY  - ' + p.place,
@@ -1542,20 +1702,21 @@ function openPaper(id) {
   D = id ? structuredClone(db.papers.find(p => p.id === id)) : {id: uid(), created: new Date().toISOString(), title: '', alias: '', sortKey: '', related: [], refTo: [], history: [], reading: 'por_leer', rating: 0, sectionIds: F.sec ? [F.sec] : [], authors: [], year: '', url: '', type: 'articulo', venue: '', doi: '', accessed: '', general: '', tagIds: [], notes: [], cites: {}}; if (!id) NEWF(D);
   tab = 'all'; drawD(); $('#dlg').showModal();
 }
-const lbl = (k, def) => FLBL[k]?.[D.type] ?? def;   // etiqueta del campo según el tipo del borrador
+const lbl = (k, def) => CTYPES.has(D.type) ? CTYPES.get(D.type).labels[k] || def : FLBL[k]?.[D.type] ?? def;   // etiqueta del campo según el tipo del borrador
 const inp = (k, lbl, type = 'text', cls = '') => `<label class="${cls}">${lbl}<input type="${type}" data-k="${k}" value="${esc(D[k])}" oninput="D.${k}=this.value"></label>`;
 const pdWarn = () => okDate(D.pubDate) && D.year && D.pubDate.slice(0, 4) !== String(D.year) ? `⚠ El año de la fecha (${D.pubDate.slice(0, 4)}) no coincide con «Año» (${D.year}): las citas usarán solo el año.` : '';
 function pubSync() {   // fecha de publicación → rellena «Año» si está vacío y avisa si no coinciden (sin redibujar el formulario)
   if (okDate(D.pubDate) && !D.year) { D.year = +D.pubDate.slice(0, 4); const y = $('#dlg input[data-k="year"]'); if (y) y.value = D.year; }
   const w = $('#pdWarn'); if (w) w.textContent = pdWarn(); }
 function drawD() {
+  if (!TYPES[D.type]) D.type = 'articulo';
   const T = {all: 'Ver todo', data: 'Datos', cite: 'Cita', notes: 'Notas', cls: 'Secciones, etiquetas y relacionados', hist: 'Historial'};
   const blk = (id, t, body, always) => tab === 'all' || tab === 'cls' ? `<details class="cs" ${ALL_FOLD.has(id) ? '' : 'open'} ontoggle="this.open ? ALL_FOLD.delete('${id}') : ALL_FOLD.add('${id}')"><summary>${t}</summary><div class="csb">${body}</div></details>`   // en «Ver todo» cada bloque lleva su título y se pliega
     : (always ? `<h2 class="grp">${t}</h2>` : '') + body;
   let h = `<div class="dh"><h2>${esc(D.alias || D.title) || 'Nuevo paper'}</h2><div class="dbtn"><button class="pri" onclick="commit()">Guardar paper</button><button onclick="$('#dlg').close()">Cancelar</button></div></div><div class="tabs">${Object.entries(T).map(([k, v]) => `<button class="${tab === k ? 'on' : ''}" onclick="tab='${k}';drawD()">${v}</button>`).join('')}</div>`;
   if (tab === 'data' || tab === 'all') h += blk('data', 'Datos', `<div class="grid"><div class="w titlerow"><div class="pimgbox">${pimgHTML(D, 'big', `role="button" tabindex="0" onclick="imgOpen()" title="Imagen del paper (opcional): pulsa para poner una URL o un archivo, o pega una imagen copiada con Ctrl+V"`)}</div><div class="titlecol">${inp('title', 'Título *')}${inp('alias', 'Título personalizado (opcional; solo para mostrar, la cita usa el título original)')}</div></div>
     <label class="w">Autores (uno por línea: «Apellido, Nombre»)<textarea oninput="D.authors=this.value.split('\\n').map(s=>s.trim()).filter(Boolean)">${esc(D.authors.join('\n'))}</textarea></label>
-    ${inp('sortKey', 'Clave de orden en la bibliografía (opcional): p. ej. «Torre» para «de la Torre, Ana»', 'text', 'w')}<label>Año<input type="number" data-k="year" value="${esc(D.year)}" oninput="D.year=this.value;pubSync()"></label><label>Tipo<select onchange="D.type=this.value;drawD()">${Object.entries(TYPES).map(([k, v]) => `<option value="${k}" ${D.type === k ? 'selected' : ''}>${v}</option>`).join('')}</select></label>
+    ${inp('sortKey', 'Clave de orden en la bibliografía (opcional): p. ej. «Torre» para «de la Torre, Ana»', 'text', 'w')}<label>Año<input type="number" data-k="year" value="${esc(D.year)}" oninput="D.year=this.value;pubSync()"></label><label>Tipo<select onchange="typeChange(this.value)">${Object.entries(TYPES).filter(([k]) => !CTYPES.has(k)).map(([k, v]) => `<option value="${k}" ${D.type === k ? 'selected' : ''}>${v}</option>`).join('')}${CTYPES.size ? `<optgroup label="Tipos propios">${[...CTYPES].map(([k, t]) => `<option value="${k}" ${D.type === k ? 'selected' : ''}>${esc(t.name)}</option>`).join('')}</optgroup>` : ''}<option value="__new">➕ Crear un tipo propio…</option></select></label>
     ${inp('url', 'URL', 'url', 'w')}${inp('venue', lbl('venue', 'Revista / editorial / sitio'))}<label>DOI (sin https://doi.org/)<span class="row" style="flex-wrap:nowrap"><input style="flex:1;min-width:0" value="${esc(D.doi)}" oninput="D.doi=this.value"><button onclick="doiFill()" title="Rellenar con los datos de CrossRef">Buscar</button></span></label>${inp('accessed', 'Fecha de consulta', 'date')}
     <label>Enlace en la cita (si hay DOI y URL)<select onchange="D.linkMode=this.value">${Object.entries(LINK_MODES).map(([k, v]) => `<option value="${k}" ${D.linkMode === k ? 'selected' : ''}>${v}</option>`).join('')}</select></label>
     <label class="chk"><input type="checkbox" ${D.hideAccessed ? 'checked' : ''} onchange="D.hideAccessed=this.checked"> Omitir «[consultado …]» en la cita (aunque la fecha esté rellena)</label>
@@ -1564,7 +1725,7 @@ function drawD() {
     ${shows('edition', D.type) ? inp('edition', lbl('edition', 'Edición (desde la 2.ª; p. ej. «2.ª»)')) : ''}${shows('publisher', D.type) ? inp('publisher', 'Editorial (del libro o actas)') : ''}${shows('place', D.type) ? inp('place', lbl('place', 'Lugar de edición')) : ''}
     ${shows('editors', D.type) ? `<label class="w">Editores del libro (uno por línea: «Apellido, Nombre»)<textarea oninput="D.editors=this.value.split('\\n').map(s=>s.trim()).filter(Boolean)">${esc(D.editors.join('\n'))}</textarea></label>` : ''}
     ${[['isbn', 'ISBN'], ['issn', 'ISSN'], ['institution', 'Institución (facultad, departamento…)'], ['docNumber', 'Número de documento'], ['series', 'Serie o colección'], ['seriesNumber', 'Número en la serie'], ['conferenceName', 'Nombre del congreso'], ['conferencePlace', 'Lugar del congreso'], ['conferenceDates', 'Fechas del congreso']].map(([k, l]) => shows(k, D.type) ? inp(k, lbl(k, l)) : '').join('')}
-    ${shows('subtype', D.type) ? `<label>Designación (opcional; p. ej. «${esc((FSUB[D.type] || [''])[0])}»)<input type="text" data-k="subtype" list="dl_sub" value="${esc(D.subtype)}" oninput="D.subtype=this.value"><datalist id="dl_sub">${(FSUB[D.type] || []).map(v => `<option value="${esc(v)}">`).join('')}</datalist></label>` : ''}
+    ${shows('subtype', D.type) ? `<label>Designación (opcional; p. ej. «${esc((FSUB[baseT(D.type)] || [''])[0])}»)<input type="text" data-k="subtype" list="dl_sub" value="${esc(D.subtype)}" oninput="D.subtype=this.value"><datalist id="dl_sub">${(FSUB[baseT(D.type)] || []).map(v => `<option value="${esc(v)}">`).join('')}</datalist></label>` : ''}
     ${shows('authorRole', D.type) ? inp('authorRole', 'Función del autor (p. ej. Director, Presentador)') : ''}${shows('userHandle', D.type) ? inp('userHandle', 'Usuario (sin @)') : ''}
     ${shows('pubDate', D.type) ? `<label>${lbl('pubDate', 'Fecha de publicación completa')}<input type="date" data-k="pubDate" value="${esc(D.pubDate)}" oninput="D.pubDate=this.value;pubSync()"><small id="pdWarn">${pdWarn()}</small></label>` : ''}
     ${shows('thesisType', D.type) ? `<label>Tipo de trabajo<select onchange="D.thesisType=this.value"><option value="">(sin especificar)</option>${THESIS.map(v => `<option ${D.thesisType === v ? 'selected' : ''}>${v}</option>`).join('')}</select></label>` : ''}
