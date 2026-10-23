@@ -63,7 +63,7 @@ aside.min .dot{position:absolute;top:6px;right:6px}.sb .chip{margin:2px 4px 2px 
 .relr{display:block;width:100%;text-align:left;margin-top:4px}.hist{display:flex;flex-direction:column;gap:6px;margin-bottom:8px}.he small{opacity:.7;margin-right:6px}
 .ntx{white-space:normal}.md p{margin:.3em 0}.md ul,.md ol{margin:.3em 0;padding-left:1.4em}
 .fmt{display:flex;gap:4px;flex-wrap:wrap;margin:6px 0 4px}.fmt button{font-size:13px;padding:1px 9px}.fmt button.on{border-color:var(--pri);color:var(--pri)}
-.prev{border:1px dashed var(--bd);border-radius:8px;padding:6px 10px;margin-top:6px}.prev[hidden]{display:none}
+
 .tplr{display:flex;flex-direction:column;gap:4px;margin-bottom:8px}.tplr textarea{width:100%;min-height:60px}
 .fmtw{display:flex;align-items:stretch;gap:6px;margin:6px 0 4px}
 .fmth{font-size:13px;font-weight:600;padding:1px 9px;flex-shrink:0}.fmtw.open .fmth{border-color:var(--pri);color:var(--pri)}
@@ -101,3 +101,8 @@ details.cs{border:1px solid var(--bd);border-radius:8px;margin:10px 0;background
 details.cs>summary{cursor:pointer;font-size:16px;font-weight:700;padding:9px 12px;list-style:none;display:flex;align-items:center;gap:8px;color:var(--pri)}
 details.cs>summary::-webkit-details-marker{display:none}details.cs>summary::before{content:"▸";transition:transform .15s;display:inline-block}details.cs[open]>summary::before{transform:rotate(90deg)}
 details.cs[open]>summary{border-bottom:1px solid var(--bd)}.csb{padding:6px 12px 10px}.csb .sct{margin-top:4px}
+
+/* F5: editor de notas con formato en vivo; la barra «Aa» vive dentro del borde del cuadro */
+.nbox{border:1px solid var(--bd);border-radius:8px;background:var(--card);margin:6px 0 4px}.nbox:focus-within{border-color:var(--pri);box-shadow:0 0 0 1px var(--pri)}
+.ned{min-height:5.2em;padding:8px 10px 2px;outline:none;overflow-wrap:anywhere;cursor:text}.ned div{min-height:1.4em}.ned ul,.ned ol{margin:.2em 0;padding-left:1.4em}
+.ned a.nl{user-select:all}.nbox .fmtw{margin:0;padding:2px 6px 6px}.nbox .fmth{border:1px solid var(--bd);background:var(--bg)}

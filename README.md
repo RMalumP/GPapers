@@ -18,7 +18,7 @@ Chrome pide confirmar el acceso al archivo al reabrirlo en una sesión nueva («
 
 ## Citas (APA 7, Vancouver, MLA, IEEE y Chicago)
 La plantilla depende del tipo de fuente (artículo, libro, capítulo, congreso, tesis, web, artículo de prensa y entrada de blog). Las citas llevan *cursiva* real: en texto plano se quita,
-y en «Copiar con formato» y en Word se convierte. En la pestaña Cita puedes escribir `*texto*` para cursiva (un asterisco literal, `\*`).
+y en «Copiar con formato» y en Word se convierte. En la pestaña «Secciones, cita y etiquetas» puedes escribir `*texto*` para cursiva (un asterisco literal, `\*`).
 En «Exportar citas» eliges idioma de los conectores (español/inglés), formato de la fecha de consulta y si Vancouver lista todos los autores.
 
 ## Novedades (F0.5 y F1a)
@@ -35,6 +35,18 @@ En «Exportar citas» eliges idioma de los conectores (español/inglés), format
 - Nuevo estilo **MLA** (8.ª/9.ª) para los seis tipos de fuente. En Exportar aparece bajo el selector un aviso con las particularidades del estilo y la lista «Basado en…». Los estilos que exijan numeración propia (IEEE, UNE numérico) ocultarán la casilla «Numerar» y los de idioma fijo bloquearán el selector de idioma.
 - Nuevos tipos **Artículo de prensa** y **Entrada de blog** (con fecha de publicación completa; la prensa admite también páginas). APA: prensa digital si la cita lleva enlace, impresa si no (con «Enlace en la cita: Ninguno» sale la forma impresa aunque haya URL). Si rellenas la fecha y «Año» está vacío, el año se completa solo; si no coinciden, un aviso lo indica y las citas usan solo el año. Donde la guía no trae plantilla (prensa en Vancouver, MLA, IEEE y UNE; blog en Vancouver, IEEE y UNE) se usa una adaptada y se avisa en Exportar y en la pestaña Cita («Verificar»). BibTeX: prensa = `@article` con `entrysubtype = {newspaper}`; blog = `@online` con `entrysubtype = {blog}`. RIS: `NEWS` y `BLOG`.
 - Quince tipos más: informe, norma técnica, patente, mapa, conjunto de datos, software o videojuego, base de datos, audiovisual, audio, publicación en red social, IA generativa, entrada de diccionario, presentación, comunicación personal y legislación, con plantilla en los 10 estilos (genérica y con aviso «Verificar» donde la guía no trae una). BibTeX con `entrysubtype` y RIS con `GEN` + marca para los que no tienen entrada propia. Las comunicaciones personales (APA, Chicago), las redes sociales (Chicago notas y bibliografía) y la IA sin enlace (Chicago) no entran en la lista de referencias.
-- **Cita en el texto y notas de Chicago** (Configuración → casilla opcional): aparecen en la pestaña «Cita» de cada paper, con campo de página y botones de copiar. Los estilos numéricos muestran `[n]` o `(n)`.
+- **Cita en el texto y notas de Chicago** (Configuración → casilla opcional): aparecen en la pestaña «Secciones, cita y etiquetas» de cada paper, con campo de página y botones de copiar. Los estilos numéricos muestran `[n]` o `(n)`.
 - **Exportar a Word (.docx)** real, con sangría francesa y cursivas, además del `.doc` anterior.
 - **Relaciones**: botón del menú que dibuja el gráfico de papers relacionados («relacionado» y «cita a»); clic en un paper para abrirlo.
+
+## Cambios de la ronda F5
+- **Papelera:** los papers eliminados se conservan 5 días.
+- **Historial:** solo muestra los cambios del día y no se guarda en el JSON (allí queda solo la fecha de creación).
+- **Lista principal:** el estado de lectura y las estrellas van junto a la ✕; clic derecho en las estrellas para cambiar la valoración.
+- **Barra lateral** con fondo y borde propios; «Gestionar» junto al título de Secciones y Etiquetas.
+- **Configuración** y **editar paper** con cabecera fija que se estrecha al hacer scroll; apartados plegables.
+- **Editar paper:** una sola pestaña «Secciones, cita y etiquetas»; «Ver todo» con bloques plegables y una sola variante de cita (selector).
+- **Notas** (generales y por sección) con un editor que muestra el formato al escribir, como WhatsApp: `*cursiva*`, `**negrita**`, `~~tachado~~`, `__subrayado__`, listas con «- » o «1. ». Se guardan y copian con esos símbolos; al exportar solo se ve el formato.
+
+## Pruebas
+`node pruebas/pruebas_citas.js app.js`, `python3 pruebas/prueba_f4.py .` y `python3 pruebas/prueba_ui.py .` (necesitan Playwright con Chromium).

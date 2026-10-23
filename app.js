@@ -823,7 +823,7 @@ document.addEventListener('keydown', e => {
   if (recAct) return;
   const combo = comboOf(e); if (!combo) return;
   const act = Object.keys(SC_DEF).find(a => db.settings.shortcuts[a] === combo); if (!act) return;
-  if (act === 'bold' || act === 'italic') { const m = /^nt(\d+)$/.exec(e.target.id || ''); if (m) { e.preventDefault(); fmtWrap(+m[1], act === 'bold' ? '**' : '*'); } return; }   // solo dentro de una nota
+  if (act === 'bold' || act === 'italic') { const ed = e.target.closest?.('.ned'); if (ed) { e.preventDefault(); edCmd(ed.dataset.key, act === 'bold' ? 'bold' : 'italic'); } return; }   // solo dentro de una nota
   const inText = /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName) || e.target.isContentEditable;
   // Dentro de campos de texto o con una ventana abierta, solo funciona Guardar; lo demás es el comportamiento nativo (p. ej. Ctrl+Z en una nota)
   if (act !== 'save' && (inText || document.querySelector('dialog[open]'))) return;
@@ -1014,7 +1014,7 @@ const cite = (p, o, ys) => p.cites[o.style] ?? STYLES[o.style].fn(p, ys ? {...o,
 function exText(L, o) {
   const sx = yearSuffixes(L, o);
   const items = L.map((p, i) => { let t = (isNum(o) ? numLbl(i + 1, o) : '') + citeTxt(cite(p, o, sx.get(p.id)));
-    if (o.notes) p.notes.filter(n => n.content.trim()).forEach(n => t += `\n   [${secName(n.sectionId)}] ${plainLinks(n.content.trim())}`);
+    if (o.notes) p.notes.filter(n => n.content.trim()).forEach(n => t += `\n   [${secName(n.sectionId)}] ${mdPlain(n.content.trim())}`);
     return t; });
   return (o.title ? o.title + '\n\n' : '') + items.join('\n\n');
 }
@@ -1049,7 +1049,7 @@ function exDocx(L, o) {
   const body = [o.title ? P(`<w:r><w:t xml:space="preserve">${esc(o.title)}</w:t></w:r>`, '<w:pStyle w:val="Heading1"/>') : ''];
   L.forEach((p, i) => {
     body.push(P(docxRuns((isNum(o) ? numLbl(i + 1, o) : '') + cite(p, o, sx.get(p.id))), '<w:ind w:left="720" w:hanging="720"/>'));   // sangría francesa
-    if (o.notes) p.notes.filter(n => n.content.trim()).forEach(n => plainLinks(n.content.trim()).split('\n').forEach((ln, j) => body.push(P(docxRuns((j ? '' : `*[${secName(n.sectionId)}]* `) + ln, 20), '<w:spacing w:after="40"/><w:ind w:left="720"/>')))); });
+    if (o.notes) p.notes.filter(n => n.content.trim()).forEach(n => n.content.trim().split('\n').forEach((ln, j) => body.push(P(docxRuns(j ? '' : `*[${secName(n.sectionId)}]* `, 20) + noteRuns(ln, 20), '<w:spacing w:after="40"/><w:ind w:left="720"/>')))); });
   const R = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
   return zipStore([
     ['[Content_Types].xml', `${H}<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/></Types>`],
@@ -1190,12 +1190,11 @@ function drawD() {
     <div class="w"><small>Lectura</small><div class="seg">${Object.entries(READ).map(([k, v]) => `<button class="${D.reading === k ? 'on' : ''}" onclick="D.reading='${k}';drawD()">${v}</button>`).join('')}</div></div>
     <div class="w"><small>Valoración</small><div class="stars">${[1, 2, 3, 4, 5].map(n => `<button class="${D.rating >= n ? 'on' : ''}" aria-label="Valorar con ${n} de 5" onclick="D.rating=D.rating===${n}?0:${n};drawD()">★</button>`).join('')}</div></div>
     </div>`);
-  if (tab === 'notes' || tab === 'all') h += blk('gen', 'Notas generales', `<label class="w"><textarea oninput="D.general=this.value">${esc(D.general)}</textarea></label>`, true);
+  if (tab === 'notes' || tab === 'all') h += blk('gen', 'Notas generales', edBox('gen', D.general), true);
   
   if (tab === 'notes' || tab === 'all') h += blk('notes', 'Notas por sección', (db.sections.length ? '' : '<p class="empty">Crea primero una sección con «Gestionar secciones».</p>') +
     D.notes.map((n, i) => `<div class="card"><div class="row"><select onchange="D.notes[${i}].sectionId=this.value;drawD()">${db.sections.map(s => `<option value="${s.id}" ${n.sectionId === s.id ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}</select>
-      <button class="danger" onclick="D.notes.splice(${i},1);drawD()">Quitar</button></div><div class="fmtw ${fmtPinned || FMT_OPEN.has(n.id) ? 'open' : ''}" id="fb${i}" data-id="${n.id}"><button class="fmth" title="Mostrar u ocultar la barra de formato" onclick="toggleFmt(${i})">Aa</button><div class="fmtc"><div class="fmt"><button title="Negrita (${db.settings.shortcuts.bold})" onclick="fmtWrap(${i},'**')"><b>N</b></button><button title="Cursiva (${db.settings.shortcuts.italic})" onclick="fmtWrap(${i},'*')"><i>K</i></button><button title="Lista con viñetas" onclick="fmtList(${i},'- ')">•</button><button title="Lista numerada" onclick="fmtList(${i},'1. ')">1.</button><button onclick="tplMenu(event,${i})">Plantilla ▾</button><button title="Insertar enlace a un paper o a una nota" onclick="lkOpen(${i})">🔗</button><button class="${PREV.has(n.id) ? 'on' : ''}" title="Vista previa" onclick="togglePrev(${i})">👁</button><button class="pin ${fmtPinned ? 'on' : ''}" title="Chincheta: mantiene la barra desplegada en todas las notas" onclick="togglePin()">📌</button></div></div></div>
-      <textarea id="nt${i}" oninput="noteInput(${i},this.value)">${esc(n.content)}</textarea><div class="ntx md prev" id="pv${i}" ${PREV.has(n.id) ? '' : 'hidden'}>${md(n.content)}</div></div>`).join('') +
+      <button class="danger" onclick="D.notes.splice(${i},1);drawD()">Quitar</button></div>${edBox(n.id, n.content)}</div>`).join('') +
     (db.sections.length ? `<button onclick="addNote()" oncontextmenu="addNoteMenu(event)" title="Clic derecho: nueva nota con plantilla">+ Añadir nota</button><button onclick="addNoteMenu(event)" title="Nueva nota con plantilla">▾</button>` : ''), true);
   const citeOne = (k, s) => `<h3>${s.name}${D.cites[k] != null ? ' (editada a mano)' : ''}</h3>${typeWarn(k, D.type) ? `<small>⚠ ${esc(typeWarn(k, D.type))}</small>` : ''}
     <textarea id="c_${k}" oninput="D.cites['${k}']=this.value">${esc(D.cites[k] ?? s.fn(D))}</textarea>
@@ -1223,7 +1222,41 @@ $('#dlg').addEventListener('mousedown', e => bdDown = outside(e, e.currentTarget
 $('#dlg').addEventListener('click', e => { if (!bdDown || !outside(e, e.currentTarget)) return; bdDown = false;
   !D.title.trim() && !db.papers.some(p => p.id === D.id) && !D.authors.length && !D.url && !D.notes.length ? $('#dlg').close() : commit(); });
 /* ===== Notas: formato (Markdown limitado) y plantillas ===== */
-const mdInline = t => esc(t).replace(/\*\*(?=\S)([^*\n]*?\S)\*\*/g, '<strong>$1</strong>').replace(/(^|[^*\w])\*(?=\S)([^*\n]*?\S)\*(?!\*)/g, '$1<em>$2</em>').replace(LINK_RX, (_, t, id) => linkHTML(t, id));
+/* Marcas de las notas: **negrita**, *cursiva*, ~~tachado~~, __subrayado__ (anidables); \* \_ \~ \\ \[ son literales.
+   La nota se guarda como texto con marcas; el editor (contenteditable) las muestra ya aplicadas y las vuelve a escribir al guardar. */
+const MK = {'**': 'strong', '__': 'u', '~~': 's', '*': 'em'}, MK_ORDER = ['**', '__', '~~', '*'];
+function mdParse(s, i = 0, stop = '') {   // → [nodos, posición]; null si falta el cierre de `stop`
+  const out = [], st = i; let txt = '';
+  const flush = () => { if (txt) { out.push({t: 'x', v: txt}); txt = ''; } };
+  while (i < s.length) {
+    const c = s[i];
+    if (c === '\\' && /[*_~\\[]/.test(s[i + 1] || '')) { txt += s[i + 1]; i += 2; continue; }
+    if (c === '\u200b') { i++; continue; }
+    if (stop && s.startsWith(stop, i) && i > st && !/\s/.test(s[i - 1])) { flush(); return [out, i + stop.length]; }
+    if (c === '[') { const m = /^\[\[([pn]):([\w-]+)\]\]/.exec(s.slice(i, i + 80)); if (m) { flush(); out.push({t: 'l', k: m[1], id: m[2]}); i += m[0].length; continue; } }
+    let hit = false;
+    for (const d of MK_ORDER) {
+      const nx = s[i + d.length];
+      if (!s.startsWith(d, i) || !nx || /\s/.test(nx) || (d === '*' && nx === '*') || (d !== '~~' && /\w/.test(s[i - 1] || ' '))) continue;
+      const r = mdParse(s, i + d.length, d);
+      if (r) { flush(); out.push({t: MK[d], c: r[0]}); i = r[1]; hit = true; break; }
+    }
+    if (hit) continue;
+    txt += c; i++;
+  }
+  if (stop) return null;
+  flush(); return [out, i];
+}
+const mdNodes = t => mdParse(String(t ?? ''))[0];
+const nodesHtml = (ns, edit) => ns.map(n => n.t === 'x' ? esc(n.v) : n.t === 'l' ? (h => edit ? h.replace(/^<(a|span) /, '<$1 contenteditable="false" ') : h)(linkHTML(n.k, n.id)) : `<${n.t}>${nodesHtml(n.c, edit)}</${n.t}>`).join('');
+const mdInline = (t, edit) => nodesHtml(mdNodes(t), edit);
+const nodesPlain = ns => ns.map(n => n.t === 'x' ? n.v : n.t === 'l' ? '[' + (linkInfo(n.k, n.id)?.label || '⚠ enlace roto') + ']' : nodesPlain(n.c)).join('');
+const mdPlain = t => String(t ?? '').split('\n').map(l => nodesPlain(mdNodes(l))).join('\n');   // sin marcas (exportar a texto)
+const noteRuns = (s, sz) => {   // marcas de nota → runs de Word (orden del esquema: b, i, strike, sz, u)
+  const run = (ns, f) => ns.map(n => n.t === 'x' || n.t === 'l' ? (t => `<w:r><w:rPr>${f.b ? '<w:b/>' : ''}${f.i ? '<w:i/>' : ''}${f.s ? '<w:strike/>' : ''}${sz ? `<w:sz w:val="${sz}"/>` : ''}${f.u ? '<w:u w:val="single"/>' : ''}</w:rPr><w:t xml:space="preserve">${esc(t)}</w:t></w:r>`)(n.t === 'x' ? n.v : nodesPlain([n]))
+    : run(n.c, {...f, [{strong: 'b', em: 'i', s: 's', u: 'u'}[n.t]]: 1})).join('');
+  return run(mdNodes(s), {});
+};
 function md(text) {   // se escapa todo el HTML antes de aplicar el formato; la nota se guarda siempre como texto plano
   const out = []; let list = null, para = [];
   const fl = () => { if (list) { out.push(`<${list.tag}>${list.items.map(i => `<li>${i}</li>`).join('')}</${list.tag}>`); list = null; } };
@@ -1237,43 +1270,113 @@ function md(text) {   // se escapa todo el HTML antes de aplicar el formato; la 
   fl(); fp();
   return out.join('');
 }
+/* ---- Editor de notas (contenteditable): texto con marcas ⇄ DOM ---- */
+function mdEdit(text) {   // una línea del texto = un <div> (o un <li>), para que ida y vuelta no cambie nada
+  const out = []; let list = null;
+  const fl = () => { if (list) { out.push(`<${list.tag}>${list.items.map(i => `<li>${i}</li>`).join('')}</${list.tag}>`); list = null; } };
+  for (const line of String(text ?? '').split(/\r?\n/)) {
+    const b = /^\s*[-•]\s+(.*)$/.exec(line), n = /^\s*\d+\.\s+(.*)$/.exec(line);
+    if (b || n) { const tag = b ? 'ul' : 'ol'; if (list && list.tag !== tag) fl(); (list ??= {tag, items: []}).items.push(mdInline((b || n)[1], 1) || '<br>'); }
+    else { fl(); out.push(`<div>${mdInline(line, 1) || '<br>'}</div>`); }
+  }
+  fl(); return out.join('') || '<div><br></div>';
+}
+const escMd = t => t.replace(/\u200b/g, '').replace(/\u00a0/g, ' ').replace(/\\(?=[*_~\\[])/g, '\\\\').replace(/\*/g, '\\*').replace(/__/g, '\\_\\_').replace(/~~/g, '\\~\\~').replace(/\[\[/g, '\\[[');
+function serInline(el) {
+  let o = '';
+  for (const n of el.childNodes) {
+    if (n.nodeType === 3) { o += escMd(n.data); continue; }
+    if (n.nodeType !== 1) continue;
+    const tg = n.tagName;
+    if (tg === 'BR') { if (n.nextSibling) o += '\n'; continue; }
+    if (n.dataset?.t && n.dataset?.id && /^(A|SPAN)$/.test(tg)) { o += `[[${n.dataset.t}:${n.dataset.id}]]`; continue; }
+    const inner = serInline(n), css = n.style || {};
+    const mk = /^(STRONG|B)$/.test(tg) || /^(bold|[6-9]00)$/.test(css.fontWeight) ? '**' : /^(EM|I)$/.test(tg) || css.fontStyle === 'italic' ? '*'
+      : /^(S|STRIKE|DEL)$/.test(tg) || /line-through/.test(css.textDecoration || css.textDecorationLine) ? '~~' : tg === 'U' || /underline/.test(css.textDecoration || css.textDecorationLine) ? '__' : '';
+    if (!mk) { o += inner; continue; }
+    const m = /^(\s*)([\s\S]*?)(\s*)$/.exec(inner); o += m[2] ? m[1] + mk + m[2] + mk + m[3] : inner;   // los espacios de los bordes quedan fuera de la marca
+  }
+  return o;
+}
+function serEd(root) {   // DOM del editor → texto con marcas
+  const out = [], BLK = /^(DIV|P|UL|OL|LI|H[1-6]|BLOCKQUOTE|PRE)$/, lines = el => serInline(el).split('\n');
+  const walk = par => {
+    let run = []; const flush = () => { if (run.length) { const d = document.createElement('div'); run.forEach(x => d.appendChild(x.cloneNode(true))); out.push(...lines(d)); run = []; } };
+    for (const n of par.childNodes) {
+      if (n.nodeType === 1 && BLK.test(n.tagName)) { flush();
+        if (/^(UL|OL)$/.test(n.tagName)) [...n.children].forEach((li, k) => out.push(...lines(li).map((l, j) => j ? l : (n.tagName === 'UL' ? '- ' : (k + 1) + '. ') + l)));
+        else if (n.querySelector('div,ul,ol,p')) walk(n); else out.push(...lines(n)); }
+      else run.push(n);
+    }
+    flush();
+  };
+  walk(root); while (out.length && !out[out.length - 1].trim()) out.pop();
+  return out.join('\n');
+}
+const noteVal = key => key === 'gen' ? D.general : D.notes.find(n => n.id === key)?.content ?? '';
+const setNoteVal = (key, v) => { if (key === 'gen') D.general = v; else { const n = D.notes.find(x => x.id === key); if (n) n.content = v; } };
+const edEl = key => document.getElementById('ed_' + key);
+const ED_RANGE = {};   // última selección de cada editor (para insertar plantillas y enlaces tras abrir un menú o ventana)
+document.addEventListener('selectionchange', () => { const s = getSelection(); if (!s.rangeCount) return;
+  const el = (s.anchorNode?.nodeType === 3 ? s.anchorNode.parentElement : s.anchorNode)?.closest?.('.ned'); if (el) ED_RANGE[el.dataset.key] = s.getRangeAt(0).cloneRange(); });
+function edFocus(key) {
+  const el = edEl(key); if (!el) return null; const r = ED_RANGE[key], s = getSelection();
+  if (!(s.rangeCount && el.contains(s.anchorNode))) { el.focus(); if (r && el.contains(r.startContainer)) { s.removeAllRanges(); s.addRange(r); } }
+  return el;
+}
+function edSync(el) { setNoteVal(el.dataset.key, serEd(el)); }
+function edCmd(key, cmd) { const el = edFocus(key); if (!el) return; document.execCommand('styleWithCSS', false, false); document.execCommand(cmd); edSync(el); }
+function edInsert(key, text, link) { const el = edFocus(key); if (!el) return; document.execCommand('insertHTML', false, link ? mdInline(text, 1) + '\u200b' : mdEdit(text)); edSync(el); }
+const MK_RX = {'**': /(^|[^\w\\*])\*\*([^\s*](?:[^*]*?[^\s*])?)\*\*$/, '__': /(^|[^\w\\_])__([^\s_](?:[^_]*?[^\s_])?)__$/, '~~': /(^|[^\\~])~~([^\s~](?:[^~]*?[^\s~])?)~~$/, '*': /(^|[^\w\\*])\*([^\s*](?:[^*]*?[^\s*])?)\*$/};
+function edAuto(ch) {   // como en WhatsApp: al cerrar una marca el texto toma el formato; «- » o «1. » al empezar línea crea una lista
+  const s = getSelection(); if (!s.rangeCount || !s.isCollapsed) return; const nd = s.anchorNode; if (nd.nodeType !== 3 || nd.parentElement.closest('a.nl')) return;
+  const off = s.anchorOffset, txt = nd.data.slice(0, off);
+  if (ch === ' ') {
+    const blk = nd.parentElement.closest('div,li'); if (!blk || blk.tagName === 'LI' || blk.classList.contains('ned')) return;
+    const r = document.createRange(); r.setStart(blk, 0); r.setEnd(nd, off); const pre = r.toString().replace(/\u00a0/g, ' ');
+    if (/^(?:[-•]|\d+\.) $/.test(pre)) { r.deleteContents(); document.execCommand(/^\d/.test(pre) ? 'insertOrderedList' : 'insertUnorderedList'); }
+    return;
+  }
+  for (const d of MK_ORDER) {
+    const m = MK_RX[d].exec(txt); if (!m) continue;
+    const start = m.index + m[1].length, r = document.createRange(); r.setStart(nd, start); r.setEnd(nd, off); r.deleteContents();
+    const el = document.createElement(MK[d]); el.textContent = m[2]; r.insertNode(el);
+    const z = document.createTextNode('\u200b'); el.after(z);
+    const c = document.createRange(); c.setStart(z, 1); c.collapse(true); s.removeAllRanges(); s.addRange(c); return;
+  }
+}
+$('#dlg').addEventListener('input', e => { const el = e.target.closest?.('.ned'); if (!el) return;
+  if (e.inputType === 'insertText' && e.data && '*_~ '.includes(e.data)) edAuto(e.data); edSync(el); });
+$('#dlg').addEventListener('paste', e => { const el = e.target.closest?.('.ned'); if (!el) return; e.preventDefault();
+  const t = e.clipboardData.getData('text/plain'); document.execCommand('insertHTML', false, /\n/.test(t) ? mdEdit(t) : mdInline(t, 1)); edSync(el); });
+['copy', 'cut'].forEach(ev => $('#dlg').addEventListener(ev, e => {   // al copiar, el texto lleva las marcas; el HTML, el formato
+  const el = e.target.closest?.('.ned'), s = getSelection(); if (!el || !s.rangeCount || s.isCollapsed) return;
+  const w = document.createElement('div'); w.appendChild(s.getRangeAt(0).cloneContents());
+  e.clipboardData.setData('text/plain', serEd(w)); e.clipboardData.setData('text/html', w.innerHTML); e.preventDefault();
+  if (ev === 'cut') { document.execCommand('delete'); edSync(el); } }));
+const edBox = (key, text) => `<div class="nbox" data-key="${key}"><div class="ned md" id="ed_${key}" data-key="${key}" contenteditable="true" role="textbox" aria-multiline="true">${mdEdit(text)}</div>
+  <div class="fmtw ${fmtPinned || FMT_OPEN.has(key) ? 'open' : ''}" data-id="${key}" onmousedown="event.preventDefault()"><button class="fmth" title="Mostrar u ocultar la barra de formato" onclick="toggleFmt('${key}')">Aa</button><div class="fmtc"><div class="fmt">
+    <button title="Negrita (${db.settings.shortcuts.bold})" onclick="edCmd('${key}','bold')"><b>N</b></button><button title="Cursiva (${db.settings.shortcuts.italic})" onclick="edCmd('${key}','italic')"><i>K</i></button><button title="Tachado" onclick="edCmd('${key}','strikeThrough')"><s>T</s></button><button title="Subrayado" onclick="edCmd('${key}','underline')"><u>S</u></button>
+    <button title="Lista con viñetas" onclick="edCmd('${key}','insertUnorderedList')">•</button><button title="Lista numerada" onclick="edCmd('${key}','insertOrderedList')">1.</button><button onclick="tplMenu(event,'${key}')">Plantilla ▾</button><button title="Insertar enlace a un paper o a una nota" onclick="lkOpen('${key}')">🔗</button>
+    <button class="pin ${fmtPinned ? 'on' : ''}" title="Chincheta: mantiene la barra desplegada en todas las notas" onclick="togglePin()">📌</button></div></div></div></div>`;
+
 let fmtPinned = false;   // chincheta: barras desplegadas en TODAS las notas (valor inicial: Configuración)
 const FMT_OPEN = new Set();   // notas cuya barra se desplegó una a una, sin chincheta
 function paintFmt() {   // cambia solo las clases, sin redibujar la ventana, para que la animación se vea
   document.querySelectorAll('#dlg .fmtw').forEach(el => el.classList.toggle('open', fmtPinned || FMT_OPEN.has(el.dataset.id)));
   document.querySelectorAll('#dlg .pin').forEach(b => b.classList.toggle('on', fmtPinned));
 }
-function toggleFmt(i) { if (fmtPinned) return; const id = D.notes[i].id; FMT_OPEN.has(id) ? FMT_OPEN.delete(id) : FMT_OPEN.add(id); paintFmt(); }
+function toggleFmt(id) { if (fmtPinned) return; FMT_OPEN.has(id) ? FMT_OPEN.delete(id) : FMT_OPEN.add(id); paintFmt(); }
 function togglePin() { fmtPinned = !fmtPinned; paintFmt(); }
 function setFmtDefault(v) { setCfg('fmtOpen', v); fmtPinned = v; paintFmt(); }
-const PREV = new Set();
 const ALL_FOLD = new Set();   // bloques plegados en «Ver todo»
 let CITE_SEL = '';   // estilo de cita mostrado en «Ver todo»
-const citeSel = () => STYLES[CITE_SEL] ? CITE_SEL : STYLES[ex().style] ? ex().style : 'apa';   // notas con la vista previa abierta (por id)
-function noteInput(i, v) { D.notes[i].content = v; const pv = $('#pv' + i); if (pv && !pv.hidden) pv.innerHTML = md(v); }
-function togglePrev(i) { const id = D.notes[i].id; PREV.has(id) ? PREV.delete(id) : PREV.add(id); drawD(); }
-function fmtWrap(i, mk) {   // pone o quita las marcas alrededor de la selección (o en el cursor)
-  const t = $('#nt' + i), s = t.selectionStart, e = t.selectionEnd, v = t.value, L = mk.length;
-  const marked = s >= L && v.slice(s - L, s) === mk && v.slice(e, e + L) === mk && (L > 1 || (v[s - 2] !== '*' && v[e + 1] !== '*'));
-  const nv = marked ? v.slice(0, s - L) + v.slice(s, e) + v.slice(e + L) : v.slice(0, s) + mk + v.slice(s, e) + mk + v.slice(e), d = marked ? -L : L;
-  t.value = nv; t.setSelectionRange(s + d, e + d); t.focus(); noteInput(i, nv);
-}
-function fmtList(i, pre) {   // convierte las líneas seleccionadas en lista (o las devuelve a texto normal)
-  const t = $('#nt' + i), v = t.value, a = t.selectionStart === 0 ? 0 : v.lastIndexOf('\n', t.selectionStart - 1) + 1; let b = v.indexOf('\n', t.selectionEnd); if (b < 0) b = v.length;
-  const rx = /^(\s*[-•]\s+|\s*\d+\.\s+)/, lines = v.slice(a, b).split('\n'), all = lines.every(l => rx.test(l));
-  const out = lines.map((l, k) => all ? l.replace(rx, '') : (pre === '1. ' ? (k + 1) + '. ' : pre) + l.replace(rx, '')).join('\n');
-  t.value = v.slice(0, a) + out + v.slice(b); t.setSelectionRange(a, a + out.length); t.focus(); noteInput(i, t.value);
-}
+const citeSel = () => STYLES[CITE_SEL] ? CITE_SEL : STYLES[ex().style] ? ex().style : 'apa';
 const tplText = t => t.text.replace(/\{fecha\}/g, new Date().toLocaleDateString('es-ES')).replace(/\{paper\}/g, D?.title || '');
-function tplMenu(e, i) {
-  ctxShow(e, '<div class="ctxh">Insertar plantilla</div>' + (db.settings.templates.map(t => `<button onclick="tplInsert(${i},'${t.id}')">${esc(t.name)}</button>`).join('') || '<div class="ctxh">No hay plantillas (créalas en Configuración)</div>'));
+function tplMenu(e, key) {
+  ctxShow(e, '<div class="ctxh">Insertar plantilla</div>' + (db.settings.templates.map(t => `<button onclick="tplInsert('${key}','${t.id}')">${esc(t.name)}</button>`).join('') || '<div class="ctxh">No hay plantillas (créalas en Configuración)</div>'));
 }
-function tplInsert(i, id) {
-  const t = db.settings.templates.find(x => x.id === id); ctxClose(); if (!t) return;
-  const ta = $('#nt' + i), s = ta.selectionStart, txt = tplText(t), pre = s > 0 && ta.value[s - 1] !== '\n' ? '\n' : '';
-  ta.value = ta.value.slice(0, s) + pre + txt + ta.value.slice(ta.selectionEnd); const c = s + pre.length + txt.length;
-  ta.setSelectionRange(c, c); ta.focus(); noteInput(i, ta.value);
-}
+function tplInsert(key, id) { const t = db.settings.templates.find(x => x.id === id); ctxClose(); if (t) edInsert(key, tplText(t)); }
 function addNote(tid) { const t = tid && db.settings.templates.find(x => x.id === tid); D.notes.push({id: uid(), sectionId: F.sec || db.sections[0].id, content: t ? tplText(t) : ''}); drawD(); }
 function addNoteMenu(e) {
   ctxShow(e, '<div class="ctxh">Nueva nota con plantilla</div>' + (db.settings.templates.map(t => `<button onclick="ctxClose();addNote('${t.id}')">${esc(t.name)}</button>`).join('') || '<div class="ctxh">No hay plantillas (créalas en Configuración)</div>'));
@@ -1292,7 +1395,7 @@ function linkInfo(t, id) {   // destino del enlace; null si ya no existe
   for (const p of db.papers) { const n = p.notes.find(x => x.id === id); if (n) return {label: `${secName(n.sectionId)} · ${shortTxt(n.content.replace(/\[\[[^\]]*\]\]|[*]/g, '').trim()).slice(0, 30)}`, pid: p.id}; }
   return null;
 }
-const linkHTML = (t, id) => { const i = linkInfo(t, id); return i ? `<a class="nl" data-t="${t}" data-id="${id}" data-p="${i.pid}">${esc(i.label)}</a>` : '<span class="nl broken">⚠ enlace roto</span>'; };
+const linkHTML = (t, id) => { const i = linkInfo(t, id); return i ? `<a class="nl" data-t="${t}" data-id="${id}" data-p="${i.pid}">${esc(i.label)}</a>` : `<span class="nl broken" data-t="${t}" data-id="${id}">⚠ enlace roto</span>`; };
 const plainLinks = s => s.replace(LINK_RX, (_, t, id) => '[' + (linkInfo(t, id)?.label || '⚠ enlace roto') + ']');
 document.addEventListener('click', e => {
   const a = e.target.closest?.('a.nl[data-id]'); if (!a) return;
@@ -1307,8 +1410,8 @@ function showNotes(id, hl) {   // visor de notas de un paper (clic derecho en «
   $('#nv .hl')?.scrollIntoView({block: 'center'});
 }
 function viewNotes(e, id) { e.preventDefault(); showNotes(id); }
-let LK = {i: 0, s: 0, e: 0, pid: ''};
-function lkOpen(i) { const ta = $('#nt' + i); LK = {i, s: ta.selectionStart, e: ta.selectionEnd, pid: ''}; lkDraw(); $('#lk').showModal(); $('#lkQ')?.focus(); }
+let LK = {key: '', pid: ''};
+function lkOpen(key) { LK = {key, pid: ''}; lkDraw(); $('#lk').showModal(); $('#lkQ')?.focus(); }
 function lkDraw() {
   const p = LK.pid && db.papers.find(x => x.id === LK.pid);
   if (!p) { $('#lk').innerHTML = `<h2>Insertar enlace</h2><input id="lkQ" placeholder="Buscar un paper por título, autor o año…" oninput="lkSearch()" style="width:100%"><div id="lkR"></div><div class="row" style="margin-top:12px"><button onclick="$('#lk').close()">Cancelar</button></div>`; lkSearch(); return; }
@@ -1318,11 +1421,7 @@ function lkSearch() {
   const q = norm($('#lkQ').value), L = db.papers.filter(p => p.id !== D.id && (!q || norm([p.title, p.alias, p.year, ...p.authors].join(' ')).includes(q))).slice(0, 10);
   $('#lkR').innerHTML = L.map(p => `<button class="lkr" onclick="LK.pid='${p.id}';lkDraw()">${esc(shortTxt(p.alias || p.title))} <small>${esc((p.authors[0] || '') + (p.year ? ' · ' + p.year : ''))}</small></button>`).join('') || '<small>Sin resultados.</small>';
 }
-function lkInsert(code) {
-  const ta = $('#nt' + LK.i); if (!ta) return; const v = ta.value, pre = LK.s > 0 && !/\s/.test(v[LK.s - 1]) ? ' ' : '';
-  ta.value = v.slice(0, LK.s) + pre + code + v.slice(LK.e); const c = LK.s + pre.length + code.length;
-  $('#lk').close(); ta.setSelectionRange(c, c); ta.focus(); noteInput(LK.i, ta.value);
-}
+function lkInsert(code) { $('#lk').close(); edInsert(LK.key, code, true); }
 /* ===== Vista de notas por sección ===== */
 let SV = {sec: '', q: '', order: 'list'};
 function orderBy(L, ord) {
