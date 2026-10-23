@@ -535,24 +535,25 @@ const BASADO = 'Basado en: Chicago 17.ª ed., MLA 8.ª/9.ª, APA 7.ª, UNE-ISO 6
    Plantilla por tipo de documento: texto con {campos}, [grupos opcionales] (solo salen si todos sus campos tienen valor) y modificadores
    {campo:i:q|alternativa}. Un estilo propio se comporta como los de serie: sale en Exportar y en la pestaña Cita. */
 const CU_F = [['authors', 'Autores'], ['author1', 'Primer autor'], ['authorsShort', 'Apellidos (cita en el texto)'], ['editors', 'Editores'], ['title', 'Título'], ['year', 'Año (con a/b si hace falta)'],
-  ['date', 'Fecha completa de publicación'], ['venue', 'Revista / editorial / sitio'], ['publisher', 'Editorial del libro o actas'], ['place', 'Lugar de edición'], ['edition', 'Edición'], ['volume', 'Volumen'], ['issue', 'Número'],
+  ['date', 'Fecha completa de publicación'], ['datey', 'Fecha completa o, si no hay, el año'], ['venue', 'Revista / editorial / sitio'], ['publisher', 'Editorial del libro o actas'], ['place', 'Lugar de edición'], ['edition', 'Edición'], ['volume', 'Volumen'], ['issue', 'Número'],
   ['pages', 'Páginas'], ['loc', 'Página citada (solo cita en el texto)'], ['doi', 'DOI (sin https://doi.org/)'], ['doiurl', 'DOI como enlace'], ['url', 'URL'], ['link', 'Enlace (DOI o URL según el paper)'], ['accessed', 'Fecha de consulta'],
   ['isbn', 'ISBN'], ['issn', 'ISSN'], ['institution', 'Institución'], ['docNumber', 'Número de documento'], ['series', 'Serie o colección'], ['seriesNumber', 'Número en la serie'], ['conferenceName', 'Nombre del congreso'],
   ['conferencePlace', 'Lugar del congreso'], ['conferenceDates', 'Fechas del congreso'], ['subtype', 'Designación'], ['authorRole', 'Función del autor'], ['userHandle', 'Usuario (@)'], ['thesisType', 'Tipo de trabajo'], ['type', 'Tipo de documento']];
-const CU_M = {i: 'Cursiva', b: 'Negrita', q: '«Comillas»', qq: '“Comillas inglesas”', par: '(Paréntesis)', br: '[Corchetes]', up: 'MAYÚSCULAS', low: 'minúsculas', cap: 'Primera en mayúscula', nodot: 'Quitar punto final', dot: 'Añadir punto final', pp: 'Páginas con p./pp.', dash: 'Rango con raya (–)'};
+const CU_M = {i: 'Cursiva', b: 'Negrita', q: '«Comillas»', qq: '“Comillas inglesas”', par: '(Paréntesis)', br: '[Corchetes]', up: 'MAYÚSCULAS', low: 'minúsculas', cap: 'Primera en mayúscula', nodot: 'Quitar punto final', dot: 'Añadir punto final', title: 'Título (Cada Palabra)', sent: 'Solo la primera en mayúscula', pp: 'Páginas con p./pp.', dash: 'Rango con raya (–)', first: 'Solo la primera página', raw: 'Texto tal cual (edición)'};
 const CU_AU = {ap_ini: 'Apellido, N. N.', ap_ini_sp: 'Apellido NN (Vancouver)', ap_nom: 'Apellido, Nombre', nom_ap: 'Nombre Apellido', ini_ap: 'N. N. Apellido', ap: 'Solo el apellido'};
 const CU_LAST = {auto: 'Según idioma (y / &)', ' y ': ' y ', ' & ': ' & ', ' and ': ' and ', ', & ': ', & ', ', ': ', (solo coma)', ' / ': ' / ', '; ': '; '};
 const CU_DATE = {long: '24 de octubre de 2017', export: 'Como en Exportar', iso: '2017-10-24', dmy: '24-10-2017', my: 'octubre 2017'};
-const cuNew = (name = 'Mi estilo') => ({id: uid(), name, order: 'alpha', numbered: false, numFmt: 'br', dis: true, dateFmt: 'long',
+const cuNew = (name = 'Mi estilo') => ({id: uid(), name, order: 'alpha', numbered: false, numFmt: 'br', dis: true, dateFmt: 'long', lang: 'export',
   au: {fmt: 'ap_ini', sep: ', ', last: 'auto', max: 0, show: 1, etAl: 'et al.', upper: false, firstOnly: false},
   tpl: {'*': '[{authors}. ]({year|s.f.}). {title}. [{venue:i}][, {volume}][({issue})][, {pages:pp}]. [{link}]'}, inText: '({authorsShort}, {year|s.f.}[, {loc:pp}])'});
 function cuClean(c) {   // lo que viene de un JSON no se fía: forma y límites
   if (!c || typeof c !== 'object') return null;
   const d = cuNew(String(c.name || 'Estilo').slice(0, 60)); d.id = String(c.id || uid()).replace(/[^\w-]/g, '') || uid();
-  d.order = c.order === 'list' ? 'list' : 'alpha'; d.numbered = !!c.numbered; d.numFmt = ['dot', 'br', 'par'].includes(c.numFmt) ? c.numFmt : 'br'; d.dis = c.dis !== false; d.dateFmt = Object.hasOwn(CU_DATE, c.dateFmt) ? c.dateFmt : 'long';
+  d.order = c.order === 'list' ? 'list' : 'alpha'; d.numbered = !!c.numbered; d.numFmt = ['dot', 'br', 'par'].includes(c.numFmt) ? c.numFmt : 'br'; d.dis = c.dis !== false; d.lang = ['es', 'en'].includes(c.lang) ? c.lang : 'export'; d.dateFmt = Object.hasOwn(CU_DATE, c.dateFmt) ? c.dateFmt : 'long';
   const a = c.au && typeof c.au === 'object' ? c.au : {};
   d.au = {fmt: Object.hasOwn(CU_AU, a.fmt) ? a.fmt : 'ap_ini', sep: typeof a.sep === 'string' ? a.sep.slice(0, 10) : ', ', last: typeof a.last === 'string' ? a.last.slice(0, 12) : 'auto', max: Math.max(0, Math.min(99, +a.max || 0)),
     show: Math.max(1, Math.min(99, +a.show || 1)), etAl: typeof a.etAl === 'string' ? a.etAl.slice(0, 20) : 'et al.', upper: !!a.upper, firstOnly: !!a.firstOnly};
+  for (const k of ['each', 'first']) if (typeof a[k] === 'string' && a[k]) d.au[k] = a[k].slice(0, 80);
   d.tpl = {}; if (c.tpl && typeof c.tpl === 'object') for (const [k, v] of Object.entries(c.tpl)) if ((k === '*' || Object.hasOwn(TYPES, k)) && typeof v === 'string') d.tpl[k] = v.slice(0, 2000);
   d.inText = typeof c.inText === 'string' ? c.inText.slice(0, 500) : ''; return d;
 }
@@ -561,7 +562,7 @@ function cuParse(s, i = 0, close = false) {   // → [nodos, posición]; \ escap
   while (i < s.length) {
     const c = s[i];
     if (c === '\\' && i + 1 < s.length) { txt += s[i + 1]; i += 2; continue; }
-    if (c === '{') { const j = s.indexOf('}', i); if (j > 0) { flush(); const body = s.slice(i + 1, j), bar = body.indexOf('|'), spec = (bar < 0 ? body : body.slice(0, bar)).split(':').map(x => x.trim());
+    if (c === '{') { const j = s.indexOf('}', i); if (j > 0) { flush(); const body = s.slice(i + 1, j), bar = body.indexOf('|'), spec = (bar < 0 ? body : body.slice(0, bar)).split(':').map(x => x.includes('=') ? x.replace(/^\s+/, '') : x.trim());   // los valores de opción conservan sus espacios finales
       out.push({t: 'f', k: spec[0], m: spec.slice(1), fb: bar < 0 ? '' : body.slice(bar + 1)}); i = j + 1; continue; } }
     if (c === '[') { flush(); const r = cuParse(s, i + 1, true); out.push({t: 'g', n: r[0]}); i = r[1]; continue; }
     if (c === ']' && close) { flush(); return [out, i + 1]; }
@@ -577,16 +578,19 @@ function cuRender(nodes, get) {
 }
 const nodesFields = ns => ns.filter(n => n.t === 'f');
 const cuMod = (v, m) => ({i: v => '*' + v + '*', b: v => '**' + v + '**', q: v => '«' + v + '»', qq: v => '“' + v + '”', par: v => '(' + v + ')', br: v => '[' + v + ']', up: v => v.toUpperCase(), low: v => v.toLowerCase(),
-  cap: v => v.charAt(0).toUpperCase() + v.slice(1), nodot: v => v.replace(/\.(\*{0,2})$/, '$1'), dot: endDot, dash: v => v.replace(/\s*[-–—]+\s*/g, '–')}[m]?.(v) ?? v);
+  cap: v => v.charAt(0).toUpperCase() + v.slice(1), sent: v => v.charAt(0).toUpperCase() + v.slice(1).toLowerCase(), title: v => v.toLowerCase().replace(/(^|[\s(«“"-])(\p{L})/gu, (_, a, b) => a + b.toUpperCase()), first: v => v.split(/\s*[-–—,]\s*/)[0], nodot: v => v.replace(/\.(\*{0,2})$/, '$1'), dot: endDot, dash: v => v.replace(/\s*[-–—]+\s*/g, '–')}[m]?.(v) ?? v);
 const cuTidy = s => s.replace(/\s+/g, ' ').replace(/ +([,.;:)\]»”])/g, '$1').replace(/([(\[«“]) +/g, '$1').replace(/([.,;:])(\s*\1)+/g, '$1').trim();
-function cuDate(s, fmt, o) {
-  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s || ''); if (!m || !okDate(s)) return s || ''; const [, y, mo, d] = m, i = +mo - 1, en = o.lang === 'en';
-  return fmt === 'export' ? fdate(s, o) : fmt === 'iso' ? s : fmt === 'dmy' ? `${d}-${mo}-${y}` : fmt === 'my' ? `${MESF[en ? 'en' : 'es'][i]} ${y}` : en ? `${MESF.en[i]} ${+d}, ${y}` : `${+d} de ${MESF.es[i]} de ${y}`;
+const MESA = {es: ['ene.', 'feb.', 'mar.', 'abr.', 'may.', 'jun.', 'jul.', 'ago.', 'sept.', 'oct.', 'nov.', 'dic.'], en: ['Jan.', 'Feb.', 'Mar.', 'Apr.', 'May', 'June', 'July', 'Aug.', 'Sept.', 'Oct.', 'Nov.', 'Dec.']};
+function cuDate(s, fmt, o, pat) {   // pat: patrón propio con YYYY YY MMMM MMM MM M DD D (en mayúsculas); manda sobre fmt
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s || ''); if (!m || !okDate(s)) return s || ''; const [, y, mo, d] = m, i = +mo - 1, en = o.lang === 'en', lg = en ? 'en' : 'es';
+  if (pat) return pat.replace(/YYYY|YY|MMMM|MMM|MM|M|DD|D/g, t => ({YYYY: y, YY: y.slice(2), MMMM: MESF[lg][i], MMM: MESA[lg][i], MM: mo, M: +mo, DD: d, D: +d}[t]));
+  return fmt === 'export' ? fdate(s, o) : fmt === 'iso' ? s : fmt === 'dmy' ? `${d}-${mo}-${y}` : fmt === 'my' ? `${MESF[lg][i]} ${y}` : en ? `${MESF.en[i]} ${+d}, ${y}` : `${+d} de ${MESF.es[i]} de ${y}`;
 }
+const cuAuTpl = (t, x) => t.replace(/\{([lLgin])\}/g, (_, c) => ea({l: x.l, L: x.l.toUpperCase(), g: x.g || '', i: x.g ? ini(x.g, 1) : '', n: x.g ? ini(x.g, 0) : ''}[c]));   // personalizado: {l} apellido · {L} APELLIDO · {g} nombre · {i} iniciales con punto · {n} iniciales
 function cuAuthors(P, o, a) {
   if (!P.length) return '';
   let list = P, etal = false; if (a.max && P.length > a.max) { list = P.slice(0, a.show); etal = true; }
-  const one = (x, k) => { if (x.org || !x.g) return ea(x.l); const l = ea(a.upper ? x.l.toUpperCase() : x.l); let f = a.fmt;
+  const one = (x, k) => { if (x.org || !x.g) return ea(x.l); const t = k === 0 && a.first ? a.first : a.each; if (t) return cuAuTpl(t, x); const l = ea(a.upper ? x.l.toUpperCase() : x.l); let f = a.fmt;
     if (a.firstOnly && k > 0) f = f === 'ap_nom' ? 'nom_ap' : f === 'ap' ? 'ap' : 'ini_ap';
     return f === 'ap_ini' ? `${l}, ${ini(x.g, 1)}` : f === 'ap_ini_sp' ? `${l} ${ini(x.g, 0)}` : f === 'ap_nom' ? `${l}, ${ea(x.g)}` : f === 'nom_ap' ? `${ea(x.g)} ${l}` : f === 'ini_ap' ? `${ini(x.g, 1)} ${l}` : l; };
   const A = list.map(one);
@@ -599,35 +603,43 @@ function cuShort(P, o) {
   const L = P.map(x => ea(x.l)); if (L.length < 3) return L.length === 2 ? L[0] + (o.lang === 'en' ? ' & ' : yE(P[1].l) + ' ') + L[1] : L[0] || '';
   return L[0] + ' et al.';
 }
-function cuValue(k, p, o, cs) {
+const cuDec = v => v.replace(/%([0-9a-f]{2})/gi, (_, h) => String.fromCharCode(parseInt(h, 16)));
+const cuEnc = v => v.replace(/[%:|{}\[\]\\=]/g, c => '%' + c.charCodeAt(0).toString(16).padStart(2, '0'));
+function cuSplit(m) { const mods = [], op = {}; for (const x of m) { const i = x.indexOf('='); i > 0 ? op[x.slice(0, i)] = cuDec(x.slice(i + 1)) : mods.push(x); } return [mods, op]; }   // {campo:i:fmt=…}: modificadores y opciones propias del campo
+const cuAuO = op => { const r = {}; for (const k of ['fmt', 'sep', 'last', 'each', 'first']) if (op[k] != null && op[k] !== '') r[k] = op[k]; if (op.etal != null && op.etal !== '') r.etAl = op.etal;
+  for (const k of ['max', 'show']) if (op[k] != null && op[k] !== '') r[k] = +op[k] || 0; if (op.upper) r.upper = op.upper === '1'; if (op.fo) r.firstOnly = op.fo === '1'; if (r.fmt && !r.each && !r.first) r.each = r.first = ''; return r; };   // elegir un formato en el campo anula las plantillas por autor del estilo
+function cuValue(k, p, o, cs, op = {}) {
   switch (k) {
-    case 'authors': return cuAuthors(pAuthP(p), o, cs.au);
-    case 'author1': return cuAuthors(pAuthP(p).slice(0, 1), o, {...cs.au, max: 0});
+    case 'authors': return cuAuthors(pAuthP(p), o, {...cs.au, ...cuAuO(op)});
+    case 'author1': return cuAuthors(pAuthP(p).slice(0, 1), o, {...cs.au, ...cuAuO(op), max: 0});
     case 'authorsShort': return cuShort(pAuthP(p), o);
-    case 'editors': return cuAuthors(parse(p.editors || []), o, cs.au);
+    case 'editors': return cuAuthors(parse(p.editors || []), o, {...cs.au, ...cuAuO(op)});
     case 'title': return ea(p.title || '');
     case 'year': return p.year ? ea(p.year + (o.ys || '')) : '';
-    case 'date': return okDate(p.pubDate) ? cuDate(p.pubDate, cs.dateFmt, o) : '';
+    case 'date': return okDate(p.pubDate) ? cuDate(p.pubDate, op.fmt || cs.dateFmt, o, op.pat) : '';
+    case 'datey': return okDate(p.pubDate) && fdOk(p) ? cuDate(p.pubDate, op.fmt || cs.dateFmt, o, op.pat) : p.year ? ea(p.year + (o.ys || '')) : '';
     case 'venue': return ea(p.venue || '');
-    case 'edition': return ea(edLbl(p.edition, o.lang === 'en' ? 'en' : 'es'));
+    case 'edition': return op.raw ? ea(p.edition || '') : ea(edLbl(p.edition, o.lang === 'en' ? 'en' : 'es'));
     case 'doi': return p.doi ? ea(normDoi(p.doi)) : '';
     case 'doiurl': return p.doi ? 'https://doi.org/' + normDoi(p.doi) : '';
     case 'url': return p.url || '';
     case 'link': return citeLink(p);
-    case 'accessed': return p.accessed && !p.hideAccessed ? cuDate(p.accessed, cs.dateFmt, o) : '';
+    case 'accessed': return p.accessed && !p.hideAccessed ? cuDate(p.accessed, op.fmt || cs.dateFmt, o, op.pat) : '';
     case 'type': return TYPES[p.type] || '';
     case 'loc': return ea(o.loc || '');
     default: return CU_F.some(f => f[0] === k) && STR_F.includes(k) ? ea(String(p[k] || '')) : '';
   }
 }
-const cuGet = (n, p, o, cs) => { let v = cuValue(n.k, p, o, cs); if (!v) return n.fb ? ea(n.fb) : '';
-  if ((n.k === 'pages' || n.k === 'loc') && n.m.includes('pp')) v = ea(pgs(n.k === 'pages' ? p.pages : o.loc, 1)); for (const m of n.m) v = cuMod(v, m); return v; };
+const cuGet = (n, p, o, cs) => { const [mods, op] = cuSplit(n.m); if (n.k === 'edition' && mods.includes('raw')) op.raw = 1; let v = cuValue(n.k, p, o, cs, op); if (!v) return n.fb ? ea(n.fb) : '';
+  if ((n.k === 'pages' || n.k === 'loc') && mods.includes('pp')) v = ea(pgs(n.k === 'pages' ? p.pages : o.loc, 1));
+  for (const m of mods) v = cuMod(v, m); return (op.pre ? ea(op.pre) : '') + v + (op.suf ? ea(op.suf) : ''); };   // pre / suf: texto que solo sale si el campo tiene valor
 const cuRun = (tpl, p, o, cs) => cuTidy(cuRender(cuParse(tpl || '')[0], n => cuGet(n, p, o, cs)));
+const cuLang = (o, c) => c.lang === 'es' || c.lang === 'en' ? {...o, lang: c.lang} : o;
 function syncStyles(list, exp) {   // registra los estilos propios junto a los de serie (clave cu_<id>)
   for (const k of Object.keys(STYLES)) if (k.startsWith('cu_')) delete STYLES[k];
   for (const c of list || []) STYLES['cu_' + c.id] = {name: c.name + ' ✎', custom: true, order: c.order, numbered: c.numbered, numFmt: c.numFmt, dis: c.dis,
-    fn: (p, o = ex()) => cuRun(c.tpl[p.type] ?? c.tpl['*'] ?? '', p, o, c) || ea(p.title || ''),
-    inText: (p, o = ex(), loc = '') => c.inText ? [{k: 'En el texto', t: cuRun(c.inText, p, {...o, loc}, c)}] : [],
+    fn: (p, o = ex()) => cuRun(c.tpl[p.type] ?? c.tpl['*'] ?? '', p, cuLang(o, c), c) || ea(p.title || ''),
+    inText: (p, o = ex(), loc = '') => c.inText ? [{k: 'En el texto', t: cuRun(c.inText, p, {...cuLang(o, c), loc}, c)}] : [],
     note: 'Estilo personalizado: se edita en Configuración → Estilos de cita personalizados.'};
   if (exp && !STYLES[exp.style]) exp.style = 'apa';
 }
@@ -994,6 +1006,125 @@ function drawCfg() {
 `;
 }
 /* ---- Editor de estilos personalizados (Configuración) ---- */
+const CU_BASE = (() => {   // estilos de serie como punto de partida: plantillas aproximadas (en español, salvo IEEE) que se ajustan a mano
+  const cg = t => ({...t, congreso: t.congreso ?? t.capitulo});   // el congreso se escribe como un capítulo de actas
+  const CONS = '[ \\[Consulta: {accessed}\\].]', CONSM = '[ \\[consultado {accessed}\\]]';
+  return {
+    apa: {name: 'APA 7', order: 'alpha', dis: true, dateFmt: 'long', lang: 'es', au: {fmt: 'ap_ini', last: 'auto'}, inText: '({authorsShort}, {year|s.f.}[, {loc:pp}])',
+      tpl: {'*': '{authors} ({year|s.f.}). {title}. {venue:i}[, {volume:i}][({issue})][, {pages}]. {link}',
+        libro: '{authors} ({year|s.f.}). {title:i}[ ({edition})]. {venue}. {link}',
+        capitulo: '{authors} ({year|s.f.}). {title}. En [{editors:fmt=ini_ap} (Ed.), ]{venue:i}[ ({pages:pp})]. [{publisher}. ]{link}',
+        congreso: '{authors} ({year|s.f.}). {title:i} \\[Comunicación en congreso\\]. {venue}[, {place}]. {link}',
+        tesis: '{authors} ({year|s.f.}). {title:i} \\[{thesisType}[, {venue}]\\]. {link}',
+        web: '{authors} ({datey:pat=D de MMMM, YYYY|s.f.}). {title:i}. {venue}. {link}',
+        prensa: '{authors} ({datey:pat=D de MMMM, YYYY|s.f.}). {title}. {venue:i}. {link}'}},
+    vancouver: {name: 'Vancouver', order: 'list', dis: false, dateFmt: 'long', lang: 'es', au: {fmt: 'ap_ini_sp', last: ', ', max: 6, show: 6, etAl: ', et al.'}, inText: '',
+      tpl: cg({'*': '{authors}. {title}. {venue} \\[Internet\\]. {year}' + CONSM + '[; {volume}[({issue})][:{pages}]]. [Disponible en: {link}]',
+        libro: '{authors}. {title} \\[Internet\\]. [{edition} ][{place}: ]{venue}; {year}' + CONSM + '. [Disponible en: {link}]',
+        capitulo: '{authors}. {title}. [En: {editors}, editor. ]{venue} \\[Internet\\]. [{place}: ]{publisher}; {year}' + CONSM + '. [p. {pages}. ][Disponible en: {link}]',
+        tesis: '{authors}. {title} \\[{thesisType:low} en Internet\\]. [{place}: ]{venue}; {year}' + CONSM + '. [Disponible en: {link}]',
+        web: '{authors}. {title} \\[Internet\\]. [{place}: ]{venue}; {datey}' + CONSM + '. [Disponible en: {link}]',
+        prensa: '{authors}. {title}. {venue} \\[Internet\\]. {datey}' + CONSM + '[; {volume}[({issue})][:{pages}]]. [Disponible en: {link}]'})},
+    mla: {name: 'MLA', order: 'alpha', dis: false, dateFmt: 'long', lang: 'es', au: {fmt: 'ap_nom', last: 'auto', firstOnly: true, max: 2, show: 1, etAl: ', et al.'}, inText: '({authorsShort}[ {loc}])',
+      tpl: cg({'*': '{authors}. “{title}”. {venue:i}[, vol. {volume}][, núm. {issue}], {year}[, {pages:pp}][, {link}]. [Consultado el {accessed}.]',
+        libro: '{authors}. {title:i}. [{edition}, ]{venue}, {year}[, {link}]. [Consultado el {accessed}.]',
+        capitulo: '{authors}. “{title}”. {venue:i}[, editado por {editors:fmt=nom_ap}], {publisher}, {year}[, {pages:pp}][, {link}]. [Consultado el {accessed}.]',
+        tesis: '{authors}. {title:i}. [{thesisType}, ]{venue}, {year}[, {link}]. [Consultado el {accessed}.]',
+        web: '{authors}. “{title}”. {venue:i}, {datey:pat=D MMM YYYY}[, {link}]. [Consultado el {accessed}.]',
+        prensa: '{authors}. “{title}”. {venue:i}[, vol. {volume}][, núm. {issue}], {datey}[, {pages:pp}][, {link}]. [Consultado el {accessed}.]'})},
+    ieee: {name: 'IEEE', order: 'list', numbered: true, numFmt: 'br', dis: false, dateFmt: 'long', lang: 'en', au: {fmt: 'ini_ap', last: ', and '}, inText: '',
+      tpl: {'*': '{authors}, “{title},” {venue:i}[, vol. {volume}][, no. {issue}][, pp. {pages}][, {date:pat=MMMM YYYY}]. \\[Online\\]. Available: {link}',
+        libro: '{authors}, {title:i}[, {edition}]. [{place}: ]{venue}[, {date:pat=MMMM YYYY}]. \\[Online\\]. Available: {link}',
+        capitulo: '{authors}, “{title},” in {venue:i}[, {editors:fmt=ini_ap}, Ed]. [{place}: ]{publisher}[, {date:pat=MMMM YYYY}][, pp. {pages}]. \\[Online\\]. Available: {link}',
+        congreso: '{authors}, “{title},” in {venue}[, {place}][, {date:pat=MMMM YYYY}][, pp. {pages}]. \\[Online\\]. Available: {link}',
+        tesis: '{authors}, “{title},” Ph.D. dissertation, {venue}[, {place}][, {date:pat=MMMM YYYY}]. \\[Online\\]. Available: {link}',
+        web: '{authors}. ({datey:pat=YYYY, MMMM D}). {title}. {venue} \\[Online\\]. Available: {link}',
+        prensa: '{authors}, “{title},” {venue:i}, {datey:pat=MMMM D, YYYY}[, pp. {pages}]. \\[Online\\]. Available: {link}'}},
+    chicago_af: {name: 'Chicago autor-fecha', order: 'alpha', dis: true, dateFmt: 'long', lang: 'es', au: {fmt: 'ap_nom', last: 'auto', firstOnly: true}, inText: '({authorsShort} {year|s.f.}[, {loc}])',
+      tpl: cg({'*': '{authors}. {year|s.f.}. “{title}”. {venue:i}[ {volume}][, n.º {issue}][ ({date:pat=MMMM})][: {pages}]. [{link}.]',
+        libro: '{authors}. {year|s.f.}. {title:i}. [{edition}. ][{place}: ]{venue}. [{link}.]',
+        capitulo: '{authors}. {year|s.f.}. “{title}”. En {venue:i}[, editado por {editors:fmt=nom_ap}][, {pages}]. [{place}: ]{publisher}. [{link}.]',
+        tesis: '{authors}. {year|s.f.}. “{title}”. {thesisType}, {venue}. [{link}.]',
+        web: '{authors}. {year|s.f.}. “{title}”. {venue}. [{link}.]',
+        prensa: '{authors}. {year|s.f.}. “{title}”. {venue:i}, {date:pat=D de MMMM de YYYY}. [{link}.]'})},
+    chicago_nb: {name: 'Chicago notas y bibliografía', order: 'alpha', dis: false, dateFmt: 'long', lang: 'es', au: {fmt: 'ap_nom', last: 'auto', firstOnly: true}, inText: '',
+      tpl: cg({'*': '{authors}. “{title}”. {venue:i}[ {volume}][, n.º {issue}][ ({datey:pat=MMMM YYYY})][: {pages}]. [{link}.]',
+        libro: '{authors}. {title:i}. [{edition}. ][{place}: ]{venue}, {year|s.f.}. [{link}.]',
+        capitulo: '{authors}. “{title}”. En {venue:i}[, editado por {editors:fmt=nom_ap}][, {pages}]. [{place}: ]{publisher}, {year|s.f.}. [{link}.]',
+        tesis: '{authors}. “{title}”. {thesisType}, {venue}, {year|s.f.}. [{link}.]',
+        web: '{authors}. “{title}”. {venue}, {year|s.f.}. [{link}.]',
+        prensa: '{authors}. “{title}”. {venue:i}, {date:pat=D de MMMM de YYYY}. [{link}.]'})},
+    une_nf: {name: 'UNE-ISO 690 nombre-fecha', order: 'alpha', dis: true, dateFmt: 'dmy', lang: 'es', au: {fmt: 'ap_nom', last: 'auto', first: '{L}, {g}', each: '{g} {L}'}, inText: '',
+      tpl: cg({'*': '{authors}, {year|s.f.}. {title}. En línea. {venue:i}[, {volume:b}][({issue})][, pp. {pages}]. Disponible en: {link}.' + CONS,
+        libro: '{authors}, {year|s.f.}. {title:i}. En línea. [{edition}. ][{place}: ]{venue}. Disponible en: {link}.' + CONS,
+        capitulo: '{authors}, {year|s.f.}. {title}. En línea. En: {editors:fmt=nom_ap:upper=1} (ed.). {venue:i}. [{place}: ]{publisher}[, pp. {pages}]. Disponible en: {link}.' + CONS,
+        tesis: '{authors}, {year|s.f.}. {title:i}. En línea. {thesisType}. [{place}: ]{venue}. Disponible en: {link}.' + CONS,
+        web: '{authors}, {year|s.f.}. {title}. {venue}. En línea. {date}. Disponible en: {link}.' + CONS,
+        prensa: '{authors}, {year|s.f.}. {title}. En línea. {venue:i}. {date}[, pp. {pages}]. Disponible en: {link}.' + CONS})},
+    une_num: {name: 'UNE-ISO 690 numérico', order: 'list', numbered: true, numFmt: 'br', dis: false, dateFmt: 'dmy', lang: 'es', au: {fmt: 'ap_nom', last: 'auto', first: '{L}, {g}', each: '{g} {L}'}, inText: '',
+      tpl: cg({'*': '{authors}. {title}. En línea. {venue:i}. {year}[, {volume:b}][({issue})][, pp. {pages}]. Disponible en: {link}.' + CONS,
+        libro: '{authors}. {title:i}. En línea. [{edition}. ][{place}: ]{venue}, {year}. Disponible en: {link}.' + CONS,
+        capitulo: '{authors}. {title}. En línea. En: {editors:fmt=nom_ap:upper=1} (ed.). {venue:i}. [{place}: ]{publisher}, {year}[, pp. {pages}]. Disponible en: {link}.' + CONS,
+        tesis: '{authors}. {title:i}. En línea. {thesisType}. [{place}: ]{venue}, {year}. Disponible en: {link}.' + CONS,
+        web: '{authors}. {title}. {venue}. En línea. {date}. Disponible en: {link}.' + CONS,
+        prensa: '{authors}. {title}. En línea. {venue:i}. {date}[, pp. {pages}]. Disponible en: {link}.' + CONS})}
+  };
+})();
+/* ---- Botón derecho sobre un campo de la plantilla: opciones propias de ese campo ---- */
+let CUF = null;   // {s, e}: posición del {campo…} que se edita dentro del textarea
+function cuCtx(e) {
+  const t = $('#cuT'), a = t.selectionStart, b = t.selectionEnd, m = [...t.value.matchAll(/\{[^{}]*\}/g)].find(x => a === b ? a > x.index && a < x.index + x[0].length : a < x.index + x[0].length && b > x.index); if (!m) return;   // fuera de un campo: menú normal
+  CUF = {s: m.index, e: m.index + m[0].length}; cufShow(e);
+}
+function cuCtxChip(e, k) {   // botón derecho en la lista de campos: lo inserta y abre sus opciones
+  const t = $('#cuT'); if (!t) return; t.focus(); const s = t.selectionStart; t.setRangeText(`{${k}}`, s, t.selectionEnd, 'end'); cuTpl(t.value); CUF = {s, e: s + k.length + 2}; cufShow(e);
+}
+function cufShow(e) {
+  const t = $('#cuT'), n = cuParse(t.value.slice(CUF.s, CUF.e))[0][0]; if (!n || n.t !== 'f') return;
+  const [mods, op] = cuSplit(n.m), k = n.k, lab = CU_F.find(f => f[0] === k)?.[1] || k, has = m => mods.includes(m);
+  const chk = (m, l) => `<label class="row"><input type="checkbox" data-m="${m}" ${has(m) ? 'checked' : ''} onchange="cufApply()"> ${l}</label>`;
+  const sel = (key, o, v, attr = 'data-o') => `<select ${attr}="${key}" onchange="cufApply()">${Object.entries(o).map(([a, b]) => `<option value="${esc(a)}" ${String(v ?? '') === a ? 'selected' : ''}>${esc(b)}</option>`).join('')}</select>`;
+  const txt = (key, v, ph = '') => `<input data-o="${key}" value="${esc(v ?? '')}" placeholder="${esc(ph)}" oninput="cufApply()">`;
+  const num = (key, v) => `<input data-o="${key}" type="number" min="0" max="99" value="${esc(v ?? '')}" placeholder="—" oninput="cufApply()">`;
+  const fld = (l, c) => `<label>${l}${c}</label>`, TRI = {'': 'Como el estilo', 1: 'Sí', 0: 'No'}, ST = o => ({'': 'Como el estilo', ...o});
+  const pick = (list, v) => Object.fromEntries([['', '—'], ...list.map(x => [x, CU_M[x]])]);
+  let h = `<div class="cuf2"><div class="ctxh">Campo «${esc(lab)}»</div>`;
+  if (CUF_PERSON.includes(k)) h += `<div class="cuh2">Cómo se escribe cada persona</div>${fld('Formato', sel('fmt', ST(CU_AU), op.fmt))}
+    ${fld('Personalizado: primer autor', txt('first', op.first, '{L}, {g}'))}${fld('Personalizado: resto de autores', txt('each', op.each, '{g} {L}'))}
+    <small>Para el personalizado: <code>{l}</code> apellido · <code>{L}</code> APELLIDO · <code>{g}</code> nombre · <code>{i}</code> iniciales con punto · <code>{n}</code> iniciales sin punto. Si solo rellenas el del resto, el primero usa el mismo.</small>
+    ${fld('Entre autores', txt('sep', op.sep, 'como el estilo'))}${fld('Antes del último', sel('last', ST(CU_LAST), op.last))}
+    <div class="cugrid2">${fld('Más de N autores', num('max', op.max))}${fld('Mostrar', num('show', op.show))}</div>${fld('Texto de «y otros»', txt('etal', op.etal, 'et al.'))}
+    ${fld('Apellidos en mayúsculas', sel('upper', TRI, op.upper))}${fld('Solo el primero invertido', sel('fo', TRI, op.fo))}`;
+  if (CUF_DATE.includes(k)) h += `<div class="cuh2">Fecha</div>${fld('Formato', sel('fmt', ST(CU_DATE), op.fmt))}${fld('Patrón propio', txt('pat', op.pat, 'D de MMMM de YYYY'))}
+    <small>Letras: <code>YYYY</code> <code>YY</code> año · <code>MMMM</code> mes completo · <code>MMM</code> mes abreviado · <code>MM</code> <code>M</code> mes en número · <code>DD</code> <code>D</code> día. El patrón manda sobre el formato.</small>`;
+  if (k === 'pages' || k === 'loc') h += `<div class="cuh2">Páginas</div>${chk('pp', 'Con «p.» / «pp.»')}${chk('dash', 'Raya en el rango (45–67)')}${chk('first', 'Solo la primera página')}`;
+  if (k === 'edition') h += `<div class="cuh2">Edición</div>${chk('raw', 'Tal como se escribe (sin «.ª ed.»)')}`;
+  h += `<div class="cuh2">Formato del texto</div><div class="row">${chk('i', 'Cursiva')}${chk('b', 'Negrita')}</div>
+    ${fld('Mayúsculas', sel('case', pick(['up', 'low', 'cap', 'sent', 'title']), mods.find(m => ['up', 'low', 'cap', 'sent', 'title'].includes(m)), 'data-case'))}
+    ${fld('Rodear con', sel('wrap', pick(['q', 'qq', 'par', 'br']), mods.find(m => ['q', 'qq', 'par', 'br'].includes(m)), 'data-wrap'))}
+    ${fld('Punto final', sel('dot', pick(['nodot', 'dot']), mods.find(m => ['nodot', 'dot'].includes(m)), 'data-dot'))}
+    <div class="cuh2">Solo si el campo tiene valor</div>${fld('Texto antes', txt('pre', op.pre))}${fld('Texto después', txt('suf', op.suf))}${fld('Si está vacío, poner', `<input data-fb value="${esc(n.fb)}" oninput="cufApply()">`)}
+    <div class="row" style="margin-top:6px"><button onclick="cufReset()">Quitar todo el formato</button><button onclick="ctxClose()">Cerrar</button></div></div>`;
+  ctxShow(e, h);
+}
+const CUF_PERSON = ['authors', 'author1', 'editors'], CUF_DATE = ['date', 'datey', 'accessed'];
+function cufApply() {
+  const t = $('#cuT'), box = $('#ctx'); if (!t || !box || !CUF) return;
+  const k = /\{([^:|}]*)/.exec(t.value.slice(CUF.s, CUF.e))?.[1] || '', parts = [k], pick = a => box.querySelector(`[${a}]`)?.value;
+  const on = m => box.querySelector(`[data-m="${m}"]`)?.checked;
+  for (const m of ['pp', 'dash', 'first', 'raw']) if (on(m)) parts.push(m);
+  if (pick('data-case')) parts.push(pick('data-case')); if (pick('data-dot')) parts.push(pick('data-dot'));
+  for (const m of ['i', 'b']) if (on(m)) parts.push(m);
+  if (pick('data-wrap')) parts.push(pick('data-wrap'));
+  box.querySelectorAll('[data-o]').forEach(el => { if (el.value !== '') parts.push(el.dataset.o + '=' + cuEnc(el.value)); });
+  const fb = box.querySelector('[data-fb]')?.value, text = '{' + parts.join(':') + (fb ? '|' + fb : '') + '}';
+  t.setRangeText(text, CUF.s, CUF.e, 'preserve'); CUF.e = CUF.s + text.length; cuTpl(t.value);
+}
+function cufReset() { const t = $('#cuT'), k = /\{([^:|}]*)/.exec(t.value.slice(CUF.s, CUF.e))?.[1] || ''; t.setRangeText(`{${k}}`, CUF.s, CUF.e, 'preserve'); cuTpl(t.value); ctxClose(); }
+function cuFromBase(k) {   // estilo propio a partir de uno de serie: plantillas de partida que se ajustan a mano
+  const B = CU_BASE[k]; if (!B) return; const c = cuClean({name: B.name + ' (personalizado)', order: B.order, numbered: B.numbered, numFmt: B.numFmt, dis: B.dis, dateFmt: B.dateFmt, lang: B.lang, au: B.au, tpl: B.tpl, inText: B.inText}); c.id = uid();
+  db.settings.customStyles.push(c); CU = {id: c.id, type: '*', prev: 'ej'}; cuTouch(); drawCfg();
+}
 let CU = {id: '', type: '*', prev: 'ej'};
 const cuCur = () => db.settings.customStyles.find(c => c.id === CU.id) || db.settings.customStyles[0] || null;
 const cuSample = ty => NEWF({id: 'ej', title: 'Ejemplo de título del documento', authors: ['Pérez, Juan Carlos', 'Gómez Ruiz, Ana', 'Lee, Min-ho'], editors: ['Martín, Luis'], year: 2021, type: ty, venue: 'Revista de Ejemplo', publisher: 'Editorial Ejemplo',
@@ -1011,7 +1142,7 @@ function cuUI() {
   const L = db.settings.customStyles, c = cuCur(); if (c) CU.id = c.id;
   let h = `<small>Crea tu propio estilo: una plantilla por tipo de documento con los campos de los papers. Sale en Exportar y en la pestaña Cita, y se guarda en el JSON.</small>
     <div class="row" style="margin:8px 0">${L.length ? `<select onchange="CU.id=this.value;CU.type='*';drawCfg()">${L.map(x => `<option value="${x.id}" ${c.id === x.id ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select>` : ''}
-      <button onclick="cuAdd()">+ Nuevo estilo</button>${c ? '<button onclick="cuDup()">Duplicar</button><button class="danger" onclick="cuDel()">Eliminar</button>' : ''}</div>`;
+      <button onclick="cuAdd()">+ Nuevo estilo</button><select onchange="cuFromBase(this.value);this.value=''" title="Empieza con las plantillas de uno de los estilos de serie y modifícalas"><option value="">+ Nuevo a partir de…</option>${Object.entries(CU_BASE).map(([k, b]) => `<option value="${k}">${esc(b.name)}</option>`).join('')}</select>${c ? '<button onclick="cuDup()">Duplicar</button><button class="danger" onclick="cuDel()">Eliminar</button>' : ''}</div>`;
   if (!c) return h + '<p class="empty">Aún no hay estilos personalizados.</p>';
   const sel = (k, o, v, f) => `<select onchange="${f}('${k}',this.value)">${Object.entries(o).map(([a, b]) => `<option value="${esc(a)}" ${String(v) === a ? 'selected' : ''}>${esc(b)}</option>`).join('')}</select>`;
   const au = c.au, tpl = c.tpl[CU.type] ?? c.tpl['*'] ?? '', over = CU.type !== '*' && c.tpl[CU.type] != null;
@@ -1021,7 +1152,8 @@ function cuUI() {
     <label class="row"><input type="checkbox" ${c.numbered ? 'checked' : ''} onchange="cuSet('numbered',this.checked)"> Numerada</label>
     <label>Formato del número${sel('numFmt', {dot: '1.', br: '[1]', par: '(1)'}, c.numFmt, 'cuSet')}</label>
     <label class="row"><input type="checkbox" ${c.dis ? 'checked' : ''} onchange="cuSet('dis',this.checked)"> Distinguir 2020a / 2020b</label>
-    <label>Formato de fechas${sel('dateFmt', CU_DATE, c.dateFmt, 'cuSet')}</label></div>
+    <label>Formato de fechas${sel('dateFmt', CU_DATE, c.dateFmt, 'cuSet')}</label>
+    <label>Idioma de conectores y fechas${sel('lang', {export: 'El de Exportar', es: 'Español', en: 'English'}, c.lang, 'cuSet')}</label></div>
     <div class="cuh">Autores y editores</div><div class="cugrid">
     <label>Cada autor${sel('fmt', CU_AU, au.fmt, 'cuAu')}</label><label>Entre autores<input value="${esc(au.sep)}" maxlength="10" oninput="cuAu('sep',this.value)"></label>
     <label>Antes del último${sel('last', CU_LAST, au.last, 'cuAu')}</label><label>Más de N autores (0 = todos)<input type="number" min="0" max="99" value="${au.max}" oninput="cuAu('max',+this.value)"></label>
@@ -1029,13 +1161,13 @@ function cuUI() {
     <label class="row"><input type="checkbox" ${au.upper ? 'checked' : ''} onchange="cuAu('upper',this.checked)"> Apellidos en mayúsculas</label><label class="row"><input type="checkbox" ${au.firstOnly ? 'checked' : ''} onchange="cuAu('firstOnly',this.checked)"> Solo el primero va «Apellido, …»</label></div>
     <div class="cuh">Plantilla</div>
     <label>Tipo de documento<select onchange="CU.type=this.value;drawCfg()"><option value="*" ${CU.type === '*' ? 'selected' : ''}>Por defecto (todos los tipos)</option>${Object.entries(TYPES).map(([k, v]) => `<option value="${k}" ${CU.type === k ? 'selected' : ''}>${esc(v)}${c.tpl[k] != null ? ' ✎' : ''}</option>`).join('')}</select></label>
-    <textarea id="cuT" rows="4" spellcheck="false" oninput="cuTpl(this.value)" placeholder="p. ej. [{authors}. ]({year|s.f.}). {title:i}.">${esc(tpl)}</textarea>
+    <textarea id="cuT" rows="4" spellcheck="false" oninput="cuTpl(this.value)" oncontextmenu="cuCtx(event)" placeholder="p. ej. [{authors}. ]({year|s.f.}). {title:i}.">${esc(tpl)}</textarea>
     ${CU.type !== '*' ? `<small>${over ? 'Plantilla propia de este tipo.' : 'Este tipo usa la plantilla por defecto; si la editas aquí, se crea una propia.'}</small>${over ? '<button onclick="cuTplClear()">Quitar la de este tipo</button>' : ''}` : ''}
-    <div class="cuh">Campos <small>(clic para insertar en la plantilla)</small></div><div class="cuf">${CU_F.map(([k, l]) => `<button title="{${k}}" onclick="cuIns('{${k}}')">${esc(l)}</button>`).join('')}</div>
+    <div class="cuh">Campos <small>(clic para insertar; clic derecho sobre un campo, aquí o dentro de la plantilla, para darle formato propio)</small></div><div class="cuf">${CU_F.map(([k, l]) => `<button title="{${k}} · clic derecho: insertar con opciones" onclick="cuIns('{${k}}')" oncontextmenu="cuCtxChip(event,'${k}')">${esc(l)}</button>`).join('')}</div>
     <div class="row" style="margin:6px 0"><button onclick="cuGroup()" title="Lo de dentro solo sale si todos sus campos tienen valor">[ ] Grupo opcional</button>
       <select onchange="cuModIns(this.value);this.value=''" title="Se aplica al campo bajo el cursor"><option value="">Formato del campo…</option>${Object.entries(CU_M).map(([k, v]) => `<option value="${k}">${esc(v)}</option>`).join('')}</select></div>
     <details class="cuhelp"><summary>Cómo se escribe</summary><small>El texto va tal cual. <code>{campo}</code> inserta un dato; <code>{campo:i}</code> lo pone en cursiva (se pueden encadenar: <code>{title:i:q}</code>); <code>{year|s.f.}</code> usa «s.f.» si está vacío.
-      <code>[ … ]</code> es un grupo opcional: solo sale si todos los campos de dentro tienen valor. <code>\\</code> escapa el siguiente carácter (<code>\\[</code>). Los puntos y espacios repetidos se limpian solos.</small></details>
+      <code>[ … ]</code> es un grupo opcional: solo sale si todos los campos de dentro tienen valor. <code>\\</code> escapa el siguiente carácter (<code>\\[</code>). Los puntos y espacios repetidos se limpian solos. Con el <b>botón derecho sobre un campo</b> de la plantilla eliges su formato (autores, fechas, páginas, cursiva, texto antes y después…) y se escribe solo. Los corchetes literales, como en <code>\\[Internet\\]</code>, se escapan con barra.</small></details>
     <label>Cita en el texto (opcional)<input value="${esc(c.inText)}" maxlength="500" oninput="cuSet('inText',this.value)" placeholder="({authorsShort}, {year})"></label>
     <div class="cuh">Vista previa</div><label>Con<select onchange="CU.prev=this.value;cuPrev()"><option value="ej" ${CU.prev === 'ej' ? 'selected' : ''}>Un ejemplo</option>${db.papers.map(p => `<option value="${p.id}" ${CU.prev === p.id ? 'selected' : ''}>${esc(shortTxt(p.alias || p.title))}</option>`).join('')}</select></label>
     <div id="cuPrev" class="cuprev"></div>`;

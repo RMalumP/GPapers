@@ -255,6 +255,43 @@ with sync_playwright() as pw:
     pg.evaluate("D.image = null; drawD(); $('#dlg').querySelector('input[data-k=title]').focus()")
     eq('pegar texto normal en el título no se toca', paste("dt.setData('text/plain', 'https://example.org/x.jpg')", '#dlg input[data-k=title]'), False)
     pg.evaluate("$('#dlg').close()")
+    # ---- Fase 11: estilos de serie como plantilla y opciones propias por campo
+    pg.evaluate(SEED)
+    bad = pg.evaluate("""() => { const out = [];
+      for (const [k, B] of Object.entries(CU_BASE)) { const c = cuClean({name: B.name, order: B.order, dis: B.dis, dateFmt: B.dateFmt, lang: B.lang, au: B.au, tpl: B.tpl, inText: B.inText});
+        for (const ty of ['articulo', 'libro', 'capitulo', 'congreso', 'tesis', 'web', 'prensa']) { const p = cuSample(ty); if (ty === 'web' || ty === 'prensa') p.pubDate = '2021-03-09';
+          const want = STYLES[k].fn(p, {...ex(), ys: ''}), have = cuRun(c.tpl[ty] ?? c.tpl['*'], p, {...ex(), ys: '', lang: B.lang === 'en' ? 'en' : 'es'}, c); if (want !== have) out.push(k + '/' + ty); } } return out; }""")
+    eq('las plantillas de partida reproducen los estilos de serie (8 estilos × 7 tipos)', bad, [])
+    eq('opciones de campo: formato de autores', (cu('{authors:fmt=nom_ap:upper=1}', '{"authors": ["Pérez, Juan", "Gómez, Ana"]}'), cu('{authors:fmt=ap_ini_sp:last=%2C }', '{"authors": ["Pérez, Juan", "Gómez, Ana", "Lee, Min"]}')), ('Juan PÉREZ y Ana GÓMEZ', 'Pérez J, Gómez A, Lee M'))
+    eq('opciones de campo: personalizado por autor (primero y resto)', cu('{authors:first=%7BL%7D, %7Bg%7D:each=%7Bg%7D %7Bl%7D}', '{"authors": ["Pérez, Juan Carlos", "Gómez, Ana"]}'), 'PÉREZ, Juan Carlos y Ana Gómez')
+    eq('opciones de campo: iniciales y límite con et al.', cu('{authors:each=%7Bi%7D %7Bl%7D:max=1:show=1:etal=, et al.}', '{"authors": ["Pérez, Juan Carlos", "Gómez, Ana"]}'), 'J. C. Pérez, et al.')
+    eq('opciones de campo: patrón de fecha propio', (cu('{date:pat=DD/MM/YY}'), cu('{accessed:fmt=iso}'), cu('{date:pat=D MMM YYYY}')), ('09/03/21', '2026-01-15', '9 mar. 2021'))
+    eq('opciones de campo: texto antes/después solo si hay valor', (cu('A{volume:pre=, vol. :suf=!}B'), cu('A{volume:pre=, vol. :suf=!}B', '{"volume": ""}')), ('A, vol. 12!B', 'AB'))
+    eq('opciones de campo: mayúsculas y primera página', (cu('{title:sent}', '{"title": "UN TÍTULO LARGO"}'), cu('{title:title}', '{"title": "un título largo"}'), cu('{pages:first}'), cu('{edition:raw}')), ('Un título largo', 'Un Título Largo', '45', '2'))
+    eq('el valor con caracteres reservados se codifica', pg.evaluate("[cuEnc('a:b|c}d[e]=f%'), cuDec(cuEnc('a:b|c}d[e]=f%'))]"), ['a%3ab%7cc%7dd%5be%5d%3df%25', 'a:b|c}d[e]=f%'])
+    pg.evaluate("CFG_OPEN.add('cu'); openCfg()"); pg.wait_for_timeout(200)
+    pg.select_option('#cfg select:has(option[value=une_nf])', 'une_nf'); pg.wait_for_timeout(300)
+    eq('nuevo estilo a partir de uno de serie', pg.evaluate("[db.settings.customStyles.length, db.settings.customStyles[0].name, db.settings.customStyles[0].au.first, Object.keys(db.settings.customStyles[0].tpl).includes('capitulo')]"), [1, 'UNE-ISO 690 nombre-fecha (personalizado)', '{L}, {g}', True])
+    eq('y sale igual que el original', pg.evaluate("(st => st.fn(cuSample('libro'), {...ex(), ys: ''}) === STYLES.une_nf.fn(cuSample('libro'), {...ex(), ys: ''}))(STYLES[Object.keys(STYLES).find(k => k.startsWith('cu_'))])"), True)
+    # botón derecho sobre un campo dentro de la plantilla
+    pg.fill('#cuT', '{authors}. ({year|s.f.}). {title}'); 
+    pg.evaluate("(t => { t.focus(); t.setSelectionRange(3, 3); t.dispatchEvent(new MouseEvent('contextmenu', {bubbles: true, cancelable: true, clientX: 300, clientY: 300})); })(document.querySelector('#cuT'))")
+    eq('botón derecho sobre un campo abre sus opciones', (pg.locator('#ctx .cuf2').count(), 'Autores' in pg.inner_text('#ctx .ctxh') or 'Autores' in pg.inner_text('#ctx')), (1, True))
+    pg.select_option('#ctx select[data-o=fmt]', 'nom_ap')
+    eq('elegir el formato reescribe el campo', pg.input_value('#cuT'), '{authors:fmt=nom_ap}. ({year|s.f.}). {title}')
+    pg.fill('#ctx input[data-o=first]', '{L}, {g}'); pg.fill('#ctx input[data-o=each]', '{g} {L}')
+    eq('autor personalizado: primero y resto', pg.input_value('#cuT'), '{authors:fmt=nom_ap:first=%7bL%7d, %7bg%7d:each=%7bg%7d %7bL%7d}. ({year|s.f.}). {title}')
+    eq('y la vista previa lo refleja', 'PÉREZ, Juan Carlos' in pg.inner_text('#cuPrev'), True)
+    pg.check('#ctx input[data-m=i]'); pg.select_option('#ctx select[data-wrap]', 'q'); pg.fill('#ctx input[data-o=suf]', '.')
+    eq('formato general del campo', pg.input_value('#cuT').split('. (')[0].endswith(':suf=.}') or ':i:q' in pg.input_value('#cuT'), True)
+    pg.click('#ctx button:has-text("Quitar todo el formato")')
+    eq('quitar el formato deja el campo limpio', pg.input_value('#cuT'), '{authors}. ({year|s.f.}). {title}')
+    eq('fuera de un campo se mantiene el menú del navegador', pg.evaluate("(t => { t.setSelectionRange(1000, 1000); const e = new MouseEvent('contextmenu', {bubbles: true, cancelable: true}); t.dispatchEvent(e); return e.defaultPrevented; })(document.querySelector('#cuT'))"), False)
+    pg.click('#cuT'); pg.evaluate("document.querySelector('#cuT').setSelectionRange(0, 0)")
+    pg.evaluate("document.querySelector('#cfg .cuf button:has-text(\"Fecha de consulta\")') || 0") if False else None
+    pg.locator('#cfg .cuf button', has_text='Fecha de consulta').click(button='right'); pg.wait_for_timeout(200)
+    eq('botón derecho en un campo de la lista lo inserta y abre sus opciones', ('{accessed}' in pg.input_value('#cuT'), pg.locator('#ctx input[data-o=pat]').count()), (True, 1))
+    pg.evaluate("ctxClose(); $('#cfg').close()")
     srv.terminate()
     eq('sin errores de consola', errs, [])
     b.close()
