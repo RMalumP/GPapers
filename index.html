@@ -12,7 +12,6 @@
     <button onclick="save(true)">Guardar como</button>
     <button class="pri" onclick="openEx()">Exportar citas</button>
     <label><input type="checkbox" id="auto" onchange="setAuto(this)"> Autoguardado</label>
-    <button onclick="openHelp()" title="Ayuda (F1)" aria-label="Ayuda">❓ Ayuda</button>
   </div>
 </header>
 <div id="app">
@@ -32,6 +31,7 @@
       <div class="sb"><small id="selN"></small><button onclick="selVisible()">Seleccionar visibles</button><button onclick="selNone()">Quitar selección</button><button class="pri" onclick="openEx()">Exportar citas…</button></div></div>
   <button class="sh" onclick="grOpen()" title="Gráfico de relaciones entre papers"><span class="ic">🕸️</span><span class="lbl">Relaciones</span></button>
   <button class="sh trb" onclick="trOpen()" title="Papelera"><span class="ic">🗑️</span><span class="lbl" id="trLbl">Papelera</span><span class="dot" id="d-tr" hidden></span></button>
+  <button class="sh" onclick="openHelp()" title="Ayuda (F1)"><span class="ic">❓</span><span class="lbl">Ayuda</span></button>
   <button class="sh cfgb" onclick="openCfg()" title="Configuración"><span class="ic">⚙️</span><span class="lbl">Configuración</span></button>
   </aside>
   <main>

@@ -316,7 +316,8 @@ with sync_playwright() as pw:
     pg.click('#cfg button:has-text("Eliminar")'); pg.wait_for_timeout(200)
     eq('eliminar el tipo pasa los papers al tipo base', pg.evaluate("[db.settings.customTypes.length, db.papers[0].type, !!TYPES['ct_x']]"), [0, 'audio', False]); pg.evaluate("$('#cfg').close()")
     # ayuda
-    pg.click('header button:has-text("Ayuda")'); pg.wait_for_timeout(200)
+    eq('el botón Ayuda está en la barra lateral, entre Papelera y Configuración', pg.evaluate("[...document.querySelectorAll('#side > button.sh')].slice(-3).map(b => b.querySelector('.lbl').textContent)"), ['Papelera', 'Ayuda', 'Configuración'])
+    pg.click('#side button:has-text("Ayuda")'); pg.wait_for_timeout(200)
     eq('el botón Ayuda abre la ventana con todas las secciones', pg.evaluate("[$('#help').open, [...document.querySelectorAll('#hpb > details > summary')].map(s => s.textContent)]"), [True, ['Primeros pasos', 'Lista principal', 'Barra lateral', 'Editar un paper', 'Exportar citas', 'Importar referencias', 'Configuración', 'Tipos de documento propios', 'Estilos de cita personalizados', 'Atajos de teclado', 'Datos, privacidad y consejos']])
     pg.fill('#hpq', 'subrayado'); eq('el buscador filtra las secciones', pg.evaluate("[...document.querySelectorAll('#hpb > details')].filter(d => !d.hidden).map(d => d.querySelector('summary').textContent)"), ['Editar un paper'])
     pg.fill('#hpq', 'zzzzqq'); eq('y avisa si no hay resultados', pg.locator('#hpEmpty').count(), 1)

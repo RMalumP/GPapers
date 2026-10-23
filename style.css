@@ -47,7 +47,7 @@ aside.min .dot{position:absolute;top:6px;right:6px}.sb .chip{margin:2px 4px 2px 
 .gbox{border:2px dashed transparent;border-radius:10px;padding:0 6px 10px}.gbox.over{border-color:var(--pri);background:color-mix(in srgb,var(--pri) 8%,transparent)}
 .card.over{outline:2px solid var(--pri)}.card.drag{opacity:.45}.card[draggable=true],.chip[draggable=true]{cursor:grab}
 .drop{padding:12px;border:1px dashed var(--bd);border-radius:8px;text-align:center}
-.cfgb{margin-top:auto}#cfg label{display:flex;flex-direction:column;gap:4px;margin:8px 0}#cfg label.row{flex-direction:row;align-items:center}
+.trb{margin-top:auto}#cfg label{display:flex;flex-direction:column;gap:4px;margin:8px 0}#cfg label.row{flex-direction:row;align-items:center}
 #reopen{align-self:stretch;font-size:11px;line-height:1.05;padding:0 9px}
 .cpick{display:grid;grid-template-columns:1fr 1fr;gap:2px 12px;margin:0 0 10px}.cpick label{margin:2px 0}.cpick button{grid-column:1/-1;justify-self:start;margin-top:6px}
 @media(max-width:520px){.cpick{grid-template-columns:1fr}}
