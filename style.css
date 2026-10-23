@@ -85,3 +85,9 @@ a.nl{color:var(--pri);cursor:pointer;text-decoration:underline dotted}a.nl:hover
 #gr{width:min(920px,96vw)}#gr svg{width:100%;height:auto;max-height:70vh;border:1px solid var(--bd);border-radius:8px;background:var(--card)}#gr .nd{cursor:pointer}#gr .nd:hover circle{stroke:var(--pri);stroke-width:3}#gr text{fill:var(--fg);font-size:11px;pointer-events:none;paint-order:stroke;stroke:var(--card);stroke-width:4px;stroke-linejoin:round}
 
 .stv.none{opacity:.35}.ct .x{flex-shrink:0}
+
+/* F2: barra lateral con fondo y borde propios; «Gestionar» junto al título del grupo, solo en el hueco que deja el texto */
+aside{background:color-mix(in srgb,var(--fg) 6%,var(--bg));border:1px solid var(--bd);border-radius:10px;padding:6px 4px}
+.sgh{display:flex;align-items:center;min-width:0}.sgh .sh{width:auto;flex:0 0 auto}.sgh .dot{margin-left:6px}
+.mgb{flex:1 1 0;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;text-align:center;font-size:12px;padding:2px 6px;margin-right:4px}
+aside.min .mgb{display:none}aside.min .sgh .sh{width:100%}
