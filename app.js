@@ -1175,8 +1175,8 @@ function pubSync() {   // fecha de publicación → rellena «Año» si está va
   if (okDate(D.pubDate) && !D.year) { D.year = +D.pubDate.slice(0, 4); const y = $('#dlg input[data-k="year"]'); if (y) y.value = D.year; }
   const w = $('#pdWarn'); if (w) w.textContent = pdWarn(); }
 function drawD() {
-  const T = {all: 'Ver todo', data: 'Datos', notes: 'Notas', cls: 'Secciones, cita y etiquetas', rel: 'Relacionados', hist: 'Historial'};
-  const blk = (id, t, body, always) => tab === 'all' ? `<details class="cs" ${ALL_FOLD.has(id) ? '' : 'open'} ontoggle="this.open ? ALL_FOLD.delete('${id}') : ALL_FOLD.add('${id}')"><summary>${t}</summary><div class="csb">${body}</div></details>`   // en «Ver todo» cada bloque lleva su título y se pliega
+  const T = {all: 'Ver todo', data: 'Datos', notes: 'Notas', cls: 'Secciones, etiquetas y relacionados', cite: 'Cita', hist: 'Historial'};
+  const blk = (id, t, body, always) => tab === 'all' || tab === 'cls' ? `<details class="cs" ${ALL_FOLD.has(id) ? '' : 'open'} ontoggle="this.open ? ALL_FOLD.delete('${id}') : ALL_FOLD.add('${id}')"><summary>${t}</summary><div class="csb">${body}</div></details>`   // en «Ver todo» cada bloque lleva su título y se pliega
     : (always ? `<h2 class="grp">${t}</h2>` : '') + body;
   let h = `<div class="dh"><h2>${esc(D.alias || D.title) || 'Nuevo paper'}</h2><div class="dbtn"><button class="pri" onclick="commit()">Guardar paper</button><button onclick="$('#dlg').close()">Cancelar</button></div></div><div class="tabs">${Object.entries(T).map(([k, v]) => `<button class="${tab === k ? 'on' : ''}" onclick="tab='${k}';drawD()">${v}</button>`).join('')}</div>`;
   if (tab === 'data' || tab === 'all') h += blk('data', 'Datos', `<div class="grid">${inp('title', 'Título *', 'text', 'w')}${inp('alias', 'Título personalizado (opcional; solo para mostrar, la cita usa el título original)', 'text', 'w')}
@@ -1206,13 +1206,18 @@ function drawD() {
   const citeOne = (k, s) => `<h3>${s.name}${D.cites[k] != null ? ' (editada a mano)' : ''}</h3>${typeWarn(k, D.type) ? `<small>⚠ ${esc(typeWarn(k, D.type))}</small>` : ''}
     <textarea id="c_${k}" oninput="D.cites['${k}']=this.value">${esc(D.cites[k] ?? s.fn(D))}</textarea>
     <div class="row"><button onclick="copyC('${k}',0,this)">Copiar</button><button onclick="copyC('${k}',1,this)" title="Con cursiva, para pegar en Word o Docs">Copiar con formato</button><button onclick="delete D.cites['${k}'];drawD()">Regenerar desde los datos</button></div>${ex().inText ? `<div class="itx" id="it_${k}">${itHtml(k)}</div>` : ''}`;
-  if (tab === 'cls' || tab === 'all') {
+  const fold = tab === 'all' || tab === 'cls';   // «Ver todo» y la pestaña de clasificación comparten diseño: bloques plegables
+  if (fold) {
     h += blk('secs', 'Secciones', db.sections.map(s => chip(s, D.sectionIds.includes(s.id), `toggleS('${s.id}')`)).join('') || '<p class="empty">No hay secciones. Créalas con «Gestionar secciones».</p>', true);
+  }
+  if (tab === 'cite' || tab === 'all') {
     h += blk('cite', 'Cita', `<small>Cursiva: *texto*. Un asterisco literal se escribe \\*. El idioma y el formato de fecha se eligen en «Exportar».</small>${ex().inText ? `<label>Página o parte citada (opcional, para la cita en el texto y las notas)<input id="locIn" value="${esc(CLOC)}" placeholder="p. ej. 87 o 87-90" oninput="CLOC=this.value;drawIT()"></label>` : ''}`
-      + (tab === 'all' ? `<label>Estilo<select onchange="CITE_SEL=this.value;drawD()">${Object.entries(STYLES).map(([k, s]) => `<option value="${k}" ${citeSel() === k ? 'selected' : ''}>${s.name}</option>`).join('')}</select></label>` + citeOne(citeSel(), STYLES[citeSel()]) : Object.entries(STYLES).map(([k, s]) => citeOne(k, s)).join('')), true);
+      + (tab === 'all' ? `<label>Estilo<select onchange="CITE_SEL=this.value;drawD()">${Object.entries(STYLES).map(([k, s]) => `<option value="${k}" ${citeSel() === k ? 'selected' : ''}>${s.name}</option>`).join('')}</select></label>` + citeOne(citeSel(), STYLES[citeSel()]) : Object.entries(STYLES).map(([k, s]) => citeOne(k, s)).join('')), false);
+  }
+  if (fold) {
     h += blk('tags', 'Etiquetas', db.tags.map(t => chip(t, D.tagIds.includes(t.id), `toggleT('${t.id}')`)).join('') || '<p class="empty">No hay etiquetas. Créalas con «Gestionar etiquetas».</p>', true);
   }
-  if (tab === 'rel' || tab === 'all') {
+  if (fold) {
     const chips = (ids, color, del) => ids.map(id => db.papers.find(p => p.id === id)).filter(Boolean).map(p => chip({name: shortTxt(p.alias || p.title) + (del ? ' ✕' : ''), color}, 1, del ? `${del}('${p.id}')` : '')).join('');
     const by = db.papers.filter(q => (q.refTo || []).includes(D.id)).map(q => q.id);
     h += blk('rel', 'Relacionados', `<div><small>Relacionados</small></div><div>${chips(D.related, '#6b45c2', 'relDel') || '<small>Ninguno.</small>'}</div>
