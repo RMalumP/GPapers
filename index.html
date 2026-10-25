@@ -32,10 +32,11 @@
       <div class="sb"><small id="selN"></small><button onclick="selVisible()">Seleccionar visibles</button><button onclick="selNone()">Quitar selección</button><button class="pri" onclick="openEx()">Exportar citas…</button></div></div>
   <button class="sh" onclick="grOpen()" title="Gráfico de relaciones entre papers"><span class="ic">🕸️</span><span class="lbl">Relaciones</span></button>
   <button class="sh trb" onclick="trOpen()" title="Papelera"><span class="ic">🗑️</span><span class="lbl" id="trLbl">Papelera</span><span class="dot" id="d-tr" hidden></span></button>
+  <button class="sh cfgb" onclick="openCfg()" title="Configuración"><span class="ic">⚙️</span><span class="lbl">Configuración</span></button>
+  <hr class="sbsep">
+  <button class="sh" onclick="openHelp()" title="Ayuda (F1)"><span class="ic">❓</span><span class="lbl">Ayuda</span></button>
   <button class="sh" onclick="openPriv()" title="Privacidad"><span class="ic">🔒</span><span class="lbl">Privacidad</span></button>
   <button class="sh" onclick="openCred()" title="Créditos"><span class="ic">©️</span><span class="lbl">Créditos</span></button>
-  <button class="sh" onclick="openHelp()" title="Ayuda (F1)"><span class="ic">❓</span><span class="lbl">Ayuda</span></button>
-  <button class="sh cfgb" onclick="openCfg()" title="Configuración"><span class="ic">⚙️</span><span class="lbl">Configuración</span></button>
   </aside>
   <main>
     <div class="row"><button class="pri" onclick="openPaper()">+ Nuevo paper</button><button id="tbView" class="tg" onclick="setView(db.settings.view==='table'?'cards':'table')" title="Cambiar entre tarjetas y tabla compacta"></button><div class="bar"><button id="tbSec" class="tg" onclick="F.tbSec=!F.tbSec;render()" oncontextmenu="groupMenu(event)" title="Clic: mostrar u ocultar las secciones · Clic derecho: agrupar por sección"></button><div id="secF2" class="chips" hidden></div></div><div class="bar"><button id="tbTag" class="tg" onclick="F.tbTag=!F.tbTag;render()" oncontextmenu="modeMenu(event)" title="Clic: mostrar u ocultar las etiquetas · Clic derecho: cómo combinarlas"></button><div id="tagF2" class="chips"></div></div><span id="count"></span></div>

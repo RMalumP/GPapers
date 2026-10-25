@@ -77,6 +77,7 @@ a.nl{color:var(--pri);cursor:pointer;text-decoration:underline dotted}a.nl:hover
 .svp{margin-top:12px}.svp h3{margin:0 0 4px}.svp .nt{margin:6px 0 6px 10px}#svB{max-height:50vh;overflow:auto;border-top:1px solid var(--bd);margin-top:8px}
 .lkr{display:block;width:100%;text-align:left;margin-top:4px}
 .trb{margin-top:auto}.trb+.cfgb{margin-top:0}
+.sbsep{border:0;border-top:1px solid var(--bd);margin:6px 10px;align-self:stretch}
 .twrap{overflow-x:auto;margin-top:10px;border:1px solid var(--bd);border-radius:8px}.tbl{width:100%;border-collapse:collapse;font-size:13px;background:var(--card)}
 .tbl th,.tbl td{padding:5px 8px;border-bottom:1px solid var(--bd);text-align:left;vertical-align:middle}.tbl th{white-space:nowrap}.tbl th.sortable{cursor:pointer}.tbl th.sortable:hover{color:var(--pri)}
 .tbl .tt{min-width:180px;font-weight:600}.tbl a.tl2{cursor:pointer}.tbl a.tl2:hover{color:var(--pri);text-decoration:underline}.tbl td input[type=checkbox]{width:auto}.tbl .nw{white-space:nowrap}
