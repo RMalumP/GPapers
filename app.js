@@ -2636,7 +2636,7 @@ function privHTML() {
     <li><b>Quitar el permiso a la aplicación</b> en todos tus dispositivos: <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener">myaccount.google.com/permissions</a>.</li>
     <li><b>Datos de este navegador</b>: Ayuda → «Aplicación instalada» → «Olvidar la copia de sesión», o borra los datos del sitio desde el navegador. Tu archivo JSON solo lo borras tú.</li></ul>
     ${syAvail() ? `<p class="sypv">${on ? `Google Drive: <b>sesión iniciada</b>${p.who ? ' como ' + esc(p.who) : ''}${p.last ? ' · última sincronización ' + syAgo(p.last) : ''}.</p><p class="row"><button onclick="syLogout()">🚪 Cerrar sesión</button><button class="danger" onclick="syWipe()">🗑 Borrar mi copia de Google Drive</button>` : 'Google Drive: <b>sin conectar</b>. <button onclick="$(\'#pv\').close();syIntro()">🔄 Sincronizar…</button>'}</p>` : ''}
-    <h4>Contacto</h4><p>Dudas sobre esta política: <a href="mailto:r.malumbresp@gmail.com">r.malumbresp@gmail.com</a>. Versión para enlazar: <a href="privacidad.html" target="_blank" rel="noopener">privacidad.html</a>.</p></div>`;
+    <h4>Contacto</h4><p>Dudas sobre esta política: <a href="mailto:r.malumbresp@gmail.com">r.malumbresp@gmail.com</a> o <a href="mailto:rmalum01@ucm.es">rmalum01@ucm.es</a>. Versión para enlazar: <a href="privacidad.html" target="_blank" rel="noopener">privacidad.html</a>.</p></div>`;
 }
 function openPriv() { $('#pv').innerHTML = privHTML(); if (!$('#pv').open) $('#pv').showModal(); }
 
@@ -2652,7 +2652,7 @@ function openCred() {
    Aparte del JSON, la app guarda (1) una copia de trabajo, para reabrir justo donde lo dejaste aunque no hayas guardado, y
    (2) el estado de la interfaz (filtros, orden, barra lateral, bloques plegados). Viven fuera de la caché de la aplicación,
    así que las actualizaciones no los tocan y no hace falta borrar datos para recibir una versión nueva. */
-const APP_V = '30.3';   // debe coincidir con la versión de sw.js
+const APP_V = '30.4';   // debe coincidir con la versión de sw.js
 let BOOTED = false, RELOADING = false, SWREG = null, tSes = 0, tUi = 0, lastUi = '';
 const sessionNow = () => { clearTimeout(tSes); if (!BOOTED) return Promise.resolve();
   return idb('readwrite', st => st.put({v: 1, path, dirty, at: new Date().toISOString(), json: dbJSON()}, 'session')).catch(() => {}); };

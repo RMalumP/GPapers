@@ -219,7 +219,7 @@ with sync_playwright() as pw:
 
     # Privacidad
     B.click('#sg-more .shm'); B.click('#side button:has-text("Privacidad")')
-    eq('Privacidad explica el permiso y la carpeta oculta', all(s in B.inner_text('#pv') for s in ['drive.appdata', 'carpeta privada y oculta', 'myaccount.google.com/permissions', 'yo@example.com']), True)
+    eq('Privacidad explica el permiso y la carpeta oculta', all(s in B.inner_text('#pv') for s in ['drive.appdata', 'carpeta privada y oculta', 'myaccount.google.com/permissions', 'yo@example.com', 'r.malumbresp@gmail.com o rmalum01@ucm.es']), True)
     B.evaluate("$('#pv').close()"); B.click('#syncBtn'); B.click('#ctx button:has-text("Borrar mis datos de Google Drive")'); B.wait_for_timeout(600)
     eq('borrar la copia de Drive y cerrar sesión (sin tocar archivos de otras webs)', (names(), [f['name'] for f in STORE.values()], B.evaluate("syOn()")), ([], ['supc1-sync.json'], False))
     # copia de la versión anterior (un solo archivo): se lee y se pasa al formato nuevo
