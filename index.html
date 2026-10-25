@@ -37,7 +37,7 @@
   <div class="sgm fold" id="sg-more"><button class="sh shs shm" onclick="sbMore()" title="Ayuda y créditos" aria-expanded="false"><span class="ic">ℹ️</span><span class="lbl">Información</span><span class="car">▸</span></button>
     <div class="smb"><button class="sh shs" onclick="openHelp()" title="Ayuda (F1)"><span class="ic">❓</span><span class="lbl">Ayuda</span></button>
     <button class="sh shs" onclick="openCred()" title="Créditos"><span class="ic">©️</span><span class="lbl">Créditos</span></button></div></div>
-  <p class="sbinfo">Gestor de papers: organiza tus papers académicos y sincronízalos si quieres con tu propio Google Drive. · <a href="privacidad.html" onclick="event.preventDefault();openPriv()">Política de privacidad</a></p>
+  <p class="sbinfo">Gestor papers: organiza tus papers y sincronízalos con tu Google Drive. · <a href="privacidad.html" onclick="event.preventDefault();openPriv()">Política de privacidad</a></p>
   </aside>
   <main>
     <div class="row"><button class="pri" onclick="openPaper()">+ Nuevo paper</button><button id="tbView" class="tg" onclick="setView(db.settings.view==='table'?'cards':'table')" title="Cambiar entre tarjetas y tabla compacta"></button><div class="bar"><button id="tbSec" class="tg" onclick="F.tbSec=!F.tbSec;render()" oncontextmenu="groupMenu(event)" title="Clic: mostrar u ocultar las secciones · Clic derecho: agrupar por sección"></button><div id="secF2" class="chips" hidden></div></div><div class="bar"><button id="tbTag" class="tg" onclick="F.tbTag=!F.tbTag;render()" oncontextmenu="modeMenu(event)" title="Clic: mostrar u ocultar las etiquetas · Clic derecho: cómo combinarlas"></button><div id="tagF2" class="chips"></div></div><span id="count"></span></div>
