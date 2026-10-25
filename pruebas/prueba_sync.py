@@ -93,7 +93,8 @@ with sync_playwright() as pw:
     cR, RD = device()   # lector: reconstruye lo que hay en Drive (copia + cambios + imágenes) sin iniciar sesión
     remote = lambda: {'db': RD.evaluate("(async () => { const t = await syToken(false), f = await syLs(t), R = await syRemote(t, f); return R.w ? syNorm(await syUnwire(t, R.w, f)) : null; })()")}
     cA, A = device('allow')
-    eq('el botón de sincronizar está a la izquierda de Guardar', A.evaluate("[!$('#syncBtn').hidden, $('#syncBtn').nextElementSibling.getAttribute('aria-label'), $('#syncBtn').dataset.st]"), [True, 'Guardar', 'off'])
+    eq('el botón de Google Drive está a la izquierda de Abrir', A.evaluate("[!$('#syncBtn').hidden, $('#syncBtn').nextElementSibling.getAttribute('aria-label'), $('#syncBtn').dataset.st, $('#syncBtn').previousElementSibling]"), [True, 'Abrir', 'off', None])
+    eq('sin conectar dice «Conectar con Google Drive»', (A.inner_text('#syncBtn').strip(), A.evaluate("$('#syncBtn').title")), ('🔄Conectar con Google Drive', 'Conectar con Google Drive'))
     eq('Privacidad está justo debajo de la Papelera', A.evaluate("$('#side .trb').nextElementSibling.textContent.trim()"), '🔒Privacidad')
     eq('Créditos está justo debajo de Privacidad', A.evaluate("$('#side .trb').nextElementSibling.nextElementSibling.textContent.trim()"), '©️Créditos')
     A.click('#side button:has-text("Créditos")')
@@ -107,6 +108,7 @@ with sync_playwright() as pw:
     eq('la copia lleva la biblioteca', (json.loads(snapf()['content'])['app'], len(remote()['db']['papers']) == A.evaluate("db.papers.length"), 'history' in snapf()['content']), ('gpapers', True, False))
     eq('mensaje de sincronizado y autoguardado activado', ('Sincronizado' in A.inner_text('#sy'), A.evaluate("[syOn(), syAuto(), $('#auto').checked, $('#syncBtn').dataset.st]")), (True, [True, True, True, 'ok']))
     eq('recuerda la cuenta', A.evaluate("syP().who"), 'yo@example.com')
+    eq('conectado ya no muestra el texto, solo el icono', A.evaluate("getComputedStyle($('#syncBtn .syl')).display"), 'none')
     A.click('#sy button:has-text("Aceptar")')
     A.evaluate("db.papers[0].title = 'Cambio en A'; markDirty()")
     eq('un cambio deja el icono pendiente', A.evaluate("$('#syncBtn').dataset.st"), 'pend')

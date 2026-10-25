@@ -6,9 +6,9 @@
 <header>
   <h1 id="appName">Papers</h1><span id="fname"></span>
   <div class="row">
+    <button id="syncBtn" onclick="syClick(event)" title="Conectar con Google Drive" aria-label="Conectar con Google Drive" data-st="off" hidden><span class="syi">🔄</span><span class="syl">Conectar con Google Drive</span><span class="syb"></span></button>
     <button onclick="doOpen()" oncontextmenu="openMenu(event)" title="Clic: abrir archivo · Clic derecho: importar referencias" aria-label="Abrir">📂</button>
     <button id="reopen" onclick="reopenLast()" title="Reabrir el último archivo" hidden>Reabrir<br>último</button>
-    <button id="syncBtn" onclick="syClick(event)" title="Sincronizar con Google Drive" aria-label="Sincronizar con Google Drive" hidden><span class="syi">🔄</span><span class="syb"></span></button>
     <button onclick="save(false)" title="Guardar" aria-label="Guardar">💾</button>
     <button onclick="save(true)">Guardar como</button>
     <button class="pri" onclick="openEx()">Exportar citas</button>
