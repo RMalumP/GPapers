@@ -65,7 +65,7 @@ En «Exportar citas» eliges idioma de los conectores (español/inglés), format
 - La versión está en `APP_V` (app.js) y en `papers-vNN` (sw.js): **súbelas juntas** en cada publicación. En Ayuda → «Aplicación instalada» hay botones para buscar actualizaciones y olvidar la copia de sesión.
 
 ## Sincronización con Google Drive, Privacidad y Créditos (F14)
-- **Final de la barra lateral (v30.1)**: Papelera, Configuración, una línea y luego Ayuda, Privacidad y Créditos, estos tres más bajos y discretos (v30.2).
+- **Final de la barra lateral (v30.1)**: Papelera, Configuración, una línea y luego Ayuda, Privacidad y Créditos, estos tres más bajos y discretos (v30.2) y agrupados en «ℹ️ Información», plegada por defecto (v30.3; se recuerda si la abres).
 - **©️ Créditos** (barra lateral, bajo Privacidad): dirección, desarrollo, derechos (licencia CC BY-SA) y la versión de la aplicación.
 - **Icono 🔄 a la izquierda de 📂** (sin conectar muestra «Conectar con Google Drive»): guarda la biblioteca entera (papers, notas, secciones, etiquetas, papelera y ajustes) en la carpeta oculta `appDataFolder` del **propio Google Drive** de cada persona, como en Supuestos C1 (permiso `drive.appdata`: la app no ve el resto del Drive; sin servidor intermedio). Archivos (todos `gpapers-…`): ver «Solo cambios» abajo.
 - **Autoguardado activado al conectar**: cada cambio se sube a los 3 s; al abrir la app, al volver a ella y cada 5 min se traen los cambios de los otros dispositivos. La casilla «Autoguardado» lo activa o desactiva (con Drive funciona en cualquier navegador, también en el móvil). El punto del icono indica el estado (verde, azul girando, amarillo, rojo).

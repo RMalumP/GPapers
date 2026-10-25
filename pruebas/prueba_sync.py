@@ -95,8 +95,12 @@ with sync_playwright() as pw:
     cA, A = device('allow')
     eq('el botón de Google Drive está a la izquierda de Abrir', A.evaluate("[!$('#syncBtn').hidden, $('#syncBtn').nextElementSibling.getAttribute('aria-label'), $('#syncBtn').dataset.st, $('#syncBtn').previousElementSibling]"), [True, 'Abrir', 'off', None])
     eq('sin conectar dice «Conectar con Google Drive»', (A.inner_text('#syncBtn').strip(), A.evaluate("$('#syncBtn').title")), ('🔄Conectar con Google Drive', 'Conectar con Google Drive'))
-    eq('final de la barra lateral: Configuración, una línea, Ayuda, Privacidad y Créditos', A.evaluate("[...document.querySelectorAll('#side > *')].slice(-5).map(e => e.tagName === 'HR' ? '——' : e.textContent.trim())"), ['⚙️Configuración', '——', '❓Ayuda', '🔒Privacidad', '©️Créditos'])
-    eq('Ayuda, Privacidad y Créditos son más bajos y discretos que Configuración', A.evaluate("(c => [...document.querySelectorAll('#side .shs')].map(b => b.offsetHeight < c.offsetHeight && +getComputedStyle(b).opacity < 1))($('#side .cfgb'))"), [True, True, True])
+    eq('final de la barra lateral: Configuración, una línea e «Información»', A.evaluate("[...document.querySelectorAll('#side > *')].slice(-3).map(e => e.tagName === 'HR' ? '——' : e.id || e.textContent.trim())"), ['⚙️Configuración', '——', 'sg-more'])
+    eq('«Información» está plegada por defecto', (A.evaluate("$('#sg-more').classList.contains('fold')"), A.is_visible('#side button:has-text("Créditos")')), (True, False))
+    A.click('#sg-more .shm')
+    eq('al pulsarla aparecen Ayuda, Privacidad y Créditos', A.evaluate("[...document.querySelectorAll('#sg-more .smb .lbl')].map(e => e.offsetParent ? e.textContent : '')"), ['Ayuda', 'Privacidad', 'Créditos'])
+    A.mouse.move(700, 700)
+    eq('Información, Ayuda, Privacidad y Créditos son más bajos y discretos que Configuración', A.evaluate("(c => [...document.querySelectorAll('#side .shs')].map(b => b.offsetHeight < c.offsetHeight && +getComputedStyle(b).opacity < 1))($('#side .cfgb'))"), [True, True, True, True])
     A.click('#side button:has-text("Créditos")')
     eq('Créditos: dirección, desarrollo, derechos y versión', A.evaluate("[...document.querySelectorAll('#cr dl > *')].map(e => e.textContent)"), ['Dirección:', 'R.M.P.', 'Desarrollo:', 'Vibe Coding con Claude', 'Derechos:', 'Licencia CC BY-SA', 'Versión:', 'v' + A.evaluate('APP_V')])
     A.evaluate("$('#cr').close()")
@@ -194,6 +198,7 @@ with sync_playwright() as pw:
     B.evaluate("db.papers[0].title = 'desde B'; markDirty()"); B.wait_for_timeout(3800)
     A.reload(); A.wait_for_timeout(1800)
     eq('al abrir la app se trae lo último (la sesión se recuerda)', (A.evaluate("db.papers[0].title"), A.evaluate("$('#auto').checked")), ('desde B', True))
+    eq('«Información» se recuerda abierta al reabrir', A.evaluate("$('#sg-more').classList.contains('fold')"), False)
 
     # tercer dispositivo con su propia biblioteca: pregunta cómo juntarlas
     cC, C = device()
@@ -213,7 +218,7 @@ with sync_playwright() as pw:
     eq('imagen sin usar borrada', names('gpapers-img-'), [])
 
     # Privacidad
-    B.click('#side button:has-text("Privacidad")')
+    B.click('#sg-more .shm'); B.click('#side button:has-text("Privacidad")')
     eq('Privacidad explica el permiso y la carpeta oculta', all(s in B.inner_text('#pv') for s in ['drive.appdata', 'carpeta privada y oculta', 'myaccount.google.com/permissions', 'yo@example.com']), True)
     B.evaluate("$('#pv').close()"); B.click('#syncBtn'); B.click('#ctx button:has-text("Borrar mis datos de Google Drive")'); B.wait_for_timeout(600)
     eq('borrar la copia de Drive y cerrar sesión (sin tocar archivos de otras webs)', (names(), [f['name'] for f in STORE.values()], B.evaluate("syOn()")), ([], ['supc1-sync.json'], False))

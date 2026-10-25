@@ -79,6 +79,7 @@ a.nl{color:var(--pri);cursor:pointer;text-decoration:underline dotted}a.nl:hover
 .trb{margin-top:auto}.trb+.cfgb{margin-top:0}
 .sbsep{border:0;border-top:1px solid var(--bd);margin:6px 10px;align-self:stretch}
 .shs{padding:3px 10px;font-size:13px;font-weight:400;opacity:.7}.shs:hover{opacity:1}.shs .ic{font-size:14px}   /* Ayuda, Privacidad y Créditos: más bajos y discretos */
+.smb{display:flex;flex-direction:column;gap:2px;padding-left:12px}#sg-more.fold .smb,aside.min .car{display:none}.car{margin-left:auto;font-size:11px;transition:transform .15s}#sg-more:not(.fold) .car{transform:rotate(90deg)}   /* plegados por defecto bajo «Información» */
 .twrap{overflow-x:auto;margin-top:10px;border:1px solid var(--bd);border-radius:8px}.tbl{width:100%;border-collapse:collapse;font-size:13px;background:var(--card)}
 .tbl th,.tbl td{padding:5px 8px;border-bottom:1px solid var(--bd);text-align:left;vertical-align:middle}.tbl th{white-space:nowrap}.tbl th.sortable{cursor:pointer}.tbl th.sortable:hover{color:var(--pri)}
 .tbl .tt{min-width:180px;font-weight:600}.tbl a.tl2{cursor:pointer}.tbl a.tl2:hover{color:var(--pri);text-decoration:underline}.tbl td input[type=checkbox]{width:auto}.tbl .nw{white-space:nowrap}

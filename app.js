@@ -1536,6 +1536,11 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') ctxClose(); 
 document.addEventListener('contextmenu', e => { if (!e.target.closest('[oncontextmenu]')) ctxClose(); });   // clic derecho en otro sitio también cierra
 function setSecF(id) { F.sec = id && F.sec === id ? '' : id; render(); }   // '' = Todas; pulsar la sección activa también vuelve a «Todas»
 function sbToggle() { $('#side').classList.toggle('min'); uiSoon(); }
+function sbMore() {   // «Información» (Ayuda, Privacidad y Créditos): plegada por defecto; con la barra plegada, la despliega abierta
+  const a = $('#side'), el = $('#sg-more'), wasMin = a.classList.contains('min');
+  a.classList.remove('min'); wasMin ? el.classList.remove('fold') : el.classList.toggle('fold');
+  el.querySelector('.shm').setAttribute('aria-expanded', !el.classList.contains('fold')); uiSoon();
+}
 function sbGroup(g) {   // con la barra plegada, pulsar un icono la despliega en ese grupo
   const a = $('#side'), el = $('#sg-' + g), wasMin = a.classList.contains('min');
   a.classList.remove('min'); wasMin ? el.classList.remove('fold') : el.classList.toggle('fold');
@@ -2647,13 +2652,13 @@ function openCred() {
    Aparte del JSON, la app guarda (1) una copia de trabajo, para reabrir justo donde lo dejaste aunque no hayas guardado, y
    (2) el estado de la interfaz (filtros, orden, barra lateral, bloques plegados). Viven fuera de la caché de la aplicación,
    así que las actualizaciones no los tocan y no hace falta borrar datos para recibir una versión nueva. */
-const APP_V = '30.2';   // debe coincidir con la versión de sw.js
+const APP_V = '30.3';   // debe coincidir con la versión de sw.js
 let BOOTED = false, RELOADING = false, SWREG = null, tSes = 0, tUi = 0, lastUi = '';
 const sessionNow = () => { clearTimeout(tSes); if (!BOOTED) return Promise.resolve();
   return idb('readwrite', st => st.put({v: 1, path, dirty, at: new Date().toISOString(), json: dbJSON()}, 'session')).catch(() => {}); };
 const sessionSoon = () => { clearTimeout(tSes); tSes = setTimeout(sessionNow, 700); };
 const uiState = () => ({v: 1, F: {sorts: F.sorts, group: F.group, sec: F.sec, tags: [...F.tags], read: F.read, minRating: F.minRating, inNotes: F.inNotes, mode: F.mode, tbSec: F.tbSec, tbTag: F.tbTag},
-  side: {min: $('#side').classList.contains('min'), fold: [...document.querySelectorAll('#side .sg.fold')].map(e => e.id)}, cite: CITE_SEL, allFold: [...ALL_FOLD], cfg: [...CFG_OPEN], help: [...HELP_OPEN]});
+  side: {min: $('#side').classList.contains('min'), fold: [...document.querySelectorAll('#side .sg.fold')].map(e => e.id), more: !$('#sg-more').classList.contains('fold')}, cite: CITE_SEL, allFold: [...ALL_FOLD], cfg: [...CFG_OPEN], help: [...HELP_OPEN]});
 const uiNow = () => { clearTimeout(tUi); if (!BOOTED) return Promise.resolve(); const s = JSON.stringify(uiState()); if (s === lastUi) return Promise.resolve(); lastUi = s; return idb('readwrite', st => st.put(JSON.parse(s), 'ui')).catch(() => {}); };
 const uiSoon = () => { clearTimeout(tUi); tUi = setTimeout(uiNow, 500); };
 function applyUI(u) {   // lo guardado nunca se fía: cada dato se valida contra el estado actual (un paper o etiqueta borrados no rompen nada)
@@ -2662,6 +2667,7 @@ function applyUI(u) {   // lo guardado nunca se fía: cada dato se valida contra
   F.group = !!f.group; F.sec = db.sections.some(s => s.id === f.sec) ? f.sec : ''; F.tags = new Set(strs(f.tags).filter(id => db.tags.some(t => t.id === id)));
   F.read = Object.hasOwn(READ, f.read) ? f.read : ''; F.minRating = Number.isInteger(f.minRating) && f.minRating >= 0 && f.minRating <= 5 ? f.minRating : 0; F.inNotes = !!f.inNotes; F.mode = f.mode === 'all' ? 'all' : 'any'; F.tbSec = !!f.tbSec; F.tbTag = f.tbTag !== false;
   const sd = u.side || {}; $('#side').classList.toggle('min', !!sd.min); document.querySelectorAll('#side .sg').forEach(e => e.classList.toggle('fold', strs(sd.fold).includes(e.id)));
+  $('#sg-more').classList.toggle('fold', sd.more !== true); $('#sg-more .shm').setAttribute('aria-expanded', sd.more === true);
   CITE_SEL = typeof u.cite === 'string' && STYLES[u.cite] ? u.cite : ''; strs(u.allFold).forEach(x => ALL_FOLD.add(x)); strs(u.cfg).forEach(x => CFG_OPEN.add(x)); strs(u.help).forEach(x => HELP_OPEN.add(x));
   $('#grpChk').checked = F.group; render();
 }
