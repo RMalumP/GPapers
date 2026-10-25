@@ -43,7 +43,7 @@ def drive(route, req):
         md = json.loads(parts[0].strip()); i = 'f%d' % next(SEQ); STORE[i] = {'name': md['name'], 'content': parts[1][:-2] if parts[1].endswith('\r\n') else parts[1], 'parents': md['parents'], 'mt': now()}; return ok(meta(i))
     if m == 'DELETE' and p.startswith('/drive/v3/files/'): STORE.pop(p.split('/')[-1], None); return route.fulfill(status=204, headers=CORS)
     return route.fulfill(status=404, headers=CORS, body='{}')
-GOOGLE = """window.google = {accounts: {oauth2: {initTokenClient: c => ({requestAccessToken: o => { window.__tok = (window.__tok || 0) + 1;
+GOOGLE = """window.google = {accounts: {oauth2: {initTokenClient: c => ({requestAccessToken: o => { window.__tok = (window.__tok || 0) + 1; window.__cid = c.client_id;
   setTimeout(() => window.__deny ? c.error_callback({type: 'popup_failed_to_open'}) : c.callback({access_token: 'tok', expires_in: 3600}), 5); }}), revoke: (t, cb) => cb && cb()}}};"""
 names = lambda pre='gpapers-': sorted(f['name'] for f in STORE.values() if f['name'].startswith(pre))
 deltas = lambda: [f for f in STORE.values() if f['name'].startswith('gpapers-d-')]
@@ -86,8 +86,9 @@ with sync_playwright() as pw:
 
     # ---- Con servidor y Google simulado
     srv = subprocess.Popen([sys.executable, '-I', '-m', 'http.server', '8792', '-d', str(folder)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL); time.sleep(1)
-    def device(sw='block'):
+    def device(sw='block', init=None):
         c = b.new_context(viewport={'width': 1200, 'height': 800}, service_workers=sw); c.add_init_script(GOOGLE); c.route('https://www.googleapis.com/**', drive)
+        if init: c.add_init_script(init)
         p = c.new_page(); p.on('pageerror', lambda e: errs.append(str(e))); p.on('console', lambda m: errs.append(m.text) if m.type == 'error' and 'favicon' not in m.text else None); p.on('dialog', lambda d: d.accept())
         p.goto('http://localhost:8792/index.html'); p.wait_for_timeout(1200); return c, p
     cR, RD = device()   # lector: reconstruye lo que hay en Drive (copia + cambios + imágenes) sin iniciar sesión
@@ -112,6 +113,7 @@ with sync_playwright() as pw:
     eq('la copia lleva la biblioteca', (json.loads(snapf()['content'])['app'], len(remote()['db']['papers']) == A.evaluate("db.papers.length"), 'history' in snapf()['content']), ('gpapers', True, False))
     eq('mensaje de sincronizado y autoguardado activado', ('Sincronizado' in A.inner_text('#sy'), A.evaluate("[syOn(), syAuto(), $('#auto').checked, $('#syncBtn').dataset.st]")), (True, [True, True, True, 'ok']))
     eq('recuerda la cuenta', A.evaluate("syP().who"), 'yo@example.com')
+    eq('usa el ID de cliente del proyecto «Gestor de papers» y lo recuerda', (A.evaluate("window.__cid"), A.evaluate("syP().cid")), ('143923429984-45e8m3bmn1315r9ceet2sb19iuq4f9qj.apps.googleusercontent.com',) * 2)
     eq('conectado ya no muestra el texto, solo el icono', A.evaluate("getComputedStyle($('#syncBtn .syl')).display"), 'none')
     A.click('#sy button:has-text("Aceptar")')
     A.evaluate("db.papers[0].title = 'Cambio en A'; markDirty()")
@@ -228,6 +230,15 @@ with sync_playwright() as pw:
     eq('la copia anterior se lee y se convierte', (D.evaluate("[db.papers[0].title, db.papers[0].image.data.length]"), names()), (['De la versión anterior', len(PNG)], sorted(['gpapers-snap.json', 'gpapers-img-' + D.evaluate(f"syHash('{PNG}')")])))
     B.evaluate("openHelp('sync')")
     eq('la ayuda tiene su apartado', 'Autoguardado activado' in B.inner_text('#hp_sync'), True)
+    # sesión iniciada con el proyecto anterior: aviso para dar permiso una vez, sin intentos sueltos
+    cE, E = device(init="if (!sessionStorage.x) { sessionStorage.x = 1; localStorage.setItem('gp-sync', JSON.stringify({on: true, auto: true, dev: 'old'})); localStorage.setItem('gp-sync-token', JSON.stringify({t: 'tok', exp: Date.now() + 3e6})); }")
+    E.wait_for_timeout(600)
+    eq('con el ID anterior: aviso «Conectar», sin usar su acceso ni abrir Google solo', (E.evaluate("$('#syncBtn').dataset.st"), 'cambiado de proyecto' in E.inner_text('#toast'), E.evaluate("window.__tok || 0"), E.evaluate("syTokGet()")), ('reconnect', True, 0, None))
+    E.click('#appName'); E.wait_for_timeout(500)
+    eq('un clic suelto no abre la ventana de permiso', E.evaluate("window.__tok || 0"), 0)
+    E.click('#toast button:has-text("Conectar")'); E.wait_for_timeout(1000)
+    eq('«Conectar» lo deja sincronizando con el proyecto nuevo', E.evaluate("[$('#syncBtn').dataset.st, syP().cid === SY_CFG.clientId, !!syTokGet()]"), ['ok', True, True])
+    eq('la página principal dice qué es la app y enlaza la privacidad (lo pide Google)', E.evaluate("(a => [!!a && !!a.offsetParent, $('.appf').textContent.includes('Gestor de papers'), !!document.querySelector('meta[name=description]')])(document.querySelector('.appf a[href=\"privacidad.html\"]'))"), [True, True, True])
     eq('sin errores', errs, [])
     srv.terminate(); b.close()
 print(f'{n - fail}/{n} pruebas correctas'); sys.exit(1 if fail else 0)
