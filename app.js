@@ -2070,12 +2070,32 @@ function grDraw() {
   $('#gr').innerHTML = `<h2>Relaciones entre papers</h2>
     <div class="row"><label class="row"><input type="checkbox" ${GR.vis ? 'checked' : ''} onchange="GR.vis=this.checked;grDraw()"> Solo los papers visibles con los filtros actuales</label><label class="row"><input type="checkbox" ${GR.all ? 'checked' : ''} onchange="GR.all=this.checked;grDraw()"> Incluir los que no tienen relaciones</label></div>
     <small id="grInfo">${nodes.length} papers · ${E.length} relaciones · <span style="color:#7c5cc4">━ relacionado</span> · <span style="color:#0f8b8d">➜ cita a</span> · clic en un paper para abrirlo</small>
+    ${E.length ? '' : grHelp()}
     ${nodes.length ? `<svg id="grSvg" viewBox="0 0 ${W} ${H}" role="img" aria-label="Gráfico de relaciones"><defs><marker id="grAr" viewBox="0 0 10 10" refX="17" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#0f8b8d"/></marker></defs>
       ${E.map(e => { const a = P[ix.get(e.a)], b = P[ix.get(e.b)]; return `<line class="ed" data-a="${e.a}" data-b="${e.b}" x1="${a.x.toFixed(1)}" y1="${a.y.toFixed(1)}" x2="${b.x.toFixed(1)}" y2="${b.y.toFixed(1)}" stroke="${e.dir ? '#0f8b8d' : '#7c5cc4'}" stroke-width="1.6" ${e.dir ? 'marker-end="url(#grAr)"' : ''}/>`; }).join('')}
-      ${nodes.map((p, i) => `<g class="nd" data-id="${p.id}" onclick="grGo('${p.id}')" tabindex="0" onkeydown="if(event.key==='Enter')grGo('${p.id}')"><title>${esc(p.title)}</title><circle cx="${P[i].x.toFixed(1)}" cy="${P[i].y.toFixed(1)}" r="8" fill="var(--pri)" stroke="var(--card)" stroke-width="2"/><text x="${(P[i].x + 12).toFixed(1)}" y="${(P[i].y + 4).toFixed(1)}">${lbl(p)}</text></g>`).join('')}</svg>` : '<p class="empty">Todavía no hay relaciones. Añádelas en la pestaña «Relacionados» de cada paper.</p>'}
+      ${nodes.map((p, i) => `<g class="nd" data-id="${p.id}" onclick="grGo('${p.id}')" tabindex="0" onkeydown="if(event.key==='Enter')grGo('${p.id}')"><title>${esc(p.title)}</title><circle cx="${P[i].x.toFixed(1)}" cy="${P[i].y.toFixed(1)}" r="8" fill="var(--pri)" stroke="var(--card)" stroke-width="2"/><text x="${(P[i].x + 12).toFixed(1)}" y="${(P[i].y + 4).toFixed(1)}">${lbl(p)}</text></g>`).join('')}</svg>` : ''}
     <div class="row" style="margin-top:12px"><button style="margin-left:auto" onclick="$('#gr').close()">Cerrar</button></div>`;
 }
 function grGo(id) { $('#gr').close(); openPaper(id); }
+function grHelp() {   // sin relaciones: qué es esta función y cómo empezar, atenuado porque es un texto provisional
+  const any = db.papers.some(p => (p.related || []).length || (p.refTo || []).length);
+  if (any) return '<div class="grhelp"><p>Con los filtros actuales no se ve ninguna relación. Desmarca «Solo los papers visibles con los filtros actuales» o cambia los filtros de la barra lateral.</p></div>';
+  return `<div class="grhelp"><h3>¿Para qué sirve?</h3>
+    <p>Este gráfico dibuja cómo se conectan tus papers: cada punto es un paper y cada línea, una relación entre dos. Así ves de un vistazo qué trabajos van juntos, cuáles sirven de base a otros y qué grupos de lectura se forman en tu bibliografía.</p>
+    <h3>Dos tipos de relación</h3>
+    <ul><li><b style="color:#7c5cc4">━ Relacionado</b>: tratan el mismo tema o se complementan. Es mutua: aparece en los dos papers.</li>
+    <li><b style="color:#0f8b8d">➜ Cita a</b>: un paper cita al otro. Tiene dirección: la flecha va del que cita al citado, y el citado lo muestra en «Citado por».</li></ul>
+    <h3>Cómo añadir la primera relación</h3>
+    <ol><li>Cierra esta ventana y pulsa <b>Editar</b> en un paper.</li>
+    <li>Ve a la pestaña <b>«Secciones, etiquetas y relacionados»</b> y abre el bloque <b>«Relacionados»</b>.</li>
+    <li>En el desplegable elige <b>«Relacionar con»</b> o <b>«Cita a»</b>, escribe parte del título del otro paper en «Buscar un paper…» y pulsa sobre él.</li>
+    <li>Pulsa <b>«Guardar paper»</b> y vuelve a <b>🕸️ Relaciones</b>: verás los dos papers unidos por una línea.</li></ol>
+    <h3>En el gráfico</h3>
+    <ul><li>Pulsa un paper para abrirlo y editarlo.</li>
+    <li><b>«Solo los papers visibles con los filtros actuales»</b> limita el gráfico a lo que muestran tus filtros (búsqueda, sección, etiquetas, lectura…).</li>
+    <li><b>«Incluir los que no tienen relaciones»</b> muestra también los papers sueltos, para ver cuáles faltan por conectar.</li></ul>
+    <p class="grtmp">Este texto desaparece en cuanto añadas la primera relación.</p></div>`;
+}
 
 /* ===== Papelera ===== */
 function trashPaper(id) {   // el paper sale de la lista pero se guarda en el JSON, con quién lo citaba, hasta que caduque
@@ -2655,7 +2675,7 @@ function openCred() {
    Aparte del JSON, la app guarda (1) una copia de trabajo, para reabrir justo donde lo dejaste aunque no hayas guardado, y
    (2) el estado de la interfaz (filtros, orden, barra lateral, bloques plegados). Viven fuera de la caché de la aplicación,
    así que las actualizaciones no los tocan y no hace falta borrar datos para recibir una versión nueva. */
-const APP_V = '31.3';   // debe coincidir con la versión de sw.js
+const APP_V = '31.4';   // debe coincidir con la versión de sw.js
 let BOOTED = false, RELOADING = false, SWREG = null, tSes = 0, tUi = 0, lastUi = '';
 const sessionNow = () => { clearTimeout(tSes); if (!BOOTED) return Promise.resolve();
   return idb('readwrite', st => st.put({v: 1, path, dirty, at: new Date().toISOString(), json: dbJSON()}, 'session')).catch(() => {}); };

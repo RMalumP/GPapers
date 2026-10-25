@@ -82,6 +82,16 @@ with sync_playwright() as pw:
     eq('sin cambios no hay parche', M("const a = LIB([P('a')]); return syDiff(a, structuredClone(a)) === undefined"), True)
     eq('cambiar algo que otro borró no lo resucita a medias', M("return syPatch(LIB([]), {o: {papers: {l: {a: {o: {title: {$: 'x'}}}}}}}).papers.length"), 0)
     eq('imágenes: en Drive solo va la huella, la misma imagen da la misma', M(f"const [w, r] = syWire(LIB([P('a', {{image: {{kind: 'data', data: '{PNG}'}}}}), P('b', {{image: {{kind: 'data', data: '{PNG}'}}}})])); return [w.papers[0].image.ref === w.papers[1].image.ref, r.size, JSON.stringify(w).includes('base64')]"), [True, 1, False])
+    # Relaciones: sin ninguna, explicación atenuada que desaparece con la primera
+    pg.evaluate("db.papers.length = 0; db.papers.push(P('r1'), P('r2')); GR.all = false; GR.vis = false; grOpen()")
+    eq('sin relaciones: explicación detallada y atenuada', pg.evaluate("(h => [!!h, +getComputedStyle(h).opacity < 1, ['¿Para qué sirve?', 'Dos tipos de relación', 'Cómo añadir la primera relación', 'Guardar paper'].every(t => h.textContent.includes(t)), !$('#grSvg')])($('#gr .grhelp'))"), [True, True, True, True])
+    pg.evaluate("GR.all = true; grDraw()")
+    eq('con «Incluir los que no tienen relaciones» sigue la explicación y se ven los papers', pg.evaluate("[!!$('#gr .grhelp h3'), document.querySelectorAll('#grSvg .nd').length]"), [True, 2])
+    pg.evaluate("db.papers[0].related = ['r2']; db.papers[1].related = ['r1']; GR.all = false; grDraw()")
+    eq('con la primera relación desaparece y se dibuja el gráfico', pg.evaluate("[!!$('#gr .grhelp'), document.querySelectorAll('#grSvg .ed').length]"), [False, 1])
+    pg.evaluate("GR.vis = true; F.q = 'nada que coincida'; grDraw()")
+    eq('si los filtros las ocultan, lo dice en vez de explicarlo todo', pg.evaluate("[!!$('#gr .grhelp h3'), $('#gr .grhelp').textContent.includes('filtros actuales')]"), [False, True])
+    pg.evaluate("F.q = ''; GR.vis = false; $('#gr').close()")
     c0.close()
 
     # ---- Con servidor y Google simulado
