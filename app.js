@@ -1310,7 +1310,7 @@ function helpHTML() {
       <li><b>El punto del icono</b>: verde, sincronizado; azul y girando, sincronizando; amarillo, cambios pendientes o hay que volver a conectar; rojo, error (se reintenta).</li>
       <li><b>Con la sesión iniciada, clic en 🔄</b>: sincronizar ahora, activar o desactivar el autoguardado, ver cómo funciona, privacidad y <b>cerrar sesión</b>.</li>
       <li><b>Cómo se combinan</b>: paper a paper y campo a campo. Si cambias el mismo campo en dos dispositivos gana el cambio más reciente; un paper editado en uno no se pierde aunque lo borres en otro. Los cambios que llegan de Drive se pueden deshacer (${kb('undo')}).</li>
-      <li>Por seguridad, Google da un acceso que dura una hora: si caduca con la pestaña abierta, el icono se pone amarillo y basta con «Volver a conectar».</li>
+      <li><b>Cada hora Google corta el acceso</b> por seguridad (sin un servidor propio no se puede renovar sin abrir su ventana). La aplicación intenta renovarlo sola; si el navegador no lo deja, el punto se pone amarillo y se reconecta con tu <b>siguiente clic o tecla</b> (puede verse un instante la ventana de Google). No pierdes nada: los cambios esperan en el dispositivo y se suben al reconectar. El acceso se comparte entre pestañas y vale al reabrir la aplicación mientras no caduque.</li>
       <li><b>Qué se guarda en Drive</b>: una copia completa, un archivo pequeño con lo que cambió en cada autoguardado y cada imagen incrustada aparte, una sola vez aunque la uses en varios papers. Cuando se acumulan cambios, la copia completa se pone al día y se borran los sueltos; las imágenes que ya no usa nadie se borran pasado un día. Cada dispositivo solo descarga lo que aún no tiene.</li>
       <li><b>Sin límite de tamaño práctico</b>: lo que pasa de 4 MB se sube por partes (subida reanudable de Google Drive), sin configurar nada.</li>
       <li>La vista (tarjetas o tabla) es de cada dispositivo y no se sincroniza. Tu archivo JSON sigue funcionando igual.</li></ul>`],
@@ -2351,15 +2351,30 @@ async function syUnwire(tok, w, files) {   // vuelve a poner las imágenes; solo
 }
 
 /* ---- Google: acceso y Drive ---- */
-const SY = {st: 'idle', busy: false, again: false, wait: false, tm: 0, applying: false, img: new Map()};   // img: huella → imagen
+const SY = {st: 'idle', busy: false, again: false, wait: false, tm: 0, exp: 0, gest: false, applying: false, img: new Map()};   // img: huella → imagen
 const syP = () => { try { return JSON.parse(localStorage.getItem('gp-sync')) || {}; } catch (e) { return {}; } };   // sesión recordada: {on, auto, who, last, dev}
 const sySet = o => { try { localStorage.setItem('gp-sync', JSON.stringify({...syP(), ...o})); } catch (e) {} };
 const syOn = () => !!syP().on;
 const syAvail = () => !!SY_CFG.clientId && /^https?:$/.test(location.protocol);   // Google no admite file://
-const SY_TOK = 'gp-sync-token';   // en sessionStorage: el acceso solo dura mientras la pestaña está abierta (y como mucho una hora)
-const syTokGet = () => { try { const t = JSON.parse(sessionStorage.getItem(SY_TOK)); if (t && t.t && t.exp > Date.now()) return t.t; } catch (e) {} return null; };
-const syTokPut = (t, s) => { try { sessionStorage.setItem(SY_TOK, JSON.stringify({t, exp: Date.now() + Math.max(60, (s || 3600) - 60) * 1000})); } catch (e) {} };
-const syTokDel = () => { try { sessionStorage.removeItem(SY_TOK); } catch (e) {} };
+/* El acceso de Google dura 1 hora y, sin servidor propio, solo se renueva abriendo su ventana, que el navegador bloquea si no la
+   provoca un clic o una tecla. Por eso (como en Supuestos C1): el acceso se comparte entre pestañas y al reabrir la aplicación
+   (localStorage, hasta que caduca), al caducar se intenta renovar una vez sin ventana y, si no se puede, se renueva con el
+   siguiente clic o tecla en cualquier parte. Mientras tanto los cambios esperan en el dispositivo. */
+const SY_TOK = 'gp-sync-token', SY_TRY = 'gp-sync-try';   // acceso temporal (1 hora) · cuándo se intentó renovar por última vez (entre pestañas)
+const syTokGet = () => { try { const t = JSON.parse(localStorage.getItem(SY_TOK)); if (t && t.t && t.exp > Date.now()) return t.t; } catch (e) {} return null; };
+const syTokPut = (t, s) => { const exp = Date.now() + Math.max(60, (s || 3600) - 60) * 1000; try { localStorage.setItem(SY_TOK, JSON.stringify({t, exp})); } catch (e) {} syTokWatch(exp); };
+const syTokDel = () => { try { localStorage.removeItem(SY_TOK); } catch (e) {} };
+const syTried = () => { try { return +localStorage.getItem(SY_TRY) || 0; } catch (e) { return 0; } };
+const syTry = () => { try { localStorage.setItem(SY_TRY, String(Date.now())); } catch (e) {} };
+function syTokWatch(exp) {   // al caducar el acceso se intenta renovar enseguida, sin esperar al siguiente cambio
+  clearTimeout(SY.exp); SY.exp = setTimeout(() => { if (syAuto() && !syTokGet()) syRun(false); }, Math.max(1000, exp - Date.now() + 500));
+}
+function syGesture() {   // sin acceso: el siguiente clic o tecla (en cualquier parte) permite abrir un instante la ventana de Google y reconectar
+  if (SY.gest) return; SY.gest = true;
+  const off = () => { SY.gest = false; ['pointerdown', 'keydown'].forEach(t => document.removeEventListener(t, h, true)); };
+  const h = () => { if (!syOn() || !['reconnect', 'error'].includes(SY.st)) return off(); if (SY.busy || Date.now() - syTried() < 15000) return; off(); syRun(false, true); };
+  ['pointerdown', 'keydown'].forEach(t => document.addEventListener(t, h, true));
+}
 const syGis = () => window.google?.accounts?.oauth2 ? Promise.resolve() : new Promise((ok, ko) => {
   const s = document.createElement('script'); s.src = 'https://accounts.google.com/gsi/client'; s.async = true; s.onload = ok; s.onerror = () => ko(Error('red')); document.head.appendChild(s); });
 function syToken(inter) {   // inter = false: renueva el acceso sin ventana (solo si ya se dio el permiso y sigue abierta la sesión de Google)
@@ -2465,10 +2480,13 @@ async function syOnce(inter) {
   if (syS(syPlain(db)) === syS(m)) { dirty = false; hdr(); sessionSoon(); }   // ya está guardado en Drive
   return {news, first: !R.w};
 }
-async function syRun(inter) {
+async function syRun(inter, gesture) {   // gesture: viene de un clic o una tecla (el navegador deja abrir la ventana de Google)
   if (!inter && !syOn()) return null;
   if (SY.busy) { SY.again = true; return null; }
-  if (!inter && SY.st === 'reconnect' && !syTokGet()) { syIcon(); return null; }   // sin acceso no se insiste: hay que pulsar «Volver a conectar»
+  if (!inter && !syTokGet()) {   // sin acceso: renovarlo sin ventana se intenta una sola vez (no a cada cambio ni desde cada pestaña); luego, con el siguiente clic
+    if (!gesture && (SY.st === 'reconnect' || Date.now() - syTried() < 6e4)) { SY.st = 'reconnect'; syGesture(); syIcon(); return null; }
+    syTry();
+  }
   clearTimeout(SY.tm); SY.tm = 0; SY.busy = true; SY.wait = false; SY.st = 'busy'; syIcon();
   try {
     let r; try { r = await syOnce(inter); } catch (e) { if (e.estado !== 401) throw e; syTokDel(); r = await syOnce(inter); }   // el acceso había caducado
@@ -2476,7 +2494,8 @@ async function syRun(inter) {
   } catch (e) {
     SY.st = /silencio|interaction|login|consent|popup|cerrada|denegado|access_denied|immediate/i.test(e.message) ? 'reconnect' : 'error'; SY.err = e;
     if (inter) throw e;
-    if (SY.st === 'reconnect' && !SY.warned) { SY.warned = true; toast('Para seguir sincronizando con Google Drive, vuelve a conectar.', [{t: 'Conectar', fn: syConnect}], 0); }
+    if (SY.st === 'reconnect' || SY.st === 'error') syGesture();
+    if (SY.st === 'reconnect' && !SY.warned) { SY.warned = true; toast('Google corta el acceso cada hora: se reconectará con tu próximo clic. No pierdes nada.', [], 6000); }
     return null;
   } finally { SY.busy = false; syIcon(); if (SY.again) { SY.again = false; sySoon(1500); } }
 }
@@ -2497,7 +2516,7 @@ function syLoaded() { syBaseSet(null); if (syAuto()) sySoon(500); }   // otro ar
 
 /* ---- Icono, menú y ventanas ---- */
 const SY_TXT = {off: 'Sincronizar con Google Drive', busy: 'Sincronizando…', ok: 'Sincronizado', pend: 'Cambios pendientes de sincronizar', wait: 'Cierra la ventana abierta para terminar de sincronizar',
-  reconnect: 'Hay que volver a conectar con Google', error: 'No se pudo sincronizar (se reintentará)', manual: 'Autoguardado desactivado: sincroniza a mano'};
+  reconnect: 'Sincronización cortada: se reconecta con tu próximo clic', error: 'No se pudo sincronizar (se reintentará)', manual: 'Autoguardado desactivado: sincroniza a mano'};
 const syAgo = ts => { const m = Math.round((Date.now() - ts) / 6e4); if (m < 1) return 'ahora mismo'; if (m < 60) return `hace ${m} min`;
   const h = Math.round(m / 60); if (h < 24) return `hace ${h} ${h === 1 ? 'hora' : 'horas'}`; const d = Math.round(h / 24); return `hace ${d} ${d === 1 ? 'día' : 'días'}`; };
 const syState = () => !syOn() ? 'off' : ['busy', 'wait', 'reconnect', 'error'].includes(SY.st) ? SY.st : dirty ? (syAuto() ? 'pend' : 'manual') : 'ok';
@@ -2515,7 +2534,7 @@ function syClick(e) {
     + '<button onclick="ctxClose();syIntro()">❔ ¿Cómo funciona?</button><button onclick="ctxClose();openPriv()">🔒 Privacidad</button><button onclick="ctxClose();syLogout()">🚪 Cerrar sesión</button>');
 }
 async function syNow() {
-  const r = await syRun(false);
+  const r = await syRun(false, true);
   if (SY.st === 'reconnect') toast('Hay que volver a conectar con Google.', [{t: 'Conectar', fn: syConnect}]);
   else if (SY.st === 'error') toast(syErr(SY.err));
   else if (r && r.wait) toast('Cierra la ventana abierta para terminar de sincronizar.', [], 4000);
@@ -2580,7 +2599,7 @@ async function syConnect() {
 async function syLogout(quiet) {
   if (!quiet && !confirm('¿Cerrar la sesión de Google Drive en este dispositivo?\nTus datos se quedan aquí y en tu Drive; los demás dispositivos siguen sincronizando.')) return;
   if (!quiet && syAuto() && dirty && !SY.busy) await syRun(false);   // sube lo último antes de salir
-  clearTimeout(SY.tm); try { localStorage.removeItem('gp-sync'); } catch (e) {} syTokDel(); syBaseSet(null); syCacheSet(null); SY.st = 'idle';
+  clearTimeout(SY.tm); clearTimeout(SY.exp); try { localStorage.removeItem('gp-sync'); } catch (e) {} syTokDel(); syBaseSet(null); syCacheSet(null); SY.st = 'idle';
   $('#auto').checked = auto; if (!FSA) $('#auto').disabled = true; syIcon(); if ($('#pv').open) openPriv();
   if (!quiet) toast('Sesión de Google Drive cerrada. Tus datos siguen en este dispositivo y en tu Drive.', [], 5000);
 }
@@ -2605,7 +2624,7 @@ function privHTML() {
     <li><b>Sincronización con Google Drive</b>, solo si la activas (abajo).</li></ul>
     <h4>Sincronización con Google Drive (opcional)</h4><p>Si pulsas 🔄 y das permiso, la aplicación guarda una copia de tu biblioteca (archivos <code>gpapers-…</code>: la biblioteca, los cambios de cada autoguardado y las imágenes incrustadas) en una <b>carpeta privada y oculta de tu propio Google Drive</b>. Usa el permiso <code>drive.appdata</code>, que solo deja ver, crear y borrar esa carpeta concreta: la aplicación <b>no puede leer ni modificar ningún otro archivo de tu Drive</b>.</p>
     <ul><li>La conexión va directamente de tu navegador a Google. Quien mantiene la aplicación no tiene acceso a tu cuenta ni a tus datos; no se usan para publicidad, ni se venden ni se comparten con terceros.</li>
-    <li>El acceso que da Google (token) se guarda solo mientras la pestaña está abierta y caduca en una hora.</li>
+    <li>El acceso que da Google (token) se guarda en este navegador, caduca en una hora y se borra al cerrar sesión.</li>
     <li>En este dispositivo se recuerda que la sesión está iniciada, el correo de la cuenta (para mostrarlo), la fecha de la última sincronización, la última versión sincronizada (para combinar bien los cambios) y lo ya descargado de Drive (para no volver a descargarlo).</li></ul>
     <h4>Cómo retirar el permiso o borrar los datos</h4><ul><li><b>Cerrar sesión</b> (menú del icono 🔄): deja de sincronizar en este dispositivo y olvida lo anterior. Tus datos siguen aquí y en tu Drive.</li>
     <li><b>Borrar la copia de Google Drive</b>: botón de abajo (con la sesión iniciada).</li>
@@ -2620,7 +2639,7 @@ function openPriv() { $('#pv').innerHTML = privHTML(); if (!$('#pv').open) $('#p
    Aparte del JSON, la app guarda (1) una copia de trabajo, para reabrir justo donde lo dejaste aunque no hayas guardado, y
    (2) el estado de la interfaz (filtros, orden, barra lateral, bloques plegados). Viven fuera de la caché de la aplicación,
    así que las actualizaciones no los tocan y no hace falta borrar datos para recibir una versión nueva. */
-const APP_V = '27';   // debe coincidir con la versión de sw.js
+const APP_V = '28';   // debe coincidir con la versión de sw.js
 let BOOTED = false, RELOADING = false, SWREG = null, tSes = 0, tUi = 0, lastUi = '';
 const sessionNow = () => { clearTimeout(tSes); if (!BOOTED) return Promise.resolve();
   return idb('readwrite', st => st.put({v: 1, path, dirty, at: new Date().toISOString(), json: dbJSON()}, 'session')).catch(() => {}); };
@@ -2676,7 +2695,7 @@ if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {   //
     document.addEventListener('visibilitychange', () => { if (!document.hidden) reg.update().catch(() => {}); }); }).catch(() => {});
   navigator.serviceWorker.addEventListener('controllerchange', () => { if (had && !RELOADING) toast('Hay una versión nueva de la aplicación.', [{t: 'Recargar ahora', fn: reloadApp}], 0); });
 }
-bootApp().then(() => { syIcon(); if (syAuto()) syRun(false); });   // con la sesión de Google Drive recordada, se trae lo último al abrir
+bootApp().then(() => { syIcon(); try { const t = JSON.parse(localStorage.getItem(SY_TOK)); if (t && t.exp > Date.now()) syTokWatch(t.exp); } catch (e) {} if (syAuto()) syRun(false); });   // con la sesión de Google Drive recordada, se trae lo último al abrir
 render();
 lastSnap = JSON.stringify(db);
 applySettings();

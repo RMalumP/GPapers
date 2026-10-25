@@ -154,15 +154,23 @@ with sync_playwright() as pw:
     A.evaluate("$('#dlg').close()"); A.wait_for_timeout(1000)
     eq('al cerrarlo llega el cambio', A.evaluate("db.papers[0].rating"), 2)
 
-    # acceso caducado: no se insiste y se avisa para volver a conectar
-    A.evaluate("sessionStorage.clear(); window.__deny = true; syRun(false)"); A.wait_for_timeout(400)
-    eq('acceso caducado: icono amarillo y aviso con «Conectar»', (A.evaluate("$('#syncBtn').dataset.st"), 'Conectar' in A.inner_text('#toast')), ('reconnect', True))
-    t0 = A.evaluate("window.__tok"); A.evaluate("db.papers[0].title = 'sin acceso'; markDirty()"); A.wait_for_timeout(3500)
-    eq('sin acceso no vuelve a pedirlo solo', A.evaluate("window.__tok"), t0)
-    A.evaluate("window.__deny = false"); A.click('#syncBtn')
+    # el acceso de Google dura 1 hora (lo que fallaba en Supuestos C1)
+    A2 = cA.new_page(); A2.on('pageerror', lambda e: errs.append(str(e))); A2.goto('http://localhost:8792/index.html'); A2.wait_for_timeout(1500)
+    eq('otra pestaña (o al reabrir la app) usa el mismo acceso sin abrir la ventana de Google', (A2.evaluate("window.__tok || 0"), A2.evaluate("$('#syncBtn').dataset.st")), (0, 'ok'))
+    A2.close()
+    A.evaluate("window.__deny = true; window.__tok = 0; localStorage.setItem(SY_TRY, '0'); const t = JSON.parse(localStorage.getItem(SY_TOK)); t.exp = Date.now() + 300; localStorage.setItem(SY_TOK, JSON.stringify(t)); syTokWatch(t.exp)")
+    A.wait_for_timeout(1600)
+    eq('al caducar intenta renovarlo una vez y, si el navegador no deja, avisa', (A.evaluate("window.__tok"), A.evaluate("$('#syncBtn').dataset.st"), 'próximo clic' in A.inner_text('#toast')), (1, 'reconnect', True))
+    A.evaluate("db.papers[0].title = 'sin acceso'; markDirty()"); A.wait_for_timeout(3500)
+    eq('mientras tanto no insiste a cada cambio y lo guarda en el dispositivo', (A.evaluate("window.__tok"), A.evaluate("dirty"), A.evaluate("$('#syncBtn').dataset.st")), (1, True, 'reconnect'))
+    A.evaluate("window.__deny = false; localStorage.setItem(SY_TRY, '0')")
+    A.click('#appName'); A.wait_for_timeout(800)
+    eq('el siguiente clic en cualquier parte reconecta y sube lo pendiente', (A.evaluate("window.__tok"), remote()['db']['papers'][0]['title'], A.evaluate("[$('#syncBtn').dataset.st, dirty]")), (2, 'sin acceso', ['ok', False]))
+    A.evaluate("syTokDel(); syTry(); SY.st = 'reconnect'; syIcon()")   # cortada otra vez y un intento reciente: el menú también ofrece reconectar
+    A.click('#syncBtn')
     eq('el menú ofrece volver a conectar y cerrar sesión', [x for x in A.evaluate("[...document.querySelectorAll('#ctx button')].map(b => b.textContent)") if 'conectar' in x or 'Cerrar sesión' in x], ['🔑 Volver a conectar', '🚪 Cerrar sesión'])
     A.click('#ctx button:has-text("Volver a conectar")'); A.wait_for_timeout(800)
-    eq('al reconectar se sube lo pendiente', (remote()['db']['papers'][0]['title'], A.evaluate("$('#syncBtn').dataset.st")), ('sin acceso', 'ok'))
+    eq('«Volver a conectar» también', A.evaluate("$('#syncBtn').dataset.st"), 'ok')
     A.click('#sy button:has-text("Aceptar")')
 
     # autoguardado desactivado desde la casilla: sincroniza a mano
@@ -188,7 +196,7 @@ with sync_playwright() as pw:
     eq('combinar junta las dos', (C.evaluate("db.papers.some(p => p.id === 'mio') && db.papers.some(p => p.title === 'desde B')"), any(p['id'] == 'mio' for p in remote()['db']['papers'])), (True, True))
     C.click('#sy button:has-text("Aceptar")')
     C.click('#syncBtn'); C.click('#ctx button:has-text("Cerrar sesión")'); C.wait_for_timeout(400)
-    eq('cerrar sesión: deja de sincronizar y conserva los datos', (C.evaluate("[syOn(), $('#syncBtn').dataset.st, sessionStorage.length, db.papers.some(p => p.id === 'mio')]"), 'gpapers-snap.json' in names()), ([False, 'off', 0, True], True))
+    eq('cerrar sesión: deja de sincronizar y conserva los datos', (C.evaluate("[syOn(), $('#syncBtn').dataset.st, localStorage.getItem(SY_TOK), db.papers.some(p => p.id === 'mio')]"), 'gpapers-snap.json' in names()), ([False, 'off', None, True], True))
     # imágenes que ya nadie usa: se borran al rehacer la copia (si tienen más de un día)
     A.evaluate("db.papers.forEach(p => p.image = null); db.trash.forEach(t => t.paper.image = null); SY_CFG.maxDeltas = 0; markDirty()")
     for f in STORE.values():
