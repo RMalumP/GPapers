@@ -151,7 +151,7 @@ aside{border-left:0;border-radius:0 10px 10px 0;padding-left:6px}
 /* F13: aviso (toast) */
 #toast{position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:100;display:flex;align-items:center;gap:10px;max-width:min(92vw,640px);background:var(--fg);color:var(--bg);padding:10px 14px;border-radius:10px;box-shadow:0 4px 16px #0005}
 #toast[hidden]{display:none}#toast button{background:var(--bg);color:var(--fg);border-color:transparent}
-#syncBtn{position:relative}#syncBtn[hidden]{display:none}.syi{display:inline-block}
+#syncBtn{position:relative}.syl{margin-left:6px}#syncBtn:not([data-st=off]) .syl{display:none}#syncBtn[hidden]{display:none}.syi{display:inline-block}
 .syb{position:absolute;right:3px;bottom:3px;width:9px;height:9px;border-radius:50%;box-shadow:0 0 0 2px var(--card);display:none}
 #syncBtn:not([data-st=off]) .syb{display:block}#syncBtn[data-st=ok] .syb{background:#27ae60}#syncBtn[data-st=busy] .syb{background:var(--pri)}
 #syncBtn[data-st=pend] .syb,#syncBtn[data-st=manual] .syb,#syncBtn[data-st=wait] .syb,#syncBtn[data-st=reconnect] .syb{background:#e0a100}#syncBtn[data-st=error] .syb{background:var(--red)}
