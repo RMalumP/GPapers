@@ -1315,7 +1315,7 @@ function helpHTML() {
       <li><b>Sin límite de tamaño práctico</b>: lo que pasa de 4 MB se sube por partes (subida reanudable de Google Drive), sin configurar nada.</li>
       <li>La vista (tarjetas o tabla) es de cada dispositivo y no se sincroniza. Tu archivo JSON sigue funcionando igual.</li></ul>`],
     atajos: ['Atajos de teclado', helpTbl(Object.keys(SC_NAMES).map(a => [esc(SC_NAMES[a]), kb(a)]).concat([['Esta ayuda', '<kbd>F1</kbd>'], ['Cerrar menús y ventanas', '<kbd>Esc</kbd>']])) + '<p>Se cambian en Configuración → Atajos de teclado. Dentro de campos de texto solo funciona «Guardar»; negrita y cursiva actúan dentro de una nota.</p>'],
-    datos: ['Datos, privacidad y consejos', `<ul><li>Todo se queda en tu navegador y en tu archivo JSON. La aplicación solo sale a internet para <b>buscar un DOI en CrossRef</b>, para mostrar <b>imágenes por URL</b> y, si la activas, para la <b>sincronización con Google Drive</b>. Detalles en <a href="#" onclick="event.preventDefault();openPriv()">🔒 Privacidad</a> (barra lateral, bajo Ayuda).</li>
+    datos: ['Datos, privacidad y consejos', `<ul><li>Todo se queda en tu navegador y en tu archivo JSON. La aplicación solo sale a internet para <b>buscar un DOI en CrossRef</b>, para mostrar <b>imágenes por URL</b> y, si la activas, para la <b>sincronización con Google Drive</b>. Detalles en la <a href="privacidad.html" onclick="event.preventDefault();openPriv()">Política de privacidad</a> (enlace al final de la barra lateral).</li>
       <li>Funciona sin conexión una vez cargada (se puede instalar como aplicación). Las imágenes por URL y la búsqueda de DOI necesitan internet.</li>
       <li>Haz copias del JSON de vez en cuando: es tu única base de datos. La papelera guarda 5 días; el historial no se guarda.</li>
       <li>Las imágenes <b>enlazadas</b> solo se ven en el navegador donde las elegiste; si vas a llevar el JSON a otro equipo, usa la <b>copia incrustada</b> o una URL.</li>
@@ -2569,7 +2569,7 @@ function syIntro() {
     <h4>Por si acaso</h4><ul><li>Si no se abre la ventana de Google, permite las ventanas emergentes para esta página y vuelve a intentarlo.</li>
     <li>Los cambios de los dispositivos se <b>combinan</b> paper a paper y campo a campo; si cambias el mismo campo en dos sitios, gana el cambio más reciente. Un paper editado en un sitio no se pierde aunque lo borres en otro.</li>
     <li>Tu archivo JSON sigue funcionando igual: si tienes activo su autoguardado (Chrome/Edge), también se escribe en él.</li>
-    <li>Pulsa el icono 🔄 para sincronizar al momento, desactivar el autoguardado o <b>cerrar la sesión</b>. Más detalles en 🔒 Privacidad.</li></ul>`,
+    <li>Pulsa el icono 🔄 para sincronizar al momento, desactivar el autoguardado o <b>cerrar la sesión</b>. Más detalles en la «Política de privacidad» (al final de la barra lateral).</li></ul>`,
     syOn() ? [['Cerrar', null, true]] : [['Continuar', syConnect, true], ['Cancelar']]);
 }
 const syCount = x => { const n = (k, a, b) => `${x[k].length} ${x[k].length === 1 ? a : b}`; return `${n('papers', 'paper', 'papers')}, ${n('sections', 'sección', 'secciones')} y ${n('tags', 'etiqueta', 'etiquetas')}`; };
@@ -2635,7 +2635,7 @@ function privHTML() {
     <li>El acceso que da Google (token) se guarda en este navegador, caduca en una hora y se borra al cerrar sesión.</li>
     <li>En este dispositivo se recuerda que la sesión está iniciada, el correo de la cuenta (para mostrarlo), la fecha de la última sincronización, la última versión sincronizada (para combinar bien los cambios) y lo ya descargado de Drive (para no volver a descargarlo).</li></ul>
     <h4>Cómo retirar el permiso o borrar los datos</h4><ul><li><b>Cerrar sesión</b> (menú del icono 🔄): deja de sincronizar en este dispositivo y olvida lo anterior. Tus datos siguen aquí y en tu Drive.</li>
-    <li><b>Borrar la copia de Google Drive</b>: botón de abajo (con la sesión iniciada).</li>
+    <li><b>Borrar la copia de Google Drive</b>: menú del icono 🔄 → «Borrar mis datos de Google Drive», o el botón de abajo (con la sesión iniciada).</li>
     <li><b>Quitar el permiso a la aplicación</b> en todos tus dispositivos: <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener">myaccount.google.com/permissions</a>.</li>
     <li><b>Datos de este navegador</b>: Ayuda → «Aplicación instalada» → «Olvidar la copia de sesión», o borra los datos del sitio desde el navegador. Tu archivo JSON solo lo borras tú.</li></ul>
     ${syAvail() ? `<p class="sypv">${on ? `Google Drive: <b>sesión iniciada</b>${p.who ? ' como ' + esc(p.who) : ''}${p.last ? ' · última sincronización ' + syAgo(p.last) : ''}.</p><p class="row"><button onclick="syLogout()">🚪 Cerrar sesión</button><button class="danger" onclick="syWipe()">🗑 Borrar mi copia de Google Drive</button>` : 'Google Drive: <b>sin conectar</b>. <button onclick="$(\'#pv\').close();syIntro()">🔄 Sincronizar…</button>'}</p>` : ''}
@@ -2655,7 +2655,7 @@ function openCred() {
    Aparte del JSON, la app guarda (1) una copia de trabajo, para reabrir justo donde lo dejaste aunque no hayas guardado, y
    (2) el estado de la interfaz (filtros, orden, barra lateral, bloques plegados). Viven fuera de la caché de la aplicación,
    así que las actualizaciones no los tocan y no hace falta borrar datos para recibir una versión nueva. */
-const APP_V = '31';   // debe coincidir con la versión de sw.js
+const APP_V = '31.1';   // debe coincidir con la versión de sw.js
 let BOOTED = false, RELOADING = false, SWREG = null, tSes = 0, tUi = 0, lastUi = '';
 const sessionNow = () => { clearTimeout(tSes); if (!BOOTED) return Promise.resolve();
   return idb('readwrite', st => st.put({v: 1, path, dirty, at: new Date().toISOString(), json: dbJSON()}, 'session')).catch(() => {}); };

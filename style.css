@@ -77,7 +77,7 @@ a.nl{color:var(--pri);cursor:pointer;text-decoration:underline dotted}a.nl:hover
 .svp{margin-top:12px}.svp h3{margin:0 0 4px}.svp .nt{margin:6px 0 6px 10px}#svB{max-height:50vh;overflow:auto;border-top:1px solid var(--bd);margin-top:8px}
 .lkr{display:block;width:100%;text-align:left;margin-top:4px}
 .trb{margin-top:auto}.trb+.cfgb{margin-top:0}
-.appf{margin-top:28px;padding-top:10px;border-top:1px solid var(--bd);font-size:12px;opacity:.6}.appf a{color:inherit}   /* qué es la app y enlace a la privacidad (lo pide Google para verificarla) */
+.sbinfo{margin:6px 0 0;padding:0 10px;font-size:13px;line-height:1.35;opacity:.7}.sbinfo a{color:inherit}aside.min .sbinfo{display:none}   /* qué es la app y enlace a la privacidad, siempre visibles (lo pide Google para verificar la marca) */
 .sbsep{border:0;border-top:1px solid var(--bd);margin:6px 10px;align-self:stretch}
 .shs{padding:3px 10px;font-size:13px;font-weight:400;opacity:.7}.shs:hover{opacity:1}.shs .ic{font-size:14px}   /* Ayuda, Privacidad y Créditos: más bajos y discretos */
 .smb{display:flex;flex-direction:column;gap:2px;padding-left:12px}#sg-more.fold .smb,aside.min .car{display:none}.car{margin-left:auto;font-size:11px;transition:transform .15s}#sg-more:not(.fold) .car{transform:rotate(90deg)}   /* plegados por defecto bajo «Información» */
