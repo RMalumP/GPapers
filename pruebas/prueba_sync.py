@@ -11,26 +11,43 @@ def eq(name, got, want):
     if got != want:
         fail += 1; print('FALLA', name, '\n  got :', json.dumps(got, ensure_ascii=False), '\n  want:', json.dumps(want, ensure_ascii=False))
 
-STORE = {}   # Drive simulado: id -> {name, content}
-CORS = {'access-control-allow-origin': '*', 'access-control-allow-headers': 'authorization, content-type', 'access-control-allow-methods': 'GET, POST, PATCH, DELETE'}
+import hashlib, itertools
+STORE = {'otra': {'name': 'supc1-sync.json', 'content': '{}', 'parents': ['appDataFolder'], 'mt': '2026-01-01T00:00:00.000Z'}}   # Drive simulado: id -> archivo (uno de otra web del mismo proyecto)
+CALLS = []; UPS = {}; SEQ = itertools.count(1)
+CORS = {'access-control-allow-origin': '*', 'access-control-allow-headers': 'authorization, content-type, x-upload-content-type', 'access-control-allow-methods': 'GET, POST, PATCH, PUT, DELETE', 'access-control-expose-headers': 'Location'}
+now = lambda: time.strftime('%Y-%m-%dT%H:%M:%S.000Z', time.gmtime())
+meta = lambda i: {'id': i, 'name': STORE[i]['name'], 'md5Checksum': hashlib.md5(STORE[i]['content'].encode()).hexdigest(), 'modifiedTime': STORE[i]['mt'], 'size': str(len(STORE[i]['content'].encode()))}
 def drive(route, req):
-    u = urllib.parse.urlparse(req.url); m = req.method; p = u.path
+    u = urllib.parse.urlparse(req.url); m = req.method; p = u.path; q = urllib.parse.parse_qs(u.query)
+    ok = lambda j, h={}: route.fulfill(status=200, headers={**CORS, 'content-type': 'application/json', **h}, body=json.dumps(j))
     if m == 'OPTIONS': return route.fulfill(status=204, headers=CORS)
+    if m == 'PUT' and 'upload_id' in q:   # segunda mitad de la subida reanudable (la dirección ya va autorizada)
+        up = UPS.pop(q['upload_id'][0]); i = up['id'] or 'f%d' % next(SEQ)
+        if not up['id']: STORE[i] = {'name': up['name'], 'parents': up['parents']}
+        STORE[i].update(content=req.post_data, mt=now()); CALLS.append(('PUT-reanudable', STORE[i]['name'])); return ok(meta(i))
     if req.headers.get('authorization') != 'Bearer tok': return route.fulfill(status=401, headers=CORS, body='{}')
-    ok = lambda j: route.fulfill(status=200, headers={**CORS, 'content-type': 'application/json'}, body=json.dumps(j))
-    if m == 'GET' and p == '/drive/v3/files': return ok({'files': [{'id': i, 'name': f['name']} for i, f in STORE.items()]})
+    CALLS.append((m, p, q.get('uploadType', [''])[0], q.get('alt', [''])[0]))
+    if m == 'GET' and p == '/drive/v3/files':
+        sub = q['q'][0].split("'")[1] if 'q' in q else ''
+        return ok({'files': [meta(i) for i in STORE if sub in STORE[i]['name']]})
     if m == 'GET' and p == '/drive/v3/about': return ok({'user': {'emailAddress': 'yo@example.com'}})
     if m == 'GET' and p.startswith('/drive/v3/files/'): return route.fulfill(status=200, headers={**CORS, 'content-type': 'application/json'}, body=STORE[p.split('/')[-1]]['content'])
-    if m == 'PATCH' and p.startswith('/upload/drive/v3/files/'): STORE[p.split('/')[-1]]['content'] = req.post_data; return ok({})
+    if q.get('uploadType') == ['resumable']:
+        i = p.split('/')[-1] if m == 'PATCH' else None; md = json.loads(req.post_data or '{}'); k = str(next(SEQ))
+        UPS[k] = {'id': i, 'name': md.get('name'), 'parents': md.get('parents')}
+        return ok({}, {'location': 'https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable&upload_id=' + k})
+    if m == 'PATCH' and p.startswith('/upload/drive/v3/files/'): i = p.split('/')[-1]; STORE[i].update(content=req.post_data, mt=now()); return ok(meta(i))
     if m == 'POST' and p == '/upload/drive/v3/files':
         bnd = req.headers['content-type'].split('boundary=')[1]
         parts = [x.split('\r\n\r\n', 1)[1] for x in req.post_data.split('--' + bnd) if '\r\n\r\n' in x]
-        meta = json.loads(parts[0].strip()); STORE['f%d' % (len(STORE) + 1)] = {'name': meta['name'], 'content': parts[1].rstrip('\r\n'), 'parents': meta['parents']}; return ok({})
+        md = json.loads(parts[0].strip()); i = 'f%d' % next(SEQ); STORE[i] = {'name': md['name'], 'content': parts[1][:-2] if parts[1].endswith('\r\n') else parts[1], 'parents': md['parents'], 'mt': now()}; return ok(meta(i))
     if m == 'DELETE' and p.startswith('/drive/v3/files/'): STORE.pop(p.split('/')[-1], None); return route.fulfill(status=204, headers=CORS)
     return route.fulfill(status=404, headers=CORS, body='{}')
 GOOGLE = """window.google = {accounts: {oauth2: {initTokenClient: c => ({requestAccessToken: o => { window.__tok = (window.__tok || 0) + 1;
   setTimeout(() => window.__deny ? c.error_callback({type: 'popup_failed_to_open'}) : c.callback({access_token: 'tok', expires_in: 3600}), 5); }}), revoke: (t, cb) => cb && cb()}}};"""
-remote = lambda: json.loads(next(iter(STORE.values()))['content']) if STORE else None
+names = lambda pre='gpapers-': sorted(f['name'] for f in STORE.values() if f['name'].startswith(pre))
+deltas = lambda: [f for f in STORE.values() if f['name'].startswith('gpapers-d-')]
+PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='
 
 with sync_playwright() as pw:
     kw = {'executable_path': '/opt/pw-browsers/chromium'} if os.path.exists('/opt/pw-browsers/chromium') else {}
@@ -56,6 +73,15 @@ with sync_playwright() as pw:
     eq('si solo el otro lado reordenó las secciones, se respeta su orden', M("const s = id => ({id, name: id, color: '#000', tagIds: []}); const B = LIB([], {sections: [s('x'), s('y')]}); return syMerge(B, LIB([], {sections: [s('y'), s('x')]}), B).sections.map(x => x.id)"), ['y', 'x'])
     eq('normalizar dos veces da lo mismo (no hay subidas en bucle)', M("const x = LIB([P('a', {notes: [{id: 'n', sectionId: '', content: 'c'}]})]); return syS(syNorm(x)) === syS(x)"), True)
     eq('la normalización no cambia los tipos propios de la app', M("const before = [...CTYPES.keys()].join(); syNorm({version: 1, sections: [], tags: [], papers: [], settings: {customTypes: [{id: 'ct_zz', name: 'Z', like: 'libro'}]}}); return [...CTYPES.keys()].join() === before"), True)
+    for name, a, b2 in [('alta y baja', "LIB([P('a'), P('b')])", "LIB([P('a'), P('c')])"), ('campo', "LIB([P('a')])", "LIB([P('a', {title: 'x', year: 1})])"),
+                        ('notas', "LIB([P('a', {notes: [{id: 'n1', sectionId: '', content: 'u'}]})])", "LIB([P('a', {notes: [{id: 'n2', sectionId: '', content: 'v'}, {id: 'n1', sectionId: '', content: 'u2'}]})])"),
+                        ('orden de secciones y ajustes', "LIB([], {sections: [{id: 'x', name: 'x', color: '#000', tagIds: []}, {id: 'y', name: 'y', color: '#000', tagIds: []}]})", "LIB([], {sections: [{id: 'y', name: 'Y', color: '#000', tagIds: []}, {id: 'x', name: 'x', color: '#000', tagIds: []}], settings: {...defSettings(), palette: 'verde'}})"),
+                        ('papelera', "LIB([P('a')])", "LIB([], {trash: [{paper: P('a'), at: new Date().toISOString(), by: []}]})")]:
+        eq('parche: ' + name, M(f"const a = {a}, b = {b2}; return syS(syPatch(a, syDiff(a, b))) === syS(b)"), True)
+    eq('el parche de un campo solo lleva ese campo', M("const a = LIB([P('a'), P('b')]); return syDiff(a, LIB([P('a', {title: 'x'}), P('b')]))"), {'o': {'papers': {'l': {'a': {'o': {'title': {'$': 'x'}}}}}}})
+    eq('sin cambios no hay parche', M("const a = LIB([P('a')]); return syDiff(a, structuredClone(a)) === undefined"), True)
+    eq('cambiar algo que otro borró no lo resucita a medias', M("return syPatch(LIB([]), {o: {papers: {l: {a: {o: {title: {$: 'x'}}}}}}}).papers.length"), 0)
+    eq('imágenes: en Drive solo va la huella, la misma imagen da la misma', M(f"const [w, r] = syWire(LIB([P('a', {{image: {{kind: 'data', data: '{PNG}'}}}}), P('b', {{image: {{kind: 'data', data: '{PNG}'}}}})])); return [w.papers[0].image.ref === w.papers[1].image.ref, r.size, JSON.stringify(w).includes('base64')]"), [True, 1, False])
     c0.close()
 
     # ---- Con servidor y Google simulado
@@ -64,14 +90,17 @@ with sync_playwright() as pw:
         c = b.new_context(viewport={'width': 1200, 'height': 800}, service_workers=sw); c.add_init_script(GOOGLE); c.route('https://www.googleapis.com/**', drive)
         p = c.new_page(); p.on('pageerror', lambda e: errs.append(str(e))); p.on('console', lambda m: errs.append(m.text) if m.type == 'error' and 'favicon' not in m.text else None); p.on('dialog', lambda d: d.accept())
         p.goto('http://localhost:8792/index.html'); p.wait_for_timeout(1200); return c, p
+    cR, RD = device()   # lector: reconstruye lo que hay en Drive (copia + cambios + imágenes) sin iniciar sesión
+    remote = lambda: {'db': RD.evaluate("(async () => { const t = await syToken(false), f = await syLs(t), R = await syRemote(t, f); return R.w ? syNorm(await syUnwire(t, R.w, f)) : null; })()")}
     cA, A = device('allow')
     eq('el botón de sincronizar está a la izquierda de Guardar', A.evaluate("[!$('#syncBtn').hidden, $('#syncBtn').nextElementSibling.getAttribute('aria-label'), $('#syncBtn').dataset.st]"), [True, 'Guardar', 'off'])
     eq('Privacidad está justo debajo de la Papelera', A.evaluate("$('#side .trb').nextElementSibling.textContent.trim()"), '🔒Privacidad')
     A.click('#syncBtn')
     eq('sin sesión, el icono explica cómo funciona', (A.evaluate("$('#sy').open"), 'carpeta privada y oculta' in A.inner_text('#sy')), (True, True))
     A.click('#sy button:has-text("Continuar")'); A.wait_for_timeout(800)
-    eq('primera conexión: crea la copia en la carpeta oculta', (len(STORE), next(iter(STORE.values()))['parents'], next(iter(STORE.values()))['name']), (1, ['appDataFolder'], 'gpapers-sync.json'))
-    eq('la copia lleva la biblioteca', (remote()['app'], len(remote()['db']['papers']) == A.evaluate("db.papers.length"), 'history' in json.dumps(remote())), ('gpapers', True, False))
+    snapf = lambda: next(f for f in STORE.values() if f['name'] == 'gpapers-snap.json')
+    eq('primera conexión: crea la copia completa en la carpeta oculta', (names(), snapf()['parents']), (['gpapers-snap.json'], ['appDataFolder']))
+    eq('la copia lleva la biblioteca', (json.loads(snapf()['content'])['app'], len(remote()['db']['papers']) == A.evaluate("db.papers.length"), 'history' in snapf()['content']), ('gpapers', True, False))
     eq('mensaje de sincronizado y autoguardado activado', ('Sincronizado' in A.inner_text('#sy'), A.evaluate("[syOn(), syAuto(), $('#auto').checked, $('#syncBtn').dataset.st]")), (True, [True, True, True, 'ok']))
     eq('recuerda la cuenta', A.evaluate("syP().who"), 'yo@example.com')
     A.click('#sy button:has-text("Aceptar")')
@@ -79,6 +108,12 @@ with sync_playwright() as pw:
     eq('un cambio deja el icono pendiente', A.evaluate("$('#syncBtn').dataset.st"), 'pend')
     A.wait_for_timeout(3800)
     eq('autoguardado: el cambio se sube solo', remote()['db']['papers'][0]['title'], 'Cambio en A')
+    d = deltas()
+    eq('solo se sube lo que cambió: un archivo pequeño con ese campo', (len(d), len(d[0]['content']) < 300, 'Cambio en A' in d[0]['content'], 'Segundo paper' in d[0]['content'], 'Cambio en A' in snapf()['content']), (1, True, True, False, False))
+    A.evaluate(f"db.papers[0].image = {{kind: 'data', data: '{PNG}'}}; markDirty()"); A.wait_for_timeout(3800)
+    eq('una imagen incrustada va en su propio archivo y el cambio solo lleva su huella', (len(names('gpapers-img-')), any('base64' in f['content'] for f in deltas()), remote()['db']['papers'][0]['image']), (1, False, {'kind': 'data', 'data': PNG}))
+    A.evaluate(f"db.papers[1].image = {{kind: 'data', data: '{PNG}'}}; markDirty()"); A.wait_for_timeout(3800)
+    eq('la misma imagen no se vuelve a subir', (len(names('gpapers-img-')), remote()['db']['papers'][1]['image']['data'] == PNG), (1, True))
     eq('y queda guardado (sin «sin guardar»)', (A.evaluate("dirty"), A.evaluate("$('#syncBtn').dataset.st")), (False, 'ok'))
     eq('el service worker se instala con la página de privacidad y no guarda nada de Google', A.evaluate("(async () => { const k = await caches.keys(), c = await caches.open(k[0]); const urls = (await c.keys()).map(r => r.url); return [urls.some(u => u.endsWith('/privacidad.html')), urls.some(u => u.includes('google'))]; })()"), [True, False])
 
@@ -86,6 +121,9 @@ with sync_playwright() as pw:
     cB, B = device()
     B.click('#syncBtn'); B.click('#sy button:has-text("Continuar")'); B.wait_for_timeout(800)
     eq('otro dispositivo con el ejemplo recibe la biblioteca sin preguntar', (B.evaluate("db.papers[0].title"), 'Ya tienes una biblioteca' in B.inner_text('#sy')), ('Cambio en A', False))
+    eq('y descarga las imágenes', B.evaluate("db.papers.map(p => p.image?.data?.length)"), [len(PNG), len(PNG)])
+    n0 = len([c for c in CALLS if c[3] == 'media']); B.evaluate("syRun(false)"); B.wait_for_timeout(600)
+    eq('sin cambios nuevos no descarga nada (solo la lista)', len([c for c in CALLS if c[3] == 'media']) - n0, 0)
     B.click('#sy button:has-text("Aceptar")')
     pid = B.evaluate("db.papers[1].id")
     B.evaluate("db.papers[1].year = 1999; markDirty()"); B.wait_for_timeout(3800)
@@ -99,6 +137,15 @@ with sync_playwright() as pw:
     A.evaluate("syRun(false)"); A.wait_for_timeout(600)
     eq('un paper borrado en B va a la papelera de A', A.evaluate(f"[db.papers.some(p => p.id === '{pid}'), db.trash.some(t => t.paper.id === '{pid}')]"), [False, True])
 
+    # cuando se acumulan cambios sueltos se rehace la copia completa y se borran
+    A.evaluate("SY_CFG.maxDeltas = 0; db.papers[0].general = 'compactar'; markDirty()"); A.wait_for_timeout(3800)
+    eq('copia completa al día y sin cambios sueltos', (len(deltas()), 'compactar' in snapf()['content'], remote()['db']['papers'][0]['general']), (0, True, 'compactar'))
+    # subida reanudable para lo grande (sin el límite de 5 MB)
+    A.evaluate("SY_CFG.big = 300; db.papers[0].general = 'grande'; markDirty()"); A.wait_for_timeout(3800)
+    eq('lo grande se sube por partes y llega bien', (('PUT-reanudable', 'gpapers-snap.json') in CALLS, remote()['db']['papers'][0]['general']), (True, 'grande'))
+    A.evaluate("SY_CFG.big = 4 * 1024 * 1024; SY_CFG.maxDeltas = 25")
+    B.evaluate("syRun(false)"); B.wait_for_timeout(600)
+    eq('el otro dispositivo lee la copia nueva', B.evaluate("db.papers[0].general"), 'grande')
     # con una ventana de edición abierta no se cambia nada debajo: se espera a que se cierre
     A.evaluate("openPaper(db.papers[0].id)")
     B.evaluate("db.papers[0].rating = 2; markDirty()"); B.wait_for_timeout(3800)
@@ -141,13 +188,23 @@ with sync_playwright() as pw:
     eq('combinar junta las dos', (C.evaluate("db.papers.some(p => p.id === 'mio') && db.papers.some(p => p.title === 'desde B')"), any(p['id'] == 'mio' for p in remote()['db']['papers'])), (True, True))
     C.click('#sy button:has-text("Aceptar")')
     C.click('#syncBtn'); C.click('#ctx button:has-text("Cerrar sesión")'); C.wait_for_timeout(400)
-    eq('cerrar sesión: deja de sincronizar y conserva los datos', (C.evaluate("[syOn(), $('#syncBtn').dataset.st, sessionStorage.length, db.papers.some(p => p.id === 'mio')]"), len(STORE)), ([False, 'off', 0, True], 1))
+    eq('cerrar sesión: deja de sincronizar y conserva los datos', (C.evaluate("[syOn(), $('#syncBtn').dataset.st, sessionStorage.length, db.papers.some(p => p.id === 'mio')]"), 'gpapers-snap.json' in names()), ([False, 'off', 0, True], True))
+    # imágenes que ya nadie usa: se borran al rehacer la copia (si tienen más de un día)
+    A.evaluate("db.papers.forEach(p => p.image = null); db.trash.forEach(t => t.paper.image = null); SY_CFG.maxDeltas = 0; markDirty()")
+    for f in STORE.values():
+        if f['name'].startswith('gpapers-img-'): f['mt'] = '2020-01-01T00:00:00.000Z'
+    A.wait_for_timeout(3800); A.evaluate("SY_CFG.maxDeltas = 25")
+    eq('imagen sin usar borrada', names('gpapers-img-'), [])
 
     # Privacidad
     B.click('#side button:has-text("Privacidad")')
     eq('Privacidad explica el permiso y la carpeta oculta', all(s in B.inner_text('#pv') for s in ['drive.appdata', 'carpeta privada y oculta', 'myaccount.google.com/permissions', 'yo@example.com']), True)
     B.click('#pv button:has-text("Borrar mi copia")'); B.wait_for_timeout(600)
-    eq('borrar la copia de Drive y cerrar sesión', (len(STORE), B.evaluate("syOn()")), (0, False))
+    eq('borrar la copia de Drive y cerrar sesión (sin tocar archivos de otras webs)', (names(), [f['name'] for f in STORE.values()], B.evaluate("syOn()")), ([], ['supc1-sync.json'], False))
+    # copia de la versión anterior (un solo archivo): se lee y se pasa al formato nuevo
+    STORE['viejo'] = {'name': 'gpapers-sync.json', 'parents': ['appDataFolder'], 'mt': now(), 'content': json.dumps({'app': 'gpapers', 'v': 1, 'db': {'version': 1, 'sections': [], 'tags': [], 'trash': [], 'papers': [{'id': 'v1', 'title': 'De la versión anterior', 'authors': [], 'image': {'kind': 'data', 'data': PNG}}]}})}
+    cD, D = device(); D.click('#syncBtn'); D.click('#sy button:has-text("Continuar")'); D.wait_for_timeout(800)
+    eq('la copia anterior se lee y se convierte', (D.evaluate("[db.papers[0].title, db.papers[0].image.data.length]"), names()), (['De la versión anterior', len(PNG)], sorted(['gpapers-snap.json', 'gpapers-img-' + D.evaluate(f"syHash('{PNG}')")])))
     B.evaluate("$('#pv').close(); openHelp('sync')")
     eq('la ayuda tiene su apartado', 'Autoguardado activado' in B.inner_text('#hp_sync'), True)
     eq('sin errores', errs, [])
