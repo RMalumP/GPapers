@@ -8,6 +8,7 @@
   <div class="row">
     <button onclick="doOpen()" oncontextmenu="openMenu(event)" title="Clic: abrir archivo · Clic derecho: importar referencias" aria-label="Abrir">📂</button>
     <button id="reopen" onclick="reopenLast()" title="Reabrir el último archivo" hidden>Reabrir<br>último</button>
+    <button id="syncBtn" onclick="syClick(event)" title="Sincronizar con Google Drive" aria-label="Sincronizar con Google Drive" hidden><span class="syi">🔄</span><span class="syb"></span></button>
     <button onclick="save(false)" title="Guardar" aria-label="Guardar">💾</button>
     <button onclick="save(true)">Guardar como</button>
     <button class="pri" onclick="openEx()">Exportar citas</button>
@@ -31,6 +32,7 @@
       <div class="sb"><small id="selN"></small><button onclick="selVisible()">Seleccionar visibles</button><button onclick="selNone()">Quitar selección</button><button class="pri" onclick="openEx()">Exportar citas…</button></div></div>
   <button class="sh" onclick="grOpen()" title="Gráfico de relaciones entre papers"><span class="ic">🕸️</span><span class="lbl">Relaciones</span></button>
   <button class="sh trb" onclick="trOpen()" title="Papelera"><span class="ic">🗑️</span><span class="lbl" id="trLbl">Papelera</span><span class="dot" id="d-tr" hidden></span></button>
+  <button class="sh" onclick="openPriv()" title="Privacidad"><span class="ic">🔒</span><span class="lbl">Privacidad</span></button>
   <button class="sh" onclick="openHelp()" title="Ayuda (F1)"><span class="ic">❓</span><span class="lbl">Ayuda</span></button>
   <button class="sh cfgb" onclick="openCfg()" title="Configuración"><span class="ic">⚙️</span><span class="lbl">Configuración</span></button>
   </aside>
@@ -39,5 +41,5 @@
     <div id="list"></div>
   </main>
 </div>
-<div id="ctx" hidden></div><dialog id="dlg"></dialog><dialog id="mg"></dialog><dialog id="ex"></dialog><dialog id="nv"></dialog><dialog id="cfg"></dialog><dialog id="imp"></dialog><dialog id="rv"></dialog><dialog id="sv"></dialog><dialog id="img"></dialog><dialog id="help"></dialog><dialog id="lk"></dialog><dialog id="tr"></dialog><dialog id="gr"></dialog>
+<div id="ctx" hidden></div><dialog id="dlg"></dialog><dialog id="mg"></dialog><dialog id="ex"></dialog><dialog id="nv"></dialog><dialog id="cfg"></dialog><dialog id="imp"></dialog><dialog id="rv"></dialog><dialog id="sv"></dialog><dialog id="img"></dialog><dialog id="help"></dialog><dialog id="lk"></dialog><dialog id="tr"></dialog><dialog id="gr"></dialog><dialog id="sy"></dialog><dialog id="pv"></dialog>
 <script src="app.js"></script></body></html>

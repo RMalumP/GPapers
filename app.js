@@ -724,15 +724,15 @@ async function doOpen() {
   if (dirty && !confirm('Hay cambios sin guardar. ¿Descartarlos y abrir otro archivo?')) return;
   try {
     if (FSA) { const [h] = await showOpenFilePicker({types: JSON_T});
-      if (await loadText(await (await h.getFile()).text(), h.name)) { handle = h; rememberHandle(); } }
-    else { const r = await pickFile(); if (r) { handle = null; await loadText(r.text, r.path); } }
+      if (await loadText(await (await h.getFile()).text(), h.name)) { handle = h; rememberHandle(); syLoaded(); } }
+    else { const r = await pickFile(); if (r) { handle = null; if (await loadText(r.text, r.path)) syLoaded(); } }
   } catch (e) { if (e.name !== 'AbortError') alert('No se pudo abrir el archivo: ' + e.message); }
 }
 async function reopenLast() {   // Chrome pide confirmar el acceso al archivo en cada sesión
   if (dirty && !confirm('Hay cambios sin guardar. ¿Descartarlos y abrir el último archivo?')) return;
   try { const h = await idb('readonly', st => st.get('last')); if (!h) return;
     if (await h.requestPermission({mode: 'readwrite'}) !== 'granted') return alert('Sin permiso para acceder al archivo.');
-    if (await loadText(await (await h.getFile()).text(), h.name)) handle = h;
+    if (await loadText(await (await h.getFile()).text(), h.name)) { handle = h; syLoaded(); }
   } catch (e) { alert('No se pudo reabrir el archivo: ' + e.message); }
 }
 async function writeTo(h, text) { const w = await h.createWritable(); await w.write(text); await w.close(); }   // el archivo solo cambia al cerrar: escritura segura
@@ -748,6 +748,10 @@ async function save(asNew) {
   } catch (e) { if (e.name !== 'AbortError') alert('Error al guardar: ' + e.message); }
 }
 async function setAuto(c) {
+  if (syOn()) {   // con Google Drive conectado la casilla manda sobre los dos: Drive y, si hay archivo con permiso, también el archivo
+    if (c.checked && handle) { try { auto = await handle.requestPermission({mode: 'readwrite'}) === 'granted'; } catch (e) { auto = false; } } else auto = false;
+    return syAutoSet(c.checked);
+  }
   auto = c.checked;
   if (auto && !handle) { await save(true); if (!handle) c.checked = auto = false; }   // la primera vez pide dónde guardar
   else if (auto) markDirty();
@@ -760,7 +764,7 @@ function record() {   // antes de cada cambio guarda el estado anterior; los cam
   if (!(Date.now() - lastRecAt < 1500 && UNDO.length)) { UNDO.push(lastSnap); if (UNDO.length > MAXU) UNDO.shift(); }
   lastRecAt = Date.now(); REDO.length = 0; lastSnap = cur;
 }
-function touch() { hdr(); sessionSoon(); clearTimeout(timer); if (auto && handle) timer = setTimeout(() => save(false), 1000); }
+function touch() { hdr(); sessionSoon(); clearTimeout(timer); if (auto && handle) timer = setTimeout(() => save(false), 1000); if (!SY.applying && syAuto()) sySoon(); }   // con Google Drive conectado, el cambio se sube a los 3 s
 function markDirty() { record(); dirty = true; touch(); }
 function undo() { if (UNDO.length) { REDO.push(JSON.stringify(db)); restore(UNDO.pop()); } }
 function redo() { if (REDO.length) { UNDO.push(JSON.stringify(db)); restore(REDO.pop()); } }
@@ -1229,7 +1233,8 @@ function helpHTML() {
     inicio: ['Primeros pasos', `<p>Esta aplicación guarda tus papers, secciones, etiquetas, notas y ajustes en <b>un único archivo JSON</b> que tú eliges. No hay cuenta ni servidor: todo está en tu navegador y en ese archivo.</p>
       <ul><li><b>Abrir 📂</b> (${kb('open')}): carga un archivo JSON. Clic derecho en 📂 para <i>importar</i> referencias (.bib, .ris, texto o DOI).</li>
       <li><b>Guardar 💾</b> (${kb('save')}) y <b>Guardar como</b>: en Chrome y Edge de escritorio escriben directamente en el archivo; en otros navegadores se descarga una copia.</li>
-      <li><b>Autoguardado</b> (solo Chrome/Edge): guarda solo, un segundo después de cada cambio. La primera vez pide el archivo.</li>
+      <li><b>Autoguardado</b> (solo Chrome/Edge): guarda solo, un segundo después de cada cambio. La primera vez pide el archivo. Con Google Drive conectado funciona en cualquier navegador y guarda en tu Drive.</li>
+      <li><b>Sincronizar 🔄</b> (a la izquierda de 💾): guarda tu biblioteca en tu Google Drive y la mantiene igual en todos tus dispositivos (ver «Sincronización con Google Drive»).</li>
       <li><b>Reabrir último</b>: aparece tras abrir un archivo y vuelve a cargarlo en la siguiente sesión (el navegador pide permiso).</li>
       <li>En la versión web se abre al principio <code>ejemplo_papers.json</code> para que pruebes; guarda tu trabajo con «Guardar como».</li>
       <li>Deshacer ${kb('undo')} y rehacer ${kb('redo')} funcionan sobre los cambios de la sesión.</li></ul>
@@ -1299,8 +1304,16 @@ function helpHTML() {
       <li><b>Actualizaciones</b>: la aplicación busca versiones nuevas sola (al abrirla, al volver a ella y cada media hora). Cuando hay una, aparece un aviso «Hay una versión nueva» con el botón <b>Recargar ahora</b>; antes de recargar guarda la copia de sesión. <b>No hace falta borrar los datos de la aplicación</b>: se guardan aparte de lo que se actualiza.</li>
       <li>Versión instalada: <b>v${APP_V}</b>. <button onclick="checkUpdate()">Buscar actualizaciones</button> <button class="danger" onclick="forgetAppData()" title="No toca tu archivo JSON">Olvidar la copia de sesión</button></li>
       <li>El navegador puede borrar los datos de los sitios si se queda sin espacio; la aplicación pide almacenamiento persistente para evitarlo, pero tu <b>JSON</b> sigue siendo la copia que debes conservar.</li></ul>`],
+    sync: ['Sincronización con Google Drive', `<p>El icono <b>🔄</b> de la barra de arriba, a la izquierda de 💾, guarda tu biblioteca entera (papers, notas, secciones, etiquetas, papelera y ajustes) en una <b>carpeta oculta de tu propio Google Drive</b>, para tenerla igual en el ordenador, la tablet y el móvil.</p>
+      <ul><li><b>Conectar</b>: pulsa 🔄 → «Continuar», elige tu cuenta de Google y da permiso. Si en Drive ya había una biblioteca de otro dispositivo, eliges si combinarlas o quedarte con una.</li>
+      <li><b>Autoguardado activado</b>: con la sesión iniciada, cada cambio se sube solo a los pocos segundos, y al abrir la aplicación o volver a ella se traen los cambios de los otros dispositivos. La casilla «Autoguardado» lo activa o desactiva (sin ella, sincroniza a mano).</li>
+      <li><b>El punto del icono</b>: verde, sincronizado; azul y girando, sincronizando; amarillo, cambios pendientes o hay que volver a conectar; rojo, error (se reintenta).</li>
+      <li><b>Con la sesión iniciada, clic en 🔄</b>: sincronizar ahora, activar o desactivar el autoguardado, ver cómo funciona, privacidad y <b>cerrar sesión</b>.</li>
+      <li><b>Cómo se combinan</b>: paper a paper y campo a campo. Si cambias el mismo campo en dos dispositivos gana el cambio más reciente; un paper editado en uno no se pierde aunque lo borres en otro. Los cambios que llegan de Drive se pueden deshacer (${kb('undo')}).</li>
+      <li>Por seguridad, Google da un acceso que dura una hora: si caduca con la pestaña abierta, el icono se pone amarillo y basta con «Volver a conectar».</li>
+      <li>La vista (tarjetas o tabla) es de cada dispositivo y no se sincroniza. Tu archivo JSON sigue funcionando igual.</li></ul>`],
     atajos: ['Atajos de teclado', helpTbl(Object.keys(SC_NAMES).map(a => [esc(SC_NAMES[a]), kb(a)]).concat([['Esta ayuda', '<kbd>F1</kbd>'], ['Cerrar menús y ventanas', '<kbd>Esc</kbd>']])) + '<p>Se cambian en Configuración → Atajos de teclado. Dentro de campos de texto solo funciona «Guardar»; negrita y cursiva actúan dentro de una nota.</p>'],
-    datos: ['Datos, privacidad y consejos', `<ul><li>Todo se queda en tu navegador y en tu archivo JSON. La aplicación solo sale a internet para <b>buscar un DOI en CrossRef</b> y para mostrar <b>imágenes por URL</b>.</li>
+    datos: ['Datos, privacidad y consejos', `<ul><li>Todo se queda en tu navegador y en tu archivo JSON. La aplicación solo sale a internet para <b>buscar un DOI en CrossRef</b>, para mostrar <b>imágenes por URL</b> y, si la activas, para la <b>sincronización con Google Drive</b>. Detalles en <a href="#" onclick="event.preventDefault();openPriv()">🔒 Privacidad</a> (barra lateral, bajo la Papelera).</li>
       <li>Funciona sin conexión una vez cargada (se puede instalar como aplicación). Las imágenes por URL y la búsqueda de DOI necesitan internet.</li>
       <li>Haz copias del JSON de vez en cuando: es tu única base de datos. La papelera guarda 5 días; el historial no se guarda.</li>
       <li>Las imágenes <b>enlazadas</b> solo se ven en el navegador donde las elegiste; si vas a llevar el JSON a otro equipo, usa la <b>copia incrustada</b> o una URL.</li>
@@ -1367,7 +1380,7 @@ const cfgSec = (id, title, body) => `<details class="cs" ${CFG_OPEN.has(id) ? 'o
 const chip = (t, on, click, drag, ctx) => `<span class="chip ${on ? 'on' : ''}" style="--c:${esc(t.color || '#888888')}" ${click ? `onclick="${click}"` : ''} ${drag ? `draggable="true" data-tag="${t.id}"` : ''} ${ctx ? `oncontextmenu="${ctx}"` : ''}>${esc(t.name)}</span>`;
 const tagById = i => db.tags.find(t => t.id === i);
 const secChips = id => (db.sections.find(s => s.id === id)?.tagIds || []).map(tagById).filter(Boolean).map(t => chip(t, 1)).join('');
-const hdr = () => $('#fname').textContent = db.settings.showFile ? (path ? path.split(/[\\/]/).pop() : '(sin archivo)') + (dirty ? ' • sin guardar' : '') : (dirty ? '• sin guardar' : '');
+const hdr = () => { $('#fname').textContent = db.settings.showFile ? (path ? path.split(/[\\/]/).pop() : '(sin archivo)') + (dirty ? ' • sin guardar' : '') : (dirty ? '• sin guardar' : ''); syIcon(); };
 function sortList(L) {   // ordena por todos los criterios, en cascada; d = 1 ascendente, -1 descendente
   return [...L].sort((a, b) => { for (const {k, d} of F.sorts) { const x = KEY[k](a), y = KEY[k](b);
     if (k === 'rating' && !x !== !y) return x ? -1 : 1;   // sin valorar: siempre al final, en ambos sentidos
@@ -2216,11 +2229,284 @@ function delM(id) {
   else { db.papers.forEach(p => { p.notes = p.notes.filter(n => n.sectionId !== id); p.sectionIds = p.sectionIds.filter(x => x !== id); }); if (F.sec === id) F.sec = ''; }
   markDirty(); drawMg();
 }
+/* ===== Sincronización con Google Drive =====
+   Copia de la biblioteca en la carpeta oculta «appDataFolder» del propio Google Drive de cada persona (permiso drive.appdata:
+   la aplicación no ve el resto del Drive y no hay ningún servidor intermedio). Fusión a tres bandas: cada lado se compara con la
+   última versión sincronizada («base», en IndexedDB), así las altas, ediciones y borrados de cada dispositivo llegan al otro sin
+   añadir marcas al JSON. Si los dos cambian el mismo campo de un paper gana el modificado más tarde (sin fecha, este dispositivo);
+   un cambio gana a un borrado. Con la sesión iniciada y el autoguardado activo, cada cambio se sube solo a los pocos segundos. */
+const SY_CFG = {clientId: '592644810471-sahcfa82q4vlaql6a01m1psh4vm3td7q.apps.googleusercontent.com', file: 'gpapers-sync.json'};   // ID de cliente OAuth (público, no es un secreto); vacío = sin sincronización
+const SY_LOCALSET = ['view'];   // ajustes propios de cada dispositivo: no se sincronizan
+const syS = v => JSON.stringify(v);
+const syPlain = d => JSON.parse(JSON.stringify(d, (k, v) => k === 'history' ? undefined : v));   // como en el JSON: sin el historial del día
+function syNorm(d) {   // pasa por validate() para comparar siempre la misma forma; validate() ajusta los tipos y estilos globales, así que se devuelven a los de db
+  try { return syPlain(validate(structuredClone(d))); } finally { syncTypes(db.settings.customTypes); syncStyles(db.settings.customStyles, db.settings.export); }
+}
+function syVal(x, y, z, hasB, mine) {   // un valor: si solo cambió un lado gana ese; si cambiaron los dos, «mine» decide (true = este dispositivo)
+  if (syS(x) === syS(y)) return x;
+  if (hasB && syS(x) === syS(z)) return y;
+  if (hasB && syS(y) === syS(z)) return x;
+  return mine ? x : y;
+}
+function syObj(x, y, z, mine, sub = {}) {   // objeto campo a campo; sub[k] fusiona ese campo a su manera
+  x ||= {}; y ||= {}; const o = {}, hasB = !!z; z ||= {};
+  for (const k of new Set([...Object.keys(x), ...Object.keys(y)])) {
+    const v = sub[k] ? sub[k](x[k], y[k], z[k], hasB) : syVal(x[k], y[k], z[k], hasB, mine);
+    if (v !== undefined) o[k] = v;
+  }
+  return o;
+}
+function syList(x, y, z, pick, key = e => e.id) {   // lista de objetos con id: altas, bajas y cambios de cada lado (z = null: sin base, se unen)
+  x ||= []; y ||= []; const m = a => new Map(a.map(e => [key(e), e])), X = m(x), Y = m(y), Z = z ? m(z) : null, o = [], ids = a => a.map(key).join('\n');
+  const order = z && ids(x) === ids(z) && ids(y) !== ids(z) ? [...Y.keys(), ...X.keys()] : [...X.keys(), ...Y.keys()];   // si solo el otro lado reordenó, se respeta su orden
+  for (const k of new Set(order)) {
+    const a = X.get(k), b = Y.get(k), c = Z && Z.get(k);
+    if (a && b) o.push(syS(a) === syS(b) ? a : c && syS(a) === syS(c) ? b : c && syS(b) === syS(c) ? a : pick(a, b, c));
+    else if (!(c && syS(a || b) === syS(c))) o.push(a || b);   // nuevo en un lado, o borrado en el otro tras cambiarlo aquí: se queda
+  }
+  return o;
+}
+const syWhen = p => p.modified || p.created || '';
+const syGen = (a, b, c) => syObj(a, b, c, true);
+const syLst = (pick, key) => (x, y, z, h) => syList(x, y, h ? z || [] : null, pick, key);
+function syPaper(a, b, c) { const mine = syWhen(a) >= syWhen(b); return syObj(a, b, c, mine, {notes: syLst((p, q, r) => syObj(p, q, r, mine))}); }
+function sySettings(x, y, z) {
+  const o = syObj(x, y, z, true, {customTypes: syLst(syGen), customStyles: syLst(syGen), templates: syLst(syGen),
+    export: (a, b, c, h) => syObj(a, b, h ? c : null, true), shortcuts: (a, b, c, h) => syObj(a, b, h ? c : null, true)});
+  for (const k of SY_LOCALSET) if (x && k in x) o[k] = x[k]; else delete o[k];
+  return o;
+}
+function syMerge(L, R, B) {   // L = este dispositivo, R = Google Drive, B = última versión sincronizada (null la primera vez: se unen)
+  const o = syObj(L, R, B, true, {sections: syLst(syGen), tags: syLst(syGen), papers: syLst(syPaper), trash: syLst(syGen, t => t.paper.id),
+    settings: (x, y, z, h) => sySettings(x || {}, y || {}, h ? z || {} : null)});
+  o.papers ||= []; o.trash ||= []; o.tags ||= []; o.sections ||= [];
+  const live = new Map(o.papers.map(p => [p.id, p]));   // en la lista y en la papelera a la vez (un lado lo borró y el otro lo editó): gana lo último
+  o.trash = o.trash.filter(t => { const p = live.get(t.paper.id); if (!p) return true; if (t.at > syWhen(p)) { o.papers.splice(o.papers.indexOf(p), 1); return true; } return false; });
+  const T = new Set(o.tags.map(t => t.id)), S = new Set(o.sections.map(s => s.id));   // sin referencias a etiquetas o secciones borradas en el otro lado
+  o.papers.forEach(p => { p.tagIds = (p.tagIds || []).filter(i => T.has(i)); p.sectionIds = (p.sectionIds || []).filter(i => S.has(i)); p.notes = (p.notes || []).filter(n => !n.sectionId || S.has(n.sectionId)); });
+  o.sections.forEach(s => s.tagIds = (s.tagIds || []).filter(i => T.has(i)));
+  return o;
+}
+
+/* ---- Google: acceso y Drive ---- */
+const SY = {st: 'idle', busy: false, again: false, wait: false, tm: 0, applying: false};
+const syP = () => { try { return JSON.parse(localStorage.getItem('gp-sync')) || {}; } catch (e) { return {}; } };   // sesión recordada: {on, auto, who, last}
+const sySet = o => { try { localStorage.setItem('gp-sync', JSON.stringify({...syP(), ...o})); } catch (e) {} };
+const syOn = () => !!syP().on;
+const syAvail = () => !!SY_CFG.clientId && /^https?:$/.test(location.protocol);   // Google no admite file://
+const SY_TOK = 'gp-sync-token';   // en sessionStorage: el acceso solo dura mientras la pestaña está abierta (y como mucho una hora)
+const syTokGet = () => { try { const t = JSON.parse(sessionStorage.getItem(SY_TOK)); if (t && t.t && t.exp > Date.now()) return t.t; } catch (e) {} return null; };
+const syTokPut = (t, s) => { try { sessionStorage.setItem(SY_TOK, JSON.stringify({t, exp: Date.now() + Math.max(60, (s || 3600) - 60) * 1000})); } catch (e) {} };
+const syTokDel = () => { try { sessionStorage.removeItem(SY_TOK); } catch (e) {} };
+const syGis = () => window.google?.accounts?.oauth2 ? Promise.resolve() : new Promise((ok, ko) => {
+  const s = document.createElement('script'); s.src = 'https://accounts.google.com/gsi/client'; s.async = true; s.onload = ok; s.onerror = () => ko(Error('red')); document.head.appendChild(s); });
+function syToken(inter) {   // inter = false: renueva el acceso sin ventana (solo si ya se dio el permiso y sigue abierta la sesión de Google)
+  const t = syTokGet(); if (t) return Promise.resolve(t);
+  return syGis().then(() => new Promise((ok, ko) => {
+    const lim = inter ? 0 : setTimeout(() => ko(Error('silencio')), 15000), fin = () => clearTimeout(lim);
+    google.accounts.oauth2.initTokenClient({client_id: SY_CFG.clientId, scope: 'https://www.googleapis.com/auth/drive.appdata',
+      callback: r => { fin(); if (r && r.access_token) { syTokPut(r.access_token, +r.expires_in); ok(r.access_token); } else ko(Error(r && r.error || 'denegado')); },
+      error_callback: e => { fin(); ko(Error(e && e.type || 'cerrada')); }}).requestAccessToken({prompt: inter ? '' : 'none'});
+  }));
+}
+async function syDrive(tok, ruta, o = {}) {
+  const r = await fetch('https://www.googleapis.com' + ruta, {...o, cache: 'no-store', headers: {Authorization: 'Bearer ' + tok, ...o.headers}});
+  if (!r.ok) { const e = Error('drive ' + r.status); e.estado = r.status; throw e; }
+  return r;
+}
+const syFind = async tok => ((await (await syDrive(tok, '/drive/v3/files?spaces=appDataFolder&fields=files(id,name)&q=' + encodeURIComponent(`name='${SY_CFG.file}'`))).json()).files || [])[0] || null;
+const syDown = async (tok, id) => (await syDrive(tok, `/drive/v3/files/${id}?alt=media`)).json();
+function syUp(tok, id, d) {
+  const body = JSON.stringify({app: 'gpapers', v: 1, at: new Date().toISOString(), db: d});
+  if (id) return syDrive(tok, `/upload/drive/v3/files/${id}?uploadType=media`, {method: 'PATCH', headers: {'Content-Type': 'application/json'}, body});
+  const b = 'gpapers' + Date.now();
+  return syDrive(tok, '/upload/drive/v3/files?uploadType=multipart', {method: 'POST', headers: {'Content-Type': 'multipart/related; boundary=' + b},
+    body: `--${b}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify({name: SY_CFG.file, parents: ['appDataFolder']})}\r\n--${b}\r\nContent-Type: application/json\r\n\r\n${body}\r\n--${b}--`});
+}
+const syWho = async tok => { try { return (await (await syDrive(tok, '/drive/v3/about?fields=user(emailAddress)')).json()).user?.emailAddress || ''; } catch (e) { return ''; } };
+const syBase = () => idb('readonly', st => st.get('syncBase')).catch(() => null);
+const syBaseSet = d => idb('readwrite', st => d ? st.put(d, 'syncBase') : st.delete('syncBase')).catch(() => {});
+
+/* ---- Una vuelta de sincronización ---- */
+const syBlocked = () => [...document.querySelectorAll('dialog[open]')].some(d => !['help', 'pv', 'sy'].includes(d.id));   // ventanas que editan datos: no se les cambia nada debajo
+const syTrivial = () => !db.papers.length && !db.trash.length || path === 'ejemplo_papers.json' && !dirty;   // aquí solo está el ejemplo: manda Drive sin preguntar
+async function syOnce(inter) {
+  const tok = await syToken(inter), f = await syFind(tok), raw = f ? await syDown(tok, f.id) : null;
+  if (raw && (raw.app !== 'gpapers' || !raw.db)) throw Error('formato');
+  const snap = syS(syPlain(db)), local = syNorm(syPlain(db)), remote = raw ? syNorm(raw.db) : null;
+  let m = local, replace = false;
+  if (remote) {
+    const base = await syBase();
+    if (base) m = syNorm(syMerge(local, remote, base));
+    else if (syS(local) === syS(remote) || syTrivial()) { m = remote; replace = syTrivial(); }
+    else { const c = await syAsk(local, remote); if (!c) return {cancel: true};
+      m = c === 'merge' ? syNorm(syMerge(local, remote, null)) : c === 'drive' ? remote : local; replace = c === 'drive'; }
+  }
+  if (syS(syPlain(db)) !== snap) { SY.again = true; return {again: true}; }   // cambiaste algo mientras tanto: otra vuelta enseguida
+  const news = syS(m) !== syS(local);
+  if (news && syBlocked()) { SY.wait = true; return {wait: true}; }   // se termina al cerrar la ventana
+  if (news) syApply(m, replace);
+  if (!remote || syS(m) !== syS(remote)) await syUp(tok, f && f.id, m);
+  await syBaseSet(m); sySet({last: Date.now()});
+  if (syS(syPlain(db)) === syS(m)) { dirty = false; hdr(); sessionSoon(); }   // ya está guardado en Drive
+  return {news, first: !f};
+}
+async function syRun(inter) {
+  if (!inter && !syOn()) return null;
+  if (SY.busy) { SY.again = true; return null; }
+  if (!inter && SY.st === 'reconnect' && !syTokGet()) { syIcon(); return null; }   // sin acceso no se insiste: hay que pulsar «Volver a conectar»
+  clearTimeout(SY.tm); SY.tm = 0; SY.busy = true; SY.wait = false; SY.st = 'busy'; syIcon();
+  try {
+    let r; try { r = await syOnce(inter); } catch (e) { if (e.estado !== 401) throw e; syTokDel(); r = await syOnce(inter); }   // el acceso había caducado
+    SY.st = SY.wait ? 'wait' : 'idle'; return r;
+  } catch (e) {
+    SY.st = /silencio|interaction|login|consent|popup|cerrada|denegado|access_denied|immediate/i.test(e.message) ? 'reconnect' : 'error'; SY.err = e;
+    if (inter) throw e;
+    if (SY.st === 'reconnect' && !SY.warned) { SY.warned = true; toast('Para seguir sincronizando con Google Drive, vuelve a conectar.', [{t: 'Conectar', fn: syConnect}], 0); }
+    return null;
+  } finally { SY.busy = false; syIcon(); if (SY.again) { SY.again = false; sySoon(1500); } }
+}
+const sySoon = (ms = 3000) => { clearTimeout(SY.tm); SY.tm = setTimeout(() => { SY.tm = 0; syRun(false); }, ms); };
+const syAuto = () => syOn() && syP().auto !== false;
+function syApply(m, replace) {   // pone en la app lo que llega de Drive (se puede deshacer)
+  const hist = new Map(db.papers.map(p => [p.id, p.history]));
+  SY.applying = true;
+  try {
+    db = validate(structuredClone(m)); db.papers.forEach(p => p.history = hist.get(p.id) || []);
+    if (replace) { path = null; handle = null; }   // se sustituyó por la biblioteca de Drive: el archivo abierto no se toca
+    for (const id of [...SEL]) if (!db.papers.some(p => p.id === id)) SEL.delete(id);
+    record(); dirty = true; applySettings(); render(); hdr(); sessionSoon();
+    if (auto && handle) { clearTimeout(timer); timer = setTimeout(() => save(false), 1000); }   // autoguardado del archivo: también recibe los cambios
+  } finally { SY.applying = false; }
+}
+function syLoaded() { syBaseSet(null); if (syAuto()) sySoon(500); }   // otro archivo abierto: la próxima vuelta pregunta cómo combinarlo con Drive
+
+/* ---- Icono, menú y ventanas ---- */
+const SY_TXT = {off: 'Sincronizar con Google Drive', busy: 'Sincronizando…', ok: 'Sincronizado', pend: 'Cambios pendientes de sincronizar', wait: 'Cierra la ventana abierta para terminar de sincronizar',
+  reconnect: 'Hay que volver a conectar con Google', error: 'No se pudo sincronizar (se reintentará)', manual: 'Autoguardado desactivado: sincroniza a mano'};
+const syAgo = ts => { const m = Math.round((Date.now() - ts) / 6e4); if (m < 1) return 'ahora mismo'; if (m < 60) return `hace ${m} min`;
+  const h = Math.round(m / 60); if (h < 24) return `hace ${h} ${h === 1 ? 'hora' : 'horas'}`; const d = Math.round(h / 24); return `hace ${d} ${d === 1 ? 'día' : 'días'}`; };
+const syState = () => !syOn() ? 'off' : ['busy', 'wait', 'reconnect', 'error'].includes(SY.st) ? SY.st : dirty ? (syAuto() ? 'pend' : 'manual') : 'ok';
+function syIcon() {
+  const b = $('#syncBtn'); if (!b) return; b.hidden = !syAvail();
+  const st = syState(), p = syP(); b.dataset.st = st;
+  b.title = st === 'off' ? SY_TXT.off : `Google Drive: ${SY_TXT[st]}${p.last ? ' · última vez ' + syAgo(p.last) : ''} (clic: opciones)`; b.setAttribute('aria-label', b.title);
+}
+function syClick(e) {
+  e.stopPropagation(); if (!syOn()) return syIntro();
+  const p = syP(), st = syState(), r = e.currentTarget.getBoundingClientRect();
+  ctxShow({preventDefault() {}, stopPropagation() {}, clientX: r.left, clientY: r.bottom + 4}, `<div class="ctxh">Google Drive${p.who ? ' · ' + esc(p.who) : ''}<br>${esc(SY_TXT[st])}${p.last ? ' · ' + syAgo(p.last) : ''}</div>`
+    + (st === 'reconnect' ? '<button onclick="ctxClose();syConnect()">🔑 Volver a conectar</button>' : '')
+    + `<button onclick="ctxClose();syNow()">🔄 Sincronizar ahora</button><button onclick="ctxClose();syAutoSet(!syAuto())">${tick(syAuto())}Autoguardado en Drive</button>`
+    + '<button onclick="ctxClose();syIntro()">❔ ¿Cómo funciona?</button><button onclick="ctxClose();openPriv()">🔒 Privacidad</button><button onclick="ctxClose();syLogout()">🚪 Cerrar sesión</button>');
+}
+async function syNow() {
+  const r = await syRun(false);
+  if (SY.st === 'reconnect') toast('Hay que volver a conectar con Google.', [{t: 'Conectar', fn: syConnect}]);
+  else if (SY.st === 'error') toast(syErr(SY.err));
+  else if (r && r.wait) toast('Cierra la ventana abierta para terminar de sincronizar.', [], 4000);
+  else if (r && !r.cancel) toast(r.news ? 'Sincronizado: han llegado cambios de Google Drive.' : 'Sincronizado con Google Drive.', [], 3000);
+}
+function syAutoSet(on) { sySet({auto: on}); $('#auto').checked = on || auto; syIcon(); if (on) sySoon(300); }
+function syDlg(title, body, btns) {   // btns: [[texto, acción (sin acción: cerrar), principal]]
+  const d = $('#sy');
+  d.innerHTML = `<div class="dh"><h2>${title}</h2></div><div class="sytx">${body}</div><div class="row sybt">${btns.map((b, i) => `<button data-i="${i}"${b[2] ? ' class="pri"' : ''}>${esc(b[0])}</button>`).join('')}</div>`;
+  d.onclick = e => { const b = e.target.closest('button[data-i]'); if (!b) return; const f = btns[+b.dataset.i][1]; f ? f() : d.close(); };
+  if (!d.open) d.showModal(); d.scrollTop = 0;   // el foco va al primer botón (abajo): se empieza a leer por arriba
+}
+function syIntro() {
+  if (!syOn()) syGis().catch(() => {});   // se carga ya, para que la ventana de Google se abra al pulsar «Continuar»
+  syDlg('Sincronizar con Google Drive', `<p>Guarda tu biblioteca (papers, notas, secciones, etiquetas, papelera y ajustes) en tu Google Drive para tenerla igual en el ordenador, la tablet y el móvil.</p>
+    <h4>¿Qué va a pasar?</h4><ul><li>Se guarda una copia en una <b>carpeta privada y oculta de tu propio Google Drive</b>. No aparece entre tus archivos y la aplicación no puede ver ni tocar nada más de tu Drive.</li>
+    <li><b>Nadie más puede verla</b>: ni quien mantiene la aplicación ni otras personas. No hay ningún servidor intermedio.</li>
+    <li>Es <b>gratis</b> y no hay que instalar nada. Necesitas una cuenta de Google (la de Gmail).</li></ul>
+    <h4>Pasos</h4><ol><li>Pulsa <b>«Continuar»</b>: se abrirá una ventana de Google.</li>
+    <li>Elige tu cuenta y pulsa <b>«Permitir»</b> o «Continuar» cuando pida acceso a «sus propios datos de configuración en Google Drive»: es la carpeta oculta de esta aplicación.</li>
+    <li>Si ya tenías una biblioteca en Drive de otro dispositivo, eliges si <b>combinarla</b> con la de aquí o quedarte con una de las dos.</li>
+    <li>Listo: el icono 🔄 lleva un punto verde. Desde entonces <b>cada cambio se guarda solo en tu Drive</b> (autoguardado activado) y los cambios de tus otros dispositivos llegan al abrir la aplicación o volver a ella.</li>
+    <li>En otro dispositivo: abre esta misma página, pulsa 🔄 y entra <b>con la misma cuenta de Google</b>.</li></ol>
+    <h4>Por si acaso</h4><ul><li>Si no se abre la ventana de Google, permite las ventanas emergentes para esta página y vuelve a intentarlo.</li>
+    <li>Los cambios de los dispositivos se <b>combinan</b> paper a paper y campo a campo; si cambias el mismo campo en dos sitios, gana el cambio más reciente. Un paper editado en un sitio no se pierde aunque lo borres en otro.</li>
+    <li>Tu archivo JSON sigue funcionando igual: si tienes activo su autoguardado (Chrome/Edge), también se escribe en él.</li>
+    <li>Pulsa el icono 🔄 para sincronizar al momento, desactivar el autoguardado o <b>cerrar la sesión</b>. Más detalles en 🔒 Privacidad.</li></ul>`,
+    syOn() ? [['Cerrar', null, true]] : [['Continuar', syConnect, true], ['Cancelar']]);
+}
+const syCount = x => { const n = (k, a, b) => `${x[k].length} ${x[k].length === 1 ? a : b}`; return `${n('papers', 'paper', 'papers')}, ${n('sections', 'sección', 'secciones')} y ${n('tags', 'etiqueta', 'etiquetas')}`; };
+const syAsk = (l, r) => new Promise(res => {   // primera vez con datos en los dos lados: cómo juntarlos
+  let done = false; const fin = v => { if (!done) { done = true; res(v); } }, pick = v => () => { fin(v); $('#sy').close(); };
+  syDlg('Ya tienes una biblioteca en Google Drive', `<p>En Google Drive: <b>${syCount(r)}</b>.<br>En este dispositivo: <b>${syCount(l)}</b>.</p>
+    <ul><li><b>Combinar las dos</b>: junta los papers, secciones y etiquetas de ambas; si un mismo paper está en las dos, se queda con lo más reciente. No se borra nada.</li>
+    <li><b>Usar la de Google Drive</b>: este dispositivo pasa a tener la de Drive (el archivo JSON que tengas abierto no se toca).</li>
+    <li><b>Usar la de este dispositivo</b>: la copia de Drive se sustituye por la de aquí.</li></ul>`,
+    [['Combinar las dos', pick('merge'), true], ['Usar la de Google Drive', pick('drive')], ['Usar la de este dispositivo', pick('local')], ['Cancelar', pick(null)]]);
+  $('#sy').addEventListener('close', () => fin(null), {once: true});
+});
+function syErr(e) {
+  const m = String(e && e.message || e);
+  if (/red|Failed to fetch|NetworkError|Load failed/i.test(m)) return 'No hay conexión con Google. Comprueba tu internet y vuelve a intentarlo.';
+  if (/popup_failed_to_open|bloque/i.test(m)) return 'El navegador ha bloqueado la ventana de Google. Permite las ventanas emergentes para esta página y vuelve a intentarlo.';
+  if (/popup_closed|cerrada|access_denied|denegado|silencio/i.test(m)) return 'No se completó el permiso de Google. No ha pasado nada: puedes volver a intentarlo cuando quieras.';
+  if (/formato/.test(m)) return 'El archivo de sincronización de Google Drive no es de esta aplicación.';
+  if (e && e.estado === 403) return 'Google ha rechazado el acceso a la carpeta oculta (puede que falte activar Google Drive API en el proyecto).';
+  if (e && e.estado === 413) return 'La biblioteca es demasiado grande para sincronizarla (más de 5 MB): usa imágenes por URL en lugar de incrustadas.';
+  return 'No se ha podido sincronizar. Vuelve a intentarlo en unos minutos. (Detalle: ' + m.slice(0, 80) + ')';
+}
+async function syConnect() {
+  syDlg('Conectando con Google…', '<p>Sigue las indicaciones de la ventana de Google que se ha abierto. Si no aparece, permite las ventanas emergentes para esta página.</p>', [['Cerrar']]);
+  try {
+    const r = await syRun(true);
+    if (!r || r.cancel) { if ($('#sy').open) $('#sy').close(); syIcon(); return; }
+    sySet({on: true, auto: true}); $('#auto').disabled = false; $('#auto').checked = true; SY.st = 'idle'; syIcon();
+    syWho(syTokGet()).then(w => { if (w) { sySet({who: w}); syIcon(); } });
+    if (r.again || r.wait) sySoon(1000);
+    syDlg('✔ Sincronizado', `<p>${r.first ? 'Se ha creado tu copia en Google Drive. ' : r.news ? 'Este dispositivo ya tiene tu biblioteca de Google Drive. ' : 'Este dispositivo ya estaba al día. '}
+      La sesión queda iniciada: desde ahora cada cambio se guarda solo en tu Drive (<b>autoguardado activado</b>) hasta que cierres la sesión desde el icono 🔄.</p>`, [['Aceptar', null, true]]);
+  } catch (e) { syDlg('No se ha podido sincronizar', `<p>${esc(syErr(e))}</p>`, [['Cerrar']]); }
+}
+async function syLogout(quiet) {
+  if (!quiet && !confirm('¿Cerrar la sesión de Google Drive en este dispositivo?\nTus datos se quedan aquí y en tu Drive; los demás dispositivos siguen sincronizando.')) return;
+  if (!quiet && syAuto() && dirty && !SY.busy) await syRun(false);   // sube lo último antes de salir
+  clearTimeout(SY.tm); try { localStorage.removeItem('gp-sync'); } catch (e) {} syTokDel(); syBaseSet(null); SY.st = 'idle';
+  $('#auto').checked = auto; if (!FSA) $('#auto').disabled = true; syIcon(); if ($('#pv').open) openPriv();
+  if (!quiet) toast('Sesión de Google Drive cerrada. Tus datos siguen en este dispositivo y en tu Drive.', [], 5000);
+}
+async function syWipe() {
+  if (!confirm('Se borrará la copia de tu biblioteca guardada en Google Drive y se cerrará la sesión. Los datos de este dispositivo no se tocan.\nSi otro dispositivo sigue conectado, volverá a crearla: cierra allí la sesión antes. ¿Continuar?')) return;
+  try { const tok = await syToken(true), f = await syFind(tok); if (f) await syDrive(tok, '/drive/v3/files/' + f.id, {method: 'DELETE'});
+    await syLogout(true); toast('Copia de Google Drive borrada y sesión cerrada.', [], 5000); }
+  catch (e) { toast(syErr(e)); }
+}
+document.addEventListener('visibilitychange', () => { if (!syAuto()) return;
+  if (document.hidden) { if (SY.tm || dirty) syRun(false); } else if (Date.now() - (syP().last || 0) > 6e4) syRun(false); });   // al salir se sube lo pendiente; al volver se traen los cambios
+setInterval(() => { if (syAuto() && !document.hidden && syTokGet()) syRun(false); }, 5 * 60 * 1000);   // trae los cambios de los otros dispositivos
+document.addEventListener('close', e => { if (SY.wait && e.target.tagName === 'DIALOG') sySoon(300); }, true);
+
+/* ===== Privacidad ===== */
+function privHTML() {
+  const on = syOn(), p = syP();
+  return `<div class="dh"><h2>Privacidad</h2><div class="dbtn"><button onclick="$('#pv').close()">Cerrar ✕</button></div></div><div class="sytx">
+    <h4>Qué datos se tratan y dónde</h4><p>Tus papers, notas, secciones, etiquetas, papelera y ajustes se guardan <b>en tu navegador</b> (copia de sesión en el almacenamiento de la aplicación) y en el <b>archivo JSON</b> que tú eliges. No se envían a ningún servidor de quien mantiene la aplicación: no hay cuentas, ni analíticas, ni publicidad, ni cookies de seguimiento.</p>
+    <h4>Cuándo sale algo a internet</h4><ul><li><b>Buscar por DOI</b>: se envía el DOI a CrossRef (api.crossref.org) para traer los datos del paper.</li>
+    <li><b>Imágenes por URL</b>: tu navegador las descarga de la web donde están.</li>
+    <li><b>Sincronización con Google Drive</b>, solo si la activas (abajo).</li></ul>
+    <h4>Sincronización con Google Drive (opcional)</h4><p>Si pulsas 🔄 y das permiso, la aplicación guarda una copia de tu biblioteca (<code>${esc(SY_CFG.file)}</code>) en una <b>carpeta privada y oculta de tu propio Google Drive</b>. Usa el permiso <code>drive.appdata</code>, que solo deja ver, crear y borrar esa carpeta concreta: la aplicación <b>no puede leer ni modificar ningún otro archivo de tu Drive</b>.</p>
+    <ul><li>La conexión va directamente de tu navegador a Google. Quien mantiene la aplicación no tiene acceso a tu cuenta ni a tus datos; no se usan para publicidad, ni se venden ni se comparten con terceros.</li>
+    <li>El acceso que da Google (token) se guarda solo mientras la pestaña está abierta y caduca en una hora.</li>
+    <li>En este dispositivo se recuerda que la sesión está iniciada, el correo de la cuenta (para mostrarlo), la fecha de la última sincronización y la última versión sincronizada (para combinar bien los cambios).</li></ul>
+    <h4>Cómo retirar el permiso o borrar los datos</h4><ul><li><b>Cerrar sesión</b> (menú del icono 🔄): deja de sincronizar en este dispositivo y olvida lo anterior. Tus datos siguen aquí y en tu Drive.</li>
+    <li><b>Borrar la copia de Google Drive</b>: botón de abajo (con la sesión iniciada).</li>
+    <li><b>Quitar el permiso a la aplicación</b> en todos tus dispositivos: <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener">myaccount.google.com/permissions</a>.</li>
+    <li><b>Datos de este navegador</b>: Ayuda → «Aplicación instalada» → «Olvidar la copia de sesión», o borra los datos del sitio desde el navegador. Tu archivo JSON solo lo borras tú.</li></ul>
+    ${syAvail() ? `<p class="sypv">${on ? `Google Drive: <b>sesión iniciada</b>${p.who ? ' como ' + esc(p.who) : ''}${p.last ? ' · última sincronización ' + syAgo(p.last) : ''}.</p><p class="row"><button onclick="syLogout()">🚪 Cerrar sesión</button><button class="danger" onclick="syWipe()">🗑 Borrar mi copia de Google Drive</button>` : 'Google Drive: <b>sin conectar</b>. <button onclick="$(\'#pv\').close();syIntro()">🔄 Sincronizar…</button>'}</p>` : ''}
+    <h4>Contacto</h4><p>Dudas sobre esta política: <a href="mailto:r.malumbresp@gmail.com">r.malumbresp@gmail.com</a>. Versión para enlazar: <a href="privacidad.html" target="_blank" rel="noopener">privacidad.html</a>.</p></div>`;
+}
+function openPriv() { $('#pv').innerHTML = privHTML(); if (!$('#pv').open) $('#pv').showModal(); }
+
 /* ===== Datos de la aplicación (PWA): copia de la sesión y estado de la interfaz, en IndexedDB =====
    Aparte del JSON, la app guarda (1) una copia de trabajo, para reabrir justo donde lo dejaste aunque no hayas guardado, y
    (2) el estado de la interfaz (filtros, orden, barra lateral, bloques plegados). Viven fuera de la caché de la aplicación,
    así que las actualizaciones no los tocan y no hace falta borrar datos para recibir una versión nueva. */
-const APP_V = '25';   // debe coincidir con la versión de sw.js
+const APP_V = '26';   // debe coincidir con la versión de sw.js
 let BOOTED = false, RELOADING = false, SWREG = null, tSes = 0, tUi = 0, lastUi = '';
 const sessionNow = () => { clearTimeout(tSes); if (!BOOTED) return Promise.resolve();
   return idb('readwrite', st => st.put({v: 1, path, dirty, at: new Date().toISOString(), json: dbJSON()}, 'session')).catch(() => {}); };
@@ -2262,8 +2548,9 @@ async function bootApp() {
     restored = true; dirty = !!ses.dirty; hdr();
     try { const h = FSA && await idb('readonly', st => st.get('last')); if (h && ses.path && h.name === ses.path) handle = h; } catch (e) {}
     toast(dirty ? `Sesión recuperada con cambios sin guardar${ses.path ? ' de «' + ses.path + '»' : ''}. Guarda para no perderlos.` : `Sesión recuperada${ses.path ? ': «' + ses.path + '»' : ''}.`, [], 6000);
-  } else if (location.protocol.startsWith('http')) {
-    try { const r = await fetch('ejemplo_papers.json'); if (r.ok && !dirty && !db.papers.length) await loadText(await r.text(), 'ejemplo_papers.json', true); } catch (e) {}   // la primera vez se abre el ejemplo
+  } else {
+    syBaseSet(null);   // no hay copia de sesión: lo que se abra ahora no es lo último sincronizado
+    if (location.protocol.startsWith('http')) try { const r = await fetch('ejemplo_papers.json'); if (r.ok && !dirty && !db.papers.length) await loadText(await r.text(), 'ejemplo_papers.json', true); } catch (e) {}   // la primera vez se abre el ejemplo
   }
   applyUI(ui); BOOTED = true; lastUi = JSON.stringify(uiState()); if (restored) uiNow();
 }
@@ -2275,12 +2562,13 @@ if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {   //
     document.addEventListener('visibilitychange', () => { if (!document.hidden) reg.update().catch(() => {}); }); }).catch(() => {});
   navigator.serviceWorker.addEventListener('controllerchange', () => { if (had && !RELOADING) toast('Hay una versión nueva de la aplicación.', [{t: 'Recargar ahora', fn: reloadApp}], 0); });
 }
-bootApp();
+bootApp().then(() => { syIcon(); if (syAuto()) syRun(false); });   // con la sesión de Google Drive recordada, se trae lo último al abrir
 render();
 lastSnap = JSON.stringify(db);
 applySettings();
 if (FSA) idb('readonly', st => st.get('last')).then(h => $('#reopen').hidden = !h).catch(() => {});
-else { $('#auto').disabled = true; $('#auto').parentElement.title = 'El autoguardado solo está disponible en Chrome o Edge de escritorio'; }
+else if (!syOn()) { $('#auto').disabled = true; $('#auto').parentElement.title = 'El autoguardado del archivo solo está disponible en Chrome o Edge de escritorio (en cualquier navegador, con Google Drive 🔄)'; }
+if (syOn()) $('#auto').checked = syAuto();
 $('#cfg').addEventListener('close', () => { recAct = null; });
 document.addEventListener('scroll', e => {   // la cabecera fija de un diálogo se estrecha al bajar (con histéresis para que no parpadee)
   const d = e.target, h = d.tagName === 'DIALOG' && d.querySelector(':scope > .dh'); if (!h) return;

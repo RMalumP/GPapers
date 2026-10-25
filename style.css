@@ -151,3 +151,11 @@ aside{border-left:0;border-radius:0 10px 10px 0;padding-left:6px}
 /* F13: aviso (toast) */
 #toast{position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:100;display:flex;align-items:center;gap:10px;max-width:min(92vw,640px);background:var(--fg);color:var(--bg);padding:10px 14px;border-radius:10px;box-shadow:0 4px 16px #0005}
 #toast[hidden]{display:none}#toast button{background:var(--bg);color:var(--fg);border-color:transparent}
+#syncBtn{position:relative}#syncBtn[hidden]{display:none}.syi{display:inline-block}
+.syb{position:absolute;right:3px;bottom:3px;width:9px;height:9px;border-radius:50%;box-shadow:0 0 0 2px var(--card);display:none}
+#syncBtn:not([data-st=off]) .syb{display:block}#syncBtn[data-st=ok] .syb{background:#27ae60}#syncBtn[data-st=busy] .syb{background:var(--pri)}
+#syncBtn[data-st=pend] .syb,#syncBtn[data-st=manual] .syb,#syncBtn[data-st=wait] .syb,#syncBtn[data-st=reconnect] .syb{background:#e0a100}#syncBtn[data-st=error] .syb{background:var(--red)}
+#syncBtn[data-st=busy] .syi{animation:sySpin 1s linear infinite}@keyframes sySpin{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){#syncBtn[data-st=busy] .syi{animation:none}}
+#sy,#pv{width:min(640px,96vw)}.sytx h4{margin:16px 0 4px}.sytx ul,.sytx ol{padding-left:22px}.sytx li{margin:3px 0}
+.sybt{margin-top:14px;justify-content:flex-end}.sypv{margin-top:14px;padding:10px;border:1px solid var(--bd);border-radius:8px;background:var(--card)}
