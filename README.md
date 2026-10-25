@@ -64,7 +64,8 @@ En «Exportar citas» eliges idioma de los conectores (español/inglés), format
 - Estos datos viven **fuera de la caché del service worker**, así que las actualizaciones no los tocan: **no hace falta borrar los datos de la aplicación** para recibir una versión nueva. El service worker revalida siempre (`cache: 'no-cache'`), busca versiones nuevas al abrir, al volver a la app y cada 30 min, y avisa con «Recargar ahora» (guarda la copia de sesión antes de recargar).
 - La versión está en `APP_V` (app.js) y en `papers-vNN` (sw.js): **súbelas juntas** en cada publicación. En Ayuda → «Aplicación instalada» hay botones para buscar actualizaciones y olvidar la copia de sesión.
 
-## Sincronización con Google Drive y Privacidad (F14)
+## Sincronización con Google Drive, Privacidad y Créditos (F14)
+- **©️ Créditos** (barra lateral, bajo Privacidad): dirección, desarrollo, derechos (licencia CC BY-SA) y la versión de la aplicación.
 - **Icono 🔄 a la izquierda de 💾**: guarda la biblioteca entera (papers, notas, secciones, etiquetas, papelera y ajustes) en la carpeta oculta `appDataFolder` del **propio Google Drive** de cada persona, como en Supuestos C1 (permiso `drive.appdata`: la app no ve el resto del Drive; sin servidor intermedio). Archivos (todos `gpapers-…`): ver «Solo cambios» abajo.
 - **Autoguardado activado al conectar**: cada cambio se sube a los 3 s; al abrir la app, al volver a ella y cada 5 min se traen los cambios de los otros dispositivos. La casilla «Autoguardado» lo activa o desactiva (con Drive funciona en cualquier navegador, también en el móvil). El punto del icono indica el estado (verde, azul girando, amarillo, rojo).
 - **Con la sesión iniciada, clic en 🔄**: sincronizar ahora, autoguardado en Drive, ¿cómo funciona?, privacidad y **cerrar sesión** (solo en ese dispositivo; los demás siguen sincronizando).

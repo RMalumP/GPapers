@@ -157,5 +157,6 @@ aside{border-left:0;border-radius:0 10px 10px 0;padding-left:6px}
 #syncBtn[data-st=pend] .syb,#syncBtn[data-st=manual] .syb,#syncBtn[data-st=wait] .syb,#syncBtn[data-st=reconnect] .syb{background:#e0a100}#syncBtn[data-st=error] .syb{background:var(--red)}
 #syncBtn[data-st=busy] .syi{animation:sySpin 1s linear infinite}@keyframes sySpin{to{transform:rotate(360deg)}}
 @media(prefers-reduced-motion:reduce){#syncBtn[data-st=busy] .syi{animation:none}}
-#sy,#pv{width:min(640px,96vw)}.sytx h4{margin:16px 0 4px}.sytx ul,.sytx ol{padding-left:22px}.sytx li{margin:3px 0}
+#sy,#pv{width:min(640px,96vw)}#cr{width:min(380px,92vw)}
+.cred{display:grid;grid-template-columns:auto 1fr;gap:8px 24px;margin:8px 0 4px}.cred dt{font-weight:600;color:var(--pri)}.cred dd{margin:0;opacity:.75}.cred a{color:inherit}.sytx h4{margin:16px 0 4px}.sytx ul,.sytx ol{padding-left:22px}.sytx li{margin:3px 0}
 .sybt{margin-top:14px;justify-content:flex-end}.sypv{margin-top:14px;padding:10px;border:1px solid var(--bd);border-radius:8px;background:var(--card)}

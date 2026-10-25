@@ -2452,7 +2452,7 @@ const syBase = () => idb('readonly', st => st.get('syncBase')).catch(() => null)
 const syBaseSet = d => idb('readwrite', st => d ? st.put(d, 'syncBase') : st.delete('syncBase')).catch(() => {});
 
 /* ---- Una vuelta de sincronización ---- */
-const syBlocked = () => [...document.querySelectorAll('dialog[open]')].some(d => !['help', 'pv', 'sy'].includes(d.id));   // ventanas que editan datos: no se les cambia nada debajo
+const syBlocked = () => [...document.querySelectorAll('dialog[open]')].some(d => !['help', 'pv', 'sy', 'cr'].includes(d.id));   // ventanas que editan datos: no se les cambia nada debajo
 const syTrivial = () => !db.papers.length && !db.trash.length || path === 'ejemplo_papers.json' && !dirty;   // aquí solo está el ejemplo: manda Drive sin preguntar
 async function syOnce(inter) {
   const tok = await syToken(inter), files = await syLs(tok), R = await syRemote(tok, files);
@@ -2635,11 +2635,19 @@ function privHTML() {
 }
 function openPriv() { $('#pv').innerHTML = privHTML(); if (!$('#pv').open) $('#pv').showModal(); }
 
+/* ===== Créditos ===== */
+function openCred() {
+  $('#cr').innerHTML = `<div class="dh"><h2>Créditos</h2><div class="dbtn"><button onclick="$('#cr').close()">Cerrar ✕</button></div></div>
+    <dl class="cred"><dt>Dirección:</dt><dd>R.M.P.</dd><dt>Desarrollo:</dt><dd>Vibe Coding con Claude</dd>
+    <dt>Derechos:</dt><dd><a href="https://creativecommons.org/licenses/by-sa/4.0/deed.es" target="_blank" rel="noopener">Licencia CC BY-SA</a></dd><dt>Versión:</dt><dd>v${APP_V}</dd></dl>`;
+  if (!$('#cr').open) $('#cr').showModal();
+}
+
 /* ===== Datos de la aplicación (PWA): copia de la sesión y estado de la interfaz, en IndexedDB =====
    Aparte del JSON, la app guarda (1) una copia de trabajo, para reabrir justo donde lo dejaste aunque no hayas guardado, y
    (2) el estado de la interfaz (filtros, orden, barra lateral, bloques plegados). Viven fuera de la caché de la aplicación,
    así que las actualizaciones no los tocan y no hace falta borrar datos para recibir una versión nueva. */
-const APP_V = '28';   // debe coincidir con la versión de sw.js
+const APP_V = '29';   // debe coincidir con la versión de sw.js
 let BOOTED = false, RELOADING = false, SWREG = null, tSes = 0, tUi = 0, lastUi = '';
 const sessionNow = () => { clearTimeout(tSes); if (!BOOTED) return Promise.resolve();
   return idb('readwrite', st => st.put({v: 1, path, dirty, at: new Date().toISOString(), json: dbJSON()}, 'session')).catch(() => {}); };
