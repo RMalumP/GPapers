@@ -96,6 +96,7 @@ with sync_playwright() as pw:
     eq('el botón de Google Drive está a la izquierda de Abrir', A.evaluate("[!$('#syncBtn').hidden, $('#syncBtn').nextElementSibling.getAttribute('aria-label'), $('#syncBtn').dataset.st, $('#syncBtn').previousElementSibling]"), [True, 'Abrir', 'off', None])
     eq('sin conectar dice «Conectar con Google Drive»', (A.inner_text('#syncBtn').strip(), A.evaluate("$('#syncBtn').title")), ('🔄Conectar con Google Drive', 'Conectar con Google Drive'))
     eq('final de la barra lateral: Configuración, una línea, Ayuda, Privacidad y Créditos', A.evaluate("[...document.querySelectorAll('#side > *')].slice(-5).map(e => e.tagName === 'HR' ? '——' : e.textContent.trim())"), ['⚙️Configuración', '——', '❓Ayuda', '🔒Privacidad', '©️Créditos'])
+    eq('Ayuda, Privacidad y Créditos son más bajos y discretos que Configuración', A.evaluate("(c => [...document.querySelectorAll('#side .shs')].map(b => b.offsetHeight < c.offsetHeight && +getComputedStyle(b).opacity < 1))($('#side .cfgb'))"), [True, True, True])
     A.click('#side button:has-text("Créditos")')
     eq('Créditos: dirección, desarrollo, derechos y versión', A.evaluate("[...document.querySelectorAll('#cr dl > *')].map(e => e.textContent)"), ['Dirección:', 'R.M.P.', 'Desarrollo:', 'Vibe Coding con Claude', 'Derechos:', 'Licencia CC BY-SA', 'Versión:', 'v' + A.evaluate('APP_V')])
     A.evaluate("$('#cr').close()")
@@ -174,6 +175,7 @@ with sync_playwright() as pw:
     A.evaluate("syTokDel(); syTry(); SY.st = 'reconnect'; syIcon()")   # cortada otra vez y un intento reciente: el menú también ofrece reconectar
     A.click('#syncBtn')
     eq('el menú ofrece volver a conectar y cerrar sesión', [x for x in A.evaluate("[...document.querySelectorAll('#ctx button')].map(b => b.textContent)") if 'conectar' in x or 'Cerrar sesión' in x], ['🔑 Volver a conectar', '🚪 Cerrar sesión'])
+    eq('el menú ofrece borrar mis datos de Google Drive', A.evaluate("[...document.querySelectorAll('#ctx button')].at(-1).textContent"), '🗑 Borrar mis datos de Google Drive')
     eq('el menú no repite Privacidad (está en la barra lateral)', A.evaluate("[...document.querySelectorAll('#ctx button')].some(b => b.textContent.includes('Privacidad'))"), False)
     A.click('#ctx button:has-text("Volver a conectar")'); A.wait_for_timeout(800)
     eq('«Volver a conectar» también', A.evaluate("$('#syncBtn').dataset.st"), 'ok')
@@ -213,13 +215,13 @@ with sync_playwright() as pw:
     # Privacidad
     B.click('#side button:has-text("Privacidad")')
     eq('Privacidad explica el permiso y la carpeta oculta', all(s in B.inner_text('#pv') for s in ['drive.appdata', 'carpeta privada y oculta', 'myaccount.google.com/permissions', 'yo@example.com']), True)
-    B.click('#pv button:has-text("Borrar mi copia")'); B.wait_for_timeout(600)
+    B.evaluate("$('#pv').close()"); B.click('#syncBtn'); B.click('#ctx button:has-text("Borrar mis datos de Google Drive")'); B.wait_for_timeout(600)
     eq('borrar la copia de Drive y cerrar sesión (sin tocar archivos de otras webs)', (names(), [f['name'] for f in STORE.values()], B.evaluate("syOn()")), ([], ['supc1-sync.json'], False))
     # copia de la versión anterior (un solo archivo): se lee y se pasa al formato nuevo
     STORE['viejo'] = {'name': 'gpapers-sync.json', 'parents': ['appDataFolder'], 'mt': now(), 'content': json.dumps({'app': 'gpapers', 'v': 1, 'db': {'version': 1, 'sections': [], 'tags': [], 'trash': [], 'papers': [{'id': 'v1', 'title': 'De la versión anterior', 'authors': [], 'image': {'kind': 'data', 'data': PNG}}]}})}
     cD, D = device(); D.click('#syncBtn'); D.click('#sy button:has-text("Continuar")'); D.wait_for_timeout(800)
     eq('la copia anterior se lee y se convierte', (D.evaluate("[db.papers[0].title, db.papers[0].image.data.length]"), names()), (['De la versión anterior', len(PNG)], sorted(['gpapers-snap.json', 'gpapers-img-' + D.evaluate(f"syHash('{PNG}')")])))
-    B.evaluate("$('#pv').close(); openHelp('sync')")
+    B.evaluate("openHelp('sync')")
     eq('la ayuda tiene su apartado', 'Autoguardado activado' in B.inner_text('#hp_sync'), True)
     eq('sin errores', errs, [])
     srv.terminate(); b.close()

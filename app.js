@@ -1308,7 +1308,7 @@ function helpHTML() {
       <ul><li><b>Conectar</b>: pulsa 🔄 → «Continuar», elige tu cuenta de Google y da permiso. Si en Drive ya había una biblioteca de otro dispositivo, eliges si combinarlas o quedarte con una.</li>
       <li><b>Autoguardado activado</b>: con la sesión iniciada, cada cambio se sube solo a los pocos segundos (solo lo que cambió, no la biblioteca entera), y al abrir la aplicación o volver a ella se traen los cambios de los otros dispositivos. La casilla «Autoguardado» lo activa o desactiva (sin ella, sincroniza a mano).</li>
       <li><b>El punto del icono</b>: verde, sincronizado; azul y girando, sincronizando; amarillo, cambios pendientes o hay que volver a conectar; rojo, error (se reintenta).</li>
-      <li><b>Con la sesión iniciada, clic en 🔄</b>: sincronizar ahora, activar o desactivar el autoguardado, ver cómo funciona y <b>cerrar sesión</b>.</li>
+      <li><b>Con la sesión iniciada, clic en 🔄</b>: sincronizar ahora, activar o desactivar el autoguardado, ver cómo funciona, <b>cerrar sesión</b> y <b>borrar mis datos de Google Drive</b> (borra la copia de Drive y cierra la sesión; lo de este dispositivo no se toca).</li>
       <li><b>Cómo se combinan</b>: paper a paper y campo a campo. Si cambias el mismo campo en dos dispositivos gana el cambio más reciente; un paper editado en uno no se pierde aunque lo borres en otro. Los cambios que llegan de Drive se pueden deshacer (${kb('undo')}).</li>
       <li><b>Cada hora Google corta el acceso</b> por seguridad (sin un servidor propio no se puede renovar sin abrir su ventana). La aplicación intenta renovarlo sola; si el navegador no lo deja, el punto se pone amarillo y se reconecta con tu <b>siguiente clic o tecla</b> (puede verse un instante la ventana de Google). No pierdes nada: los cambios esperan en el dispositivo y se suben al reconectar. El acceso se comparte entre pestañas y vale al reabrir la aplicación mientras no caduque.</li>
       <li><b>Qué se guarda en Drive</b>: una copia completa, un archivo pequeño con lo que cambió en cada autoguardado y cada imagen incrustada aparte, una sola vez aunque la uses en varios papers. Cuando se acumulan cambios, la copia completa se pone al día y se borran los sueltos; las imágenes que ya no usa nadie se borran pasado un día. Cada dispositivo solo descarga lo que aún no tiene.</li>
@@ -2531,7 +2531,7 @@ function syClick(e) {
   ctxShow({preventDefault() {}, stopPropagation() {}, clientX: r.left, clientY: r.bottom + 4}, `<div class="ctxh">Google Drive${p.who ? ' · ' + esc(p.who) : ''}<br>${esc(SY_TXT[st])}${p.last ? ' · ' + syAgo(p.last) : ''}</div>`
     + (st === 'reconnect' ? '<button onclick="ctxClose();syConnect()">🔑 Volver a conectar</button>' : '')
     + `<button onclick="ctxClose();syNow()">🔄 Sincronizar ahora</button><button onclick="ctxClose();syAutoSet(!syAuto())">${tick(syAuto())}Autoguardado en Drive</button>`
-    + '<button onclick="ctxClose();syIntro()">❔ ¿Cómo funciona?</button><button onclick="ctxClose();syLogout()">🚪 Cerrar sesión</button>');
+    + '<button onclick="ctxClose();syIntro()">❔ ¿Cómo funciona?</button><button onclick="ctxClose();syLogout()">🚪 Cerrar sesión</button><button class="danger" onclick="ctxClose();syWipe()">🗑 Borrar mis datos de Google Drive</button>');
 }
 async function syNow() {
   const r = await syRun(false, true);
@@ -2647,7 +2647,7 @@ function openCred() {
    Aparte del JSON, la app guarda (1) una copia de trabajo, para reabrir justo donde lo dejaste aunque no hayas guardado, y
    (2) el estado de la interfaz (filtros, orden, barra lateral, bloques plegados). Viven fuera de la caché de la aplicación,
    así que las actualizaciones no los tocan y no hace falta borrar datos para recibir una versión nueva. */
-const APP_V = '30.1';   // debe coincidir con la versión de sw.js
+const APP_V = '30.2';   // debe coincidir con la versión de sw.js
 let BOOTED = false, RELOADING = false, SWREG = null, tSes = 0, tUi = 0, lastUi = '';
 const sessionNow = () => { clearTimeout(tSes); if (!BOOTED) return Promise.resolve();
   return idb('readwrite', st => st.put({v: 1, path, dirty, at: new Date().toISOString(), json: dbJSON()}, 'session')).catch(() => {}); };
