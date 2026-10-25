@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="es"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Gestor de papers</title><link rel="stylesheet" href="style.css"><link rel="manifest" href="manifest.json"><meta name="theme-color" content="#2457c5"><link rel="icon" href="icon-192.png"></head>
+<title>Gestor de papers</title><meta name="description" content="Gestor de papers académicos: notas, secciones, etiquetas, citas en varios estilos y sincronización opcional con tu propio Google Drive."><link rel="stylesheet" href="style.css"><link rel="manifest" href="manifest.json"><meta name="theme-color" content="#2457c5"><link rel="icon" href="icon-192.png"></head>
 <body>
 <header>
   <h1 id="appName">Papers</h1><span id="fname"></span>
@@ -42,6 +42,7 @@
   <main>
     <div class="row"><button class="pri" onclick="openPaper()">+ Nuevo paper</button><button id="tbView" class="tg" onclick="setView(db.settings.view==='table'?'cards':'table')" title="Cambiar entre tarjetas y tabla compacta"></button><div class="bar"><button id="tbSec" class="tg" onclick="F.tbSec=!F.tbSec;render()" oncontextmenu="groupMenu(event)" title="Clic: mostrar u ocultar las secciones · Clic derecho: agrupar por sección"></button><div id="secF2" class="chips" hidden></div></div><div class="bar"><button id="tbTag" class="tg" onclick="F.tbTag=!F.tbTag;render()" oncontextmenu="modeMenu(event)" title="Clic: mostrar u ocultar las etiquetas · Clic derecho: cómo combinarlas"></button><div id="tagF2" class="chips"></div></div><span id="count"></span></div>
     <div id="list"></div>
+    <footer class="appf">Gestor de papers: organiza tus papers académicos con notas, secciones, etiquetas y citas en varios estilos, y sincronízalos si quieres con tu propio Google Drive. · <a href="privacidad.html">Política de privacidad</a></footer>
   </main>
 </div>
 <div id="ctx" hidden></div><dialog id="dlg"></dialog><dialog id="mg"></dialog><dialog id="ex"></dialog><dialog id="nv"></dialog><dialog id="cfg"></dialog><dialog id="imp"></dialog><dialog id="rv"></dialog><dialog id="sv"></dialog><dialog id="img"></dialog><dialog id="help"></dialog><dialog id="lk"></dialog><dialog id="tr"></dialog><dialog id="gr"></dialog><dialog id="sy"></dialog><dialog id="pv"></dialog><dialog id="cr"></dialog>

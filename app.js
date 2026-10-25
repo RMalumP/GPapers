@@ -2246,7 +2246,7 @@ function delM(id) {
    (gpapers-d-<hora>-<dispositivo>.json, campo a campo) y cada imagen incrustada aparte, una sola vez (gpapers-img-<huella>).
    Cuando se acumulan cambios, la copia completa se reescribe y se borran los que ya incluye. Lo ya descargado se guarda en
    IndexedDB, así cada vuelta solo pide la lista de archivos y los nuevos. Lo grande se sube por partes (subida reanudable). */
-const SY_CFG = {clientId: '592644810471-sahcfa82q4vlaql6a01m1psh4vm3td7q.apps.googleusercontent.com',   // ID de cliente OAuth (público, no es un secreto); vacío = sin sincronización
+const SY_CFG = {clientId: '143923429984-45e8m3bmn1315r9ceet2sb19iuq4f9qj.apps.googleusercontent.com',   // ID de cliente OAuth del proyecto «Gestor de papers» (público, no es un secreto); vacío = sin sincronización
   file: 'gpapers-snap.json', legacy: 'gpapers-sync.json', big: 4 * 1024 * 1024, maxDeltas: 25};   // big: a partir de aquí, subida reanudable · maxDeltas: cambios sueltos antes de rehacer la copia completa
 const SY_LOCALSET = ['view'];   // ajustes propios de cada dispositivo: no se sincronizan
 const syS = v => JSON.stringify(v);
@@ -2366,8 +2366,8 @@ const syAvail = () => !!SY_CFG.clientId && /^https?:$/.test(location.protocol); 
    (localStorage, hasta que caduca), al caducar se intenta renovar una vez sin ventana y, si no se puede, se renueva con el
    siguiente clic o tecla en cualquier parte. Mientras tanto los cambios esperan en el dispositivo. */
 const SY_TOK = 'gp-sync-token', SY_TRY = 'gp-sync-try';   // acceso temporal (1 hora) · cuándo se intentó renovar por última vez (entre pestañas)
-const syTokGet = () => { try { const t = JSON.parse(localStorage.getItem(SY_TOK)); if (t && t.t && t.exp > Date.now()) return t.t; } catch (e) {} return null; };
-const syTokPut = (t, s) => { const exp = Date.now() + Math.max(60, (s || 3600) - 60) * 1000; try { localStorage.setItem(SY_TOK, JSON.stringify({t, exp})); } catch (e) {} syTokWatch(exp); };
+const syTokGet = () => { try { const t = JSON.parse(localStorage.getItem(SY_TOK)); if (t && t.t && t.exp > Date.now() && t.c === SY_CFG.clientId) return t.t; } catch (e) {} return null; };   // un acceso de otro ID de cliente no vale (abre otra carpeta oculta)
+const syTokPut = (t, s) => { const exp = Date.now() + Math.max(60, (s || 3600) - 60) * 1000; try { localStorage.setItem(SY_TOK, JSON.stringify({t, exp, c: SY_CFG.clientId})); } catch (e) {} syTokWatch(exp); };
 const syTokDel = () => { try { localStorage.removeItem(SY_TOK); } catch (e) {} };
 const syTried = () => { try { return +localStorage.getItem(SY_TRY) || 0; } catch (e) { return 0; } };
 const syTry = () => { try { localStorage.setItem(SY_TRY, String(Date.now())); } catch (e) {} };
@@ -2377,7 +2377,7 @@ function syTokWatch(exp) {   // al caducar el acceso se intenta renovar enseguid
 function syGesture() {   // sin acceso: el siguiente clic o tecla (en cualquier parte) permite abrir un instante la ventana de Google y reconectar
   if (SY.gest) return; SY.gest = true;
   const off = () => { SY.gest = false; ['pointerdown', 'keydown'].forEach(t => document.removeEventListener(t, h, true)); };
-  const h = () => { if (!syOn() || !['reconnect', 'error'].includes(SY.st)) return off(); if (SY.busy || Date.now() - syTried() < 15000) return; off(); syRun(false, true); };
+  const h = () => { if (!syOn() || SY.consent || !['reconnect', 'error'].includes(SY.st)) return off(); if (SY.busy || Date.now() - syTried() < 15000) return; off(); syRun(false, true); };
   ['pointerdown', 'keydown'].forEach(t => document.addEventListener(t, h, true));
 }
 const syGis = () => window.google?.accounts?.oauth2 ? Promise.resolve() : new Promise((ok, ko) => {
@@ -2489,7 +2489,7 @@ async function syRun(inter, gesture) {   // gesture: viene de un clic o una tecl
   if (!inter && !syOn()) return null;
   if (SY.busy) { SY.again = true; return null; }
   if (!inter && !syTokGet()) {   // sin acceso: renovarlo sin ventana se intenta una sola vez (no a cada cambio ni desde cada pestaña); luego, con el siguiente clic
-    if (!gesture && (SY.st === 'reconnect' || Date.now() - syTried() < 6e4)) { SY.st = 'reconnect'; syGesture(); syIcon(); return null; }
+    if (SY.consent || !gesture && (SY.st === 'reconnect' || Date.now() - syTried() < 6e4)) { SY.st = 'reconnect'; if (!SY.consent) syGesture(); syIcon(); return null; }   // consent: hace falta «Conectar»
     syTry();
   }
   clearTimeout(SY.tm); SY.tm = 0; SY.busy = true; SY.wait = false; SY.st = 'busy'; syIcon();
@@ -2499,8 +2499,11 @@ async function syRun(inter, gesture) {   // gesture: viene de un clic o una tecl
   } catch (e) {
     SY.st = /silencio|interaction|login|consent|popup|cerrada|denegado|access_denied|immediate/i.test(e.message) ? 'reconnect' : 'error'; SY.err = e;
     if (inter) throw e;
-    if (SY.st === 'reconnect' || SY.st === 'error') syGesture();
-    if (SY.st === 'reconnect' && !SY.warned) { SY.warned = true; toast('Google corta el acceso cada hora: se reconectará con tu próximo clic. No pierdes nada.', [], 6000); }
+    if (SY.st === 'reconnect' && gesture) { SY.consent = true; toast('Google necesita que vuelvas a dar permiso a la aplicación. Tus datos siguen aquí.', [{t: 'Conectar', fn: syConnect}], 0); }   // ni con un clic se pudo sin su ventana de permiso
+    else {
+      if (SY.st === 'reconnect' || SY.st === 'error') syGesture();
+      if (SY.st === 'reconnect' && !SY.warned) { SY.warned = true; toast('Google corta el acceso cada hora: se reconectará con tu próximo clic. No pierdes nada.', [], 6000); }
+    }
     return null;
   } finally { SY.busy = false; syIcon(); if (SY.again) { SY.again = false; sySoon(1500); } }
 }
@@ -2594,7 +2597,7 @@ async function syConnect() {
   try {
     const r = await syRun(true);
     if (!r || r.cancel) { if ($('#sy').open) $('#sy').close(); syIcon(); return; }
-    sySet({on: true, auto: true}); $('#auto').disabled = false; $('#auto').checked = true; SY.st = 'idle'; syIcon();
+    sySet({on: true, auto: true, cid: SY_CFG.clientId}); SY.consent = false; $('#auto').disabled = false; $('#auto').checked = true; SY.st = 'idle'; syIcon();
     syWho(syTokGet()).then(w => { if (w) { sySet({who: w}); syIcon(); } });
     if (r.again || r.wait) sySoon(1000);
     syDlg('✔ Sincronizado', `<p>${r.first ? 'Se ha creado tu copia en Google Drive. ' : r.news ? 'Este dispositivo ya tiene tu biblioteca de Google Drive. ' : 'Este dispositivo ya estaba al día. '}
@@ -2652,7 +2655,7 @@ function openCred() {
    Aparte del JSON, la app guarda (1) una copia de trabajo, para reabrir justo donde lo dejaste aunque no hayas guardado, y
    (2) el estado de la interfaz (filtros, orden, barra lateral, bloques plegados). Viven fuera de la caché de la aplicación,
    así que las actualizaciones no los tocan y no hace falta borrar datos para recibir una versión nueva. */
-const APP_V = '30.4';   // debe coincidir con la versión de sw.js
+const APP_V = '31';   // debe coincidir con la versión de sw.js
 let BOOTED = false, RELOADING = false, SWREG = null, tSes = 0, tUi = 0, lastUi = '';
 const sessionNow = () => { clearTimeout(tSes); if (!BOOTED) return Promise.resolve();
   return idb('readwrite', st => st.put({v: 1, path, dirty, at: new Date().toISOString(), json: dbJSON()}, 'session')).catch(() => {}); };
@@ -2709,7 +2712,10 @@ if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {   //
     document.addEventListener('visibilitychange', () => { if (!document.hidden) reg.update().catch(() => {}); }); }).catch(() => {});
   navigator.serviceWorker.addEventListener('controllerchange', () => { if (had && !RELOADING) toast('Hay una versión nueva de la aplicación.', [{t: 'Recargar ahora', fn: reloadApp}], 0); });
 }
-bootApp().then(() => { syIcon(); try { const t = JSON.parse(localStorage.getItem(SY_TOK)); if (t && t.exp > Date.now()) syTokWatch(t.exp); } catch (e) {} if (syAuto()) syRun(false); });   // con la sesión de Google Drive recordada, se trae lo último al abrir
+bootApp().then(() => { syIcon(); try { const t = JSON.parse(localStorage.getItem(SY_TOK)); if (t && t.exp > Date.now()) syTokWatch(t.exp); } catch (e) {}
+  if (syOn() && syP().cid !== SY_CFG.clientId) {   // la sesión era de otro proyecto de Google (otra carpeta oculta): hay que dar permiso al nuevo una vez
+    SY.st = 'reconnect'; SY.consent = true; syIcon(); toast('La sincronización con Google Drive ha cambiado de proyecto: pulsa «Conectar» y da permiso una vez. Tus datos siguen aquí.', [{t: 'Conectar', fn: syConnect}], 0);
+  } else if (syAuto()) syRun(false); });   // con la sesión de Google Drive recordada, se trae lo último al abrir
 render();
 lastSnap = JSON.stringify(db);
 applySettings();
