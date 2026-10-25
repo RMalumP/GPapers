@@ -316,7 +316,7 @@ with sync_playwright() as pw:
     pg.click('#cfg button:has-text("Eliminar")'); pg.wait_for_timeout(200)
     eq('eliminar el tipo pasa los papers al tipo base', pg.evaluate("[db.settings.customTypes.length, db.papers[0].type, !!TYPES['ct_x']]"), [0, 'audio', False]); pg.evaluate("$('#cfg').close()")
     # ayuda
-    eq('el botón Ayuda está en la barra lateral, entre Papelera y Configuración', pg.evaluate("[...document.querySelectorAll('#side > button.sh')].slice(-3).map(b => b.querySelector('.lbl').textContent)"), ['Papelera', 'Ayuda', 'Configuración'])
+    eq('final de la barra lateral: Papelera, Configuración, una línea, Ayuda, Privacidad y Créditos', pg.evaluate("[...document.querySelectorAll('#side > button.sh, #side > hr')].slice(-6).map(b => b.tagName === 'HR' ? '——' : b.querySelector('.lbl').textContent)"), ['Papelera', 'Configuración', '——', 'Ayuda', 'Privacidad', 'Créditos'])
     pg.click('#side button:has-text("Ayuda")'); pg.wait_for_timeout(200)
     eq('el botón Ayuda abre la ventana con todas las secciones', pg.evaluate("[$('#help').open, [...document.querySelectorAll('#hpb > details > summary')].map(s => s.textContent)]"), [True, ['Primeros pasos', 'Lista principal', 'Barra lateral', 'Editar un paper', 'Exportar citas', 'Importar referencias', 'Configuración', 'Tipos de documento propios', 'Estilos de cita personalizados', 'Aplicación instalada (PWA), sesión y actualizaciones', 'Atajos de teclado', 'Datos, privacidad y consejos']])
     pg.fill('#hpq', 'subrayado'); eq('el buscador filtra las secciones', pg.evaluate("[...document.querySelectorAll('#hpb > details')].filter(d => !d.hidden).map(d => d.querySelector('summary').textContent)"), ['Editar un paper'])
@@ -329,7 +329,7 @@ with sync_playwright() as pw:
     # ---- Fase 13: datos de la aplicación (PWA) y actualizaciones
     import re
     swsrc = (folder / 'sw.js').read_text(); appsrc = (folder / 'app.js').read_text()
-    eq('la versión de app.js coincide con la del service worker', re.search(r"APP_V = '(\d+)'", appsrc).group(1), re.search(r"papers-v(\d+)", swsrc).group(1))
+    eq('la versión de app.js coincide con la del service worker', re.search(r"APP_V = '([\d.]+)'", appsrc).group(1), re.search(r"papers-v([\d.]+)'", swsrc).group(1))
     eq('el service worker revalida y no toca IndexedDB', ("cache: 'no-cache'" in swsrc, 'indexedDB' in swsrc), (True, False))
     ctx2 = b.new_context(viewport={'width': 1200, 'height': 800}, service_workers='allow'); p2 = ctx2.new_page(); e2 = []; p2.on('pageerror', lambda e: e2.append(str(e))); p2.on('dialog', lambda d: d.accept())
     URL = 'http://localhost:8791/index.html'
@@ -358,7 +358,7 @@ with sync_playwright() as pw:
     eq('tras recargar los datos siguen ahí (no hay que borrar nada)', p2.evaluate("db.papers[0].title"), 'Antes de actualizar')
     eq('la copia en IndexedDB y la caché son independientes', p2.evaluate("(async () => [(await idb('readonly', st => st.get('session'))).json.includes('Antes de actualizar'), (await caches.keys()).every(k => k.startsWith('papers-v'))])()"), [True, True])
     p2.evaluate("document.querySelector('#toast') && (document.querySelector('#toast').hidden = true); openHelp('pwa')")
-    eq('la ayuda explica el almacenamiento y la versión', ('v' + re.search(r"APP_V = '(\d+)'", appsrc).group(1) in p2.inner_text('#hp_pwa'), 'No hace falta borrar los datos' in p2.inner_text('#hp_pwa')), (True, True))
+    eq('la ayuda explica el almacenamiento y la versión', ('v' + re.search(r"APP_V = '([\d.]+)'", appsrc).group(1) in p2.inner_text('#hp_pwa'), 'No hace falta borrar los datos' in p2.inner_text('#hp_pwa')), (True, True))
     p2.click('#hp_pwa button:has-text("Olvidar")'); p2.wait_for_timeout(400)
     eq('olvidar la copia de sesión', p2.evaluate("(async () => [await idb('readonly', st => st.get('session')), await idb('readonly', st => st.get('ui'))])()"), [None, None])
     p2.evaluate("$('#help').close()")

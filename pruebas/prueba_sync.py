@@ -95,8 +95,7 @@ with sync_playwright() as pw:
     cA, A = device('allow')
     eq('el botón de Google Drive está a la izquierda de Abrir', A.evaluate("[!$('#syncBtn').hidden, $('#syncBtn').nextElementSibling.getAttribute('aria-label'), $('#syncBtn').dataset.st, $('#syncBtn').previousElementSibling]"), [True, 'Abrir', 'off', None])
     eq('sin conectar dice «Conectar con Google Drive»', (A.inner_text('#syncBtn').strip(), A.evaluate("$('#syncBtn').title")), ('🔄Conectar con Google Drive', 'Conectar con Google Drive'))
-    eq('Privacidad está justo debajo de la Papelera', A.evaluate("$('#side .trb').nextElementSibling.textContent.trim()"), '🔒Privacidad')
-    eq('Créditos está justo debajo de Privacidad', A.evaluate("$('#side .trb').nextElementSibling.nextElementSibling.textContent.trim()"), '©️Créditos')
+    eq('final de la barra lateral: Configuración, una línea, Ayuda, Privacidad y Créditos', A.evaluate("[...document.querySelectorAll('#side > *')].slice(-5).map(e => e.tagName === 'HR' ? '——' : e.textContent.trim())"), ['⚙️Configuración', '——', '❓Ayuda', '🔒Privacidad', '©️Créditos'])
     A.click('#side button:has-text("Créditos")')
     eq('Créditos: dirección, desarrollo, derechos y versión', A.evaluate("[...document.querySelectorAll('#cr dl > *')].map(e => e.textContent)"), ['Dirección:', 'R.M.P.', 'Desarrollo:', 'Vibe Coding con Claude', 'Derechos:', 'Licencia CC BY-SA', 'Versión:', 'v' + A.evaluate('APP_V')])
     A.evaluate("$('#cr').close()")
@@ -175,6 +174,7 @@ with sync_playwright() as pw:
     A.evaluate("syTokDel(); syTry(); SY.st = 'reconnect'; syIcon()")   # cortada otra vez y un intento reciente: el menú también ofrece reconectar
     A.click('#syncBtn')
     eq('el menú ofrece volver a conectar y cerrar sesión', [x for x in A.evaluate("[...document.querySelectorAll('#ctx button')].map(b => b.textContent)") if 'conectar' in x or 'Cerrar sesión' in x], ['🔑 Volver a conectar', '🚪 Cerrar sesión'])
+    eq('el menú no repite Privacidad (está en la barra lateral)', A.evaluate("[...document.querySelectorAll('#ctx button')].some(b => b.textContent.includes('Privacidad'))"), False)
     A.click('#ctx button:has-text("Volver a conectar")'); A.wait_for_timeout(800)
     eq('«Volver a conectar» también', A.evaluate("$('#syncBtn').dataset.st"), 'ok')
     A.click('#sy button:has-text("Aceptar")')
