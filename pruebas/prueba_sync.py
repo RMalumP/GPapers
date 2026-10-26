@@ -82,6 +82,19 @@ with sync_playwright() as pw:
     eq('sin cambios no hay parche', M("const a = LIB([P('a')]); return syDiff(a, structuredClone(a)) === undefined"), True)
     eq('cambiar algo que otro borró no lo resucita a medias', M("return syPatch(LIB([]), {o: {papers: {l: {a: {o: {title: {$: 'x'}}}}}}}).papers.length"), 0)
     eq('imágenes: en Drive solo va la huella, la misma imagen da la misma', M(f"const [w, r] = syWire(LIB([P('a', {{image: {{kind: 'data', data: '{PNG}'}}}}), P('b', {{image: {{kind: 'data', data: '{PNG}'}}}})])); return [w.papers[0].image.ref === w.papers[1].image.ref, r.size, JSON.stringify(w).includes('base64')]"), [True, 1, False])
+    # todas las ventanas se cierran con un clic fuera (y no con un clic dentro)
+    ids = pg.evaluate("[...document.querySelectorAll('dialog:not(#dlg)')].map(d => d.id)")
+    res = {}
+    for i in ids:
+        pg.evaluate(f"(d => {{ if (!d.innerHTML.trim()) d.innerHTML = '<p>Prueba</p>'; d.showModal(); }})($('#{i}'))")
+        b0 = pg.evaluate(f"(r => [r.left + r.width / 2, r.top + Math.min(r.height / 2, 20)])($('#{i}').getBoundingClientRect())")
+        pg.mouse.click(b0[0], b0[1]); dentro = pg.evaluate(f"$('#{i}').open")
+        pg.mouse.click(5, 5); res[i] = [dentro, pg.evaluate(f"$('#{i}').open")]
+        pg.evaluate(f"$('#{i}').open && $('#{i}').close()")
+    eq('cada ventana sigue abierta con un clic dentro y se cierra con uno fuera', {k: v for k, v in res.items() if v != [True, False]}, {})
+    eq('se comprueban todas las ventanas', len(ids), 15)
+    pg.evaluate("openCfg()"); pg.mouse.click(5, 5)
+    eq('Configuración también, con su contenido real', pg.evaluate("$('#cfg').open"), False)
     # Relaciones: sin ninguna, explicación atenuada que desaparece con la primera
     pg.evaluate("db.papers.length = 0; db.papers.push(P('r1'), P('r2')); GR.all = false; GR.vis = false; grOpen()")
     eq('sin relaciones: explicación detallada y atenuada', pg.evaluate("(h => [!!h, +getComputedStyle(h).opacity < 1, ['¿Para qué sirve?', 'Dos tipos de relación', 'Cómo añadir la primera relación', 'Guardar paper'].every(t => h.textContent.includes(t)), !$('#grSvg')])($('#gr .grhelp'))"), [True, True, True, True])
