@@ -1711,14 +1711,10 @@ async function exSave() {
     else download(text, 'citas.' + o.fmt, mime); }
   catch (e) { if (e.name !== 'AbortError') alert('Error al guardar: ' + e.message); }
 }
-for (const id of ['sv', 'lk', 'tr']) {   // estas ventanas se cierran con un clic fuera (sin tocar la de edición que haya debajo)
-  $('#' + id).addEventListener('mousedown', e => bdDown = outside(e, e.currentTarget));
-  $('#' + id).addEventListener('click', e => { if (bdDown && outside(e, e.currentTarget)) { bdDown = false; e.currentTarget.close(); } });
-}
-$('#rv').addEventListener('mousedown', e => bdDown = outside(e, e.currentTarget));
-$('#rv').addEventListener('click', e => { if (bdDown && outside(e, e.currentTarget)) { bdDown = false; $('#rv').close(); } });
-$('#ex').addEventListener('mousedown', e => bdDown = outside(e, e.currentTarget));
-$('#ex').addEventListener('click', e => { if (bdDown && outside(e, e.currentTarget)) { bdDown = false; $('#ex').close(); } });
+document.querySelectorAll('dialog:not(#dlg)').forEach(d => {   // todas las ventanas se cierran con un clic fuera (sin tocar la de edición que haya debajo); la de editar paper guarda al salir, más abajo
+  d.addEventListener('mousedown', e => bdDown = outside(e, d));
+  d.addEventListener('click', e => { if (bdDown && outside(e, d)) { bdDown = false; d.close(); } });
+});
 function delPaper(id) {
   const p = db.papers.find(x => x.id === id); if (!p) return;
   if (!confirm(`¿Mover «${p.title}» a la papelera? Podrás restaurarlo durante ${TRASH_DAYS} días.`)) return;
@@ -1791,7 +1787,7 @@ function drawD() {
   $('#dlg').innerHTML = h; hydrateImgs();
 }
 let bdDown = false;   // clic fuera del cuadro de edición = guardar y salir (un paper nuevo en blanco solo se cierra)
-const outside = (e, el) => { const r = el.getBoundingClientRect(); return e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom; };
+const outside = (e, el) => { if (e.target !== el) return false; const r = el.getBoundingClientRect(); return e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom; };   // en el fondo, no en un menú (#ctx) que asome por fuera
 $('#dlg').addEventListener('mousedown', e => bdDown = outside(e, e.currentTarget));   // evita cerrar al arrastrar una selección de texto hacia fuera
 $('#dlg').addEventListener('click', e => { if (!bdDown || !outside(e, e.currentTarget)) return; bdDown = false;
   !D.title.trim() && !db.papers.some(p => p.id === D.id) && !D.authors.length && !D.url && !D.notes.length ? $('#dlg').close() : commit(); });
@@ -2204,8 +2200,6 @@ $('#list').addEventListener('drop', e => {
   if (tag && c) { e.preventDefault(); addTag(c.dataset.id, tag); }
   else if (pap && g) { e.preventDefault(); const d = JSON.parse(pap); movePaper(d.id, d.from, g.dataset.sec); }
 });
-$('#nv').addEventListener('mousedown', e => bdDown = outside(e, e.currentTarget));
-$('#nv').addEventListener('click', e => { if (bdDown && outside(e, e.currentTarget)) { bdDown = false; $('#nv').close(); } });
 function toggleS(id) { const i = D.sectionIds.indexOf(id); i < 0 ? D.sectionIds.push(id) : D.sectionIds.splice(i, 1); drawD(); }
 function toggleT(id) { const i = D.tagIds.indexOf(id); i < 0 ? D.tagIds.push(id) : D.tagIds.splice(i, 1); drawD(); }
 let CLOC = '';   // página o parte citada que se usa en la cita en el texto (no se guarda)
@@ -2675,7 +2669,7 @@ function openCred() {
    Aparte del JSON, la app guarda (1) una copia de trabajo, para reabrir justo donde lo dejaste aunque no hayas guardado, y
    (2) el estado de la interfaz (filtros, orden, barra lateral, bloques plegados). Viven fuera de la caché de la aplicación,
    así que las actualizaciones no los tocan y no hace falta borrar datos para recibir una versión nueva. */
-const APP_V = '31.4';   // debe coincidir con la versión de sw.js
+const APP_V = '31.5';   // debe coincidir con la versión de sw.js
 let BOOTED = false, RELOADING = false, SWREG = null, tSes = 0, tUi = 0, lastUi = '';
 const sessionNow = () => { clearTimeout(tSes); if (!BOOTED) return Promise.resolve();
   return idb('readwrite', st => st.put({v: 1, path, dirty, at: new Date().toISOString(), json: dbJSON()}, 'session')).catch(() => {}); };
