@@ -65,7 +65,7 @@ with sync_playwright() as pw:
     # ---- pestaña Cita: secciones y cita en el texto
     pg.evaluate("ex().inText = true; openPaper('j2'); tab = 'cite'; CLOC = '3'; drawD()")
     eq('Cita: títulos de sección', pg.evaluate("[...document.querySelectorAll('#dlg h2.grp')].map(h => h.textContent)"), ['Estilo principal', 'Estilos generales', 'Derecho y jurisprudencia'])
-    eq('Cita: anexo de Derecho', pg.input_value('#c_derecho'), 'España. Tribunal Supremo (Sala de lo Penal, Sección 1.ª). Sentencia núm. 1229/2017, de 29 de marzo de 2017.')
+    eq('Cita: anexo de Derecho', pg.evaluate("citeRaw('derecho')"), 'España. Tribunal Supremo (Sala de lo Penal, Sección 1.ª). Sentencia núm. 1229/2017, de 29 de marzo de 2017.')
     eq('Cita: en el texto con FJ', 'STS 1229/2017 de 29 de marzo, FJ 3' in pg.inner_text('#it_derecho'), True)
     eq('Cita: el campo dice qué se cita', pg.get_attribute('#locIn', 'placeholder'), 'p. ej. 22.1 (artículo) o 3 (FJ, FD o apartado)')
     if shots: pg.evaluate("document.getElementById('c_derecho').scrollIntoView({block: 'center'})"); pg.screenshot(path=os.path.join(shots, 'cita_derecho.png'))
