@@ -26,6 +26,8 @@ Los ajustes son comunes a todos: nombre de la aplicación, colores, atajos, tipo
 - La biblioteca de versiones anteriores pasa sola a ser el primer proyecto (con el nombre de su archivo).
 - **Google Drive** guarda todos los proyectos: un índice común (`gpapers-projects.json`, lista de proyectos y ajustes comunes) y los archivos de cada uno (el primero conserva los nombres de siempre, `gpapers-snap.json`…; los demás, `gpapers-p-<id>-…`). Cada vuelta sincroniza el índice y el proyecto abierto; los proyectos de otros dispositivos salen en ▾ con ☁ y se descargan al abrirlos. Renombrar o borrar un proyecto llega a todos los dispositivos.
 
+- **Relaciones**: la primera vez que se abre (con relaciones) se muestra la explicación de la función; después se abre el gráfico y el botón «❓ ¿Para qué sirve?» la vuelve a mostrar. Sin relaciones, la explicación atenuada sigue saliendo siempre.
+
 ## Interfaz simplificada (v33)
 - **Cabecera**: solo Google Drive 🔄, Guardar 💾 y Exportar citas; Abrir, Guardar como, Importar referencias y Autoguardado están en **Archivo ▾**. «Reabrir último» pasó al menú ▾ del proyecto («↻ Volver a leer…», solo si el proyecto tiene archivo) y «Buscar duplicados» también.
 - **Estado de guardado único** junto al nombre del proyecto («Guardado», «Sin guardar», «Guardado en Google Drive», «Sincronizando…»…), con un punto de color.
