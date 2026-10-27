@@ -17,7 +17,7 @@ const TPL_DEF = [   // plantillas de nota de serie; {fecha} y {paper} se sustitu
   {id: 't_res', name: 'Resumen del paper', text: '**Objetivo:** \n**Método:** \n**Resultados:** \n**Limitaciones:** '},
   {id: 't_cit', name: 'Cita textual', text: '**Cita:** \n**Página:** \n**Comentario:** '},
   {id: 't_ide', name: 'Idea propia', text: '**Idea:** \n**Relación con mi tema:** \n**Siguiente paso:** '}];
-const defSettings = () => ({palette: 'azul', appName: 'Papers', showFile: true, showImg: true, customTypes: [], customStyles: [], shortcuts: {...SC_DEF}, fmtOpen: false, view: 'cards', templates: TPL_DEF.map(t => ({...t})), export: {fmt: 'txt', style: 'apa', order: 'auto', num: false, notes: false, particles: false, title: '', lang: 'es', dateFmt: 'long', vanAll: false, ppChap: true, numFmt: 'auto', disamb: true, inText: false}});   // ajustes por defecto (se guardan en el JSON)
+const defSettings = () => ({palette: 'azul', appName: 'Papers', showFile: true, showImg: true, pdfDrive: false, customTypes: [], customStyles: [], shortcuts: {...SC_DEF}, fmtOpen: false, view: 'cards', templates: TPL_DEF.map(t => ({...t})), export: {fmt: 'txt', style: 'apa', order: 'auto', num: false, notes: false, particles: false, title: '', lang: 'es', dateFmt: 'long', vanAll: false, ppChap: true, numFmt: 'auto', disamb: true, inText: false}});   // ajustes por defecto (se guardan en el JSON)
 let db = {version: 1, sections: [], tags: [], papers: [], trash: [], settings: defSettings()}, path = null, dirty = false, auto = false, D, tab = 'data', MG, timer;
 const F = {q: '', sorts: [{k: 'title', d: 1}], group: false, sec: '', tags: new Set(), read: '', minRating: 0, inNotes: false, mode: 'any', tbSec: false, tbTag: true};
 const SEL = new Set();   // ids de papers seleccionados
@@ -705,7 +705,7 @@ function validate(d) {
   d.settings = {...defSettings(), ...sIn, shortcuts: {...SC_DEF}};
   d.settings.export = {...defSettings().export, ...(sIn.export && typeof sIn.export === 'object' ? sIn.export : {})};
   const xo = d.settings.export; if (!['es', 'en'].includes(xo.lang)) xo.lang = 'es'; if (!['long', 'dmy', 'iso'].includes(xo.dateFmt)) xo.dateFmt = 'long'; xo.vanAll = !!xo.vanAll; xo.ppChap = !!xo.ppChap; xo.disamb = !!xo.disamb; if (!['auto', 'dot', 'br', 'par'].includes(xo.numFmt)) xo.numFmt = 'auto';
-  d.settings.fmtOpen = !!d.settings.fmtOpen; d.settings.view = d.settings.view === 'table' ? 'table' : 'cards';
+  d.settings.pdfDrive = !!d.settings.pdfDrive; d.settings.fmtOpen = !!d.settings.fmtOpen; d.settings.view = d.settings.view === 'table' ? 'table' : 'cards';
   if (!Array.isArray(d.settings.templates)) d.settings.templates = defSettings().templates;
   d.settings.templates = d.settings.templates.filter(t => t && typeof t.name === 'string' && typeof t.text === 'string').map(t => ({id: t.id || uid(), name: t.name, text: t.text}));
   d.settings.customTypes = [...new Map((Array.isArray(sIn.customTypes) ? sIn.customTypes : []).map(ctClean).filter(Boolean).map(c => [c.id, c])).values()];
@@ -1026,6 +1026,8 @@ function drawCfg() {
     ${cfgSec('pal', 'Paleta de colores', `<div style="margin:6px 0 10px">${Object.entries(PAL).map(([k, p]) => chip({name: p.n, color: p.c}, c.palette === k, `setCfg('palette','${k}');drawCfg()`)).join('')}${chip({name: 'Personalizada', color: c.custom?.pri || '#888888'}, c.palette === 'custom', 'pickCustom()')}</div>${c.palette === 'custom' && c.custom ? `<div class="cpick">${LAB.map(([k, t]) => `<label class="row"><input type="color" value="${c.custom[k]}" oninput="setCustom('${k}', this.value)"> ${t}</label>`).join('')}<button onclick="resetPal()">Restablecer a Azul</button></div>` : ''}`)}
     <label class="row"><input type="checkbox" ${c.showImg !== false ? 'checked' : ''} onchange="setCfg('showImg', this.checked);render()"> Mostrar la imagen del paper en las tarjetas y la tabla</label>
     <label class="row"><input type="checkbox" ${c.showFile ? 'checked' : ''} onchange="setCfg('showFile', this.checked)"> Mostrar el archivo abierto en la cabecera</label>
+    <label class="row"><input type="checkbox" ${c.pdfDrive ? 'checked' : ''} onchange="setPdfDrive(this.checked)"> Subir a mi Google Drive los PDF enlazados</label>
+    <small class="cfgnote">${syOn() ? 'Cada PDF enlazado se copia solo a la carpeta privada y oculta de tu Google Drive (la misma de la sincronización) y se puede abrir desde otros dispositivos. Nadie más lo ve. Máx. 100 MB por PDF.' : 'Necesita la sesión de Google Drive iniciada (botón 🔄 de la cabecera).'}</small>
     <label class="row"><input type="checkbox" ${c.fmtOpen ? 'checked' : ''} onchange="setFmtDefault(this.checked)"> Barra de formato de las notas desplegada por defecto</label>
     <label class="row"><input type="checkbox" ${c.export.inText ? 'checked' : ''} onchange="setInText(this.checked)"> Mostrar la cita en el texto y las notas (Chicago) en la pestaña «Cita» de cada paper</label>
     ${cfgSec('ct', 'Tipos de documento propios', ctUI())}${cfgSec('cu', 'Estilos de cita personalizados', cuUI())}${cfgSec('tpl', 'Plantillas de nota', tplUI())}${cfgSec('sc', 'Atajos de teclado', `<div class="sct"><small>(clic en una combinación para cambiarla; Retroceso la quita)</small>${Object.keys(SC_NAMES).map(a => `<div class="scr"><span>${SC_NAMES[a]}</span><span class="scb"><button class="${recAct === a ? 'rec' : ''}" onclick="recAct='${a}';drawCfg()">${recAct === a ? 'Pulsa una tecla… (Esc cancela)' : esc(c.shortcuts[a]) || 'Sin asignar'}</button>${c.shortcuts[a] ? `<button title="Quitar" onclick="setSC('${a}','')">✕</button>` : ''}</span></div>`).join('')}<button onclick="resetSC()">Restablecer atajos</button></div>`)}
@@ -1249,7 +1251,7 @@ function helpHTML() {
     extras: ['Copias, duplicados, PDF y filtros guardados', `<ul><li><b>Copias de seguridad</b>: ▾ junto al nombre del proyecto → «Copias de seguridad…». Se guarda una al abrir la aplicación cada día (las últimas 10) y otra antes de restaurar o de sustituirlo todo por lo de Drive; también puedes crear una a mano, descargarla o borrarla. «Restaurar» sustituye los papers, notas, secciones, etiquetas y papelera de ese proyecto (los ajustes no cambian) y se puede deshacer. Solo viven en este navegador y se borran con el proyecto.</li>
       <li><b>Buscar duplicados</b>: grupo <b>Selección</b> de la barra lateral. Agrupa papers con el mismo DOI o título; «Quedarme con este» conserva ese paper, le añade lo que falte de los otros (campos vacíos, etiquetas, secciones, notas, relaciones y enlaces de las notas) y manda los demás a la papelera. «No son duplicados» los descarta hasta cerrar la aplicación.</li>
       <li><b>Mover o copiar a otro proyecto</b>: marca papers con «Seleccionar» y pulsa «Mover o copiar a otro proyecto…» (grupo Selección). Se llevan las notas, etiquetas y secciones (se buscan por nombre y, si no existen en el destino, se crean) y las relaciones entre los papers elegidos. Se ve al abrir el otro proyecto.</li>
-      <li><b>PDF enlazado</b>: en «Datos» de cada paper, «Enlazar un PDF…» (y, si quieres, la página donde abrirlo). Solo se guarda el <b>nombre</b> en el JSON; el archivo no se sube a ningún sitio, ni a Google Drive. Se abre con «📄 PDF» en la tarjeta o la tabla. En otro dispositivo, o si lo moviste, te pide elegirlo de nuevo. Sin acceso a archivos (no Chrome ni Edge de escritorio), hay que elegirlo cada vez.</li>
+      <li><b>PDF enlazado</b>: en «Datos» de cada paper, «Enlazar un PDF…» (y, si quieres, la página donde abrirlo). Solo se guarda el <b>nombre</b> en el JSON; el archivo no se sube a ningún sitio, salvo que actives en Configuración <b>«Subir a mi Google Drive los PDF enlazados»</b> (con la sesión de Drive iniciada): entonces cada PDF se copia solo a la carpeta privada y oculta de tu Drive (máx. 100 MB cada uno) y se abre desde cualquier dispositivo con tu sesión; se borra de allí si quitas el enlace. Se abre con «📄 PDF» en la tarjeta o la tabla. En otro dispositivo, o si lo moviste, te pide elegirlo de nuevo. Sin acceso a archivos (no Chrome ni Edge de escritorio), hay que elegirlo cada vez.</li>
       <li><b>Copiar cita 📋</b>: en cada tarjeta y fila copia la cita en el estilo elegido en Exportar, con cursiva al pegar en Word o Docs.</li>
       <li><b>Filtros guardados ⭐</b>: en el grupo Buscar, «＋» guarda la búsqueda, el orden, la sección, las etiquetas, la lectura y la valoración actuales con un nombre; elígelo para aplicarlo. Son de cada proyecto y de este navegador.</li>
       <li><b>Progreso</b>: junto al nombre del proyecto, una barra con los papers leídos y leyendo (el detalle, al pasar el ratón).</li></ul>`],
@@ -1757,7 +1759,7 @@ function drawD() {
   if (tab === 'data' || tab === 'all') h += blk('data', 'Datos', `<div class="grid"><div class="w titlerow"><div class="pimgbox">${pimgHTML(D, 'big', `role="button" tabindex="0" onclick="imgOpen()" title="Imagen del paper (opcional): pulsa para poner una URL o un archivo, o pega una imagen copiada con Ctrl+V"`)}</div><div class="titlecol">${inp('title', 'Título *')}${inp('alias', 'Título personalizado (opcional; solo para mostrar, la cita usa el título original)')}</div></div>
     <label class="w">Autores (uno por línea: «Apellido, Nombre»)<textarea oninput="D.authors=this.value.split('\\n').map(s=>s.trim()).filter(Boolean)">${esc(D.authors.join('\n'))}</textarea></label>
     ${inp('sortKey', 'Clave de orden en la bibliografía (opcional): p. ej. «Torre» para «de la Torre, Ana»', 'text', 'w')}<label>Año<input type="number" data-k="year" value="${esc(D.year)}" oninput="D.year=this.value;pubSync()"></label><label>Tipo<select onchange="typeChange(this.value)">${Object.entries(TYPES).filter(([k]) => !CTYPES.has(k)).map(([k, v]) => `<option value="${k}" ${D.type === k ? 'selected' : ''}>${v}</option>`).join('')}${CTYPES.size ? `<optgroup label="Tipos propios">${[...CTYPES].map(([k, t]) => `<option value="${k}" ${D.type === k ? 'selected' : ''}>${esc(t.name)}</option>`).join('')}</optgroup>` : ''}<option value="__new">➕ Crear un tipo propio…</option></select></label>
-    ${inp('url', 'URL', 'url', 'w')}<div class="w pdfrow"><span>📄 PDF: ${D.pdf ? `<b>${esc(D.pdf.name)}</b>` : '<i>ninguno</i>'}</span><button onclick="pdfPick()">${D.pdf ? 'Cambiar…' : 'Enlazar un PDF…'}</button>${D.pdf ? `<button onclick="pdfOpen('${D.id}')">Abrir</button><label>Página <input type="number" min="1" style="width:5em" value="${D.pdf.page || ''}" oninput="pdfSetPage(this.value)" placeholder="1"></label><button class="x" onclick="pdfClear()" title="Quitar el enlace al PDF">✕</button>` : ''}<small>El archivo no se sube a ningún sitio: solo se recuerda su nombre.</small></div>${inp('venue', lbl('venue', 'Revista / editorial / sitio'))}<label>DOI (sin https://doi.org/)<span class="row" style="flex-wrap:nowrap"><input style="flex:1;min-width:0" value="${esc(D.doi)}" oninput="D.doi=this.value"><button onclick="doiFill()" title="Rellenar con los datos de CrossRef">Buscar</button></span></label>${inp('accessed', 'Fecha de consulta', 'date')}
+    ${inp('url', 'URL', 'url', 'w')}<div class="w pdfrow"><span>📄 PDF: ${D.pdf ? `<b>${esc(D.pdf.name)}</b>` : '<i>ninguno</i>'}</span><button onclick="pdfPick()">${D.pdf ? 'Cambiar…' : 'Enlazar un PDF…'}</button>${D.pdf ? `<button onclick="pdfOpen('${D.id}')">Abrir</button><label>Página <input type="number" min="1" style="width:5em" value="${D.pdf.page || ''}" oninput="pdfSetPage(this.value)" placeholder="1"></label><button class="x" onclick="pdfClear()" title="Quitar el enlace al PDF">✕</button>` : ''}<small>${db.settings.pdfDrive ? 'El PDF se copia a tu Google Drive privado (Configuración).' : 'El archivo no se sube a ningún sitio: solo se recuerda su nombre.'}</small></div>${inp('venue', lbl('venue', 'Revista / editorial / sitio'))}<label>DOI (sin https://doi.org/)<span class="row" style="flex-wrap:nowrap"><input style="flex:1;min-width:0" value="${esc(D.doi)}" oninput="D.doi=this.value"><button onclick="doiFill()" title="Rellenar con los datos de CrossRef">Buscar</button></span></label>${inp('accessed', 'Fecha de consulta', 'date')}
     <label>Enlace en la cita (si hay DOI y URL)<select onchange="D.linkMode=this.value">${Object.entries(LINK_MODES).map(([k, v]) => `<option value="${k}" ${D.linkMode === k ? 'selected' : ''}>${v}</option>`).join('')}</select></label>
     <label class="chk"><input type="checkbox" ${D.hideAccessed ? 'checked' : ''} onchange="D.hideAccessed=this.checked"> Omitir «[consultado …]» en la cita (aunque la fecha esté rellena)</label>
     <label>Tipo de autor<select onchange="D.authorType=this.value">${Object.entries(AUTH_T).map(([k, v]) => `<option value="${k}" ${D.authorType === k ? 'selected' : ''}>${v}</option>`).join('')}</select></label>
@@ -2283,11 +2285,11 @@ function delM(id) {
    (gpapers-projects.json) lleva la lista de proyectos y los ajustes comunes, que se combinan igual. Cada vuelta sincroniza el
    índice y el proyecto abierto; los demás se descargan al abrirlos. */
 const SY_CFG = {clientId: '143923429984-45e8m3bmn1315r9ceet2sb19iuq4f9qj.apps.googleusercontent.com',   // ID de cliente OAuth del proyecto «Gestor de papers» (público, no es un secreto); vacío = sin sincronización
-  file: 'gpapers-snap.json', legacy: 'gpapers-sync.json', big: 4 * 1024 * 1024, maxDeltas: 25};   // big: a partir de aquí, subida reanudable · maxDeltas: cambios sueltos antes de rehacer la copia completa
+  file: 'gpapers-snap.json', legacy: 'gpapers-sync.json', big: 4 * 1024 * 1024, maxDeltas: 25, pdfMax: 100 * 1048576};   // big: a partir de aquí, subida reanudable · maxDeltas: cambios sueltos antes de rehacer la copia completa
 const SY_LOCALSET = ['view'];   // ajustes propios de cada dispositivo: no se sincronizan
 const SY_IDX = 'gpapers-projects.json';   // índice: lista de proyectos y ajustes comunes
-const syNames = id => id === 'main' ? {snap: SY_CFG.file, legacy: SY_CFG.legacy, d: 'gpapers-d-', img: 'gpapers-img-', key: ''}   // el primer proyecto conserva los nombres de antes (las versiones anteriores lo siguen viendo)
-  : {snap: `gpapers-p-${id}-snap.json`, legacy: null, d: `gpapers-p-${id}-d-`, img: `gpapers-p-${id}-img-`, key: ':' + id};
+const syNames = id => id === 'main' ? {snap: SY_CFG.file, legacy: SY_CFG.legacy, d: 'gpapers-d-', img: 'gpapers-img-', pdf: 'gpapers-pdf-', key: ''}   // el primer proyecto conserva los nombres de antes (las versiones anteriores lo siguen viendo)
+  : {snap: `gpapers-p-${id}-snap.json`, legacy: null, d: `gpapers-p-${id}-d-`, img: `gpapers-p-${id}-img-`, pdf: `gpapers-p-${id}-pdf-`, key: ':' + id};
 const syPjOf = n => /^gpapers-p-([a-z0-9]+)-/.exec(n)?.[1] || (n !== SY_IDX ? 'main' : null);   // proyecto de un archivo de Drive
 const syS = v => JSON.stringify(v);
 const syPlain = d => JSON.parse(JSON.stringify(d, (k, v) => k === 'history' ? undefined : v));   // como en el JSON: sin el historial del día
@@ -2372,6 +2374,43 @@ function syPatch(a, p, f) {   // aplica un parche sin tocar a
   if (p.o) { const o = syIsObj(a) ? {...a} : {}; for (const [k, d] of Object.entries(p.o)) { if (d.x) delete o[k]; else o[k] = syPatch(o[k], d, k); } return o; }
   return a;
 }
+/* ---- PDF enlazados: copia opcional en la carpeta oculta (Configuración → «Subir a mi Google Drive los PDF enlazados») ----
+   Un archivo por paper (gpapers-pdf-<id>), subido tal cual (subida reanudable). Solo se sube lo que este dispositivo puede leer sin
+   preguntar; cualquier dispositivo con la sesión iniciada puede abrir el PDF desde Drive. Los de papers que ya no tienen PDF se borran pasado un día. */
+async function syUploadFile(tok, id, name, file) {   // siempre reanudable: el archivo va tal cual, sin pasarlo a texto
+  const F = '&fields=id,md5Checksum,modifiedTime,size', r = await syDrive(tok, `/upload/drive/v3/files${id ? '/' + id : ''}?uploadType=resumable${F}`, {method: id ? 'PATCH' : 'POST',
+    headers: {'Content-Type': 'application/json; charset=UTF-8', 'X-Upload-Content-Type': 'application/pdf'}, body: JSON.stringify(id ? {} : {name, parents: ['appDataFolder']})});
+  const loc = r.headers.get('Location'); if (!loc) throw Error('reanudable');
+  const u = await fetch(loc, {method: 'PUT', headers: {'Content-Type': 'application/pdf'}, body: file, cache: 'no-store'});
+  if (!u.ok) { const e = Error('drive ' + u.status); e.estado = u.status; throw e; }
+  return u.json();
+}
+async function pdfLocal(id) {   // el PDF de este paper si este dispositivo puede leerlo ahora sin preguntar
+  try {
+    if (!FSA) return PDF_FILES.get(id) || null;
+    const h = PEND_PDF.get(id) || await idb('readonly', st => st.get('pdf:' + id)).catch(() => null);
+    return h && await h.queryPermission({mode: 'read'}) === 'granted' ? await h.getFile() : null;
+  } catch (e) { return null; }
+}
+async function syPdfs(tok, files, m, N) {
+  try {
+    const have = new Map(files.filter(f => f.name.startsWith(N.pdf)).map(f => [f.name.slice(N.pdf.length), f])), old = Date.now() - 864e5;
+    if (m.settings.pdfDrive) for (const p of m.papers) {
+      if (!p.pdf) continue; const file = await pdfLocal(p.id); if (!file || file.size > SY_CFG.pdfMax) continue;
+      const f = have.get(p.id), k = `pdfUp:${PJ.cur}:${p.id}`, sig = `${file.size}:${file.lastModified}`, rec = await idb('readonly', st => st.get(k)).catch(() => null);
+      if (f && (rec === sig || !rec && +f.size === file.size)) { if (rec !== sig) idb('readwrite', st => st.put(sig, k)).catch(() => {}); continue; }   // ya está en Drive
+      await syUploadFile(tok, f && f.id, N.pdf + p.id, file); await idb('readwrite', st => st.put(sig, k)).catch(() => {});
+    }
+    const used = new Set(syPapersOf(m).filter(p => p.pdf).map(p => p.id));
+    for (const [id, f] of have) if (!used.has(id) && Date.parse(f.modifiedTime) < old) await syDel(tok, f.id);   // el paper ya no tiene PDF
+  } catch (e) { if (e.estado === 401) throw e; if (!SY.pdfWarned) { SY.pdfWarned = true; toast(e.estado === 403 ? 'No se pudo subir un PDF: puede que tu Google Drive esté lleno.' : 'No se pudo subir un PDF a Google Drive; se reintentará.', [], 6000); } }
+}
+async function pdfFromDrive(id, name) {   // el PDF subido por otro dispositivo (solo con acceso vigente: no se abre ninguna ventana de Google)
+  const tok = syOn() && syTokGet(); if (!tok) return null;
+  try { const f = (await syLs(tok)).find(x => x.name === syNames(PJ.cur).pdf + id); if (!f) return null; toast('Descargando el PDF de tu Google Drive…', [], 3000);
+    return new File([await (await syDrive(tok, `/drive/v3/files/${f.id}?alt=media`)).blob()], name, {type: 'application/pdf'}); } catch (e) { return null; }
+}
+function setPdfDrive(on) { setCfg('pdfDrive', on); if (on && syAuto()) sySoon(500); }
 /* ---- Imágenes incrustadas aparte: en la biblioteca de Drive solo queda su huella ---- */
 const syHash = s => {   // huella de 64 bits + longitud (cyrb53 doble): la misma imagen da siempre el mismo nombre de archivo
   let h1 = 0xdeadbeef, h2 = 0x41c6ce57;
@@ -2571,6 +2610,7 @@ async function syOnce(inter) {
     R.c.deltas[name] = p; await syCacheSet(N, R.c); } }
   await syGc(tok, files, I.w ? iF : null);
   await syBaseSet(N, m); sySet({last: Date.now()});
+  await syPdfs(tok, files, m, N);
   if (syS(syPlain(db)) === syS(m)) { dirty = false; hdr(); sessionSoon(); }   // ya está guardado en Drive
   return {news, first: !R.w};
 }
@@ -2752,7 +2792,7 @@ function privHTML() {
     <li><b>Borrar la copia de Google Drive</b>: menú del icono 🔄 → «Borrar mis datos de Google Drive», o el botón de abajo (con la sesión iniciada).</li>
     <li><b>Quitar el permiso a la aplicación</b> en todos tus dispositivos: <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener">myaccount.google.com/permissions</a>.</li>
     <li><b>Datos de este navegador</b>: Ayuda → «Aplicación instalada» → «Olvidar la copia de sesión», o borra los datos del sitio desde el navegador. Tus archivos JSON solo los borras tú.</li>
-    <li><b>Copias de seguridad, filtros guardados y enlaces a PDF</b> se guardan solo en este navegador (nunca en Google Drive); los PDF enlazados no se leen ni se envían a ningún sitio.</li></ul>
+    <li><b>Copias de seguridad y filtros guardados</b> se guardan solo en este navegador (nunca en Google Drive). Los <b>PDF enlazados</b> no se leen ni se envían a ningún sitio, salvo que actives en Configuración «Subir a mi Google Drive los PDF enlazados»: entonces cada PDF se copia a la carpeta privada y oculta de tu Google Drive (mismo permiso <code>drive.appdata</code>), solo para que puedas abrirlo desde tus otros dispositivos. Se borra de allí si quitas el enlace, y con «Borrar mis datos de Google Drive».</li></ul>
     ${syAvail() ? `<p class="sypv">${on ? `Google Drive: <b>sesión iniciada</b>${p.who ? ' como ' + esc(p.who) : ''}${p.last ? ' · última sincronización ' + syAgo(p.last) : ''}.</p><p class="row"><button onclick="syLogout()">🚪 Cerrar sesión</button><button class="danger" onclick="syWipe()">🗑 Borrar mi copia de Google Drive</button>` : 'Google Drive: <b>sin conectar</b>. <button onclick="$(\'#pv\').close();syIntro()">🔄 Sincronizar…</button>'}</p>` : ''}
     <h4>Contacto</h4><p>Dudas sobre esta política: <a href="mailto:r.malumbresp@gmail.com">r.malumbresp@gmail.com</a> o <a href="mailto:rmalum01@ucm.es">rmalum01@ucm.es</a>. Versión para enlazar: <a href="privacidad.html" target="_blank" rel="noopener">privacidad.html</a>.</p></div>`;
 }
@@ -2868,7 +2908,8 @@ async function pdfOpen(id) {
       const h = PEND_PDF.get(id) || await idb('readonly', st => st.get('pdf:' + id)).catch(() => null);
       if (h) try { if (await h.queryPermission({mode: 'read'}) === 'granted' || await h.requestPermission({mode: 'read'}) === 'granted') file = await h.getFile(); else return toast('Sin permiso para leer el PDF.'); } catch (e) { toast(`No se encuentra «${p.pdf.name}»: elígelo de nuevo.`, [], 4000); }
     }
-    if (!file) {   // otro dispositivo o archivo movido: se vuelve a enlazar
+    if (!file) file = await pdfFromDrive(id, p.pdf.name);   // subido por otro dispositivo
+    if (!file) {   // archivo movido o sin copia en Drive: se vuelve a enlazar
       const r = await pdfChoose(id); file = r.file; if (r.h) idb('readwrite', st => st.put(r.h, 'pdf:' + id)).catch(() => {});
       if (file.name !== p.pdf.name) toast(`Has elegido «${file.name}», distinto de «${p.pdf.name}».`, [], 4000);
     }
@@ -3057,7 +3098,7 @@ function pjMenu(e) {
    Aparte del JSON, la app guarda (1) una copia de trabajo, para reabrir justo donde lo dejaste aunque no hayas guardado, y
    (2) el estado de la interfaz (filtros, orden, barra lateral, bloques plegados). Viven fuera de la caché de la aplicación,
    así que las actualizaciones no los tocan y no hace falta borrar datos para recibir una versión nueva. */
-const APP_V = '32.1';   // debe coincidir con la versión de sw.js
+const APP_V = '32.2';   // debe coincidir con la versión de sw.js
 let BOOTED = false, RELOADING = false, SWREG = null, tSes = 0, tUi = 0, lastUi = '';
 const sessionNow = () => { clearTimeout(tSes); if (!BOOTED) return Promise.resolve();   // copia de trabajo del proyecto abierto (y la lista de proyectos)
   const p = pjCur(); if (p) { Object.assign(p, {n: db.papers.length, file: path, dirty}); delete p.remote; }

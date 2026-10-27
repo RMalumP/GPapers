@@ -30,7 +30,7 @@ Los ajustes son comunes a todos: nombre de la aplicación, colores, atajos, tipo
 - **Copias de seguridad** por proyecto (IndexedDB `bk:<id>`): una al abrir cada día y antes de restaurar o de sustituirlo todo por Drive, las últimas 10; crear, descargar, restaurar (deshacible) y borrar desde ▾ → «Copias de seguridad…». Solo en el navegador.
 - **Buscar duplicados** (grupo Selección): mismo DOI o título; «Quedarme con este» fusiona campos vacíos, etiquetas, secciones, notas y relaciones, y manda los demás a la papelera.
 - **Mover o copiar a otro proyecto** (grupo Selección): notas, etiquetas y secciones (por nombre; se crean si faltan) y relaciones entre los elegidos.
-- **PDF enlazado** (Datos): solo el nombre y la página van al JSON; el enlace al archivo vive en el navegador y no se sube a Drive.
+- **PDF enlazado** (Datos): solo el nombre y la página van al JSON; el enlace al archivo vive en el navegador. Opcional (Configuración → «Subir a mi Google Drive los PDF enlazados»): cada PDF se copia a la carpeta oculta de Drive (`gpapers-pdf-<id>`, subida reanudable, máx. 100 MB) y se abre desde otros dispositivos; se borra al quitar el enlace.
 - **Copiar cita 📋** en tarjetas y tabla; **filtros guardados ⭐** por proyecto (IndexedDB `fav:<id>`); **barra de progreso** de lectura junto al nombre del proyecto.
 
 ## Añadir app
