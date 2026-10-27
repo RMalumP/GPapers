@@ -4,7 +4,7 @@
 <title>Gestor de papers</title><meta name="description" content="Gestor de papers académicos: notas, secciones, etiquetas, citas en varios estilos y sincronización opcional con tu propio Google Drive."><link rel="stylesheet" href="style.css"><link rel="manifest" href="manifest.json"><meta name="theme-color" content="#2457c5"><link rel="icon" href="icon-192.png"></head>
 <body>
 <header>
-  <h1 id="appName">Papers</h1><span id="fname"></span>
+  <h1 id="appName">Papers</h1><span class="pj"><span class="pjs" aria-hidden="true">/</span><input id="pjName" maxlength="60" spellcheck="false" autocomplete="off" aria-label="Nombre del proyecto" title="Nombre del proyecto (su archivo JSON se llama igual). Escribe para cambiarlo." placeholder="Proyecto" oninput="this.size=Math.max(6,this.value.length+1)" onchange="pjRename(this.value)" onkeydown="if(event.key==='Enter')this.blur();else if(event.key==='Escape'){this.value=pjCur().name;this.blur()}"><button id="pjBtn" onclick="pjMenu(event)" title="Proyectos: cambiar, crear o borrar" aria-label="Proyectos">▾</button></span><span id="fname"></span>
   <div class="row">
     <button id="syncBtn" onclick="syClick(event)" title="Conectar con Google Drive" aria-label="Conectar con Google Drive" data-st="off" hidden><span class="syi">🔄</span><span class="syl">Conectar con Google Drive</span><span class="syb"></span></button>
     <button onclick="doOpen()" oncontextmenu="openMenu(event)" title="Clic: abrir archivo · Clic derecho: importar referencias" aria-label="Abrir">📂</button>

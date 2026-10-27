@@ -12,9 +12,19 @@ o usa ⋮ → Guardar y compartir → Crear acceso directo → «Abrir como vent
 3. Abre la URL que te da GitHub y, en Chrome/Edge, pulsa «Instalar aplicación» en la barra de direcciones.
 
 ## Datos y autoguardado
-Tus datos viven en un archivo JSON local que eliges tú; nada se envía a ningún servidor.
+Tus datos viven en archivos JSON locales que eliges tú (uno por proyecto); nada se envía a ningún servidor.
 El autoguardado usa la API de acceso a archivos (solo Chrome/Edge de escritorio); en otros navegadores el guardado es una descarga.
 Chrome pide confirmar el acceso al archivo al reabrirlo en una sesión nueva («Reabrir último»).
+
+## Proyectos
+Cada proyecto es una biblioteca aparte (papers, notas, secciones, etiquetas, relaciones y papelera) con **su propio archivo JSON, que se llama como el proyecto** (`Tesis` → `Tesis.json`).
+Los ajustes son comunes a todos: nombre de la aplicación, colores, atajos, tipos y estilos propios, plantillas y opciones de exportación (cada JSON lleva una copia para que sirva solo).
+- **Nombre**: se escribe en la cabecera, junto al nombre de la aplicación. En Chrome/Edge se intenta renombrar también el archivo; si no se puede, el siguiente «Guardar» crea el del nombre nuevo.
+- **Cambiar de proyecto**: botón ▾ de la cabecera. El navegador guarda la copia de trabajo de cada proyecto (IndexedDB: `projects`, `proj:<id>`, `h:<id>`), así que el cambio es inmediato y no se pierde lo que no estaba guardado.
+- **Guardar** guarda solo el proyecto abierto en su archivo; **Guardar como** propone `<proyecto>.json`; el autoguardado escribe en el archivo de cada proyecto.
+- **Abrir 📂** abre un JSON como proyecto: el suyo si ya lo es (mismo archivo), o uno nuevo con el nombre del archivo. Un JSON de versiones anteriores se abre igual.
+- La biblioteca de versiones anteriores pasa sola a ser el primer proyecto (con el nombre de su archivo).
+- **Google Drive** guarda todos los proyectos: un índice común (`gpapers-projects.json`, lista de proyectos y ajustes comunes) y los archivos de cada uno (el primero conserva los nombres de siempre, `gpapers-snap.json`…; los demás, `gpapers-p-<id>-…`). Cada vuelta sincroniza el índice y el proyecto abierto; los proyectos de otros dispositivos salen en ▾ con ☁ y se descargan al abrirlos. Renombrar o borrar un proyecto llega a todos los dispositivos.
 
 ## Citas (APA 7, Vancouver, MLA, IEEE y Chicago)
 La plantilla depende del tipo de fuente (artículo, libro, capítulo, congreso, tesis, web, artículo de prensa y entrada de blog). Las citas llevan *cursiva* real: en texto plano se quita,
@@ -49,7 +59,7 @@ En «Exportar citas» eliges idioma de los conectores (español/inglés), format
 - **Notas** (generales y por sección) con un editor que muestra el formato al escribir, como WhatsApp: `*cursiva*`, `**negrita**`, `~~tachado~~`, `__subrayado__`, listas con «- » o «1. ». Se guardan y copian con esos símbolos; al exportar solo se ve el formato.
 
 ## Pruebas
-`node pruebas/pruebas_citas.js app.js`, `python3 pruebas/prueba_f4.py .`, `python3 pruebas/prueba_ui.py .` y `python3 pruebas/prueba_sync.py .` (necesitan Playwright con Chromium; la de sincronización simula Google y Drive).
+`node pruebas/pruebas_citas.js app.js`, `python3 pruebas/prueba_f4.py .`, `python3 pruebas/prueba_ui.py .`, `python3 pruebas/prueba_sync.py .` y `python3 pruebas/prueba_proyectos.py .` (necesitan Playwright con Chromium; la de sincronización simula Google y Drive).
 
 ## Cambios de la ronda F7–F9
 - **Tabla:** columna *Secciones* (se puede seguir agrupando por sección). La pestaña **Cita** va justo después de **Datos**. La **valoración mínima** está en el grupo *Ordenar*.
