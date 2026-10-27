@@ -92,7 +92,7 @@ with sync_playwright() as pw:
     eq('el botón de Google Drive está a la izquierda de Guardar', A.evaluate("[!$('#syncBtn').hidden, $('#syncBtn').nextElementSibling.getAttribute('aria-label'), $('#syncBtn').dataset.st, $('#syncBtn').previousElementSibling]"), [True, 'Guardar', 'off', None])
     eq('cabecera: solo Drive, Guardar, Exportar y «Archivo ▾»', A.evaluate("[...document.querySelectorAll('header .row > button, header .row > .fm > button')].map(b => b.textContent.trim().replace(/\\s+/g, ' '))"), ['🔄Conectar con Google Drive', '💾', 'Exportar citas', 'Archivo ▾'])
     A.click('#fmBtn')
-    eq('el menú Archivo: abrir, guardar como, importar y autoguardado', A.evaluate("[...document.querySelectorAll('#fmenu button, #fmenu label')].map(b => b.textContent.trim())"), ['📂 Abrir un archivo JSON…', '💾 Guardar como…', '📄 Desde archivo (.bib / .ris)…', '📋 Pegar texto BibTeX / RIS…', '🔎 Buscar por DOI…', 'Autoguardado'])
+    eq('el menú Archivo: abrir, guardar como, importar y autoguardado', A.evaluate("[...document.querySelectorAll('#fmenu button, #fmenu label')].map(b => b.textContent.trim())"), ['📂 Abrir un archivo JSON…', '💾 Guardar como…', '📄 Desde archivo (.bib, .ris o .txt)…', '📋 Pegar BibTeX, RIS o citas de Google Scholar…', '🔎 Buscar por DOI…', 'Autoguardado'])
     A.keyboard.press('Escape')
     eq('Esc lo cierra', A.evaluate("$('#fmenu').hidden"), True)
     eq('sin conectar dice «Conectar con Google Drive»', (A.inner_text('#syncBtn').strip(), A.evaluate("$('#syncBtn').title")), ('🔄Conectar con Google Drive', 'Conectar con Google Drive'))

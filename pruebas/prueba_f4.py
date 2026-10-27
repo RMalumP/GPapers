@@ -22,7 +22,7 @@ with sync_playwright() as pw:
     eq('activar guarda el ajuste', (pg.evaluate("ex().inText"), pg.evaluate("JSON.parse(JSON.stringify(db)).settings.export.inText")), (True, True))
     pg.evaluate("$('#cfg').close(); openPaper('p1'); tab = 'cite'; drawD()")
     eq('activado: una zona por estilo y el campo de página', (pg.locator('.itx').count(), pg.locator('#locIn').count()), (11, 1))   # 10 generales + Derecho y jurisprudencia
-    t = lambda k: pg.inner_text('#it_' + k)
+    t = lambda k: pg.text_content('#it_' + k)
     eq('APA: paréntesis y narrativa', ('(Minow y LaMay, 2008)' in t('apa'), 'Minow y LaMay (2008)' in t('apa')), (True, True))
     eq('Chicago NB: nota completa, abreviada e ibid.', pg.locator('#it_chicago_nb .row').count(), 3)
     eq('IEEE y Vancouver traen la advertencia «verificar»', ('verificar' in t('ieee'), 'verificar' in t('vancouver')), (True, True))

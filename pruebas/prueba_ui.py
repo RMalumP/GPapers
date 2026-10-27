@@ -80,7 +80,7 @@ with sync_playwright() as pw:
     pg.evaluate("drawD()")
     eq('el plegado se conserva al redibujar', pg.evaluate("document.querySelectorAll('#dlg details.cs:not([open])').length"), 1)
     pg.evaluate("tab = 'cite'; drawD()")
-    eq('pestaña Cita propia: todas las variantes', (pg.locator('#dlg .ced[id^=c_]').count(), pg.locator('#dlg details').count()), (11, 0))
+    eq('pestaña Cita propia: todas las variantes', (pg.locator('#dlg .ced[id^=c_]').count(), pg.locator('#dlg details').count()), (11, 2))
     pg.evaluate("ALL_FOLD.clear(); tab = 'cls'; drawD()")
     eq('la pestaña de clasificación usa el diseño de Ver todo (bloques plegables)', pg.evaluate("[...document.querySelectorAll('#dlg details.cs > summary')].map(s => s.textContent)"), ['Secciones', 'Etiquetas', 'Relacionados'])
     eq('y no lleva la cita', pg.locator('#dlg .ced[id^=c_]').count(), 0)

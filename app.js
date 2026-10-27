@@ -976,6 +976,61 @@ async function fetchDoi(raw) {
   } catch (e) { throw Error(e.name === 'AbortError' ? 'CrossRef tardó demasiado en responder.' : e instanceof TypeError ? 'No se pudo conectar con CrossRef (¿sin conexión, o abierta desde file://?).' : e.message); }
   finally { clearTimeout(tm); }
 }
+/* ---- Texto de ScienceDirect (.txt «Export citation → Text») y citas copiadas de Google Scholar (APA, MLA, Chicago, Harvard, Vancouver) ---- */
+const isSdTxt = t => /^\s*(Volume|ISSN|ISBN|Pages)\s.+,\s*$/m.test(t) && /\n\s*\(https?:\/\/[^)]+\)\s*$|https?:\/\/doi\.org\/\S+\.\s*$/m.test(t);
+const sdAuthors = l => l.replace(/,\s*$/, '').split(/,\s*|\s+and\s+/).map(a => a.trim()).filter(Boolean).map(fixAuthor);
+function parseSd(t) {   // un registro por bloque separado por una línea en blanco: autores, título, revista, Volume, Issue, año, páginas o número de artículo, ISSN, DOI, (URL), Abstract, Keywords
+  return t.split(/\n\s*\n/).map(b => b.split(/\r?\n/).map(l => l.trim()).filter(Boolean)).filter(L => L.length >= 3 && L.some(l => /^(Volume|ISSN|ISBN|Pages)\s|doi\.org/.test(l))).map(L => {
+    const r = {authors: sdAuthors(L[0]), title: L[1].replace(/,\s*$/, ''), year: '', venue: '', doi: '', url: '', type: 'articulo', general: ''}, o = {}, notes = [];
+    for (const raw of L.slice(2)) { const l = raw.replace(/[,.]\s*$/, ''); let m;
+      if ((m = /^Abstract:\s*(.*)$/i.exec(raw))) notes.push('**Resumen:** ' + m[1]);
+      else if ((m = /^Keywords:\s*(.*)$/i.exec(raw))) notes.push('**Palabras clave:** ' + m[1]);
+      else if ((m = /^Volume\s+(.+)$/i.exec(l))) o.volume = m[1];
+      else if ((m = /^(?:Issue|Number)\s+(.+)$/i.exec(l))) o.issue = m[1];
+      else if ((m = /^Pages?\s+(.+)$/i.exec(l))) o.pages = normPages(m[1]);
+      else if ((m = /^ISSN\s+(.+)$/i.exec(l))) o.issn = m[1];
+      else if ((m = /^ISBN\s+(.+)$/i.exec(l))) o.isbn = m[1];
+      else if ((m = /^https?:\/\/(?:dx\.)?doi\.org\/(.+)$/i.exec(l))) r.doi = normDoi(m[1]);
+      else if ((m = /^\((https?:\/\/[^)]+)\)$/.exec(l))) r.url = m[1];
+      else if (/^\d{4}$/.test(l) && !r.year) r.year = l;
+      else if (/^[A-Za-z]?\d+$/.test(l) && !o.pages) o.pages = l;   // número de artículo (eLocator)
+      else if (!r.venue) r.venue = l;
+    }
+    if (o.isbn && !o.volume) r.type = 'libro';
+    if (notes.length) r.general = notes.join('\n\n');
+    return {...r, ...refFields(r.type, o)};
+  });
+}
+const expPages = p => { const m = /^(\d+)\s*[-–]\s*(\d+)$/.exec(p = normPages(p)); return m && m[2].length < m[1].length ? `${m[1]}-${m[1].slice(0, m[1].length - m[2].length)}${m[2]}` : p; };   // 129-46 → 129-146
+const vipp = s => {   // «Revista, 22(1), 129-146» / «Revista 22.1 (2019): 129-146» / «Revista 22, no. 1 (2019)» → partes
+  let m = /^(.*?),?\s+(\d+)(?:\(([^)]+)\)|\.(\w+)|,\s*no\.\s*(\w+))?(?:\s*\((\d{4})\))?(?:\s*[,:]\s*(?:pp?\.\s*)?([A-Za-z]?\d+(?:\s*[-–]\s*\d+)?))?\.?$/.exec(s.trim());
+  return m && m[1] ? {venue: m[1].replace(/[.,]$/, ''), volume: m[2], issue: m[3] || m[4] || m[5] || '', year: m[6] || '', pages: m[7] ? expPages(m[7]) : ''} : null;
+};
+const splitTitle = s => { const m = /^(.+?[?!]|.+?)\.\s+(.+)$/.exec(s) || /^(.+?[?!])\s+(.+)$/.exec(s); return m ? [m[1], m[2]] : [s.replace(/\.$/, ''), '']; };
+const initAuthors = s => {   // «Iyengar, S., Lelkes, Y., & Westwood, S. J.» / «Wagner, M. and Smith, J.» → pares Apellido, Iniciales
+  const p = s.replace(/,?\s*(&|and|y)\s+/g, ', ').replace(/\s*…\s*|\.\.\./g, ', ').split(/,\s*/).map(x => x.trim()).filter(Boolean), out = [];
+  for (let i = 0; i < p.length; i++) { if (/^([A-ZÀ-Ý]\.\s*-?)+$/.test(p[i + 1] || '')) { out.push(`${p[i]}, ${p[i + 1].replace(/\.(?=[A-ZÀ-Ý])/g, '. ')}`); i++; } else out.push(fixAuthor(p[i])); }
+  return out; };
+const fullAuthors = s => {   // MLA y Chicago: «Iyengar, Shanto, Yphtach Lelkes, and Sean J. Westwood» / «Iyengar, Shanto, et al.»
+  s = s.replace(/,?\s*et al\.?$/, ''); const [last, first, ...rest] = s.split(/,\s*/); if (first == null) return [fixAuthor(last)];
+  return [`${last}, ${first.replace(/^and\s+/, '')}`, ...rest.join(', ').split(/,\s*(?:and\s+)?|\s+and\s+/).map(a => a.replace(/^and\s+/, '').trim()).filter(Boolean).map(fixAuthor)]; };
+function parseCite(c) {   // una cita con formato → referencia; null si no se reconoce
+  c = c.trim().replace(/\s+/g, ' ').replace(/[“”«»]/g, '"'); let m, r = null;
+  const ref = (authors, year, title, rest, book) => { const v = !book && vipp(rest), ty = v ? 'articulo' : 'libro';
+    const o = v ? {volume: v.volume, issue: v.issue, pages: v.pages} : {publisher: ''};
+    return {authors, year: year || v?.year || (/(\d{4})\.?$/.exec(rest)?.[1] ?? ''), title: title.replace(/[.,]$/, ''), venue: v ? v.venue : rest.replace(/,?\s*\d{4}\.?$/, '').replace(/\.$/, ''), doi: '', url: '', type: ty, ...refFields(ty, o)}; };
+  if ((m = /^(.+?)\s\((\d{4})[a-z]?\)\.\s(.+)$/.exec(c))) { const [t, rest] = splitTitle(m[3]); r = ref(initAuthors(m[1]), m[2], t, rest); }   // APA
+  else if ((m = /^(.+?)\.\s"(.+?)"\s*(.*)$/.exec(c))) r = ref(fullAuthors(m[1]), '', m[2], m[3]);   // MLA y Chicago (título entre comillas)
+  else if ((m = /^(.+?),\s(\d{4})[a-z]?\.\s(.+)$/.exec(c))) { const [t, rest] = splitTitle(m[3]); r = ref(initAuthors(m[1]), m[2], t, rest); }   // Harvard
+  else if ((m = /^(.+?)\.\s(.+?)\.\s(.+?)\.\s(\d{4})[^;]*;\s*(\d+)(?:\(([^)]+)\))?(?::\s*([A-Za-z]?\d+(?:-\d+)?))?\.?$/.exec(c)))   // Vancouver
+    r = {authors: m[1].split(/,\s*/).map(a => { const x = /^(.+?)\s([A-Z]{1,3})$/.exec(a.trim()); return x ? `${x[1]}, ${[...x[2]].join('. ')}.` : fixAuthor(a); }), year: m[4], title: m[2], venue: m[3], doi: '', url: '', type: 'articulo',
+      ...refFields('articulo', {volume: m[5], issue: m[6] || '', pages: m[7] ? expPages(m[7]) : ''})};
+  else if ((m = /^(.+?)\.\s(.+?)\.\s(.+?),\s(\d{4})\.?$/.exec(c))) r = ref(fullAuthors(m[1]), m[4], m[2], m[3], true);   // libro en MLA o Chicago: Autor. Título. Editorial, año.
+  if (!r || !r.title || !r.authors.length) return null;
+  if (r.type === 'libro') r.venue = r.venue.replace(/,?\s*\d{4}$/, '');
+  return r;
+}
+const parseCites = t => t.split(/\r?\n/).map(l => l.trim()).filter(Boolean).map(parseCite).filter(Boolean);
 function impPrepare(refs) {   // marca duplicados (mismo DOI o mismo título) frente al archivo y dentro del propio lote
   const dois = new Set(db.papers.map(p => normDoi(p.doi)).filter(Boolean)), tits = new Set(db.papers.map(p => normTitle(p.title)).filter(Boolean));
   refs.forEach(r => { const t = normTitle(r.title); r.bad = !r.title;
@@ -993,15 +1048,15 @@ function openImport(mode) {   // desde el menú del clic derecho en 📂 (o el a
 async function impFile() {
   try {
     let text;
-    if (FSA) { const [h] = await showOpenFilePicker({types: [{description: 'Referencias (BibTeX / RIS)', accept: {'text/plain': ['.bib', '.ris', '.txt']}}]}); text = await (await h.getFile()).text(); }
+    if (FSA) { const [h] = await showOpenFilePicker({types: [{description: 'Referencias (BibTeX, RIS o texto)', accept: {'text/plain': ['.bib', '.ris', '.txt']}}]}); text = await (await h.getFile()).text(); }
     else { const r = await pickFile('.bib,.ris,.txt'); if (!r) return; text = r.text; }
     impText(text);
   } catch (e) { if (e.name !== 'AbortError') alert('No se pudo leer el archivo: ' + e.message); }
 }
 function impText(t) {
   t = t.replace(/^\uFEFF/, '');
-  const refs = /^\s*TY\s{2}-/m.test(t) ? parseRis(t) : /@\w+\s*\{/.test(t) ? parseBib(t) : [];
-  if (!refs.length) return alert('No se reconoce ninguna referencia. Usa un archivo BibTeX (.bib) o RIS (.ris).');
+  const refs = /^\s*TY\s{2}-/m.test(t) ? parseRis(t) : /@\w+\s*\{/.test(t) ? parseBib(t) : isSdTxt(t) ? parseSd(t) : parseCites(t);
+  if (!refs.length) return alert('No se reconoce ninguna referencia. Usa BibTeX (.bib), RIS (.ris), el texto (.txt) de ScienceDirect o citas copiadas de Google Scholar, una por línea.');
   IMP = {mode: 'prev', refs: impPrepare(refs)}; impDraw(); if (!$('#imp').open) $('#imp').showModal();
 }
 async function impDoi() {
@@ -1011,7 +1066,7 @@ async function impDoi() {
 function impDraw() {
   const m = IMP.mode, close = `<button onclick="$('#imp').close()">Cancelar</button>`;
   let h = `<h2>${m === 'fill' ? 'Datos de CrossRef' : 'Importar referencias'}</h2>`;
-  if (m === 'text') h += `<textarea id="iTxt" style="min-height:220px" placeholder="Pega aquí BibTeX o RIS"></textarea><div class="row" style="margin-top:10px"><button class="pri" onclick="impText($('#iTxt').value)">Analizar</button>${close}</div>`;
+  if (m === 'text') h += `<textarea id="iTxt" style="min-height:220px" placeholder="Pega aquí BibTeX, RIS, el texto de ScienceDirect o citas de Google Scholar (una por línea, en APA, MLA, Chicago, Harvard o Vancouver)"></textarea><div class="row" style="margin-top:10px"><button class="pri" onclick="impText($('#iTxt').value)">Analizar</button>${close}</div>`;
   else if (m === 'doi') h += `<div class="row"><input id="iDoi" style="flex:1" placeholder="10.1000/xyz123 o https://doi.org/…" onkeydown="if(event.key==='Enter')impDoi()"><button class="pri" onclick="impDoi()">Buscar</button></div><p id="iMsg" class="empty"></p>${close}`;
   else if (m === 'fill') {
     const j = v => Array.isArray(v) ? v.join('; ') : String(v ?? ''), r = IMP.ref, cur = k => j(D[k]), nw = k => j(r[k]), L = FLD.filter(([k]) => nw(k) && nw(k) !== cur(k) && (!FLD_T[k] || shows(k, r.type)));
@@ -1033,7 +1088,7 @@ function impGo() {
   const L = IMP.refs.filter(r => r.on); if (!L.length) return alert('No hay ninguna referencia marcada.');
   const sec = $('#iSec').value, tag = $('#iTag').value, rd = $('#iRd').value, now = new Date().toISOString();
   L.forEach(r => db.papers.push(NEWF({id: uid(), created: now, title: r.title, alias: '', reading: rd, rating: 0, sectionIds: sec ? [sec] : [], authors: r.authors, year: r.year ? +r.year : '', url: r.url || '', type: r.type,
-    venue: r.venue || '', doi: r.doi || '', ...Object.fromEntries(IMP_F.filter(k => r[k] != null).map(k => [k, r[k]])), general: '', tagIds: tag ? [tag] : [], notes: [], cites: {}, related: [], refTo: [], history: [{t: now, s: 'Importado'}]})));
+    venue: r.venue || '', doi: r.doi || '', ...Object.fromEntries(IMP_F.filter(k => r[k] != null).map(k => [k, r[k]])), general: r.general || '', tagIds: tag ? [tag] : [], notes: [], cites: {}, related: [], refTo: [], history: [{t: now, s: 'Importado'}]})));
   markDirty(); $('#imp').close(); render(); alert(`Se añadieron ${L.length} papers.`);   // una sola operación: un único Ctrl+Z la deshace
 }
 async function doiFill() {   // botón «Buscar» junto al DOI en la ventana de editar
@@ -1045,7 +1100,7 @@ function fillGo() {
   if ($('#f_authors')?.checked && r.authorType === 'entidad' && D.authorType === 'auto') D.authorType = 'entidad';
   D.doi = r.doi; $('#imp').close(); drawD();
 }
-function openMenu(e) { ctxShow(e, `<div class="ctxh">Importar referencias</div><button onclick="openImport('file')">📄 Desde archivo (.bib / .ris)</button><button onclick="openImport('text')">📋 Pegar texto BibTeX / RIS</button><button onclick="openImport('doi')">🔎 Buscar por DOI</button>`); }
+function openMenu(e) { ctxShow(e, `<div class="ctxh">Importar referencias</div><button onclick="openImport('file')">📄 Desde archivo (.bib, .ris o .txt)</button><button onclick="openImport('text')">📋 Pegar BibTeX, RIS o citas de Google Scholar</button><button onclick="openImport('doi')">🔎 Buscar por DOI</button>`); }
 
 /* ===== Atajos de teclado (editables en Configuración; se guardan en settings.shortcuts) ===== */
 let recAct = null;   // acción cuyo atajo se está grabando
@@ -1402,7 +1457,7 @@ function helpHTML() {
       ${helpTbl([['Anexo', 'España. Tribunal Supremo (Sala de lo Penal, Sección 1.ª). Sentencia núm. 1229/2017, de 29 de marzo de 2017.'], ['Caso europeo', 'Tribunal de Justicia de la Unión Europea. Caso Schempp (C-403/03). Sentencia de 12 de julio de 2005, EU:C:2005:446.'], ['En el texto', '(STS 1229/2017 de 29 de marzo, FJ 3) · abreviada: (STS 1229/2017) · (STSJ Madrid de 14 de junio de 2002, FD 2) · (STEDH de 21 de febrero de 2017, ap. 45)']])}
       <p>En la <b>cita en el texto</b> (si la activas en Configuración), «Página o parte citada» es el artículo en la legislación (<i>22.1</i> → art. 22.1 CE) y el fundamento o apartado en la jurisprudencia (<i>3</i> → FJ 3 en el TC, el TS y la AN; FD 3 en los TSJ y las audiencias provinciales; ap. 3 en los tribunales europeos). Puedes escribirlo tal cual (<i>Preámbulo</i>, <i>DA 2.ª</i>).</p>
       <p>Los <b>demás estilos</b> citan la jurisprudencia con esta misma plantilla, porque las guías dicen que se aplica sea cual sea el estilo, y lo avisan. La legislación sigue en ellos como hasta ahora.</p>`],
-    importar: ['Importar referencias', `<p>Menú <b>Archivo ▾</b> → «Importar referencias» (o ${kb('import')}): desde un archivo <code>.bib</code>/<code>.ris</code>, pegando texto BibTeX/RIS o buscando por <b>DOI</b>. Antes de añadir se revisa la lista, y puedes asignar sección, etiqueta y estado de lectura a todas. Dentro de un paper, «Buscar» junto al DOI propone rellenar solo los campos vacíos o los que marques.</p>`],
+    importar: ['Importar referencias', `<p>Botón <b>📥 Importar</b> junto a «+ Nuevo paper» (también en <b>Archivo ▾</b> o con ${kb('import')}): desde un archivo <code>.bib</code>, <code>.ris</code> o <code>.txt</code>, pegando texto o buscando por <b>DOI</b>.</p><ul><li><b>Texto de ScienceDirect</b> («Export citation → Export citation to text»): autores, título, revista, volumen, número, páginas o número de artículo, ISSN, DOI y URL; el resumen y las palabras clave van a las notas generales.</li><li><b>Citas de Google Scholar</b> (botón «Citar»): pega una o varias, una por línea, en APA, MLA, Chicago, Harvard o Vancouver; se detectan autores, año, título, revista o editorial, volumen, número y páginas. Revisa la lista: MLA abrevia con «et al.» y Scholar escribe la revista en minúsculas. El BibTeX de Scholar también vale.</li></ul><p> Antes de añadir se revisa la lista, y puedes asignar sección, etiqueta y estado de lectura a todas. Dentro de un paper, «Buscar» junto al DOI propone rellenar solo los campos vacíos o los que marques.</p>`],
     config: ['Configuración', `<p>⚙️ en la barra lateral, con cuatro pestañas: <b>Apariencia</b>, <b>Notas y citas</b>, <b>Atajos</b> y <b>Datos y Drive</b>. Es común a todos los proyectos y se guarda también en cada JSON.</p><ul><li><b>Nombre de la aplicación</b>, <b>paleta de colores</b> (o personalizada), mostrar el archivo abierto en la cabecera y, si quieres, el <b>progreso de lectura</b> (papers leídos) junto al nombre del proyecto (desactivado por defecto).</li>
       <li><b>Estilo de cita principal</b> (Notas y citas; APA 7 por defecto): sale primero en la pestaña Cita (o solo él, si lo marcas), pasa a ser el estilo de Exportar al elegirlo y decide los campos de la vista simplificada de Datos.</li>
       <li><b>Mostrar la imagen</b> del paper en tarjetas y tabla (Apariencia). <b>Barra de formato</b> de las notas desplegada por defecto. <b>Cita en el texto</b> (Chicago) en la pestaña Cita.</li>
@@ -1922,7 +1977,7 @@ function drawD() {
     h += blk('data', 'Datos', `<div class="grid"><div class="w titlerow"><div class="pimgbox">${pimgHTML(D, 'big', `role="button" tabindex="0" onclick="imgOpen()" title="Imagen del paper (opcional): pulsa para poner una URL o un archivo, o pega una imagen copiada con Ctrl+V"`)}</div><div class="titlecol">${inp('title', lbl('title', 'Título *'))}${DATA_ALL || has('alias') ? inp('alias', 'Título personalizado (opcional; solo para mostrar, la cita usa el título original)') : ''}</div></div>
     <label class="w">Autores (uno por línea: «Apellido, Nombre»)<textarea oninput="D.authors=this.value.split('\\n').map(s=>s.trim()).filter(Boolean)">${esc(D.authors.join('\n'))}</textarea></label>
     <label>Año<input type="number" data-k="year" value="${esc(D.year)}" oninput="D.year=this.value;pubSync()"></label><label>Tipo<select onchange="typeChange(this.value)">${Object.entries(TYPES).filter(([k]) => !CTYPES.has(k)).map(([k, v]) => `<option value="${k}" ${D.type === k ? 'selected' : ''}>${v}</option>`).join('')}${CTYPES.size ? `<optgroup label="Tipos propios">${[...CTYPES].map(([k, t]) => `<option value="${k}" ${D.type === k ? 'selected' : ''}>${esc(t.name)}</option>`).join('')}</optgroup>` : ''}<option value="__new">➕ Crear un tipo propio…</option></select></label>
-    ${top.join('')}${DATA_ALL && rest.length ? `<div class="w dsep">Otros campos</div>${rest.join('')}` : ''}${more}
+    ${top.join('')}${DATA_ALL && rest.length ? `<div class="w dsep"><span>Otros campos</span><button onclick="DATA_ALL=false;uiSoon();drawD()" title="Ocultar los campos que no usa tu estilo principal">Ocultar ▴</button></div>${rest.join('')}` : ''}${more}
     <div class="w"><small>Lectura</small><div class="seg">${Object.entries(READ).map(([k, v]) => `<button class="${D.reading === k ? 'on' : ''}" onclick="D.reading='${k}';drawD()">${v}</button>`).join('')}</div></div>
     <div class="w"><small>Valoración</small><div class="stars">${[1, 2, 3, 4, 5].map(n => `<button class="${D.rating >= n ? 'on' : ''}" aria-label="Valorar con ${n} de 5" onclick="D.rating=D.rating===${n}?0:${n};drawD()">★</button>`).join('')}</div></div>
     </div>`);
@@ -1945,7 +2000,8 @@ function drawD() {
     h += blk('cite', 'Cita', citeBar() + (ex().inText ? `<label>Página o parte citada (opcional, para la cita en el texto y las notas)<input id="locIn" value="${esc(CLOC)}" placeholder="${LAW_T.has(baseT(D.type)) ? 'p. ej. 22.1 (artículo) o 3 (FJ, FD o apartado)' : 'p. ej. 87 o 87-90'}" oninput="CLOC=this.value;drawIT()"></label>` : '')
       + (tab === 'all' ? `<label>Estilo<select onchange="CITE_SEL=this.value;drawD()">${styOpts(citeSel())}</select></label>` + citeOne(citeSel(), STYLES[citeSel()])
         : `<h2 class="grp">Estilo principal</h2>` + citeOne(M, STYLES[M]) + (only ? `<p><button onclick="CITE_ALL=true;drawD()">Ver todos los estilos</button> <small>Configuración → Notas y citas: «mostrar solo el estilo principal».</small></p>`
-          : STY_G.map(([g, t]) => { const E = Object.entries(STYLES).filter(([k, s]) => k !== M && styGroup(s) === g); return E.length ? `<h2 class="grp">${t}</h2>` + E.map(([k, s]) => citeOne(k, s)).join('') : ''; }).join(''))), false);
+          : STY_G.map(([g, t]) => { const E = Object.entries(STYLES).filter(([k, s]) => k !== M && styGroup(s) === g), id = g || 'gen';   // el resto, en secciones plegables (cerradas salvo que las abras)
+            return E.length ? `<details class="cs cgrp" data-g="${id}" ${CITE_OPEN.has(id) ? 'open' : ''} ontoggle="this.open ? CITE_OPEN.add('${id}') : CITE_OPEN.delete('${id}');uiSoon()"><summary>${t} <small>(${E.length})</small></summary><div class="csb">${E.map(([k, s]) => citeOne(k, s)).join('')}</div></details>` : ''; }).join(''))), false);
   }
   if (fold) {
     h += blk('tags', 'Etiquetas', db.tags.map(t => chip(t, D.tagIds.includes(t.id), `toggleT('${t.id}')`)).join('') || '<p class="empty">No hay etiquetas. Créalas con «Gestionar etiquetas».</p>', true);
@@ -2129,6 +2185,7 @@ function relFields(p, st = mainSty()) {   // campos que el estilo usa para el ti
   const R = new Set(F.filter(k => cite({...full, [k]: nil(k)}) !== c1 || cite({...min, [k]: val(k)}) !== c0));
   return R.size ? R : new Set(F);   // si el estilo no da cita para este tipo, se ve todo
 }
+const CITE_OPEN = new Set();   // secciones de estilos abiertas en la pestaña Cita
 let CITE_ALL = false, DATA_ALL = false;   // «Ver todos los estilos» puntual (con «solo el principal») y Datos desplegado (se recuerda en la sesión)
 let CITE_TA = '';   // última cita con el foco: la barra de formato de la pestaña Cita actúa sobre ella
 /* Cada cita se edita ya con su formato (cursiva y negrita reales) y se guarda con las marcas de siempre: *cursiva*, **negrita**, \* literal. */
@@ -2142,10 +2199,10 @@ function ceVal(el) {   // DOM del cuadro de cita → texto con marcas
   return run(el, {});
 }
 const citeRaw = k => { const e = document.getElementById('c_' + k); return e ? ceVal(e) : D.cites[k] ?? STYLES[k].fn(D); };
-const citeBar = () => { const o = ex(), fx = STYLES[citeSel()]?.fixedLang, sel = (k, opts, tt) => `<select title="${tt}" onchange="citeOpt('${k}',this.value)">${Object.entries(opts).map(([v, t]) => `<option value="${v}" ${v === o[k] ? 'selected' : ''}>${t}</option>`).join('')}</select>`;
+const citeBar = () => { const o = ex(), sel = (k, opts, tt) => `<select title="${tt}" onchange="citeOpt('${k}',this.value)">${Object.entries(opts).map(([v, t]) => `<option value="${v}" ${v === o[k] ? 'selected' : ''}>${t}</option>`).join('')}</select>`;
   return `<div class="cbar" onmousedown="if(event.target.tagName==='BUTTON')event.preventDefault()"><div class="cbg"><span class="cbt">Formato</span><button onclick="citeCmd('italic')" title="Cursiva en lo seleccionado de la cita (${esc(db.settings.shortcuts.italic)})"><i>K</i> Cursiva</button><button onclick="citeCmd('bold')" title="Negrita en lo seleccionado de la cita"><b>N</b> Negrita</button></div>
     <div class="cbg"><span class="cbt">Idioma</span>${sel('lang', {es: 'Español (y, En, consultado)', en: 'English (&, In, cited)'}, 'Idioma de los conectores de la cita')}<span class="cbt">Fecha de consulta</span>${sel('dateFmt', {long: '20 de octubre de 2026', dmy: '20-10-2026', iso: '2026-10-20'}, 'Cómo se escribe la fecha de consulta (el «[consultado el …]» de las páginas web)')}</div>
-    <small>Las citas se editan con su formato: selecciona y pulsa Cursiva. «Fecha de consulta» es cómo se escribe el día en que viste una página web («[consultado el 20 de octubre de 2026]»); solo sale si el paper la tiene rellena. Idioma y fecha son los mismos ajustes que en «Exportar»${fx ? ` (${esc(STYLES[citeSel()].name)} usa siempre el ${fx === 'en' ? 'inglés' : 'español'})` : ''}.</small></div>`; };
+    </div>`; };
 document.addEventListener('focusin', e => { if (e.target.classList?.contains('ced')) CITE_TA = e.target.id; });
 document.addEventListener('paste', e => { const el = e.target.closest?.('.ced'); if (!el) return;   // se pega como texto, sin el formato de otra página
   e.preventDefault(); document.execCommand('insertText', false, e.clipboardData.getData('text/plain').replace(/\s*\n\s*/g, ' ')); });
@@ -3295,14 +3352,14 @@ function pjMenu(e) {
    Aparte del JSON, la app guarda (1) una copia de trabajo, para reabrir justo donde lo dejaste aunque no hayas guardado, y
    (2) el estado de la interfaz (filtros, orden, barra lateral, bloques plegados). Viven fuera de la caché de la aplicación,
    así que las actualizaciones no los tocan y no hace falta borrar datos para recibir una versión nueva. */
-const APP_V = '35.1';   // debe coincidir con la versión de sw.js
+const APP_V = '35.2';   // debe coincidir con la versión de sw.js
 let BOOTED = false, RELOADING = false, SWREG = null, tSes = 0, tUi = 0, lastUi = '';
 const sessionNow = () => { clearTimeout(tSes); if (!BOOTED) return Promise.resolve();   // copia de trabajo del proyecto abierto (y la lista de proyectos)
   const p = pjCur(); if (p) { Object.assign(p, {n: db.papers.length, file: path, dirty}); delete p.remote; }
   return idb('readwrite', st => { st.put({v: 1, cur: PJ.cur, list: PJ.list, gone: PJ.gone}, 'projects'); return st.put({v: 1, path, dirty, at: new Date().toISOString(), json: dbJSON()}, 'proj:' + PJ.cur); }).catch(() => {}); };
 const sessionSoon = () => { clearTimeout(tSes); tSes = setTimeout(sessionNow, 700); };
 const uiState = () => ({v: 1, F: {sorts: F.sorts, group: F.group, sec: F.sec, tags: [...F.tags], read: F.read, minRating: F.minRating, inNotes: F.inNotes, mode: F.mode, tbSec: F.tbSec, tbTag: F.tbTag},
-  side: {min: $('#side').classList.contains('min'), fold: [...document.querySelectorAll('#side .sg.fold')].map(e => e.id), more: !$('#sg-more').classList.contains('fold')}, cite: CITE_SEL, dataAll: DATA_ALL, allFold: [...ALL_FOLD], cfg: [...CFG_OPEN], help: [...HELP_OPEN]});
+  side: {min: $('#side').classList.contains('min'), fold: [...document.querySelectorAll('#side .sg.fold')].map(e => e.id), more: !$('#sg-more').classList.contains('fold')}, cite: CITE_SEL, dataAll: DATA_ALL, citeOpen: [...CITE_OPEN], allFold: [...ALL_FOLD], cfg: [...CFG_OPEN], help: [...HELP_OPEN]});
 const uiNow = () => { clearTimeout(tUi); if (!BOOTED) return Promise.resolve(); const s = JSON.stringify(uiState()); if (s === lastUi) return Promise.resolve(); lastUi = s; return idb('readwrite', st => st.put(JSON.parse(s), 'ui')).catch(() => {}); };
 const uiSoon = () => { clearTimeout(tUi); tUi = setTimeout(uiNow, 500); };
 function applyUI(u) {   // lo guardado nunca se fía: cada dato se valida contra el estado actual (un paper o etiqueta borrados no rompen nada)
@@ -3312,7 +3369,7 @@ function applyUI(u) {   // lo guardado nunca se fía: cada dato se valida contra
   F.read = Object.hasOwn(READ, f.read) ? f.read : ''; F.minRating = Number.isInteger(f.minRating) && f.minRating >= 0 && f.minRating <= 5 ? f.minRating : 0; F.inNotes = !!f.inNotes; F.mode = f.mode === 'all' ? 'all' : 'any'; F.tbSec = !!f.tbSec; F.tbTag = f.tbTag !== false;
   const sd = u.side || {}; $('#side').classList.toggle('min', !!sd.min); document.querySelectorAll('#side .sg').forEach(e => e.classList.toggle('fold', strs(sd.fold).includes(e.id)));
   $('#sg-more').classList.toggle('fold', sd.more !== true); $('#sg-more .shm').setAttribute('aria-expanded', sd.more === true);
-  CITE_SEL = typeof u.cite === 'string' && STYLES[u.cite] ? u.cite : ''; DATA_ALL = u.dataAll === true; strs(u.allFold).forEach(x => ALL_FOLD.add(x)); strs(u.cfg).forEach(x => CFG_OPEN.add(x)); strs(u.help).forEach(x => HELP_OPEN.add(x));
+  CITE_SEL = typeof u.cite === 'string' && STYLES[u.cite] ? u.cite : ''; DATA_ALL = u.dataAll === true; strs(u.citeOpen).filter(g => STY_G.some(([x]) => (x || 'gen') === g)).forEach(g => CITE_OPEN.add(g)); strs(u.allFold).forEach(x => ALL_FOLD.add(x)); strs(u.cfg).forEach(x => CFG_OPEN.add(x)); strs(u.help).forEach(x => HELP_OPEN.add(x));
   $('#grpChk').checked = F.group; render();
 }
 function toast(msg, acts = [], ms = 8000) {

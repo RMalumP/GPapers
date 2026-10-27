@@ -14,8 +14,8 @@
         <button onclick="fmClose();doOpen()">📂 Abrir un archivo JSON…</button>
         <button onclick="fmClose();save(true)">💾 Guardar como…</button>
         <hr><div class="fmh">Importar referencias</div>
-        <button onclick="fmClose();openImport('file')">📄 Desde archivo (.bib / .ris)…</button>
-        <button onclick="fmClose();openImport('text')">📋 Pegar texto BibTeX / RIS…</button>
+        <button onclick="fmClose();openImport('file')">📄 Desde archivo (.bib, .ris o .txt)…</button>
+        <button onclick="fmClose();openImport('text')">📋 Pegar BibTeX, RIS o citas de Google Scholar…</button>
         <button onclick="fmClose();openImport('doi')">🔎 Buscar por DOI…</button>
         <hr><label><input type="checkbox" id="auto" onchange="setAuto(this)"> Autoguardado</label>
       </div></span>
@@ -46,7 +46,7 @@
   <p class="sbinfo">Gestor papers: organiza tus papers y sincronízalos con tu Google Drive. · <a href="privacidad.html" onclick="event.preventDefault();openPriv()">Política de privacidad</a></p>
   </aside>
   <main>
-    <div class="row"><button class="pri" onclick="openPaper()">+ Nuevo paper</button><button id="tbView" class="tg" onclick="setView(db.settings.view==='table'?'cards':'table')" title="Cambiar entre tarjetas y tabla compacta"></button><div class="bar"><button id="tbSec" class="tg" onclick="F.tbSec=!F.tbSec;render()" oncontextmenu="groupMenu(event)" title="Clic: mostrar u ocultar las secciones · Clic derecho: agrupar por sección"></button><div id="secF2" class="chips" hidden></div></div><div class="bar"><button id="tbTag" class="tg" onclick="F.tbTag=!F.tbTag;render()" oncontextmenu="modeMenu(event)" title="Clic: mostrar u ocultar las etiquetas · Clic derecho: cómo combinarlas"></button><div id="tagF2" class="chips"></div></div><button id="selAll" class="tg" onclick="selVisible()" title="Seleccionar todos los papers que se ven">☑ Seleccionar visibles</button><span id="count"></span></div>
+    <div class="row"><button class="pri" onclick="openPaper()">+ Nuevo paper</button><button onclick="openMenu(event)" title="Importar referencias: archivo (.bib, .ris, .txt de ScienceDirect), texto pegado (BibTeX, RIS o citas de Google Scholar) o DOI">📥 Importar</button><button id="tbView" class="tg" onclick="setView(db.settings.view==='table'?'cards':'table')" title="Cambiar entre tarjetas y tabla compacta"></button><div class="bar"><button id="tbSec" class="tg" onclick="F.tbSec=!F.tbSec;render()" oncontextmenu="groupMenu(event)" title="Clic: mostrar u ocultar las secciones · Clic derecho: agrupar por sección"></button><div id="secF2" class="chips" hidden></div></div><div class="bar"><button id="tbTag" class="tg" onclick="F.tbTag=!F.tbTag;render()" oncontextmenu="modeMenu(event)" title="Clic: mostrar u ocultar las etiquetas · Clic derecho: cómo combinarlas"></button><div id="tagF2" class="chips"></div></div><button id="selAll" class="tg" onclick="selVisible()" title="Seleccionar todos los papers que se ven">☑ Seleccionar visibles</button><span id="count"></span></div>
     <div id="list"></div>
   </main>
 </div>

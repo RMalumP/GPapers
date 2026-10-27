@@ -22,7 +22,7 @@ with sync_playwright() as pw:
     eq('Archivo abre el menú y marca aria-expanded', A.evaluate("[!$('#fmenu').hidden, $('#fmBtn').getAttribute('aria-expanded')]"), [True, 'true'])
     A.mouse.click(600, 600)
     eq('un clic fuera lo cierra', A.evaluate("$('#fmenu').hidden"), True)
-    A.click('#fmBtn'); A.click('#fmenu button:has-text("Pegar texto")'); A.wait_for_timeout(200)
+    A.click('#fmBtn'); A.click('#fmenu button:has-text("Pegar BibTeX")'); A.wait_for_timeout(200)
     eq('un elemento del menú lo cierra y abre su ventana', A.evaluate("[$('#fmenu').hidden, $('#imp').open]"), [True, True])
     A.evaluate("$('#imp').close()")
     # estado de guardado único
