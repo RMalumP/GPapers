@@ -64,9 +64,9 @@ with sync_playwright() as pw:
     eq('Formulario de legislación: rango y abreviatura', ['Rango (opcional; se deduce del título)' in labels, 'Abreviatura (p. ej. CE, LOPJ, LRJSP)' in labels], [True, True])
     # ---- pestaña Cita: secciones y cita en el texto
     pg.evaluate("ex().inText = true; openPaper('j2'); tab = 'cite'; CLOC = '3'; drawD()")
-    eq('Cita: títulos de sección', pg.evaluate("[...document.querySelectorAll('#dlg h2.grp')].map(h => h.textContent)"), ['Estilo principal', 'Estilos generales', 'Derecho y jurisprudencia'])
+    eq('Cita: títulos de sección', pg.evaluate("[...document.querySelectorAll('#dlg h2.grp, #dlg details.cgrp > summary')].map(h => h.textContent)"), ['Estilo principal', 'Estilos generales (9)', 'Derecho y jurisprudencia (1)'])
     eq('Cita: anexo de Derecho', pg.evaluate("citeRaw('derecho')"), 'España. Tribunal Supremo (Sala de lo Penal, Sección 1.ª). Sentencia núm. 1229/2017, de 29 de marzo de 2017.')
-    eq('Cita: en el texto con FJ', 'STS 1229/2017 de 29 de marzo, FJ 3' in pg.inner_text('#it_derecho'), True)
+    eq('Cita: en el texto con FJ', 'STS 1229/2017 de 29 de marzo, FJ 3' in pg.text_content('#it_derecho'), True)
     eq('Cita: el campo dice qué se cita', pg.get_attribute('#locIn', 'placeholder'), 'p. ej. 22.1 (artículo) o 3 (FJ, FD o apartado)')
     if shots: pg.evaluate("document.getElementById('c_derecho').scrollIntoView({block: 'center'})"); pg.screenshot(path=os.path.join(shots, 'cita_derecho.png'))
     pg.evaluate("openPaper('j2'); tab = 'all'; CITE_SEL = 'derecho'; drawD()")
