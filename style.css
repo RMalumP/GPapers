@@ -2,7 +2,8 @@
 @media(prefers-color-scheme:dark){:root{--bg:#161a22;--fg:#e6e9f0;--card:#1f2430;--bd:#394055;--pri:#6e97ee;--red:#f2877f}}
 *{box-sizing:border-box}body{margin:0;font:15px/1.45 system-ui,sans-serif;background:var(--bg);color:var(--fg)}
 header{display:flex;flex-wrap:wrap;gap:12px;align-items:center;padding:10px 16px;border-bottom:1px solid var(--bd)}
-h1{margin:0;font-size:20px}#fname{opacity:.7;flex:1}
+h1{margin:0;font-size:20px}#fname{opacity:.7;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:8ch}
+.pj{display:flex;align-items:center;gap:2px;margin-left:-6px}.pjs{font-size:20px;opacity:.4;margin-right:4px}#pjName{font-weight:600;font-size:18px;font-family:inherit;color:inherit;background:none;border:0;border-bottom:1px dashed transparent;border-radius:0;padding:2px 2px;max-width:40vw;min-width:4ch;field-sizing:content}#pjName:hover{border-bottom-color:var(--bd)}#pjName:focus{outline:none;border-bottom:1px solid var(--pri)}#pjBtn{padding:2px 7px;font-size:13px;line-height:1.2}#ctx .pji small{opacity:.6;margin-left:6px}#ctx hr{border:0;border-top:1px solid var(--bd);margin:4px 0;width:100%}
 #app{display:grid;grid-template-columns:280px 1fr;gap:16px;padding:16px}
 @media(max-width:760px){#app{grid-template-columns:1fr}}
 aside{display:flex;flex-direction:column;gap:10px}
@@ -79,7 +80,7 @@ a.nl{color:var(--pri);cursor:pointer;text-decoration:underline dotted}a.nl:hover
 .trb{margin-top:auto}.trb+.cfgb{margin-top:0}
 .sbinfo{margin:6px 0 0;padding:0 10px;font-size:13px;line-height:1.35;opacity:.7}.sbinfo a{color:inherit}aside.min .sbinfo{display:none}   /* qué es la app y enlace a la privacidad, siempre visibles (lo pide Google para verificar la marca) */
 .sbsep{border:0;border-top:1px solid var(--bd);margin:6px 10px;align-self:stretch}
-.shs{padding:3px 10px;font-size:13px;font-weight:400;opacity:.7}.shs:hover{opacity:1}.shs .ic{font-size:14px}   /* Ayuda, Privacidad y Créditos: más bajos y discretos */
+.shs{padding:3px 10px;font-size:13px;font-weight:400;opacity:.7}.shs:hover{opacity:1}.shs .ic{font-size:14px}.shs[hidden]{display:none}   /* Ayuda, Privacidad y Créditos: más bajos y discretos */
 .smb{display:flex;flex-direction:column;gap:2px;padding-left:12px}#sg-more.fold .smb,aside.min .car{display:none}.car{margin-left:auto;font-size:11px;transition:transform .15s}#sg-more:not(.fold) .car{transform:rotate(90deg)}   /* plegados por defecto bajo «Información» */
 .twrap{overflow-x:auto;margin-top:10px;border:1px solid var(--bd);border-radius:8px}.tbl{width:100%;border-collapse:collapse;font-size:13px;background:var(--card)}
 .tbl th,.tbl td{padding:5px 8px;border-bottom:1px solid var(--bd);text-align:left;vertical-align:middle}.tbl th{white-space:nowrap}.tbl th.sortable{cursor:pointer}.tbl th.sortable:hover{color:var(--pri)}
@@ -165,3 +166,7 @@ aside{border-left:0;border-radius:0 10px 10px 0;padding-left:6px}
 #sy,#pv{width:min(640px,96vw)}#cr{width:min(380px,92vw)}
 .cred{display:grid;grid-template-columns:auto 1fr;gap:8px 24px;margin:8px 0 4px}.cred dt{font-weight:600;color:var(--pri)}.cred dd{margin:0;opacity:.75}.cred a{color:inherit}.sytx h4{margin:16px 0 4px}.sytx ul,.sytx ol{padding-left:22px}.sytx li{margin:3px 0}
 .sybt{margin-top:14px;justify-content:flex-end}.sypv{margin-top:14px;padding:10px;border:1px solid var(--bd);border-radius:8px;background:var(--card)}
+.dpg{border:1px solid var(--bd);border-radius:8px;padding:8px 10px;margin:10px 0}.dpt{font-size:12px;font-weight:600;opacity:.7;margin-bottom:4px}#bk .irow small,#dp .irow small{opacity:.75}
+#ps .pji2{display:block;width:100%;text-align:left;margin:4px 0}#ps .pji2 small{opacity:.6;margin-left:6px}
+.pdfrow{display:flex;flex-wrap:wrap;gap:8px;align-items:center}.pdfrow small{flex-basis:100%;opacity:.7}.pdfrow label{display:flex;align-items:center;gap:4px}
+#pjProg{display:flex;align-items:center;gap:6px;font-size:12px;opacity:.85}.pjb{display:flex;width:70px;height:7px;border-radius:99px;background:var(--bd);overflow:hidden}.pjb i{display:block;height:100%}.cpb{padding:2px 6px}#sg-search .sb .row select{flex:1;min-width:0}

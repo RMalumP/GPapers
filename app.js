@@ -69,6 +69,7 @@ function NEWF(p) {   // rellena los campos nuevos de un paper (JSON antiguo, imp
   p.editors = Array.isArray(p.editors) ? p.editors.filter(x => typeof x === 'string' && x.trim()) : [];
   p.authorType = Object.hasOwn(AUTH_T, p.authorType) ? p.authorType : 'auto';
   p.linkMode = Object.hasOwn(LINK_MODES, p.linkMode) ? p.linkMode : 'auto'; p.hideAccessed = !!p.hideAccessed; p.image = imgOk(p.image);
+  p.pdf = p.pdf && typeof p.pdf === 'object' && typeof p.pdf.name === 'string' && p.pdf.name ? {name: p.pdf.name.slice(0, 260), ...(pdfPage(p.pdf.page) ? {page: pdfPage(p.pdf.page)} : {})} : null;
   return p;
 }
 
@@ -687,7 +688,7 @@ const JSON_T = [{description: 'Datos de papers (JSON)', accept: {'application/js
 const idb = (mode, fn) => new Promise((res, rej) => {   // IndexedDB: recuerda el último archivo entre sesiones
   const r = indexedDB.open('gestor-papers', 1); r.onupgradeneeded = () => r.result.createObjectStore('k'); r.onerror = () => rej(r.error);
   r.onsuccess = () => { const t = r.result.transaction('k', mode), q = fn(t.objectStore('k')); t.oncomplete = () => res(q.result); t.onerror = () => rej(t.error); }; });
-const rememberHandle = () => idb('readwrite', st => st.put(handle, 'last')).then(() => $('#reopen').hidden = false).catch(() => {});
+const rememberHandle = () => idb('readwrite', st => { st.put(handle, 'h:' + PJ.cur); return st.put(handle, 'last'); }).then(() => $('#reopen').hidden = false).catch(() => {});   // el archivo de cada proyecto y el último abierto
 function validate(d) {
   if (!d || typeof d !== 'object' || !['papers', 'tags', 'sections'].every(k => Array.isArray(d[k])))
     throw Error('faltan las listas "papers", "tags" o "sections"');
@@ -720,19 +721,16 @@ async function loadText(text, name, quiet) {
   try { db = validate(JSON.parse(text)); path = name; dirty = false; F.tags.clear(); F.sec = ''; SEL.clear(); UNDO.length = 0; REDO.length = 0; lastSnap = JSON.stringify(db); fmtPinned = db.settings.fmtOpen; applySettings(); render(); sessionSoon(); return true; }
   catch (e) { if (!quiet) alert('Archivo no válido (se mantienen los datos actuales): ' + e.message); return false; }
 }
-async function doOpen() {
-  if (dirty && !confirm('Hay cambios sin guardar. ¿Descartarlos y abrir otro archivo?')) return;
+async function doOpen() {   // cada archivo JSON se abre como proyecto (ver Proyectos)
   try {
-    if (FSA) { const [h] = await showOpenFilePicker({types: JSON_T});
-      if (await loadText(await (await h.getFile()).text(), h.name)) { handle = h; rememberHandle(); syLoaded(); } }
-    else { const r = await pickFile(); if (r) { handle = null; if (await loadText(r.text, r.path)) syLoaded(); } }
+    if (FSA) { const [h] = await showOpenFilePicker({types: JSON_T}); await pjOpenFile(await (await h.getFile()).text(), h.name, h); }
+    else { const r = await pickFile(); if (r) await pjOpenFile(r.text, r.path, null); }
   } catch (e) { if (e.name !== 'AbortError') alert('No se pudo abrir el archivo: ' + e.message); }
 }
 async function reopenLast() {   // Chrome pide confirmar el acceso al archivo en cada sesión
-  if (dirty && !confirm('Hay cambios sin guardar. ¿Descartarlos y abrir el último archivo?')) return;
   try { const h = await idb('readonly', st => st.get('last')); if (!h) return;
     if (await h.requestPermission({mode: 'readwrite'}) !== 'granted') return alert('Sin permiso para acceder al archivo.');
-    if (await loadText(await (await h.getFile()).text(), h.name)) { handle = h; syLoaded(); }
+    await pjOpenFile(await (await h.getFile()).text(), h.name, h);
   } catch (e) { alert('No se pudo reabrir el archivo: ' + e.message); }
 }
 async function writeTo(h, text) { const w = await h.createWritable(); await w.write(text); await w.close(); }   // el archivo solo cambia al cerrar: escritura segura
@@ -741,9 +739,9 @@ async function save(asNew) {
   const text = dbJSON();
   try {
     if (FSA && handle && !asNew && handle.queryPermission && await handle.queryPermission({mode: 'readwrite'}) !== 'granted' && await handle.requestPermission({mode: 'readwrite'}) !== 'granted') handle = null;   // enlace recuperado de la sesión anterior: pide permiso o elige archivo
-    if (FSA) { if (!handle || asNew) { handle = await showSaveFilePicker({suggestedName: path || 'papers.json', types: JSON_T}); rememberHandle(); path = handle.name; }
+    if (FSA) { if (!handle || asNew) { handle = await showSaveFilePicker({suggestedName: pjFile(pjCur().name), types: JSON_T}); rememberHandle(); path = handle.name; }   // el archivo se llama como el proyecto
       await writeTo(handle, text); }
-    else { path = path || 'papers.json'; download(text, path, 'application/json'); }
+    else { path = pjFile(pjCur().name); download(text, path, 'application/json'); }
     dirty = false; hdr(); sessionSoon();
   } catch (e) { if (e.name !== 'AbortError') alert('Error al guardar: ' + e.message); }
 }
@@ -1230,15 +1228,31 @@ const helpTbl = rows => `<table class="hpt">${rows.map(r => `<tr>${r.map((c, i) 
 function helpHTML() {
   const sc = db.settings.shortcuts, kb = a => `<kbd>${esc(sc[a] || 'sin asignar')}</kbd>`;
   const S = {
-    inicio: ['Primeros pasos', `<p>Esta aplicación guarda tus papers, secciones, etiquetas, notas y ajustes en <b>un único archivo JSON</b> que tú eliges. No hay cuenta ni servidor: todo está en tu navegador y en ese archivo.</p>
-      <ul><li><b>Abrir 📂</b> (${kb('open')}): carga un archivo JSON. Clic derecho en 📂 para <i>importar</i> referencias (.bib, .ris, texto o DOI).</li>
-      <li><b>Guardar 💾</b> (${kb('save')}) y <b>Guardar como</b>: en Chrome y Edge de escritorio escriben directamente en el archivo; en otros navegadores se descarga una copia.</li>
+    inicio: ['Primeros pasos', `<p>Esta aplicación guarda tus papers, secciones, etiquetas y notas por <b>proyectos</b>: cada proyecto en <b>su propio archivo JSON</b>, que se llama como el proyecto. No hay cuenta ni servidor: todo está en tu navegador y en tus archivos.</p>
+      <ul><li><b>Proyecto</b>: su nombre va arriba, al lado del de la aplicación; escríbelo ahí para cambiarlo. Con <b>▾</b> cambias de proyecto o creas uno nuevo (ver «Proyectos»).</li>
+      <li><b>Abrir 📂</b> (${kb('open')}): abre un archivo JSON como proyecto. Clic derecho en 📂 para <i>importar</i> referencias (.bib, .ris, texto o DOI).</li>
+      <li><b>Guardar 💾</b> (${kb('save')}) y <b>Guardar como</b> guardan el proyecto abierto en su archivo, con el nombre del proyecto: en Chrome y Edge de escritorio escriben directamente en el archivo; en otros navegadores se descarga una copia.</li>
       <li><b>Autoguardado</b> (solo Chrome/Edge): guarda solo, un segundo después de cada cambio. La primera vez pide el archivo. Con Google Drive conectado funciona en cualquier navegador y guarda en tu Drive.</li>
       <li><b>Google Drive 🔄</b> (a la izquierda de 📂; sin conectar pone «Conectar con Google Drive»): guarda tu biblioteca en tu Google Drive y la mantiene igual en todos tus dispositivos (ver «Sincronización con Google Drive»).</li>
       <li><b>Reabrir último</b>: aparece tras abrir un archivo y vuelve a cargarlo en la siguiente sesión (el navegador pide permiso).</li>
       <li>En la versión web se abre al principio <code>ejemplo_papers.json</code> para que pruebes; guarda tu trabajo con «Guardar como».</li>
       <li>Deshacer ${kb('undo')} y rehacer ${kb('redo')} funcionan sobre los cambios de la sesión.</li></ul>
       <p>Qué se guarda en el JSON: papers (con su fecha de creación, notas e imagen), secciones, etiquetas, papelera y todos los ajustes (paleta, atajos, plantillas de nota, tipos y estilos de cita propios). <b>No</b> se guarda el historial de cambios del día ni los enlaces a archivos de imagen locales.</p>`],
+    proyectos: ['Proyectos', `<p>Un <b>proyecto</b> es una biblioteca aparte: sus papers, notas, secciones, etiquetas, relaciones y papelera. Al abrir un proyecto solo ves sus papers. Lo demás es <b>común a todos</b>: el nombre de la aplicación, los colores, los atajos, los tipos y estilos propios, las plantillas de nota y las opciones de exportación.</p>
+      <ul><li><b>Nombre</b>: arriba, al lado del nombre de la aplicación. Haz clic, escribe y pulsa Intro. Su archivo JSON se llama igual (<code>Tesis</code> → <code>Tesis.json</code>); en Chrome y Edge el archivo se renombra, y si no se puede, el siguiente «Guardar» crea el del nombre nuevo.</li>
+      <li><b>Cambiar de proyecto</b>: botón <b>▾</b> → elige uno. Es inmediato: el navegador guarda la copia de trabajo de cada proyecto, también los cambios sin guardar, y al volver está como lo dejaste.</li>
+      <li><b>Nuevo proyecto</b>: ▾ → «Nuevo proyecto»; empieza vacío y puedes escribir su nombre.</li>
+      <li><b>Abrir 📂 un JSON</b>: si ese archivo ya es uno de tus proyectos, se abre ese proyecto; si no, se crea uno nuevo con el nombre del archivo.</li>
+      <li><b>Guardar 💾</b> guarda solo el proyecto abierto en su archivo; <b>Guardar como</b> propone <code>&lt;nombre del proyecto&gt;.json</code>. El autoguardado escribe en el archivo de cada proyecto.</li>
+      <li><b>Borrar</b>: ▾ → «Borrar este proyecto»; desaparece de la aplicación (y de tu Google Drive si está conectado). Tu archivo JSON no se toca.</li>
+      <li><b>Con Google Drive</b> se guardan todos los proyectos y en tus otros dispositivos aparecen en la lista ▾ (☁ = aún no descargado: se descarga al abrirlo). Al cambiar de proyecto, primero se sube lo pendiente.</li></ul>`],
+    extras: ['Copias, duplicados, PDF y filtros guardados', `<ul><li><b>Copias de seguridad</b>: ▾ junto al nombre del proyecto → «Copias de seguridad…». Se guarda una al abrir la aplicación cada día (las últimas 10) y otra antes de restaurar o de sustituirlo todo por lo de Drive; también puedes crear una a mano, descargarla o borrarla. «Restaurar» sustituye los papers, notas, secciones, etiquetas y papelera de ese proyecto (los ajustes no cambian) y se puede deshacer. Solo viven en este navegador y se borran con el proyecto.</li>
+      <li><b>Buscar duplicados</b>: grupo <b>Selección</b> de la barra lateral. Agrupa papers con el mismo DOI o título; «Quedarme con este» conserva ese paper, le añade lo que falte de los otros (campos vacíos, etiquetas, secciones, notas, relaciones y enlaces de las notas) y manda los demás a la papelera. «No son duplicados» los descarta hasta cerrar la aplicación.</li>
+      <li><b>Mover o copiar a otro proyecto</b>: marca papers con «Seleccionar» y pulsa «Mover o copiar a otro proyecto…» (grupo Selección). Se llevan las notas, etiquetas y secciones (se buscan por nombre y, si no existen en el destino, se crean) y las relaciones entre los papers elegidos. Se ve al abrir el otro proyecto.</li>
+      <li><b>PDF enlazado</b>: en «Datos» de cada paper, «Enlazar un PDF…» (y, si quieres, la página donde abrirlo). Solo se guarda el <b>nombre</b> en el JSON; el archivo no se sube a ningún sitio, ni a Google Drive. Se abre con «📄 PDF» en la tarjeta o la tabla. En otro dispositivo, o si lo moviste, te pide elegirlo de nuevo. Sin acceso a archivos (no Chrome ni Edge de escritorio), hay que elegirlo cada vez.</li>
+      <li><b>Copiar cita 📋</b>: en cada tarjeta y fila copia la cita en el estilo elegido en Exportar, con cursiva al pegar en Word o Docs.</li>
+      <li><b>Filtros guardados ⭐</b>: en el grupo Buscar, «＋» guarda la búsqueda, el orden, la sección, las etiquetas, la lectura y la valoración actuales con un nombre; elígelo para aplicarlo. Son de cada proyecto y de este navegador.</li>
+      <li><b>Progreso</b>: junto al nombre del proyecto, una barra con los papers leídos y leyendo (el detalle, al pasar el ratón).</li></ul>`],
     lista: ['Lista principal', `<ul><li><b>Tarjetas o tabla</b>: el botón «Tabla / Tarjetas» cambia la vista. La tabla muestra imagen, título, autores, año, revista, lectura, valoración, secciones, etiquetas y notas.</li>
       <li><b>En cada tarjeta</b>: casilla para seleccionar, <i>Editar</i>, las etiquetas del paper, el estado de lectura, las estrellas y la ✕ (a la papelera). Si las etiquetas no caben en la barra, pasan a su propia línea.</li>
       <li><b>Estado de lectura</b>: un clic lo cambia (por leer → leyendo → leído). <b>Estrellas</b>: clic derecho para elegir la valoración.</li>
@@ -1250,6 +1264,7 @@ function helpHTML() {
       <li><b>Ordenar ⇅</b>: varios criterios en cascada (título, autor, año, revista, lectura, valoración, fecha de creación o modificación…), cada uno ascendente o descendente. Aquí también está «Agrupar por sección» y la <b>valoración mínima</b>.</li>
       <li><b>Secciones 📁</b> y <b>Etiquetas 🏷️</b>: filtran la lista. «✎ Gestionar» crea, renombra, recolorea, ordena y borra. Las etiquetas se pueden combinar con «al menos una» o «todas». Clic derecho en una sección abre sus notas.</li>
       <li><b>Lectura 📖</b>: filtra por estado. <b>Selección ☑️</b>: seleccionar visibles/quitar y exportar.</li>
+      <li><b>Información ℹ️</b> (plegada): Ayuda, <b>Añadir app</b> (solo si no está instalada) y Créditos.</li>
       <li><b>Relaciones 🕸️</b>: gráfico de los papers relacionados o que se citan entre sí. <b>Papelera 🗑️</b>: los papers eliminados se guardan <b>5 días</b> y se pueden restaurar.</li></ul>`],
     paper: ['Editar un paper', `<p>«+ Nuevo paper» o «Editar». Pestañas: <b>Ver todo</b> (todos los bloques, plegables y con una sola variante de cita), <b>Datos</b>, <b>Cita</b>, <b>Notas</b>, <b>Secciones, etiquetas y relacionados</b> e <b>Historial</b>. «Guardar paper» confirma; «Cancelar» o cerrar sin guardar descarta el borrador.</p>
       <h4>Datos</h4><ul><li><b>Imagen</b> (recuadro junto a los títulos): una <i>URL</i>, un <i>archivo local enlazado</i> (solo Chrome/Edge: el JSON guarda el nombre y el enlace queda en ese navegador) o una <i>copia reducida incrustada</i> en el JSON. También puedes <b>pegar con Ctrl+V</b> una imagen copiada (por ejemplo de Google Imágenes).</li>
@@ -1266,7 +1281,7 @@ function helpHTML() {
       <li><b>Orden</b>: automático (alfabético o por lista según el estilo), lista, alfabético o por año. <b>Numerar</b>, formato del número, idioma de los conectores (es/en), formato de la fecha de consulta, incluir notas, listar todos los autores en Vancouver…</li>
       <li>El texto de la vista previa es editable. <b>Copiar</b> copia texto; <b>Copiar con formato</b> conserva cursiva y sangría francesa para Word o Docs. También puedes guardar el archivo.</li></ul>`],
     importar: ['Importar referencias', `<p>Clic derecho en 📂 (o ${kb('import')}): desde un archivo <code>.bib</code>/<code>.ris</code>, pegando texto BibTeX/RIS o buscando por <b>DOI</b>. Antes de añadir se revisa la lista, y puedes asignar sección, etiqueta y estado de lectura a todas. Dentro de un paper, «Buscar» junto al DOI propone rellenar solo los campos vacíos o los que marques.</p>`],
-    config: ['Configuración', `<p>⚙️ en la barra lateral. Todo se guarda en el JSON.</p><ul><li><b>Nombre de la aplicación</b>, <b>paleta de colores</b> (o personalizada) y mostrar el archivo abierto en la cabecera.</li>
+    config: ['Configuración', `<p>⚙️ en la barra lateral. Es común a todos los proyectos y se guarda también en cada JSON.</p><ul><li><b>Nombre de la aplicación</b>, <b>paleta de colores</b> (o personalizada) y mostrar el archivo abierto en la cabecera.</li>
       <li><b>Mostrar la imagen</b> del paper en tarjetas y tabla. <b>Barra de formato</b> de las notas desplegada por defecto. <b>Cita en el texto</b> (Chicago) en la pestaña Cita.</li>
       <li><b>Tipos de documento propios</b> y <b>Estilos de cita personalizados</b>: ver las dos secciones siguientes.</li>
       <li><b>Plantillas de nota</b>: textos de partida para las notas; <code>{fecha}</code> y <code>{paper}</code> se sustituyen al insertarlas.</li>
@@ -1299,12 +1314,13 @@ function helpHTML() {
       <h4>Vista previa</h4><p>Se actualiza al escribir. Elige «Un ejemplo» (con la opción «Ver el ejemplo en todos los tipos») o uno de tus papers para comprobar cómo queda.</p>
       <h4>Ejemplo</h4><p><code>[{authors}. ]({year|s.f.}). {title:i}. [{edition}. ][{place}: ]{venue}. [{link}]</code><br>→ «Pérez, J. C. (2021). <i>Título del libro</i>. 2.ª ed. Madrid: Editorial. https://…»</p>`],
     pwa: ['Aplicación instalada (PWA), sesión y actualizaciones', `<p>Puedes instalar la aplicación desde el navegador (icono de instalar en la barra de direcciones o «Instalar aplicación» en el menú). Funciona sin conexión.</p>
-      <ul><li><b>Datos de la aplicación</b>: además de tu JSON, la aplicación guarda en el almacenamiento del navegador una <b>copia de la sesión</b> (tus datos tal como los tienes ahora, aunque no hayas guardado) y el <b>estado de la interfaz</b> (filtros, orden, barra lateral plegada, bloques abiertos). Al volver a abrirla sigues donde lo dejaste; si había cambios sin guardar, un aviso te lo recuerda.</li>
+      <ul><li><b>Datos de la aplicación</b>: además de tu JSON, la aplicación guarda en el almacenamiento del navegador una <b>copia de la sesión</b> de cada proyecto (tus datos tal como los tienes ahora, aunque no hayas guardado) y el <b>estado de la interfaz</b> (filtros, orden, barra lateral plegada, bloques abiertos). Al volver a abrirla sigues donde lo dejaste; si había cambios sin guardar, un aviso te lo recuerda.</li>
       <li><b>Tu archivo JSON sigue siendo el original</b>: la copia de sesión no lo sustituye. Guarda (${kb('save')}) para escribir en el archivo; si la aplicación recuerda el archivo, te pedirá permiso para escribir en él.</li>
+      <li><b>Instalar</b>: en «Información», bajo Configuración, el botón <b>Añadir app</b> la instala en este dispositivo (en los navegadores que no lo permiten, explica cómo). Solo aparece si la aplicación aún no está instalada.</li>
       <li><b>Actualizaciones</b>: la aplicación busca versiones nuevas sola (al abrirla, al volver a ella y cada media hora). Cuando hay una, aparece un aviso «Hay una versión nueva» con el botón <b>Recargar ahora</b>; antes de recargar guarda la copia de sesión. <b>No hace falta borrar los datos de la aplicación</b>: se guardan aparte de lo que se actualiza.</li>
-      <li>Versión instalada: <b>v${APP_V}</b>. <button onclick="checkUpdate()">Buscar actualizaciones</button> <button class="danger" onclick="forgetAppData()" title="No toca tu archivo JSON">Olvidar la copia de sesión</button></li>
+      <li>Versión instalada: <b>v${APP_V}</b>. <button onclick="checkUpdate()">Buscar actualizaciones</button> <button class="danger" onclick="forgetAppData()" title="Borra de este navegador las copias de trabajo de los proyectos; no toca tus archivos JSON ni Google Drive">Olvidar la copia de sesión</button></li>
       <li>El navegador puede borrar los datos de los sitios si se queda sin espacio; la aplicación pide almacenamiento persistente para evitarlo, pero tu <b>JSON</b> sigue siendo la copia que debes conservar.</li></ul>`],
-    sync: ['Sincronización con Google Drive', `<p>El icono <b>🔄</b> de la barra de arriba, a la izquierda de 📂 (sin conectar pone «Conectar con Google Drive»), guarda tu biblioteca entera (papers, notas, secciones, etiquetas, papelera y ajustes) en una <b>carpeta oculta de tu propio Google Drive</b>, para tenerla igual en el ordenador, la tablet y el móvil.</p>
+    sync: ['Sincronización con Google Drive', `<p>El icono <b>🔄</b> de la barra de arriba, a la izquierda de 📂 (sin conectar pone «Conectar con Google Drive»), guarda <b>todos tus proyectos</b> (papers, notas, secciones, etiquetas, papelera y ajustes) en una <b>carpeta oculta de tu propio Google Drive</b>, para tenerlos igual en el ordenador, la tablet y el móvil.</p>
       <ul><li><b>Conectar</b>: pulsa 🔄 → «Continuar», elige tu cuenta de Google y da permiso. Si en Drive ya había una biblioteca de otro dispositivo, eliges si combinarlas o quedarte con una.</li>
       <li><b>Autoguardado activado</b>: con la sesión iniciada, cada cambio se sube solo a los pocos segundos (solo lo que cambió, no la biblioteca entera), y al abrir la aplicación o volver a ella se traen los cambios de los otros dispositivos. La casilla «Autoguardado» lo activa o desactiva (sin ella, sincroniza a mano).</li>
       <li><b>El punto del icono</b>: verde, sincronizado; azul y girando, sincronizando; amarillo, cambios pendientes o hay que volver a conectar; rojo, error (se reintenta).</li>
@@ -1313,7 +1329,8 @@ function helpHTML() {
       <li><b>Cada hora Google corta el acceso</b> por seguridad (sin un servidor propio no se puede renovar sin abrir su ventana). La aplicación intenta renovarlo sola; si el navegador no lo deja, el punto se pone amarillo y se reconecta con tu <b>siguiente clic o tecla</b> (puede verse un instante la ventana de Google). No pierdes nada: los cambios esperan en el dispositivo y se suben al reconectar. El acceso se comparte entre pestañas y vale al reabrir la aplicación mientras no caduque.</li>
       <li><b>Qué se guarda en Drive</b>: una copia completa, un archivo pequeño con lo que cambió en cada autoguardado y cada imagen incrustada aparte, una sola vez aunque la uses en varios papers. Cuando se acumulan cambios, la copia completa se pone al día y se borran los sueltos; las imágenes que ya no usa nadie se borran pasado un día. Cada dispositivo solo descarga lo que aún no tiene.</li>
       <li><b>Sin límite de tamaño práctico</b>: lo que pasa de 4 MB se sube por partes (subida reanudable de Google Drive), sin configurar nada.</li>
-      <li>La vista (tarjetas o tabla) es de cada dispositivo y no se sincroniza. Tu archivo JSON sigue funcionando igual.</li></ul>`],
+      <li><b>Proyectos</b>: se sincroniza el proyecto abierto, la lista de proyectos (con sus nombres) y los ajustes comunes. Los proyectos creados en otro dispositivo salen en ▾ con ☁ y se descargan al abrirlos; renombrar o borrar un proyecto llega a los demás dispositivos.</li>
+      <li>La vista (tarjetas o tabla) es de cada dispositivo y no se sincroniza. Tus archivos JSON siguen funcionando igual.</li></ul>`],
     atajos: ['Atajos de teclado', helpTbl(Object.keys(SC_NAMES).map(a => [esc(SC_NAMES[a]), kb(a)]).concat([['Esta ayuda', '<kbd>F1</kbd>'], ['Cerrar menús y ventanas', '<kbd>Esc</kbd>']])) + '<p>Se cambian en Configuración → Atajos de teclado. Dentro de campos de texto solo funciona «Guardar»; negrita y cursiva actúan dentro de una nota.</p>'],
     datos: ['Datos, privacidad y consejos', `<ul><li>Todo se queda en tu navegador y en tu archivo JSON. La aplicación solo sale a internet para <b>buscar un DOI en CrossRef</b>, para mostrar <b>imágenes por URL</b> y, si la activas, para la <b>sincronización con Google Drive</b>. Detalles en la <a href="privacidad.html" onclick="event.preventDefault();openPriv()">Política de privacidad</a> (enlace al final de la barra lateral).</li>
       <li>Funciona sin conexión una vez cargada (se puede instalar como aplicación). Las imágenes por URL y la búsqueda de DOI necesitan internet.</li>
@@ -1464,7 +1481,7 @@ const starsHTML = p => `<span class="stv${p.rating ? '' : ' none'}" oncontextmen
 const rdHTML = p => `<span class="rd"><button class="rst" style="--c:${READ_C[p.reading]}" title="Clic: cambiar el estado de lectura" onclick="cycleRead('${p.id}')">${READ[p.reading]}</button>${starsHTML(p)}</span>`;
 function starMenu(e, id) { ctxShow(e, '<div class="ctxh">Valoración</div>' + [5, 4, 3, 2, 1, 0].map(n => `<button onclick="setRating('${id}',${n})">${n ? '★'.repeat(n) + '☆'.repeat(5 - n) : 'Sin valorar'}</button>`).join('')); }
 function setRating(id, n) { const p = db.papers.find(x => x.id === id); ctxClose(); if (!p || p.rating === n) return; logChange(p, `Valoración: ${p.rating || '—'} → ${n || '—'}`); p.rating = n; markDirty(); render(); }
-const card = (p, from) => `<article class="card" data-id="${p.id}" ${F.group ? `draggable="true" data-from="${from || ''}"` : ''}><div class="ct"><label class="sel"><input type="checkbox" ${SEL.has(p.id) ? 'checked' : ''} onchange="toggleSel('${p.id}')"> Seleccionar</label><button class="sm" onclick="openPaper('${p.id}')">Editar</button>${p.tagIds.length ? `<span class="tl">${tagsOf(p)}</span>` : ''}${rdHTML(p)}<button class="x" title="Eliminar" onclick="delPaper('${p.id}')">✕</button></div><div class="th">${thumbHTML(p, 'sm')}<h3>${esc(p.alias || p.title)}</h3></div>${p.alias ? `<div class="sub">${esc(p.title)}</div>` : ''}
+const card = (p, from) => `<article class="card" data-id="${p.id}" ${F.group ? `draggable="true" data-from="${from || ''}"` : ''}><div class="ct"><label class="sel"><input type="checkbox" ${SEL.has(p.id) ? 'checked' : ''} onchange="toggleSel('${p.id}')"> Seleccionar</label><button class="sm" onclick="openPaper('${p.id}')">Editar</button><button class="sm cpb" onclick="copyCardCite('${p.id}',this)" title="Copiar la cita (estilo elegido en Exportar), con cursiva al pegar en Word">📋</button>${p.pdf ? `<button class="sm" onclick="pdfOpen('${p.id}')" title="Abrir el PDF enlazado: ${esc(p.pdf.name)}">📄 PDF</button>` : ''}${p.tagIds.length ? `<span class="tl">${tagsOf(p)}</span>` : ''}${rdHTML(p)}<button class="x" title="Eliminar" onclick="delPaper('${p.id}')">✕</button></div><div class="th">${thumbHTML(p, 'sm')}<h3>${esc(p.alias || p.title)}</h3></div>${p.alias ? `<div class="sub">${esc(p.title)}</div>` : ''}
     <div class="au"><span>${esc(p.authors.join('; '))} ${p.year ? '(' + esc(p.year) + ')' : ''}</span></div>
     ${/^https?:/i.test(p.url) ? `<a href="${esc(p.url)}" target="_blank" rel="noopener noreferrer">${esc(p.url)}</a>` : ''}
     
@@ -1479,7 +1496,7 @@ const rowHTML = (p, from) => `<tr class="rw" data-id="${p.id}" ${F.group ? `drag
   <td class="tt"><a class="tl2" onclick="openPaper('${p.id}')" title="Editar">${esc(p.alias || p.title)}</a></td><td>${esc(p.authors.join('; '))}</td><td>${esc(p.year)}</td><td>${esc(p.venue)}</td>
   <td><button class="rst" style="--c:${READ_C[p.reading]}" title="Clic: cambiar el estado de lectura" onclick="cycleRead('${p.id}')">${READ[p.reading]}</button></td><td>${starsHTML(p)}</td>
   <td>${p.sectionIds.map(id => db.sections.find(s => s.id === id)).filter(Boolean).map(s => chip(s, 1)).join('')}</td><td>${tagsOf(p)}</td>
-  <td class="nw"><button class="sm" onclick="toggleNotes('${p.id}')" oncontextmenu="viewNotes(event,'${p.id}')" title="Clic: desplegar · Clic derecho: visor de notas">${p.notes.filter(n => n.content.trim()).length} ${EXP.has(p.id) ? '▾' : '▸'}</button>${relCount(p) ? `<button class="sm" onclick="viewRel('${p.id}')" title="Relaciones">🔗 ${relCount(p)}</button>` : ''}</td>
+  <td class="nw"><button class="sm cpb" onclick="copyCardCite('${p.id}',this)" title="Copiar la cita (estilo elegido en Exportar), con cursiva al pegar en Word">📋</button>${p.pdf ? `<button class="sm" onclick="pdfOpen('${p.id}')" title="Abrir el PDF enlazado: ${esc(p.pdf.name)}">📄</button>` : ''}<button class="sm" onclick="toggleNotes('${p.id}')" oncontextmenu="viewNotes(event,'${p.id}')" title="Clic: desplegar · Clic derecho: visor de notas">${p.notes.filter(n => n.content.trim()).length} ${EXP.has(p.id) ? '▾' : '▸'}</button>${relCount(p) ? `<button class="sm" onclick="viewRel('${p.id}')" title="Relaciones">🔗 ${relCount(p)}</button>` : ''}</td>
   <td><button class="x" title="Eliminar" onclick="delPaper('${p.id}')">✕</button></td></tr>${EXP.has(p.id) ? `<tr class="rn"><td></td><td colspan="11">${notesHTML(p)}</td></tr>` : ''}`;
 const tableHTML = (L, from) => `<div class="twrap"><table class="tbl"><thead><tr><th></th>${TH.map(([k, t]) => k ? `<th class="sortable" onclick="thSort('${k}')">${t}${F.sorts[0]?.k === k ? (F.sorts[0].d > 0 ? ' ▲' : ' ▼') : ''}</th>` : `<th>${t}</th>`).join('')}</tr></thead><tbody>${L.map(p => rowHTML(p, from)).join('')}</tbody></table></div>`;
 const items = (l, from) => db.settings.view === 'table' ? (l.length ? tableHTML(l, from) : '') : l.map(p => card(p, from)).join('');
@@ -1516,7 +1533,7 @@ function render() {
   const L = visible();
   $('#list').innerHTML = listHTML(L) || '<p class="empty">No hay papers que mostrar. Crea uno con «Nuevo paper» o ajusta los filtros.</p>';
   fitTags(); hydrateImgs(); uiSoon();
-  $('#count').textContent = `${L.length} de ${db.papers.length} papers · ${SEL.size} seleccionados`;
+  $('#count').textContent = `${L.length} de ${db.papers.length} papers · ${SEL.size} seleccionados`; progDraw();
 }
 function toggleF(id) { F.tags.has(id) ? F.tags.delete(id) : F.tags.add(id); render(); }
 function ctxShow(e, html) {   // menú contextual genérico
@@ -1740,7 +1757,7 @@ function drawD() {
   if (tab === 'data' || tab === 'all') h += blk('data', 'Datos', `<div class="grid"><div class="w titlerow"><div class="pimgbox">${pimgHTML(D, 'big', `role="button" tabindex="0" onclick="imgOpen()" title="Imagen del paper (opcional): pulsa para poner una URL o un archivo, o pega una imagen copiada con Ctrl+V"`)}</div><div class="titlecol">${inp('title', 'Título *')}${inp('alias', 'Título personalizado (opcional; solo para mostrar, la cita usa el título original)')}</div></div>
     <label class="w">Autores (uno por línea: «Apellido, Nombre»)<textarea oninput="D.authors=this.value.split('\\n').map(s=>s.trim()).filter(Boolean)">${esc(D.authors.join('\n'))}</textarea></label>
     ${inp('sortKey', 'Clave de orden en la bibliografía (opcional): p. ej. «Torre» para «de la Torre, Ana»', 'text', 'w')}<label>Año<input type="number" data-k="year" value="${esc(D.year)}" oninput="D.year=this.value;pubSync()"></label><label>Tipo<select onchange="typeChange(this.value)">${Object.entries(TYPES).filter(([k]) => !CTYPES.has(k)).map(([k, v]) => `<option value="${k}" ${D.type === k ? 'selected' : ''}>${v}</option>`).join('')}${CTYPES.size ? `<optgroup label="Tipos propios">${[...CTYPES].map(([k, t]) => `<option value="${k}" ${D.type === k ? 'selected' : ''}>${esc(t.name)}</option>`).join('')}</optgroup>` : ''}<option value="__new">➕ Crear un tipo propio…</option></select></label>
-    ${inp('url', 'URL', 'url', 'w')}${inp('venue', lbl('venue', 'Revista / editorial / sitio'))}<label>DOI (sin https://doi.org/)<span class="row" style="flex-wrap:nowrap"><input style="flex:1;min-width:0" value="${esc(D.doi)}" oninput="D.doi=this.value"><button onclick="doiFill()" title="Rellenar con los datos de CrossRef">Buscar</button></span></label>${inp('accessed', 'Fecha de consulta', 'date')}
+    ${inp('url', 'URL', 'url', 'w')}<div class="w pdfrow"><span>📄 PDF: ${D.pdf ? `<b>${esc(D.pdf.name)}</b>` : '<i>ninguno</i>'}</span><button onclick="pdfPick()">${D.pdf ? 'Cambiar…' : 'Enlazar un PDF…'}</button>${D.pdf ? `<button onclick="pdfOpen('${D.id}')">Abrir</button><label>Página <input type="number" min="1" style="width:5em" value="${D.pdf.page || ''}" oninput="pdfSetPage(this.value)" placeholder="1"></label><button class="x" onclick="pdfClear()" title="Quitar el enlace al PDF">✕</button>` : ''}<small>El archivo no se sube a ningún sitio: solo se recuerda su nombre.</small></div>${inp('venue', lbl('venue', 'Revista / editorial / sitio'))}<label>DOI (sin https://doi.org/)<span class="row" style="flex-wrap:nowrap"><input style="flex:1;min-width:0" value="${esc(D.doi)}" oninput="D.doi=this.value"><button onclick="doiFill()" title="Rellenar con los datos de CrossRef">Buscar</button></span></label>${inp('accessed', 'Fecha de consulta', 'date')}
     <label>Enlace en la cita (si hay DOI y URL)<select onchange="D.linkMode=this.value">${Object.entries(LINK_MODES).map(([k, v]) => `<option value="${k}" ${D.linkMode === k ? 'selected' : ''}>${v}</option>`).join('')}</select></label>
     <label class="chk"><input type="checkbox" ${D.hideAccessed ? 'checked' : ''} onchange="D.hideAccessed=this.checked"> Omitir «[consultado …]» en la cita (aunque la fecha esté rellena)</label>
     <label>Tipo de autor<select onchange="D.authorType=this.value">${Object.entries(AUTH_T).map(([k, v]) => `<option value="${k}" ${D.authorType === k ? 'selected' : ''}>${v}</option>`).join('')}</select></label>
@@ -2223,6 +2240,8 @@ function commit() {
   const i = db.papers.findIndex(p => p.id === D.id), old = i < 0 ? null : db.papers[i];
   logChange(D, ...(old ? diffPaper(old, D) : ['Creado']));
   if (PEND.has(D.id)) idb('readwrite', st => st.put(PEND.get(D.id), 'img:' + D.id)).catch(() => {});
+  if (PEND_PDF.has(D.id)) idb('readwrite', st => st.put(PEND_PDF.get(D.id), 'pdf:' + D.id)).catch(() => {});
+  if (!D.pdf) idb('readwrite', st => st.delete('pdf:' + D.id)).catch(() => {});
   syncRelated(old ? old.related : [], D);
   i < 0 ? db.papers.push(D) : db.papers[i] = D;
   markDirty(); $('#dlg').close(); render();
@@ -2259,10 +2278,17 @@ function delM(id) {
    En Drive: una copia completa (gpapers-snap.json), un archivo pequeño por cada autoguardado con solo lo que cambió
    (gpapers-d-<hora>-<dispositivo>.json, campo a campo) y cada imagen incrustada aparte, una sola vez (gpapers-img-<huella>).
    Cuando se acumulan cambios, la copia completa se reescribe y se borran los que ya incluye. Lo ya descargado se guarda en
-   IndexedDB, así cada vuelta solo pide la lista de archivos y los nuevos. Lo grande se sube por partes (subida reanudable). */
+   IndexedDB, así cada vuelta solo pide la lista de archivos y los nuevos. Lo grande se sube por partes (subida reanudable).
+   Proyectos: cada uno tiene sus archivos (el primero, «main», los de siempre; los demás, gpapers-p-<id>-…) y un índice común
+   (gpapers-projects.json) lleva la lista de proyectos y los ajustes comunes, que se combinan igual. Cada vuelta sincroniza el
+   índice y el proyecto abierto; los demás se descargan al abrirlos. */
 const SY_CFG = {clientId: '143923429984-45e8m3bmn1315r9ceet2sb19iuq4f9qj.apps.googleusercontent.com',   // ID de cliente OAuth del proyecto «Gestor de papers» (público, no es un secreto); vacío = sin sincronización
   file: 'gpapers-snap.json', legacy: 'gpapers-sync.json', big: 4 * 1024 * 1024, maxDeltas: 25};   // big: a partir de aquí, subida reanudable · maxDeltas: cambios sueltos antes de rehacer la copia completa
 const SY_LOCALSET = ['view'];   // ajustes propios de cada dispositivo: no se sincronizan
+const SY_IDX = 'gpapers-projects.json';   // índice: lista de proyectos y ajustes comunes
+const syNames = id => id === 'main' ? {snap: SY_CFG.file, legacy: SY_CFG.legacy, d: 'gpapers-d-', img: 'gpapers-img-', key: ''}   // el primer proyecto conserva los nombres de antes (las versiones anteriores lo siguen viendo)
+  : {snap: `gpapers-p-${id}-snap.json`, legacy: null, d: `gpapers-p-${id}-d-`, img: `gpapers-p-${id}-img-`, key: ':' + id};
+const syPjOf = n => /^gpapers-p-([a-z0-9]+)-/.exec(n)?.[1] || (n !== SY_IDX ? 'main' : null);   // proyecto de un archivo de Drive
 const syS = v => JSON.stringify(v);
 const syPlain = d => JSON.parse(JSON.stringify(d, (k, v) => k === 'history' ? undefined : v));   // como en el JSON: sin el historial del día
 function syNorm(d) {   // pasa por validate() para comparar siempre la misma forma; validate() ajusta los tipos y estilos globales, así que se devuelven a los de db
@@ -2359,11 +2385,11 @@ function syWire(d) {   // copia para Drive: {kind: 'data', data} → {kind: 'dat
   for (const p of syPapersOf(w)) if (p.image && p.image.kind === 'data' && p.image.data) { const h = syHash(p.image.data); SY.img.set(h, p.image.data); p.image = {kind: 'data', ref: h}; refs.add(h); }
   return [w, refs];
 }
-async function syUnwire(tok, w, files) {   // vuelve a poner las imágenes; solo descarga las que este dispositivo no tiene
+async function syUnwire(tok, w, files, N) {   // vuelve a poner las imágenes; solo descarga las que este dispositivo no tiene
   const d = structuredClone(w);
   for (const p of syPapersOf(d)) {
     const r = p.image && p.image.kind === 'data' && p.image.ref; if (!r) continue;
-    if (!SY.img.has(r)) { const f = files.find(x => x.name === 'gpapers-img-' + r); if (f) try { SY.img.set(r, await (await syDrive(tok, `/drive/v3/files/${f.id}?alt=media`)).text()); } catch (e) {} }
+    if (!SY.img.has(r)) { const f = files.find(x => x.name === N.img + r); if (f) try { SY.img.set(r, await (await syDrive(tok, `/drive/v3/files/${f.id}?alt=media`)).text()); } catch (e) {} }
     p.image = SY.img.has(r) ? {kind: 'data', data: SY.img.get(r)} : null;
   }
   return d;
@@ -2419,7 +2445,6 @@ async function syLs(tok) {   // archivos de esta aplicación en la carpeta ocult
   return out;
 }
 const syVer = f => f.md5Checksum || `${f.modifiedTime}:${f.size}`;
-const syIsD = n => n.startsWith('gpapers-d-'), syIsImg = n => n.startsWith('gpapers-img-');
 const syGet = async (tok, id) => (await syDrive(tok, `/drive/v3/files/${id}?alt=media`)).json();
 const syDel = (tok, id) => syDrive(tok, '/drive/v3/files/' + id, {method: 'DELETE'}).catch(() => {});
 async function syUpload(tok, id, name, body, type) {   // id: sustituye ese archivo; sin id, lo crea. Devuelve {id, md5Checksum, modifiedTime, size}
@@ -2436,12 +2461,14 @@ async function syUpload(tok, id, name, body, type) {   // id: sustituye ese arch
   return (await syDrive(tok, `/upload/drive/v3/files?uploadType=multipart${F}`, {method: 'POST', headers: {'Content-Type': 'multipart/related; boundary=' + b},
     body: `--${b}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n--${b}\r\nContent-Type: ${type}\r\n\r\n${body}\r\n--${b}--`})).json();
 }
-const syCache = async () => { const c = await idb('readonly', st => st.get('syncCache')).catch(() => null); return c && c.v === 2 ? c : {v: 2, snap: null, deltas: {}}; };   // lo ya descargado de Drive
-const syCacheSet = c => idb('readwrite', st => c ? st.put(c, 'syncCache') : st.delete('syncCache')).catch(() => {});
+const syCache = async N => { const c = await idb('readonly', st => st.get('syncCache' + N.key)).catch(() => null); return c && c.v === 2 ? c : {v: 2, snap: null, deltas: {}}; };   // lo ya descargado de Drive (de cada proyecto)
+const syCacheSet = (N, c) => idb('readwrite', st => st.put(c, 'syncCache' + N.key)).catch(() => {});
+const syForget = async () => { const ks = await idb('readonly', st => st.getAllKeys()).catch(() => []);   // al cerrar sesión: bases y copias descargadas de todos los proyectos
+  await idb('readwrite', st => { ks.filter(k => typeof k === 'string' && k.startsWith('sync')).forEach(k => st.delete(k)); return st.count(); }).catch(() => {}); };
 const syEmpty = () => ({version: 1, sections: [], tags: [], papers: [], trash: [], settings: {}});
 const syOk = j => j && j.app === 'gpapers';
-async function syRemote(tok, files) {   // la biblioteca de Drive (con huellas en lugar de imágenes): copia completa + los cambios posteriores, por orden
-  const c = await syCache(), sf = files.find(f => f.name === SY_CFG.file), lf = !sf && files.find(f => f.name === SY_CFG.legacy) || null;
+async function syRemote(tok, files, N) {   // el proyecto en Drive (con huellas en lugar de imágenes): copia completa + los cambios posteriores, por orden
+  const c = await syCache(N), sf = files.find(f => f.name === N.snap), lf = !sf && N.legacy && files.find(f => f.name === N.legacy) || null;
   let w = null, inc = [];
   if (sf) {
     if (!c.snap || c.snap.ver !== syVer(sf)) { const j = await syGet(tok, sf.id); if (!syOk(j) || !j.db) throw Error('formato'); c.snap = {ver: syVer(sf), inc: j.inc || [], db: j.db}; }
@@ -2450,52 +2477,100 @@ async function syRemote(tok, files) {   // la biblioteca de Drive (con huellas e
     c.snap = null;
     if (lf) { const j = await syGet(tok, lf.id); if (!syOk(j) || !j.db) throw Error('formato'); w = syWire(j.db)[0]; }   // copia de un solo archivo (versión anterior)
   }
-  const all = files.filter(f => syIsD(f.name)).sort((a, b) => a.name < b.name ? -1 : 1), ds = all.filter(f => !inc.includes(f.name));
+  const all = files.filter(f => f.name.startsWith(N.d)).sort((a, b) => a.name < b.name ? -1 : 1), ds = all.filter(f => !inc.includes(f.name));
   for (const k of Object.keys(c.deltas)) if (!all.some(f => f.name === k)) delete c.deltas[k];
   for (const f of ds) {
     if (!c.deltas[f.name]) { const j = await syGet(tok, f.id); if (!syOk(j) || !j.patch) continue; c.deltas[f.name] = j.patch; }
     w = syPatch(w || syEmpty(), c.deltas[f.name]);
   }
-  await syCacheSet(c);
-  return {w, c, sf, lf, all, files, n: ds.length};
+  await syCacheSet(N, c);
+  return {w, c, sf, lf, all, files, n: ds.length, N};
 }
 async function syCompact(tok, R, mw, refs) {   // reescribe la copia completa y borra lo que ya incluye: los cambios sueltos, la copia antigua y las imágenes que nadie usa
-  const inc = R.all.map(f => f.name), f = await syUpload(tok, R.sf && R.sf.id, SY_CFG.file, JSON.stringify({app: 'gpapers', v: 2, at: new Date().toISOString(), inc, db: mw}), 'application/json');
-  R.c.snap = {ver: syVer(f), inc, db: mw}; R.c.deltas = {}; await syCacheSet(R.c);
+  const inc = R.all.map(f => f.name), f = await syUpload(tok, R.sf && R.sf.id, R.N.snap, JSON.stringify({app: 'gpapers', v: 2, at: new Date().toISOString(), inc, db: mw}), 'application/json');
+  R.c.snap = {ver: syVer(f), inc, db: mw}; R.c.deltas = {}; await syCacheSet(R.N, R.c);
   const old = Date.now() - 864e5;   // una imagen que otro dispositivo acaba de subir aún no está en esta copia: solo se borran las de más de un día
-  for (const x of [...R.all, ...(R.lf ? [R.lf] : []), ...R.files.filter(x => syIsImg(x.name) && !refs.has(x.name.slice(12)) && Date.parse(x.modifiedTime) < old)]) await syDel(tok, x.id);
+  for (const x of [...R.all, ...(R.lf ? [R.lf] : []), ...R.files.filter(x => x.name.startsWith(R.N.img) && !refs.has(x.name.slice(R.N.img.length)) && Date.parse(x.modifiedTime) < old)]) await syDel(tok, x.id);
 }
 const syDev = () => { let d = syP().dev; if (!d) { d = Math.random().toString(36).slice(2, 8); sySet({dev: d}); } return d; };
 const syWho = async tok => { try { return (await (await syDrive(tok, '/drive/v3/about?fields=user(emailAddress)')).json()).user?.emailAddress || ''; } catch (e) { return ''; } };
-const syBase = () => idb('readonly', st => st.get('syncBase')).catch(() => null);
-const syBaseSet = d => idb('readwrite', st => d ? st.put(d, 'syncBase') : st.delete('syncBase')).catch(() => {});
+const syBase = N => idb('readonly', st => st.get('syncBase' + N.key)).catch(() => null);
+const syBaseSet = (N, d) => idb('readwrite', st => d ? st.put(d, 'syncBase' + N.key) : st.delete('syncBase' + N.key)).catch(() => {});
+/* ---- Índice: proyectos y ajustes comunes ---- */
+const syShared = s => { const o = structuredClone(s || {}); SY_LOCALSET.forEach(k => delete o[k]); return o; };
+const syOwn = s => Object.fromEntries(SY_LOCALSET.filter(k => s && k in s).map(k => [k, s[k]]));
+const pjEntry = p => ({id: p.id, name: p.name, created: p.created || ''});
+const syIdxLocal = s => ({projects: PJ.list.map(pjEntry), settings: syShared(s)});
+function syIdxMerge(L, R, B) {   // sin base (primera vez en este dispositivo) manda Drive en nombres y ajustes; las listas se unen
+  const pick = (a, b, c) => c ? syObj(a, b, c, true) : syObj(b, a, null, true);
+  return {projects: syList(L.projects, R.projects || [], B ? B.projects : null, pick),
+    settings: syShared(B ? sySettings(L.settings, R.settings || {}, B.settings || {}) : sySettings(R.settings || {}, L.settings, null))};
+}
+async function syIdxGet(tok, files) {
+  const f = files.find(x => x.name === SY_IDX); if (!f) return {f: null, w: null};
+  const c = await idb('readonly', st => st.get('syncIdx')).catch(() => null); if (c && c.ver === syVer(f)) return {f, w: c.w};
+  const j = await syGet(tok, f.id); if (!syOk(j) || !j.idx || !Array.isArray(j.idx.projects)) throw Error('formato');
+  const w = {projects: j.idx.projects.filter(p => p && typeof p.id === 'string' && /^[a-z0-9]+$/.test(p.id) && typeof p.name === 'string'), settings: j.idx.settings || {}};
+  await idb('readwrite', st => st.put({ver: syVer(f), w}, 'syncIdx')).catch(() => {}); return {f, w};
+}
+async function syIdxPut(tok, f, w) {
+  const r = await syUpload(tok, f && f.id, SY_IDX, JSON.stringify({app: 'gpapers', v: 2, at: new Date().toISOString(), idx: w}), 'application/json');
+  await idb('readwrite', st => st.put({ver: syVer(r), w}, 'syncIdx')).catch(() => {});
+}
+function syIdxApply(M) {   // la lista que llega de Drive: proyectos nuevos de otros dispositivos (☁, se descargan al abrirlos), nombres y bajas
+  const old = new Map(PJ.list.map(p => [p.id, p])), ids = new Set(M.projects.map(p => p.id));
+  for (const p of PJ.list) if (!ids.has(p.id) && p.id !== PJ.cur) pjDrop(p.id);
+  PJ.list = M.projects.map(e => old.has(e.id) ? Object.assign(old.get(e.id), {name: e.name, created: e.created}) : {...e, remote: true});
+  if (!ids.has(PJ.cur) && old.has(PJ.cur)) PJ.list.push(old.get(PJ.cur));
+  pjSave(); pjShow();
+}
+async function syGc(tok, files, idx) {   // archivos de proyectos borrados: los borrados aquí, enseguida; los que no están en el índice, pasado un día (por si acaban de crearse)
+  const ids = idx && new Set(idx.projects.map(p => p.id)), old = Date.now() - 864e5;
+  for (const f of files) { const k = syPjOf(f.name); if (!k) continue;
+    if (PJ.gone.includes(k) && !PJ.list.some(p => p.id === k) || ids && k !== 'main' && !ids.has(k) && Date.parse(f.modifiedTime) < old) await syDel(tok, f.id); }
+  if (PJ.gone.length) { PJ.gone = []; pjSave(); }
+}
 
 /* ---- Una vuelta de sincronización ---- */
 const syBlocked = () => [...document.querySelectorAll('dialog[open]')].some(d => !['help', 'pv', 'sy', 'cr'].includes(d.id));   // ventanas que editan datos: no se les cambia nada debajo
 const syTrivial = () => !db.papers.length && !db.trash.length || path === 'ejemplo_papers.json' && !dirty;   // aquí solo está el ejemplo: manda Drive sin preguntar
 async function syOnce(inter) {
-  const tok = await syToken(inter), files = await syLs(tok), R = await syRemote(tok, files);
-  const snap = syS(syPlain(db)), local = syNorm(syPlain(db)), remote = R.w ? syNorm(await syUnwire(tok, R.w, files)) : null;
+  const tok = await syToken(inter), files = await syLs(tok), id = PJ.cur, N = syNames(id);
+  const I = await syIdxGet(tok, files), iB = await idb('readonly', st => st.get('syncIdxBase')).catch(() => null);
+  const R = await syRemote(tok, files, N), rw = R.w ? await syUnwire(tok, R.w, files, N) : null;
+  const plain = syPlain(db), snap = syS(plain), cur = syNorm(plain);
+  const iM = I.w ? syIdxMerge(syIdxLocal(plain.settings), I.w, iB) : syIdxLocal(plain.settings);
+  for (const p of PJ.list) if ((p.id === id ? dirty : p.dirty) && !iM.projects.some(e => e.id === p.id)) iM.projects.push(pjEntry(p));   // borrado en otro dispositivo, pero aquí tiene cambios sin guardar: se queda
+  if (!iM.projects.some(e => e.id === id)) {   // el proyecto abierto se borró en otro dispositivo: se pasa a otro
+    if (iM.projects.length) { syIdxApply(iM); return {gone: id}; }
+    iM.projects.push(pjEntry(pjCur()));
+  }
+  const local = syNorm({...plain, settings: {...iM.settings, ...syOwn(plain.settings)}});   // con los ajustes comunes que llegan del índice
   let m = local, replace = false;
-  if (remote) {
-    const base = await syBase();
+  if (rw) {
+    const remote = syNorm(rw), base = await syBase(N);
     if (base) m = syNorm(syMerge(local, remote, base));
     else if (syS(local) === syS(remote) || syTrivial()) { m = remote; replace = syTrivial(); }
     else { const c = await syAsk(local, remote); if (!c) return {cancel: true};
       m = c === 'merge' ? syNorm(syMerge(local, remote, null)) : c === 'drive' ? remote : local; replace = c === 'drive'; }
   }
-  if (syS(syPlain(db)) !== snap) { SY.again = true; return {again: true}; }   // cambiaste algo mientras tanto: otra vuelta enseguida
-  const news = syS(m) !== syS(local);
+  if (syS(syPlain(db)) !== snap || PJ.cur !== id) { SY.again = true; return {again: true}; }   // cambiaste algo mientras tanto: otra vuelta enseguida
+  const news = syS(m) !== syS(cur);
   if (news && syBlocked()) { SY.wait = true; return {wait: true}; }   // se termina al cerrar la ventana
+  syIdxApply(iM);
   if (news) syApply(m, replace);
-  const [mw, refs] = syWire(m), have = new Set(files.filter(f => syIsImg(f.name)).map(f => f.name.slice(12)));
-  for (const h of refs) if (!have.has(h)) await syUpload(tok, null, 'gpapers-img-' + h, SY.img.get(h), 'text/plain');   // cada imagen se sube una sola vez
+  const iF = syIdxLocal(m.settings);   // primero el índice: un proyecto nuevo nunca queda en Drive sin estar en la lista
+  if (!I.w || syS(iF) !== syS(I.w)) await syIdxPut(tok, I.f, iF);
+  await idb('readwrite', st => st.put(iF, 'syncIdxBase')).catch(() => {});
+  const [mw, refs] = syWire(m), have = new Set(files.filter(f => f.name.startsWith(N.img)).map(f => f.name.slice(N.img.length)));
+  for (const h of refs) if (!have.has(h)) await syUpload(tok, null, N.img + h, SY.img.get(h), 'text/plain');   // cada imagen se sube una sola vez
   if (!R.sf || R.n >= SY_CFG.maxDeltas) await syCompact(tok, R, mw, refs);   // primera vez, copia de la versión anterior o muchos cambios sueltos: copia completa
   else { const p = syDiff(R.w, mw); if (p) {   // autoguardado: se sube solo lo que cambió
-    const name = `gpapers-d-${String(Date.now()).padStart(14, '0')}-${syDev()}.json`;
+    const name = `${N.d}${String(Date.now()).padStart(14, '0')}-${syDev()}.json`;
     await syUpload(tok, null, name, JSON.stringify({app: 'gpapers', v: 2, at: new Date().toISOString(), patch: p}), 'application/json');
-    R.c.deltas[name] = p; await syCacheSet(R.c); } }
-  await syBaseSet(m); sySet({last: Date.now()});
+    R.c.deltas[name] = p; await syCacheSet(N, R.c); } }
+  await syGc(tok, files, I.w ? iF : null);
+  await syBaseSet(N, m); sySet({last: Date.now()});
   if (syS(syPlain(db)) === syS(m)) { dirty = false; hdr(); sessionSoon(); }   // ya está guardado en Drive
   return {news, first: !R.w};
 }
@@ -2509,7 +2584,7 @@ async function syRun(inter, gesture) {   // gesture: viene de un clic o una tecl
   clearTimeout(SY.tm); SY.tm = 0; SY.busy = true; SY.wait = false; SY.st = 'busy'; syIcon();
   try {
     let r; try { r = await syOnce(inter); } catch (e) { if (e.estado !== 401) throw e; syTokDel(); r = await syOnce(inter); }   // el acceso había caducado
-    SY.st = SY.wait ? 'wait' : 'idle'; return r;
+    SY.st = SY.wait ? 'wait' : 'idle'; if (r && r.gone) setTimeout(() => pjGone(r.gone)); return r;
   } catch (e) {
     SY.st = /silencio|interaction|login|consent|popup|cerrada|denegado|access_denied|immediate/i.test(e.message) ? 'reconnect' : 'error'; SY.err = e;
     if (inter) throw e;
@@ -2524,17 +2599,18 @@ async function syRun(inter, gesture) {   // gesture: viene de un clic o una tecl
 const sySoon = (ms = 3000) => { clearTimeout(SY.tm); SY.tm = setTimeout(() => { SY.tm = 0; syRun(false); }, ms); };
 const syAuto = () => syOn() && syP().auto !== false;
 function syApply(m, replace) {   // pone en la app lo que llega de Drive (se puede deshacer)
+  if (replace) bkTake('Antes de reemplazar por Google Drive');
   const hist = new Map(db.papers.map(p => [p.id, p.history]));
   SY.applying = true;
   try {
     db = validate(structuredClone(m)); db.papers.forEach(p => p.history = hist.get(p.id) || []);
-    if (replace) { path = null; handle = null; }   // se sustituyó por la biblioteca de Drive: el archivo abierto no se toca
+    if (replace) { path = null; handle = null; if (pjCur().name === 'Ejemplo') { pjCur().name = 'Mi biblioteca'; pjShow(); } }   // se sustituyó por la de Drive: el archivo abierto no se toca
     for (const id of [...SEL]) if (!db.papers.some(p => p.id === id)) SEL.delete(id);
     record(); dirty = true; applySettings(); render(); hdr(); sessionSoon();
     if (auto && handle) { clearTimeout(timer); timer = setTimeout(() => save(false), 1000); }   // autoguardado del archivo: también recibe los cambios
   } finally { SY.applying = false; }
 }
-function syLoaded() { syBaseSet(null); if (syAuto()) sySoon(500); }   // otro archivo abierto: la próxima vuelta pregunta cómo combinarlo con Drive
+function syLoaded() { syBaseSet(syNames(PJ.cur), null); if (syAuto()) sySoon(500); }   // otro archivo abierto en el proyecto: la próxima vuelta pregunta cómo combinarlo con Drive
 
 /* ---- Icono, menú y ventanas ---- */
 const SY_TXT = {off: 'Conectar con Google Drive', busy: 'Sincronizando…', ok: 'Sincronizado', pend: 'Cambios pendientes de sincronizar', wait: 'Cierra la ventana abierta para terminar de sincronizar',
@@ -2574,6 +2650,7 @@ function syIntro() {
   syDlg('Sincronizar con Google Drive', `<p>Guarda tu biblioteca (papers, notas, secciones, etiquetas, papelera y ajustes) en tu Google Drive para tenerla igual en el ordenador, la tablet y el móvil.</p>
     <h4>¿Qué va a pasar?</h4><ul><li>Se guarda una copia en una <b>carpeta privada y oculta de tu propio Google Drive</b>. No aparece entre tus archivos y la aplicación no puede ver ni tocar nada más de tu Drive.</li>
     <li><b>Nadie más puede verla</b>: ni quien mantiene la aplicación ni otras personas. No hay ningún servidor intermedio.</li>
+    <li>Se guardan <b>todos tus proyectos</b>, y cambias entre ellos con ▾ en cualquier dispositivo.</li>
     <li>Es <b>gratis</b> y no hay que instalar nada. Necesitas una cuenta de Google (la de Gmail).</li></ul>
     <h4>Pasos</h4><ol><li>Pulsa <b>«Continuar»</b>: se abrirá una ventana de Google.</li>
     <li>Elige tu cuenta y pulsa <b>«Permitir»</b> o «Continuar» cuando pida acceso a «sus propios datos de configuración en Google Drive»: es la carpeta oculta de esta aplicación.</li>
@@ -2621,12 +2698,14 @@ async function syConnect() {
 async function syLogout(quiet) {
   if (!quiet && !confirm('¿Cerrar la sesión de Google Drive en este dispositivo?\nTus datos se quedan aquí y en tu Drive; los demás dispositivos siguen sincronizando.')) return;
   if (!quiet && syAuto() && dirty && !SY.busy) await syRun(false);   // sube lo último antes de salir
-  clearTimeout(SY.tm); clearTimeout(SY.exp); try { localStorage.removeItem('gp-sync'); } catch (e) {} syTokDel(); syBaseSet(null); syCacheSet(null); SY.st = 'idle';
+  clearTimeout(SY.tm); clearTimeout(SY.exp); try { localStorage.removeItem('gp-sync'); } catch (e) {} syTokDel(); await syForget(); SY.st = 'idle';
+  PJ.list = PJ.list.filter(p => !p.remote); pjSave(); pjShow();   // los proyectos que solo están en Drive dejan de verse aquí (siguen en tu Drive)
   $('#auto').checked = auto; if (!FSA) $('#auto').disabled = true; syIcon(); if ($('#pv').open) openPriv();
   if (!quiet) toast('Sesión de Google Drive cerrada. Tus datos siguen en este dispositivo y en tu Drive.', [], 5000);
 }
 async function syWipe() {
-  if (!confirm('Se borrará la copia de tu biblioteca guardada en Google Drive y se cerrará la sesión. Los datos de este dispositivo no se tocan.\nSi otro dispositivo sigue conectado, volverá a crearla: cierra allí la sesión antes. ¿Continuar?')) return;
+  const only = PJ.list.filter(p => p.remote).map(p => '«' + p.name + '»');
+  if (!confirm(`Se borrará de Google Drive la copia de todos tus proyectos y se cerrará la sesión. Los datos de este dispositivo no se tocan.${only.length ? '\nOJO: ' + only.join(', ') + (only.length === 1 ? ' solo está' : ' solo están') + ' en Google Drive y se perderá' + (only.length === 1 ? '.' : 'n.') : ''}\nSi otro dispositivo sigue conectado, volverá a crearla: cierra allí la sesión antes. ¿Continuar?`)) return;
   try { const tok = await syToken(true); for (const f of await syLs(tok)) await syDrive(tok, '/drive/v3/files/' + f.id, {method: 'DELETE'});
     await syLogout(true); toast('Copia de Google Drive borrada y sesión cerrada.', [], 5000); }
   catch (e) { toast(syErr(e)); }
@@ -2636,22 +2715,44 @@ document.addEventListener('visibilitychange', () => { if (!syAuto()) return;
 setInterval(() => { if (syAuto() && !document.hidden && syTokGet()) syRun(false); }, 5 * 60 * 1000);   // trae los cambios de los otros dispositivos
 document.addEventListener('close', e => { if (SY.wait && e.target.tagName === 'DIALOG') sySoon(300); }, true);
 
+/* ===== Instalar la aplicación (PWA) =====
+   «Añadir app» (Información, en la barra lateral) solo se ve si la aplicación se abre desde la web y aún no está instalada.
+   Chrome y Edge ofrecen la instalación con un evento (beforeinstallprompt); en los demás navegadores se explica cómo hacerlo. */
+let INST = null, INSTALLED = false;   // instalación ofrecida por el navegador · instalada en esta sesión
+const isInstalled = () => ['standalone', 'window-controls-overlay', 'minimal-ui', 'fullscreen'].some(m => matchMedia(`(display-mode: ${m})`).matches) || navigator.standalone === true;
+const instShow = () => { const b = $('#instBtn'); if (b) b.hidden = !location.protocol.startsWith('http') || INSTALLED || isInstalled(); };
+addEventListener('beforeinstallprompt', e => { e.preventDefault(); INST = e; instShow(); });
+addEventListener('appinstalled', () => { INST = null; INSTALLED = true; instShow(); toast('Aplicación instalada: ábrela desde tu escritorio o tu pantalla de inicio.', [], 6000); });
+['standalone', 'window-controls-overlay'].forEach(m => matchMedia(`(display-mode: ${m})`).addEventListener('change', instShow));
+async function appInstall() {
+  if (INST) { const e = INST; INST = null; try { await e.prompt(); await e.userChoice; } catch (x) {} return instShow(); }   // el navegador pide confirmar
+  const ios = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1), li = t => `<li>${t}</li>`;
+  syDlg('Añadir la aplicación', `<p>Instalada, la aplicación se abre en su propia ventana, desde tu escritorio o tu pantalla de inicio, y funciona sin conexión.</p>
+    <ul>${(ios ? [li('<b>iPhone o iPad (Safari)</b>: botón Compartir → «Añadir a pantalla de inicio».')] : []).join('')}
+    ${li('<b>Chrome o Edge (ordenador)</b>: el icono de instalar de la barra de direcciones, o el menú ⋮ → «Guardar y compartir» → «Instalar…» (Edge: ⋯ → «Aplicaciones» → «Instalar este sitio como aplicación»).')}
+    ${li('<b>Chrome en Android</b>: menú ⋮ → «Instalar aplicación» o «Añadir a la pantalla de inicio».')}
+    ${ios ? '' : li('<b>Safari en iPhone o iPad</b>: botón Compartir → «Añadir a pantalla de inicio». <b>Safari en Mac</b>: Archivo → «Añadir al Dock».')}
+    ${li('<b>Firefox</b> en ordenador no permite instalarla; en Android, menú ⋮ → «Instalar».')}</ul>
+    <p>Si ya la tienes instalada, ábrela desde su icono y este botón no aparecerá.</p>`, [['Entendido', null, true]]);
+}
+
 /* ===== Privacidad ===== */
 function privHTML() {
   const on = syOn(), p = syP();
   return `<div class="dh"><h2>Privacidad</h2><div class="dbtn"><button onclick="$('#pv').close()">Cerrar ✕</button></div></div><div class="sytx">
-    <h4>Qué datos se tratan y dónde</h4><p>Tus papers, notas, secciones, etiquetas, papelera y ajustes se guardan <b>en tu navegador</b> (copia de sesión en el almacenamiento de la aplicación) y en el <b>archivo JSON</b> que tú eliges. No se envían a ningún servidor de quien mantiene la aplicación: no hay cuentas, ni analíticas, ni publicidad, ni cookies de seguimiento.</p>
+    <h4>Qué datos se tratan y dónde</h4><p>Tus proyectos (papers, notas, secciones, etiquetas y papelera) y tus ajustes se guardan <b>en tu navegador</b> (copia de trabajo de cada proyecto en el almacenamiento de la aplicación) y en los <b>archivos JSON</b> que tú eliges. No se envían a ningún servidor de quien mantiene la aplicación: no hay cuentas, ni analíticas, ni publicidad, ni cookies de seguimiento.</p>
     <h4>Cuándo sale algo a internet</h4><ul><li><b>Buscar por DOI</b>: se envía el DOI a CrossRef (api.crossref.org) para traer los datos del paper.</li>
     <li><b>Imágenes por URL</b>: tu navegador las descarga de la web donde están.</li>
     <li><b>Sincronización con Google Drive</b>, solo si la activas (abajo).</li></ul>
-    <h4>Sincronización con Google Drive (opcional)</h4><p>Si pulsas 🔄 y das permiso, la aplicación guarda una copia de tu biblioteca (archivos <code>gpapers-…</code>: la biblioteca, los cambios de cada autoguardado y las imágenes incrustadas) en una <b>carpeta privada y oculta de tu propio Google Drive</b>. Usa el permiso <code>drive.appdata</code>, que solo deja ver, crear y borrar esa carpeta concreta: la aplicación <b>no puede leer ni modificar ningún otro archivo de tu Drive</b>.</p>
+    <h4>Sincronización con Google Drive (opcional)</h4><p>Si pulsas 🔄 y das permiso, la aplicación guarda una copia de tus proyectos (archivos <code>gpapers-…</code>: la lista de proyectos con los ajustes, cada proyecto, los cambios de cada autoguardado y las imágenes incrustadas) en una <b>carpeta privada y oculta de tu propio Google Drive</b>. Usa el permiso <code>drive.appdata</code>, que solo deja ver, crear y borrar esa carpeta concreta: la aplicación <b>no puede leer ni modificar ningún otro archivo de tu Drive</b>.</p>
     <ul><li>La conexión va directamente de tu navegador a Google. Quien mantiene la aplicación no tiene acceso a tu cuenta ni a tus datos; no se usan para publicidad, ni se venden ni se comparten con terceros.</li>
     <li>El acceso que da Google (token) se guarda en este navegador, caduca en una hora y se borra al cerrar sesión.</li>
     <li>En este dispositivo se recuerda que la sesión está iniciada, el correo de la cuenta (para mostrarlo), la fecha de la última sincronización, la última versión sincronizada (para combinar bien los cambios) y lo ya descargado de Drive (para no volver a descargarlo).</li></ul>
     <h4>Cómo retirar el permiso o borrar los datos</h4><ul><li><b>Cerrar sesión</b> (menú del icono 🔄): deja de sincronizar en este dispositivo y olvida lo anterior. Tus datos siguen aquí y en tu Drive.</li>
     <li><b>Borrar la copia de Google Drive</b>: menú del icono 🔄 → «Borrar mis datos de Google Drive», o el botón de abajo (con la sesión iniciada).</li>
     <li><b>Quitar el permiso a la aplicación</b> en todos tus dispositivos: <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener">myaccount.google.com/permissions</a>.</li>
-    <li><b>Datos de este navegador</b>: Ayuda → «Aplicación instalada» → «Olvidar la copia de sesión», o borra los datos del sitio desde el navegador. Tu archivo JSON solo lo borras tú.</li></ul>
+    <li><b>Datos de este navegador</b>: Ayuda → «Aplicación instalada» → «Olvidar la copia de sesión», o borra los datos del sitio desde el navegador. Tus archivos JSON solo los borras tú.</li>
+    <li><b>Copias de seguridad, filtros guardados y enlaces a PDF</b> se guardan solo en este navegador (nunca en Google Drive); los PDF enlazados no se leen ni se envían a ningún sitio.</li></ul>
     ${syAvail() ? `<p class="sypv">${on ? `Google Drive: <b>sesión iniciada</b>${p.who ? ' como ' + esc(p.who) : ''}${p.last ? ' · última sincronización ' + syAgo(p.last) : ''}.</p><p class="row"><button onclick="syLogout()">🚪 Cerrar sesión</button><button class="danger" onclick="syWipe()">🗑 Borrar mi copia de Google Drive</button>` : 'Google Drive: <b>sin conectar</b>. <button onclick="$(\'#pv\').close();syIntro()">🔄 Sincronizar…</button>'}</p>` : ''}
     <h4>Contacto</h4><p>Dudas sobre esta política: <a href="mailto:r.malumbresp@gmail.com">r.malumbresp@gmail.com</a> o <a href="mailto:rmalum01@ucm.es">rmalum01@ucm.es</a>. Versión para enlazar: <a href="privacidad.html" target="_blank" rel="noopener">privacidad.html</a>.</p></div>`;
 }
@@ -2665,14 +2766,302 @@ function openCred() {
   if (!$('#cr').open) $('#cr').showModal();
 }
 
+/* ===== Buscar duplicados y fusionar =====
+   Dos papers son posibles duplicados si comparten DOI o título (sin tildes ni signos). Al fusionar, el elegido conserva sus datos,
+   completa los campos vacíos con los del otro, une etiquetas, secciones, notas y relaciones (también en las notas que enlazan
+   con él) y el otro va a la papelera, por si acaso. */
+const DP_IGN = new Set();   // grupos marcados «no son duplicados» (hasta cerrar la aplicación)
+function dpGroups() {
+  const P = db.papers, par = P.map((_, i) => i), f = i => par[i] === i ? i : (par[i] = f(par[i])), u = (a, b) => { par[f(a)] = f(b); }, byD = new Map(), byT = new Map();
+  P.forEach((p, i) => { const d = normDoi(p.doi), t = normTitle(p.title); if (d) byD.has(d) ? u(i, byD.get(d)) : byD.set(d, i); if (t) byT.has(t) ? u(i, byT.get(t)) : byT.set(t, i); });
+  const g = new Map(); P.forEach((p, i) => { const r = f(i); if (!g.has(r)) g.set(r, []); g.get(r).push(p); });
+  return [...g.values()].filter(a => a.length > 1 && !DP_IGN.has(a.map(p => p.id).sort().join()));
+}
+const dpEmpty = v => v == null || v === '' || v === false || v === 'auto' || (Array.isArray(v) && !v.length);
+const dpScore = p => Object.entries(p).filter(([k, v]) => !['id', 'history', 'created', 'modified', 'notes'].includes(k) && !dpEmpty(v)).length + 3 * p.notes.length;
+function dpMerge(keepId, ids) {
+  const k = db.papers.find(p => p.id === keepId), gone = ids.filter(i => i !== keepId).map(i => db.papers.find(p => p.id === i)).filter(Boolean); if (!k) return;
+  const SKIP = new Set(['id', 'history', 'created', 'modified', 'notes', 'tagIds', 'sectionIds', 'related', 'refTo', 'cites', 'general', 'rating', 'reading']), G = new Set(gone.map(q => q.id)), uniq = a => [...new Set(a)];
+  for (const q of gone) {
+    for (const key of Object.keys(q)) if (!SKIP.has(key) && dpEmpty(k[key]) && !dpEmpty(q[key])) k[key] = structuredClone(q[key]);
+    k.tagIds = uniq([...k.tagIds, ...q.tagIds]); k.sectionIds = uniq([...(k.sectionIds || []), ...(q.sectionIds || [])]); k.notes.push(...q.notes.map(n => ({...n})));
+    for (const [s, v] of Object.entries(q.cites || {})) if (!(s in k.cites)) k.cites[s] = v;
+    if (q.general && q.general.trim() && q.general.trim() !== (k.general || '').trim()) k.general = (k.general ? k.general + '\n\n' : '') + q.general;
+    k.rating = Math.max(k.rating || 0, q.rating || 0); if ((READ_N[q.reading] || 0) > (READ_N[k.reading] || 0)) k.reading = q.reading;
+    if (q.created && (!k.created || q.created < k.created)) k.created = q.created;
+    k.related = uniq([...k.related, ...q.related]); k.refTo = uniq([...(k.refTo || []), ...(q.refTo || [])]);
+  }
+  const map = a => uniq((a || []).map(x => G.has(x) ? k.id : x));
+  for (const p of db.papers) {
+    p.related = map(p.related).filter(x => x !== p.id && !G.has(x)); p.refTo = map(p.refTo).filter(x => x !== p.id && !G.has(x));
+    const fix = t => gone.reduce((s, q) => s.split(`[[p:${q.id}]]`).join(`[[p:${k.id}]]`), String(t ?? '')); p.general = fix(p.general); p.notes.forEach(n => n.content = fix(n.content));
+  }
+  k.related.forEach(r => { const q = db.papers.find(x => x.id === r); if (q && !q.related.includes(k.id)) q.related.push(k.id); });
+  logChange(k, 'Fusionado con: ' + gone.map(q => '«' + shortTxt(q.title) + '»').join(', ')); k.modified = new Date().toISOString();
+  gone.forEach(q => trashPaper(q.id)); markDirty(); render();
+}
+function dpOpen() { dpDraw(); if (!$('#dp').open) $('#dp').showModal(); }
+function dpDraw() {
+  const G = dpGroups();
+  $('#dp').innerHTML = `<div class="dh"><h2>Posibles duplicados</h2><div class="dbtn"><button onclick="$('#dp').close()">Cerrar ✕</button></div></div>
+    <p class="empty">Papers con el mismo DOI o el mismo título. «Quedarme con este» lo conserva, le añade lo que falte de los otros (campos vacíos, etiquetas, secciones, notas, relaciones) y manda los demás a la papelera.</p>
+    ${G.length ? G.map((g, gi) => `<div class="dpg"><div class="dpt">${g.length} papers · ${g.some((p, i) => g.some((q, j) => i < j && normDoi(p.doi) && normDoi(p.doi) === normDoi(q.doi))) ? 'mismo DOI' : 'mismo título'}</div>
+      ${g.map(p => `<div class="irow"><span><b>${esc(p.alias || p.title)}</b><br><small>${esc(svAuth(p))}${p.venue ? ' · ' + esc(p.venue) : ''}${p.doi ? ' · ' + esc(p.doi) : ''}<br>${p.notes.length} notas · ${p.tagIds.length} etiquetas · ${p.related.length} relaciones</small></span><button class="sm" style="margin-left:auto" onclick="dpMerge('${p.id}', ${esc(JSON.stringify(g.map(x => x.id)).replace(/"/g, '&quot;'))});dpDraw()">Quedarme con este</button></div>`).join('')}
+      <div class="row"><button class="sm" onclick="DP_IGN.add('${g.map(p => p.id).sort().join()}');dpDraw()">No son duplicados</button></div></div>`).join('') : '<p class="empty">No hay papers duplicados.</p>'}`;
+}
+
+/* ===== Extras: copiar cita, filtros guardados y progreso del proyecto ===== */
+async function copyCardCite(id, b) {   // la cita del paper en el estilo elegido en Exportar, con cursiva real al pegar en Word o Docs
+  const p = db.papers.find(x => x.id === id); if (!p) return; const raw = cite(p, ex());
+  await clipHtml(`<p style="font-family:'Times New Roman',serif;font-size:12pt">${citeHtml(raw)}</p>`, citeTxt(raw), document.body);
+  if (b) { const t = b.textContent; b.textContent = '✓'; setTimeout(() => b.textContent = t, 1200); }
+}
+let FAV = [];   // filtros guardados de este proyecto (solo en este navegador): [{name, q, sorts, group, sec, tags, read, minRating, inNotes, mode}]
+const favLoad = async () => { FAV = await idb('readonly', st => st.get('fav:' + PJ.cur)).then(a => Array.isArray(a) ? a : []).catch(() => []); favDraw(); };
+const favPut = () => idb('readwrite', st => st.put(FAV, 'fav:' + PJ.cur)).catch(() => {});
+function favDraw() {
+  const s = $('#favSel'); if (!s) return; s.innerHTML = `<option value="">⭐ Filtros guardados${FAV.length ? ` (${FAV.length})` : ''}…</option>` + FAV.map((f, i) => `<option value="${i}">${esc(f.name)}</option>`).join('');
+  $('#favDel').hidden = true;
+}
+function favSave() {
+  const name = (prompt('Nombre para estos filtros (búsqueda, orden, sección, etiquetas, lectura y valoración):') || '').trim().slice(0, 40); if (!name) return;
+  const f = {name, q: F.q, sorts: F.sorts.map(s => ({...s})), group: F.group, sec: F.sec, tags: [...F.tags], read: F.read, minRating: F.minRating, inNotes: F.inNotes, mode: F.mode}, i = FAV.findIndex(x => x.name.toLowerCase() === name.toLowerCase());
+  if (i >= 0) FAV[i] = f; else FAV.push(f); favPut(); favDraw(); $('#favSel').value = String(i >= 0 ? i : FAV.length - 1); $('#favDel').hidden = false;
+}
+function favApply(v) {
+  const f = FAV[+v]; $('#favDel').hidden = !f; if (!f) return;
+  F.q = typeof f.q === 'string' ? f.q : ''; $('#q').value = F.q; F.group = !!f.group; F.sec = db.sections.some(s => s.id === f.sec) ? f.sec : '';   // lo que ya no existe se ignora
+  F.tags = new Set((f.tags || []).filter(id => db.tags.some(t => t.id === id))); F.read = Object.hasOwn(READ, f.read) ? f.read : ''; F.minRating = Number.isInteger(f.minRating) && f.minRating >= 0 && f.minRating <= 5 ? f.minRating : 0;
+  F.inNotes = !!f.inNotes; F.mode = f.mode === 'all' ? 'all' : 'any'; const so = (f.sorts || []).filter(x => x && Object.hasOwn(SORTS, x.k) && (x.d === 1 || x.d === -1)).slice(0, 3); if (so.length) F.sorts = so.map(x => ({k: x.k, d: x.d}));
+  document.querySelector('#sg-search .sb input[type=checkbox]').checked = F.inNotes; render(); $('#favSel').value = v; $('#favDel').hidden = false;
+}
+function favDel() { const i = +$('#favSel').value; if (!FAV[i] || !confirm(`¿Borrar los filtros «${FAV[i].name}»?`)) return; FAV.splice(i, 1); favPut(); favDraw(); }
+function progDraw() {   // barra de progreso de lectura del proyecto, en la cabecera
+  const el = $('#pjProg'), n = db.papers.length; el.hidden = !n; if (!n) return;
+  const c = {leido: 0, leyendo: 0, por_leer: 0}; db.papers.forEach(p => c[p.reading in c ? p.reading : 'por_leer']++);
+  el.querySelector('.pjb').innerHTML = ['leido', 'leyendo'].map(k => `<i style="width:${c[k] / n * 100}%;background:${READ_C[k]}"></i>`).join('');
+  el.querySelector('small').textContent = `${c.leido}/${n} leídos`; el.title = `${READ.leido}: ${c.leido} · ${READ.leyendo}: ${c.leyendo} · ${READ.por_leer}: ${c.por_leer} (de ${n} papers)`;
+}
+
+/* ===== PDF enlazado =====
+   Como la imagen enlazada: en el JSON solo va el nombre (y la página donde abrir, si se indica) y el enlace al archivo vive en este
+   navegador (IndexedDB). Nada se sube a Google Drive. En otro dispositivo, o si el archivo se movió, al abrirlo se pide elegirlo de nuevo.
+   En navegadores sin acceso a archivos hay que elegir el PDF cada vez que se abre. */
+const PDF_T = [{description: 'PDF', accept: {'application/pdf': ['.pdf']}}], PEND_PDF = new Map(), PDF_FILES = new Map();   // PEND_PDF: elegidos en el borrador · PDF_FILES: archivos de esta sesión (sin acceso a archivos)
+const pdfPage = v => { v = parseInt(v, 10); return Number.isInteger(v) && v > 0 && v < 100000 ? v : 0; };
+async function pdfChoose(id) {   // elige el archivo de un paper (guardándolo en el borrador o en el paper); devuelve el File
+  if (FSA) { const [h] = await showOpenFilePicker({types: PDF_T}); PEND_PDF.set(id, h); return {file: await h.getFile(), h}; }
+  const file = await new Promise(res => { const i = document.createElement('input'); i.type = 'file'; i.accept = '.pdf,application/pdf'; i.onchange = () => res(i.files[0] || null); i.oncancel = () => res(null); i.click(); });
+  if (!file) throw Object.assign(Error('cancelado'), {name: 'AbortError'}); PDF_FILES.set(id, file); return {file};
+}
+async function pdfPick() {
+  try { const {file} = await pdfChoose(D.id); D.pdf = {name: file.name, ...(pdfPage(D.pdf?.page) ? {page: D.pdf.page} : {})}; drawD(); }
+  catch (e) { if (e.name !== 'AbortError') alert('No se pudo elegir el archivo: ' + e.message); }
+}
+function pdfClear() { PEND_PDF.delete(D.id); PDF_FILES.delete(D.id); D.pdf = null; drawD(); }
+function pdfSetPage(v) { if (D.pdf) { const n = pdfPage(v); n ? D.pdf.page = n : delete D.pdf.page; } }
+async function pdfOpen(id) {
+  const p = D && D.id === id && $('#dlg').open ? D : db.papers.find(x => x.id === id); if (!p || !p.pdf) return;   // con el editor abierto, el borrador
+  try {
+    let file = PDF_FILES.get(id);
+    if (!file && FSA) {
+      const h = PEND_PDF.get(id) || await idb('readonly', st => st.get('pdf:' + id)).catch(() => null);
+      if (h) try { if (await h.queryPermission({mode: 'read'}) === 'granted' || await h.requestPermission({mode: 'read'}) === 'granted') file = await h.getFile(); else return toast('Sin permiso para leer el PDF.'); } catch (e) { toast(`No se encuentra «${p.pdf.name}»: elígelo de nuevo.`, [], 4000); }
+    }
+    if (!file) {   // otro dispositivo o archivo movido: se vuelve a enlazar
+      const r = await pdfChoose(id); file = r.file; if (r.h) idb('readwrite', st => st.put(r.h, 'pdf:' + id)).catch(() => {});
+      if (file.name !== p.pdf.name) toast(`Has elegido «${file.name}», distinto de «${p.pdf.name}».`, [], 4000);
+    }
+    const url = URL.createObjectURL(file.type === 'application/pdf' ? file : new Blob([file], {type: 'application/pdf'})) + (pdfPage(p.pdf.page) ? '#page=' + pdfPage(p.pdf.page) : '');
+    window.open(url, '_blank'); setTimeout(() => URL.revokeObjectURL(url.split('#')[0]), 120000);
+  } catch (e) { if (e.name !== 'AbortError') alert('No se pudo abrir el PDF: ' + e.message); }
+}
+
+/* ===== Mover o copiar papers a otro proyecto =====
+   Los papers seleccionados (con sus notas, etiquetas, secciones y las relaciones entre ellos) pasan a la copia de trabajo del otro
+   proyecto. Las etiquetas y secciones se buscan por nombre y, si no existen allí, se crean. Se ve al abrir ese proyecto. */
+function psOpen() {
+  const ids = [...SEL].filter(id => db.papers.some(p => p.id === id)), T = PJ.list.filter(p => p.id !== PJ.cur && !p.remote);
+  if (!ids.length) return toast('Selecciona antes los papers que quieres mover o copiar (casilla «Seleccionar» de cada uno).', [], 4000);
+  if (!T.length) return toast('Necesitas otro proyecto en este dispositivo: crea uno con ▾ junto al nombre del proyecto.', [], 4500);
+  $('#ps').innerHTML = `<div class="dh"><h2>Mover o copiar ${ids.length} ${ids.length === 1 ? 'paper' : 'papers'}</h2><div class="dbtn"><button onclick="$('#ps').close()">Cerrar ✕</button></div></div>
+    <p class="empty">Desde «${esc(pjCur().name)}» a otro proyecto. Se llevan las notas, etiquetas y secciones (se crean en el destino si no existen) y las relaciones entre los papers elegidos.</p>
+    <label class="row"><input type="radio" name="psm" value="copy" checked> Copiar (se quedan también aquí)</label><label class="row"><input type="radio" name="psm" value="move"> Mover (dejan de estar aquí)</label>
+    <h4>Proyecto de destino</h4>${T.map(p => `<button class="pji2" onclick="psGo('${p.id}')">${esc(p.name)} <small>${p.n || 0} papers</small></button>`).join('')}`;
+  $('#ps').showModal();
+}
+async function psGo(tid) {
+  const mode = document.querySelector('#ps input[name=psm]:checked')?.value || 'copy', ids = [...SEL].filter(id => db.papers.some(p => p.id === id)), tp = PJ.list.find(p => p.id === tid);
+  const rec = await idb('readonly', st => st.get('proj:' + tid)).catch(() => null); let d; try { d = JSON.parse(rec.json); } catch (e) { return alert('No se pudo leer el proyecto de destino.'); }
+  const src = ids.map(id => structuredClone(db.papers.find(p => p.id === id))), srcTags = new Map(db.tags.map(t => [t.id, t])), srcSecs = new Map(db.sections.map(s => [s.id, s]));
+  const low = s => String(s).trim().toLowerCase(), tagMap = new Map(), secMap = new Map(), have = new Set(d.papers.map(p => p.id).concat(d.trash.map(t => t.paper.id)));
+  const mapTag = id => { const t = srcTags.get(id); if (!t) return null; if (!tagMap.has(id)) { let x = d.tags.find(y => low(y.name) === low(t.name)); if (!x) { x = {...t, id: have.has(t.id) || d.tags.some(y => y.id === t.id) ? uid() : t.id}; d.tags.push(x); } tagMap.set(id, x.id); } return tagMap.get(id); };
+  const mapSec = id => { const s = srcSecs.get(id); if (!s) return null; if (!secMap.has(id)) { let x = d.sections.find(y => low(y.name) === low(s.name)); if (!x) { x = {...s, id: d.sections.some(y => y.id === s.id) ? uid() : s.id, tagIds: (s.tagIds || []).map(mapTag).filter(Boolean)}; d.sections.push(x); } secMap.set(id, x.id); } return secMap.get(id); };
+  const idMap = new Map(src.map(p => [p.id, mode === 'move' && !have.has(p.id) ? p.id : (have.has(p.id) ? uid() : p.id)])), uq = a => [...new Set(a)];
+  for (const p of src) {
+    const old = p.id; p.id = idMap.get(old); p.history = [];
+    p.tagIds = uq(p.tagIds.map(mapTag).filter(Boolean)); p.sectionIds = uq((p.sectionIds || []).map(mapSec).filter(Boolean));
+    p.notes.forEach(n => { n.sectionId = n.sectionId ? mapSec(n.sectionId) || '' : ''; });
+    p.related = uq(p.related.filter(x => idMap.has(x)).map(x => idMap.get(x))); p.refTo = uq((p.refTo || []).filter(x => idMap.has(x)).map(x => idMap.get(x)));
+    const fix = t => [...idMap].reduce((s, [a, b]) => a === b ? s : s.split(`[[p:${a}]]`).join(`[[p:${b}]]`), String(t ?? '')); p.general = fix(p.general); p.notes.forEach(n => n.content = fix(n.content));
+    d.papers.push(p);
+  }
+  await bkTake('Antes de ' + (mode === 'move' ? 'mover' : 'copiar') + ' papers a «' + tp.name + '»', true);
+  const json = JSON.stringify(d, null, 2);
+  await idb('readwrite', st => st.put({...rec, dirty: true, at: new Date().toISOString(), json}, 'proj:' + tid)).catch(() => {});
+  Object.assign(tp, {n: d.papers.length, dirty: true});
+  if (mode === 'move') { const S = new Set(ids); db.papers = db.papers.filter(p => !S.has(p.id)); db.papers.forEach(q => { q.related = q.related.filter(x => !S.has(x)); q.refTo = (q.refTo || []).filter(x => !S.has(x)); }); SEL.clear(); markDirty(); render(); } else { SEL.clear(); render(); }
+  pjSave(); $('#ps').close();
+  toast(`${ids.length} ${ids.length === 1 ? 'paper' : 'papers'} ${mode === 'move' ? 'movido' + (ids.length === 1 ? '' : 's') : 'copiado' + (ids.length === 1 ? '' : 's')} a «${tp.name}».`, [{t: 'Abrir ese proyecto', fn: () => pjOpen(tid)}], 8000);
+}
+
+/* ===== Copias de seguridad de cada proyecto =====
+   Una copia al abrir cada día (y antes de restaurar o de sustituirlo todo por lo de Drive) en IndexedDB
+   («bk:<id>»): las últimas 10 (4 si son muy grandes). Solo viven en este navegador; la papelera y Drive no las sustituyen. */
+const BK_MAX = 10;
+const bkList = (id = PJ.cur) => idb('readonly', st => st.get('bk:' + id)).then(L => Array.isArray(L) ? L : []).catch(() => []);
+async function bkTake(why, force, id = PJ.cur) {   // la copia se hace del estado que hay al llamar (antes de cualquier await)
+  if (!BOOTED || id !== PJ.cur) return; const json = dbJSON(), n = db.papers.length, any = n + db.trash.length + db.sections.length + db.tags.length;
+  if (!any && !force) return;
+  const L = await bkList(id); if (!force && L.length && L[0].json === json) return;   // sin cambios desde la última
+  L.unshift({at: new Date().toISOString(), why, n, size: json.length, json}); L.length = Math.min(L.length, json.length > 3e6 ? 4 : BK_MAX);
+  await idb('readwrite', st => st.put(L, 'bk:' + id)).catch(() => {});
+}
+const bkDaily = async () => { const L = await bkList(); if (!L.length || Date.now() - Date.parse(L[0].at) > 864e5) await bkTake('Automática'); };
+const bkFmt = c => new Date(c.at).toLocaleString('es', {dateStyle: 'medium', timeStyle: 'short'});
+async function bkOpen() {
+  ctxClose(); const L = await bkList(), kb = x => x < 1024 ? x + ' B' : x < 1048576 ? Math.round(x / 1024) + ' KB' : (x / 1048576).toFixed(1) + ' MB';
+  $('#bk').innerHTML = `<div class="dh"><h2>Copias de seguridad · ${esc(pjCur().name)}</h2><div class="dbtn"><button onclick="$('#bk').close()">Cerrar ✕</button></div></div>
+    <p class="empty">Se guarda una copia al abrir la aplicación cada día (las últimas ${BK_MAX}) y antes de restaurar o de sustituirlo todo por lo de Drive. Solo están en este navegador y se borran con el proyecto. Restaurar sustituye papers, notas, secciones, etiquetas y papelera de este proyecto (los ajustes no cambian) y se puede deshacer.</p>
+    ${L.length ? L.map((c, i) => `<div class="irow"><span><b>${esc(bkFmt(c))}</b><br><small>${esc(c.why)} · ${c.n} papers · ${kb(c.size)}</small></span><span class="row" style="margin-left:auto;flex-wrap:nowrap"><button class="sm" onclick="bkRestore(${i})">Restaurar</button><button class="sm" onclick="bkDownload(${i})" title="Descargar esta copia como JSON">⬇</button><button class="sm x" onclick="bkDelete(${i})" title="Borrar esta copia">✕</button></span></div>`).join('') : '<p class="empty">Todavía no hay copias.</p>'}
+    <div class="row" style="margin-top:12px"><button class="pri" onclick="bkNow()">Crear copia ahora</button></div>`;
+  if (!$('#bk').open) $('#bk').showModal();
+}
+async function bkNow() { await bkTake('Manual', true); bkOpen(); }
+async function bkDownload(i) { const c = (await bkList())[i]; if (c) download(c.json, `${pjCur().name} · copia ${c.at.slice(0, 10)}.json`, 'application/json'); }
+async function bkDelete(i) { const L = await bkList(); L.splice(i, 1); await idb('readwrite', st => st.put(L, 'bk:' + PJ.cur)).catch(() => {}); bkOpen(); }
+async function bkRestore(i) {
+  const c = (await bkList())[i]; if (!c) return;
+  if (!confirm(`¿Restaurar la copia del ${bkFmt(c)} (${c.n} papers)?\nSe sustituye lo que hay ahora en «${pjCur().name}»; antes se guarda una copia del estado actual y puedes deshacerlo (${db.settings.shortcuts.undo}).`)) return;
+  let d; try { d = JSON.parse(c.json); d.settings = structuredClone(db.settings); d = validate(d); } catch (e) { return alert('La copia no es válida: ' + e.message); } finally { syncTypes(db.settings.customTypes); syncStyles(db.settings.customStyles, db.settings.export); }
+  await bkTake('Antes de restaurar', true);
+  const hist = new Map(db.papers.map(p => [p.id, p.history])); db = d; db.papers.forEach(p => p.history = hist.get(p.id) || []);
+  for (const id of [...SEL]) if (!db.papers.some(p => p.id === id)) SEL.delete(id);
+  lastRecAt = 0; record(); markDirty(); applySettings(); render(); bkOpen(); toast('Copia restaurada. Lo anterior sigue en las copias y se puede deshacer.', [], 5000);
+}
+
+/* ===== Proyectos =====
+   Cada proyecto es una biblioteca aparte (papers, notas, secciones, etiquetas y papelera) con su propio archivo JSON, que se llama
+   como el proyecto. Los ajustes (nombre de la aplicación, colores, atajos, tipos y estilos propios, plantillas, exportación) son
+   comunes: viajan en db.settings y se quedan al cambiar de proyecto (también se guardan en cada JSON, para que el archivo sirva
+   solo). En IndexedDB: «projects» (lista y proyecto abierto), «proj:<id>» (copia de trabajo de cada uno) y «h:<id>» (su archivo).
+   El primero es «main»: en Google Drive conserva los nombres de archivo de antes. */
+const PJ = {cur: 'main', list: [{id: 'main', name: 'Mi biblioteca', created: ''}], gone: []};   // gone: borrados aquí cuyos archivos de Drive aún hay que borrar
+const pjCur = () => PJ.list.find(p => p.id === PJ.cur);
+const pjFile = n => (String(n).replace(/[\\/:*?"<>|\u0000-\u001f]/g, '-').trim() || 'papers') + '.json';   // nombre de su archivo JSON
+const pjNameFor = f => { const b = String(f || '').split(/[\\/]/).pop().replace(/\.json$/i, '').trim(); return !b ? 'Mi biblioteca' : b === 'ejemplo_papers' ? 'Ejemplo' : b.slice(0, 60); };
+const pjUnique = (n, skip) => { let o = n, i = 2; while (PJ.list.some(p => p.id !== skip && p.name.toLowerCase() === o.toLowerCase())) o = `${n} (${i++})`; return o; };
+const pjSave = () => BOOTED ? idb('readwrite', st => st.put({v: 1, cur: PJ.cur, list: PJ.list, gone: PJ.gone}, 'projects')).catch(() => {}) : Promise.resolve();
+const pjDrop = id => { const N = syNames(id); return idb('readwrite', st => { ['proj:' + id, 'h:' + id, 'bk:' + id, 'fav:' + id, 'syncBase' + N.key, 'syncCache' + N.key].forEach(k => st.delete(k)); return st.count(); }).catch(() => {}); };
+function pjShow() {
+  const p = pjCur(), i = $('#pjName'); if (!p || !i) return;
+  if (document.activeElement !== i) i.value = p.name; i.size = Math.max(6, i.value.length + 1); document.title = p.name + ' · Gestor de papers';
+}
+const pjIdle = () => new Promise(ok => { const t = () => SY.busy ? setTimeout(t, 100) : ok(); t(); });   // espera a que termine la sincronización en curso
+async function pjLeave() {   // antes de cambiar de proyecto: lo pendiente se guarda en su archivo (con autoguardado), se sube a Drive y queda su copia de trabajo
+  clearTimeout(timer); if (auto && handle && dirty) await save(false);
+  await pjIdle(); if (syAuto() && (dirty || SY.tm)) await syRun(false);
+  clearTimeout(SY.tm); SY.tm = 0; await sessionNow();
+}
+async function pjLoad(id, text, file, h) {   // abre un proyecto: su copia de trabajo (o el texto de un archivo) con los ajustes comunes
+  const r = text == null ? await idb('readonly', st => st.get('proj:' + id)).catch(() => null) : null;
+  let d = null; try { d = JSON.parse(text ?? (r && r.v === 1 ? r.json : 'null')); } catch (e) {}
+  if (!d || typeof d !== 'object') d = {version: 1, sections: [], tags: [], papers: [], trash: []};
+  if (text == null || !d.settings) d.settings = structuredClone(db.settings);
+  PJ.cur = id; pjShow();
+  if (!await loadText(JSON.stringify(d), text != null ? file : r && typeof r.path === 'string' ? r.path : null, true))
+    await loadText(JSON.stringify({version: 1, sections: [], tags: [], papers: [], trash: [], settings: db.settings}), null, true);
+  handle = h || null; if (text == null) { dirty = !!(r && r.dirty); try { if (FSA) handle = await idb('readonly', st => st.get('h:' + id)) || null; } catch (e) {} }
+  if (auto) { try { auto = !!handle && await handle.requestPermission({mode: 'readwrite'}) === 'granted'; } catch (e) { auto = false; } }   // el autoguardado sigue en el archivo de este proyecto
+  if (!syOn()) $('#auto').checked = auto;
+  if (h) rememberHandle(); hdr(); await sessionNow();
+  if (text != null) syLoaded(); else if (syAuto()) sySoon(300);
+  bkDaily(); favLoad();
+}
+async function pjOpen(id) {   // cambiar de proyecto (menú ▾ de la cabecera)
+  ctxClose(); const p = PJ.list.find(x => x.id === id); if (!p || id === PJ.cur) return;
+  if (p.remote && !syOn()) return toast('Este proyecto está en Google Drive: conecta 🔄 para abrirlo.');
+  await pjLeave(); await pjLoad(id);
+  toast(`Proyecto «${p.name}»${p.remote ? ': descargando de Google Drive…' : ''}`, [], 2500);
+}
+async function pjNew() {
+  ctxClose(); await pjLeave();
+  const id = uid(); PJ.list.push({id, name: pjUnique('Proyecto nuevo'), created: new Date().toISOString()});
+  await pjLoad(id); pjEdit();
+}
+function pjEdit() { const i = $('#pjName'); i.focus(); i.select(); }
+async function pjOpenFile(text, name, h) {   // un archivo JSON se abre como proyecto: el suyo si ya lo es; si no, uno nuevo con el nombre del archivo
+  try { validate(JSON.parse(text)); } catch (e) { alert('Archivo no válido (se mantienen los datos actuales): ' + e.message); return false; }
+  finally { syncTypes(db.settings.customTypes); syncStyles(db.settings.customStyles, db.settings.export); }   // validate() cambia los tipos y estilos globales
+  const d = JSON.parse(text), ex = PJ.list.length === 1 && path === 'ejemplo_papers.json' && !dirty;   // solo está el ejemplo sin tocar: el archivo ocupa su lugar, con sus ajustes
+  let id = ex ? PJ.cur : null;
+  if (!id) for (const p of PJ.list) {
+    if (h) { const k = await idb('readonly', st => st.get('h:' + p.id)).catch(() => null); if (k && await k.isSameEntry(h).catch(() => false)) { id = p.id; break; } }
+    else if (p.id === PJ.cur ? path === name : p.file === name) { id = p.id; break; }
+  }
+  const p = PJ.list.find(x => x.id === id);
+  if (p && !ex && (p.id === PJ.cur ? dirty : p.dirty) && !confirm(`El proyecto «${p.name}» tiene cambios sin guardar. ¿Descartarlos y cargar el archivo?`)) return false;
+  if (!ex) {   // ajustes comunes; del archivo solo se añaden los tipos, estilos y plantillas que no estén (los pueden usar sus papers)
+    const o = structuredClone(db.settings);
+    for (const k of ['customTypes', 'customStyles', 'templates']) { const have = new Set(o[k].map(x => x.id)); for (const x of Array.isArray(d.settings?.[k]) ? d.settings[k] : []) if (x && x.id && !have.has(x.id)) o[k].push(x); }
+    d.settings = o;
+  }
+  if (id !== PJ.cur) await pjLeave();
+  if (!id) { id = uid(); PJ.list.push({id, name: pjUnique(pjNameFor(name)), created: new Date().toISOString()}); }
+  else if (ex) pjCur().name = pjUnique(pjNameFor(name), id);
+  await pjLoad(id, JSON.stringify(d), name, h);
+  return true;
+}
+async function pjRename(v) {   // el nombre se escribe en la cabecera; el archivo JSON pasa a llamarse igual
+  const p = pjCur(), n = v.trim().replace(/\s+/g, ' ').slice(0, 60);
+  if (!n || n === p.name) return pjShow();
+  p.name = pjUnique(n, p.id); pjShow(); pjSave(); sessionSoon(); if (syAuto()) sySoon();
+  if (!path || path === pjFile(p.name)) return;
+  if (!FSA) { path = pjFile(p.name); return hdr(); }   // sin acceso directo a archivos, la próxima descarga ya sale con el nombre nuevo
+  if (handle && handle.move) try { if (await handle.requestPermission({mode: 'readwrite'}) === 'granted') { await handle.move(pjFile(p.name)); path = handle.name; rememberHandle(); hdr(); sessionSoon(); return; } } catch (e) {}
+  if (handle) { toast(`El archivo «${path}» se queda como estaba: al guardar se creará «${pjFile(p.name)}».`, [], 6000); handle = null; idb('readwrite', st => st.delete('h:' + p.id)).catch(() => {}); }
+  path = null; hdr(); sessionSoon();
+}
+async function pjDel() {
+  ctxClose(); const p = pjCur();
+  if (PJ.list.length < 2) return alert('Es el único proyecto: crea otro antes de borrar este.');
+  if (!confirm(`¿Borrar el proyecto «${p.name}» de este navegador${syOn() ? ' y de tu Google Drive' : ''}?\nSus papers, notas, secciones y etiquetas desaparecen de la aplicación.${path ? `\nTu archivo «${path}» no se toca.` : '\nNo tiene archivo JSON: si quieres conservarlo, antes pulsa «Guardar como».'}`)) return;
+  clearTimeout(timer); await pjIdle(); clearTimeout(SY.tm); SY.tm = 0;
+  const id = p.id; PJ.list = PJ.list.filter(x => x.id !== id); PJ.gone.push(id);
+  await pjLoad(PJ.list[0].id); await pjDrop(id); pjSave(); if (syAuto()) sySoon(300);
+  toast(`Proyecto «${p.name}» borrado.`, [], 4000);
+}
+async function pjGone(id) {   // otro dispositivo borró el proyecto abierto
+  const p = PJ.list.find(x => x.id === id); if (!p || PJ.cur !== id) return;
+  PJ.list = PJ.list.filter(x => x.id !== id); await pjLoad(PJ.list[0].id); await pjDrop(id); pjSave();
+  toast(`El proyecto «${p.name}» se borró en otro dispositivo. Ahora estás en «${pjCur().name}».`, [], 8000);
+}
+function pjMenu(e) {
+  e.stopPropagation(); const r = e.currentTarget.getBoundingClientRect(), L = [...PJ.list].sort((a, b) => a.name.localeCompare(b.name, 'es'));
+  ctxShow({preventDefault() {}, stopPropagation() {}, clientX: r.left, clientY: r.bottom + 4}, '<div class="ctxh">Proyectos</div>'
+    + L.map(p => `<button class="pji" onclick="pjOpen('${p.id}')">${tick(p.id === PJ.cur)}${esc(p.name)} <small>${p.remote ? '☁ en Google Drive' : (p.id === PJ.cur ? db.papers.length : p.n || 0) + ' papers'}</small></button>`).join('')
+    + '<hr><button onclick="pjNew()">＋ Nuevo proyecto</button><button onclick="ctxClose();doOpen()">📂 Abrir un JSON como proyecto…</button><button onclick="ctxClose();pjEdit()">✏️ Cambiar el nombre</button><button onclick="bkOpen()">🕘 Copias de seguridad…</button><button class="danger" onclick="pjDel()">🗑 Borrar este proyecto…</button>');
+}
+
 /* ===== Datos de la aplicación (PWA): copia de la sesión y estado de la interfaz, en IndexedDB =====
    Aparte del JSON, la app guarda (1) una copia de trabajo, para reabrir justo donde lo dejaste aunque no hayas guardado, y
    (2) el estado de la interfaz (filtros, orden, barra lateral, bloques plegados). Viven fuera de la caché de la aplicación,
    así que las actualizaciones no los tocan y no hace falta borrar datos para recibir una versión nueva. */
-const APP_V = '31.5';   // debe coincidir con la versión de sw.js
+const APP_V = '32.1';   // debe coincidir con la versión de sw.js
 let BOOTED = false, RELOADING = false, SWREG = null, tSes = 0, tUi = 0, lastUi = '';
-const sessionNow = () => { clearTimeout(tSes); if (!BOOTED) return Promise.resolve();
-  return idb('readwrite', st => st.put({v: 1, path, dirty, at: new Date().toISOString(), json: dbJSON()}, 'session')).catch(() => {}); };
+const sessionNow = () => { clearTimeout(tSes); if (!BOOTED) return Promise.resolve();   // copia de trabajo del proyecto abierto (y la lista de proyectos)
+  const p = pjCur(); if (p) { Object.assign(p, {n: db.papers.length, file: path, dirty}); delete p.remote; }
+  return idb('readwrite', st => { st.put({v: 1, cur: PJ.cur, list: PJ.list, gone: PJ.gone}, 'projects'); return st.put({v: 1, path, dirty, at: new Date().toISOString(), json: dbJSON()}, 'proj:' + PJ.cur); }).catch(() => {}); };
 const sessionSoon = () => { clearTimeout(tSes); tSes = setTimeout(sessionNow, 700); };
 const uiState = () => ({v: 1, F: {sorts: F.sorts, group: F.group, sec: F.sec, tags: [...F.tags], read: F.read, minRating: F.minRating, inNotes: F.inNotes, mode: F.mode, tbSec: F.tbSec, tbTag: F.tbTag},
   side: {min: $('#side').classList.contains('min'), fold: [...document.querySelectorAll('#side .sg.fold')].map(e => e.id), more: !$('#sg-more').classList.contains('fold')}, cite: CITE_SEL, allFold: [...ALL_FOLD], cfg: [...CFG_OPEN], help: [...HELP_OPEN]});
@@ -2695,9 +3084,12 @@ function toast(msg, acts = [], ms = 8000) {
   if (ms) t.tm = setTimeout(() => t.hidden = true, ms);
 }
 async function forgetAppData() {
-  if (!confirm('Se borrará la copia de sesión y el estado de la interfaz guardados por la aplicación (tu archivo JSON no se toca). ¿Continuar?')) return;
-  BOOTED = false; clearTimeout(tSes); clearTimeout(tUi); await idb('readwrite', st => { st.delete('session'); return st.delete('ui'); }).catch(() => {}); BOOTED = true; lastUi = '';
-  toast('Datos de sesión borrados. La próxima vez la aplicación arrancará limpia.');
+  const n = PJ.list.filter(p => !p.remote).length;
+  if (!confirm(`Se borrarán de este navegador ${n === 1 ? 'el proyecto' : `los ${n} proyectos`} (copias de trabajo) y el estado de la interfaz. Tus archivos JSON y tu Google Drive no se tocan: guarda antes lo que no tengas guardado. ¿Continuar?`)) return;
+  BOOTED = false; clearTimeout(tSes); clearTimeout(tUi);
+  const ks = await idb('readonly', st => st.getAllKeys()).catch(() => []);
+  await idb('readwrite', st => { ks.filter(k => typeof k === 'string' && /^(session|ui|projects|proj:|h:|bk:|fav:|sync)/.test(k)).forEach(k => st.delete(k)); return st.count(); }).catch(() => {});
+  toast('Datos de este navegador borrados. La próxima vez la aplicación arrancará limpia.');   // en esta pestaña ya no se guarda nada más
 }
 const reloadApp = async () => { RELOADING = true; await sessionNow(); await uiNow(); location.reload(); };
 function checkUpdate() {
@@ -2706,17 +3098,26 @@ function checkUpdate() {
 }
 async function bootApp() {
   navigator.storage?.persist?.().catch(() => {});   // pide que el navegador no borre estos datos por falta de espacio
-  let ses = null, ui = null; try { ses = await idb('readonly', st => st.get('session')); ui = await idb('readonly', st => st.get('ui')); } catch (e) {}
+  let ses = null, ui = null, pj = null, old = false; try { pj = await idb('readonly', st => st.get('projects')); ui = await idb('readonly', st => st.get('ui')); } catch (e) {}
+  const okId = x => x && typeof x.id === 'string' && /^[a-z0-9]+$/.test(x.id) && typeof x.name === 'string';
+  if (pj && pj.v === 1 && Array.isArray(pj.list) && pj.list.some(okId)) {   // proyectos guardados: se abre el último
+    PJ.list = pj.list.filter(okId); PJ.cur = PJ.list.some(p => p.id === pj.cur && !p.remote) ? pj.cur : (PJ.list.find(p => !p.remote) || PJ.list[0]).id; PJ.gone = Array.isArray(pj.gone) ? pj.gone.filter(x => typeof x === 'string') : [];
+    try { ses = await idb('readonly', st => st.get('proj:' + PJ.cur)); } catch (e) {}
+  } else { try { ses = await idb('readonly', st => st.get('session')); old = !!ses; } catch (e) {} }   // versión anterior (una sola biblioteca): pasa a ser el primer proyecto
   let restored = false;
   if (ses && ses.v === 1 && typeof ses.json === 'string' && await loadText(ses.json, typeof ses.path === 'string' ? ses.path : null, true)) {
-    restored = true; dirty = !!ses.dirty; hdr();
-    try { const h = FSA && await idb('readonly', st => st.get('last')); if (h && ses.path && h.name === ses.path) handle = h; } catch (e) {}
+    restored = true; dirty = !!ses.dirty; if (old) PJ.list[0].name = pjNameFor(path); hdr();
+    try { const h = FSA && (await idb('readonly', st => st.get('h:' + PJ.cur)) || old && await idb('readonly', st => st.get('last'))); if (h && ses.path && h.name === ses.path) handle = h; } catch (e) {}
     toast(dirty ? `Sesión recuperada con cambios sin guardar${ses.path ? ' de «' + ses.path + '»' : ''}. Guarda para no perderlos.` : `Sesión recuperada${ses.path ? ': «' + ses.path + '»' : ''}.`, [], 6000);
   } else {
-    syBaseSet(null);   // no hay copia de sesión: lo que se abra ahora no es lo último sincronizado
-    if (location.protocol.startsWith('http')) try { const r = await fetch('ejemplo_papers.json'); if (r.ok && !dirty && !db.papers.length) await loadText(await r.text(), 'ejemplo_papers.json', true); } catch (e) {}   // la primera vez se abre el ejemplo
+    syBaseSet(syNames(PJ.cur), null);   // no hay copia de trabajo: lo que se abra ahora no es lo último sincronizado
+    if (!pj && location.protocol.startsWith('http')) try { const r = await fetch('ejemplo_papers.json'); if (r.ok && !dirty && !db.papers.length) await loadText(await r.text(), 'ejemplo_papers.json', true); } catch (e) {}   // la primera vez se abre el ejemplo
+    if (!pj) PJ.list[0].name = pjNameFor(path);
   }
-  applyUI(ui); BOOTED = true; lastUi = JSON.stringify(uiState()); if (restored) uiNow();
+  pjShow(); instShow(); applyUI(ui); BOOTED = true; lastUi = JSON.stringify(uiState()); if (restored) uiNow();
+  if (pj && !restored) pjSave(); else await sessionNow();
+  if (old) { if (handle) rememberHandle(); idb('readwrite', st => st.delete('session')).catch(() => {}); }
+  bkDaily(); favLoad();
 }
 document.addEventListener('visibilitychange', () => { if (document.hidden) { sessionNow(); uiNow(); } });
 addEventListener('pagehide', () => { sessionNow(); uiNow(); });
