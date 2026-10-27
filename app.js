@@ -17,7 +17,7 @@ const TPL_DEF = [   // plantillas de nota de serie; {fecha} y {paper} se sustitu
   {id: 't_res', name: 'Resumen del paper', text: '**Objetivo:** \n**Método:** \n**Resultados:** \n**Limitaciones:** '},
   {id: 't_cit', name: 'Cita textual', text: '**Cita:** \n**Página:** \n**Comentario:** '},
   {id: 't_ide', name: 'Idea propia', text: '**Idea:** \n**Relación con mi tema:** \n**Siguiente paso:** '}];
-const defSettings = () => ({palette: 'azul', appName: 'Papers', showFile: true, showImg: true, showProgress: false, pdfDrive: false, customTypes: [], customStyles: [], shortcuts: {...SC_DEF}, fmtOpen: false, view: 'cards', templates: TPL_DEF.map(t => ({...t})), export: {fmt: 'txt', style: 'apa', order: 'auto', num: false, notes: false, particles: false, title: '', lang: 'es', dateFmt: 'long', vanAll: false, ppChap: true, numFmt: 'auto', disamb: true, inText: false}});   // ajustes por defecto (se guardan en el JSON)
+const defSettings = () => ({palette: 'azul', appName: 'Papers', showFile: true, showImg: true, showProgress: false, pdfDrive: false, customTypes: [], customStyles: [], shortcuts: {...SC_DEF}, fmtOpen: false, view: 'cards', templates: TPL_DEF.map(t => ({...t})), export: {fmt: 'txt', style: 'apa', order: 'auto', num: false, notes: false, particles: false, title: '', lang: 'es', dateFmt: 'long', vanAll: false, ppChap: true, numFmt: 'auto', disamb: true, abbrList: true, inText: false}});   // ajustes por defecto (se guardan en el JSON)
 let db = {version: 1, sections: [], tags: [], papers: [], trash: [], settings: defSettings()}, path = null, dirty = false, auto = false, D, tab = 'data', MG, timer;
 const F = {q: '', sorts: [{k: 'title', d: 1}], group: false, sec: '', tags: new Set(), read: '', minRating: 0, inNotes: false, mode: 'any', tbSec: false, tbTag: true};
 const SEL = new Set();   // ids de papers seleccionados
@@ -28,33 +28,40 @@ const KEY = {created: p => p.created || '', modified: p => p.modified || p.creat
   year: p => +p.year || 0, venue: p => p.venue || '', accessed: p => p.accessed || '', reading: p => READ_N[p.reading] ?? 0, rating: p => p.rating || 0};
 const TYPES = {articulo: 'Artículo de revista', libro: 'Libro', capitulo: 'Capítulo', congreso: 'Congreso', tesis: 'Tesis', web: 'Página web', prensa: 'Artículo de prensa', blog: 'Entrada de blog',
   informe: 'Informe', norma: 'Norma técnica', patente: 'Patente', mapa: 'Mapa', dataset: 'Conjunto de datos', software: 'Software o videojuego', basedatos: 'Base de datos', audiovisual: 'Audiovisual (película, serie, vídeo)',
-  audio: 'Audio (podcast, canción)', redsocial: 'Publicación en red social', ia: 'IA generativa', diccionario: 'Entrada de diccionario o enciclopedia', presentacion: 'Presentación', personal: 'Comunicación personal', legislacion: 'Legislación'};
+  audio: 'Audio (podcast, canción)', redsocial: 'Publicación en red social', ia: 'IA generativa', diccionario: 'Entrada de diccionario o enciclopedia', presentacion: 'Presentación', personal: 'Comunicación personal', legislacion: 'Legislación', jurisprudencia: 'Jurisprudencia (sentencia, auto…)'};
 const LINK_MODES = {auto: 'Automático (DOI si hay; si no, URL)', doi: 'Solo DOI', url: 'Solo URL (Disponible en)', none: 'Ninguno'};   // enlace que se escribe en la cita
 const AUTH_T = {auto: 'Automático', persona: 'Persona', entidad: 'Entidad (organización)', sin_autor: 'Sin autor'};
 const THESIS = ['Tesis doctoral', 'Trabajo fin de grado', 'Trabajo fin de máster', 'Proyecto fin de carrera'];
 const STR_F = ['volume', 'issue', 'pages', 'publisher', 'place', 'edition', 'pubDate', 'thesisType',
-  'isbn', 'issn', 'series', 'seriesNumber', 'institution', 'docNumber', 'conferenceName', 'conferencePlace', 'conferenceDates', 'subtype', 'authorRole', 'userHandle'];   // campos de texto (F1a y, desde F3a, los P2: aún sin plantilla de cita)
-const FLD_T = {volume: ['articulo'], issue: ['articulo', 'legislacion'], pages: ['articulo', 'capitulo', 'congreso', 'prensa', 'legislacion', 'diccionario'], publisher: ['capitulo', 'congreso'],
-  place: ['libro', 'capitulo', 'congreso', 'tesis', 'web', 'informe', 'norma', 'patente', 'mapa', 'software', 'basedatos', 'audiovisual', 'legislacion'],
+  'isbn', 'issn', 'series', 'seriesNumber', 'institution', 'docNumber', 'conferenceName', 'conferencePlace', 'conferenceDates', 'subtype', 'authorRole', 'userHandle', 'abbr', 'ecli'];   // campos de texto (F1a y, desde F3a, los P2: aún sin plantilla de cita)
+const FLD_T = {volume: ['articulo'], issue: ['articulo', 'legislacion'], pages: ['articulo', 'capitulo', 'congreso', 'prensa', 'legislacion', 'diccionario'], publisher: ['capitulo', 'congreso', 'jurisprudencia'],
+  place: ['libro', 'capitulo', 'congreso', 'tesis', 'web', 'informe', 'norma', 'patente', 'mapa', 'software', 'basedatos', 'audiovisual', 'legislacion', 'jurisprudencia'],
   edition: ['libro', 'norma', 'mapa', 'dataset', 'software', 'ia', 'diccionario'], editors: ['capitulo'],
-  pubDate: ['articulo', 'web', 'prensa', 'blog', 'informe', 'norma', 'patente', 'dataset', 'software', 'audiovisual', 'audio', 'redsocial', 'ia', 'presentacion', 'personal', 'legislacion'], thesisType: ['tesis'],
-  isbn: ['libro'], issn: ['articulo'], institution: ['tesis'], series: ['informe', 'mapa', 'audiovisual', 'audio', 'ia'], seriesNumber: ['informe', 'mapa', 'audiovisual', 'audio'], docNumber: ['informe', 'norma', 'patente', 'mapa', 'legislacion'],
+  pubDate: ['articulo', 'web', 'prensa', 'blog', 'informe', 'norma', 'patente', 'dataset', 'software', 'audiovisual', 'audio', 'redsocial', 'ia', 'presentacion', 'personal', 'legislacion', 'jurisprudencia'], thesisType: ['tesis'],
+  isbn: ['libro'], issn: ['articulo'], institution: ['tesis'], series: ['informe', 'mapa', 'audiovisual', 'audio', 'ia', 'jurisprudencia'], seriesNumber: ['informe', 'mapa', 'audiovisual', 'audio', 'jurisprudencia'], docNumber: ['informe', 'norma', 'patente', 'mapa', 'legislacion', 'jurisprudencia'],
   conferenceName: [], conferencePlace: [], conferenceDates: [],
-  subtype: ['mapa', 'dataset', 'software', 'audiovisual', 'audio', 'redsocial', 'ia', 'presentacion', 'personal'], authorRole: ['audiovisual', 'audio'], userHandle: ['redsocial']};   // en qué tipos se muestra cada campo en el formulario (F3a–F3e)
+  subtype: ['mapa', 'dataset', 'software', 'audiovisual', 'audio', 'redsocial', 'ia', 'presentacion', 'personal', 'legislacion', 'jurisprudencia'], authorRole: ['audiovisual', 'audio'], userHandle: ['redsocial'],
+  abbr: ['legislacion', 'jurisprudencia'], ecli: ['jurisprudencia']};   // en qué tipos se muestra cada campo en el formulario (F3a–F3e)
 // etiquetas del formulario según el tipo (si no hay entrada, se usa la genérica)
 const FLBL = {
   venue: {prensa: 'Periódico o medio', blog: 'Nombre del blog', informe: 'Institución o editorial', norma: 'Organismo de normalización (p. ej. International Organization for Standardization (ISO))', patente: 'Titular o solicitante', mapa: 'Editor o impresor', dataset: 'Repositorio o editor',
     software: 'Empresa, editor o repositorio', basedatos: 'Editor o institución', audiovisual: 'Productora o distribuidora', audio: 'Discográfica, plataforma o productora', redsocial: 'Red social (Instagram, X, Facebook…)', ia: 'Empresa (OpenAI, Google…)',
-    diccionario: 'Obra de referencia (diccionario o enciclopedia)', presentacion: 'Plataforma o repositorio', personal: 'Contexto (opcional)', legislacion: 'Publicación oficial (BOE, DOUE…)'},
-  docNumber: {informe: 'Número o código del informe (p. ej. NIH Publication No. 18-2059)', norma: 'Código de la norma (p. ej. ISO 690:2010)', patente: 'Número de la patente', mapa: 'Escala (p. ej. 1:8.000.000)', legislacion: 'Código o referencia (p. ej. RCL 2018\\1629)'},
+    diccionario: 'Obra de referencia (diccionario o enciclopedia)', presentacion: 'Plataforma o repositorio', personal: 'Contexto (opcional)', legislacion: 'Publicación oficial (BOE, DOUE…)', jurisprudencia: 'Tribunal u órgano (p. ej. Tribunal Supremo)'},
+  title: {legislacion: 'Título completo y exacto de la norma * (p. ej. Ley 40/2015, de 2 de octubre, de Régimen Jurídico del Sector Público)', jurisprudencia: 'Caso o partes * (p. ej. Rubio dos Amantes contra España; si no hay, la identificación: STS 1229/2017)'},
+  docNumber: {informe: 'Número o código del informe (p. ej. NIH Publication No. 18-2059)', norma: 'Código de la norma (p. ej. ISO 690:2010)', patente: 'Número de la patente', mapa: 'Escala (p. ej. 1:8.000.000)', legislacion: 'Código o referencia (p. ej. RCL 2018\\1629)', jurisprudencia: 'Número de la resolución (p. ej. 1229/2017)'},
   edition: {norma: 'Edición o estado (p. ej. completa)', mapa: 'Edición o versión', dataset: 'Versión', software: 'Versión', ia: 'Versión (p. ej. versión del 13 de febrero)', diccionario: 'Edición (desde la 2.ª)'},
-  place: {patente: 'País (p. ej. US, ES)', legislacion: 'Ámbito territorial (p. ej. España)'},
-  series: {informe: 'Serie (p. ej. Documentos de trabajo)', mapa: 'Serie del mapa', audiovisual: 'Serie o programa (si es un episodio)', audio: 'Disco o programa (podcast)', ia: 'Herramienta (p. ej. ChatGPT)'},
-  seriesNumber: {informe: 'Número en la serie', mapa: 'Designación de la serie', audiovisual: 'Temporada y episodio (p. ej. Temporada 6, Episodio 5)', audio: 'Número del episodio'},
-  pubDate: {articulo: 'Fecha de publicación (se usa solo el mes: Chicago, IEEE)', norma: 'Fecha de aprobación', patente: 'Fecha de concesión', personal: 'Fecha exacta', legislacion: 'Fecha de publicación'},
-  issue: {legislacion: 'Número del boletín'}};
+  place: {patente: 'País (p. ej. US, ES)', legislacion: 'Ámbito territorial (p. ej. España, Extremadura, Unión Europea)', jurisprudencia: 'Ámbito (opcional; p. ej. España)'},
+  series: {informe: 'Serie (p. ej. Documentos de trabajo)', mapa: 'Serie del mapa', audiovisual: 'Serie o programa (si es un episodio)', audio: 'Disco o programa (podcast)', ia: 'Herramienta (p. ej. ChatGPT)', jurisprudencia: 'Sala y sección (p. ej. Sala de lo Penal, Sección 1.ª; Pleno)'},
+  seriesNumber: {informe: 'Número en la serie', mapa: 'Designación de la serie', audiovisual: 'Temporada y episodio (p. ej. Temporada 6, Episodio 5)', audio: 'Número del episodio', jurisprudencia: 'Asunto (p. ej. C-403/03; TJUE)'},
+  pubDate: {articulo: 'Fecha de publicación (se usa solo el mes: Chicago, IEEE)', norma: 'Fecha de aprobación', patente: 'Fecha de concesión', personal: 'Fecha exacta', legislacion: 'Fecha de publicación en el boletín', jurisprudencia: 'Fecha de la resolución'},
+  issue: {legislacion: 'Número del boletín (p. ej. 236; en el DOUE, L 94)'},
+  publisher: {jurisprudencia: 'Base de datos (opcional; p. ej. Aranzadi Instituciones, CENDOJ)'},
+  subtype: {legislacion: 'Rango (opcional; se deduce del título)', jurisprudencia: 'Tipo de resolución (por defecto, Sentencia)'},
+  abbr: {legislacion: 'Abreviatura (p. ej. CE, LOPJ, LRJSP)', jurisprudencia: 'Abreviatura propia (opcional; se deduce: STS, STC, STSJ Madrid…)'}};
 const FSUB = {mapa: ['Mapa'], dataset: ['Dataset', 'Conjunto de datos'], software: ['Software', 'Videojuego', 'Programa', 'Aplicación'], audiovisual: ['Película', 'Serie de TV', 'Capítulo de serie de televisión', 'Video'], audio: ['Audio podcast', 'Episodio de audio podcast', 'Canción'],
-  redsocial: ['Post de X', 'Fotografía', 'Video', 'Actualización de estado', 'Historia de Instagram'], ia: ['Modelo de lenguaje de gran tamaño', 'Chat de IA generativa'], presentacion: ['Presentación de PowerPoint', 'Conferencia'], personal: ['Correo electrónico', 'Entrevista', 'Carta', 'Mensaje', 'Llamada telefónica']};
+  redsocial: ['Post de X', 'Fotografía', 'Video', 'Actualización de estado', 'Historia de Instagram'], ia: ['Modelo de lenguaje de gran tamaño', 'Chat de IA generativa'], presentacion: ['Presentación de PowerPoint', 'Conferencia'], personal: ['Correo electrónico', 'Entrevista', 'Carta', 'Mensaje', 'Llamada telefónica'],
+  legislacion: ['Constitución', 'Estatuto de Autonomía', 'Ley Orgánica', 'Ley', 'Real Decreto-ley', 'Real Decreto Legislativo', 'Real Decreto', 'Decreto', 'Orden', 'Resolución', 'Circular', 'Instrucción', 'Tratado', 'Convenio', 'Reglamento (UE)', 'Directiva', 'Decisión', 'Recomendación', 'Dictamen'],
+  jurisprudencia: ['Sentencia', 'Auto', 'Declaración', 'Providencia']};
 const shows = (k, t) => CTYPES.has(t) ? CTYPES.get(t).fields.includes(k) : FLD_T[k].includes(t);
 const IMG_RX = /^data:image\/(png|jpe?g|webp|gif);base64,[A-Za-z0-9+/=]+$/;
 function imgOk(i) {   // imagen del paper: URL, archivo local enlazado (solo el nombre; el enlace vive en este navegador) o copia reducida incrustada
@@ -442,7 +449,7 @@ const xFn = (p, o, st) => {
   const dsg = ty === 'software' && !p.subtype ? (en ? 'Software' : 'Programa') : sub;
   return [...head(endDot(ind ? it(T) : T)), dsg && !['basedatos', 'diccionario'].includes(ty) && endDot(dsg), ed && endDot(['software', 'ia', 'mapa'].includes(ty) ? verLbl(ed, en) : ea(edLbl(p.edition, o.lang))), kind === 'ep' && ser && endDot(`${L.in}: ${it(ser)}`), pub(join(plc, V, ': '), yEnd), code && ty !== 'informe' && endDot(code), lk, acc].filter(Boolean).join(' ').trim();
 };
-const withX = (fn, st) => (p, o = ex()) => XTYPES.has(p.type) ? xFn(p, o, st) : fn(p, o);
+const withX = (fn, st) => (p, o = ex()) => p.type === 'jurisprudencia' ? jurRef(p, o) : XTYPES.has(p.type) ? xFn(p, o, st) : fn(p, o);
 // estilos donde la guía trae plantilla propia para cada tipo nuevo (en los demás se usa la genérica y se avisa)
 const XCOVER = {informe: ['apa', 'apa2', 'chicago_nb', 'ieee', 'une_nf', 'une_num'], norma: ['apa', 'apa2', 'chicago_af', 'chicago_nb', 'une_nf', 'une_num'], patente: ['chicago_af', 'chicago_nb', 'ieee', 'une_nf', 'une_num'], mapa: ['chicago_af', 'chicago_nb', 'une_nf', 'une_num'],
   dataset: ['apa', 'apa2', 'mla', 'ieee', 'une_nf', 'une_num'], software: ['apa', 'apa2', 'une_nf', 'une_num'], basedatos: ['vancouver', 'vancouver2'], audiovisual: ['apa', 'apa2', 'chicago_af', 'chicago_nb', 'mla', 'une_nf', 'une_num'], audio: ['apa', 'apa2'],
@@ -454,6 +461,80 @@ const XNOTE = {   // avisos concretos adicionales (estilo → tipo)
   mla: {legislacion: 'MLA no cubre documentos jurídicos: es una adaptación. Verificar.'}, une_nf: {legislacion: 'UNE solo trae un ejemplo de legislación. Verificar.'}, une_num: {legislacion: 'UNE solo trae un ejemplo de legislación. Verificar.'}};
 XNOTE.apa2 = XNOTE.apa;
 const xWarn = (st, ty) => { const s = STYLES[st]; if (!s) return ''; return [XCOVER[ty]?.includes(st) ? '' : `${s.name}: la guía no trae plantilla de ${TYPES[ty].toLowerCase()}; se usa una genérica. Verificar.`, XNOTE[st]?.[ty]].filter(Boolean).join(' '); };
+/* ---- Derecho y jurisprudencia: un solo estilo que une las guías de la UAM (Facultad de Derecho), la UMA (BUMA), la UC3M y la UCM.
+   Legislación y jurisprudencia van en anexos ordenados de la más antigua a la más reciente (nunca en la bibliografía) y se citan en el texto con
+   abreviaturas; la doctrina (libros, artículos…) se cita con las plantillas de APA 7, como recomiendan la UAM y la UCM.
+   Anexo de legislación (UMA): [Ámbito.] Título [Internet]. Boletín, fecha, núm. N, pp. · Anexo de jurisprudencia: [Ámbito.] Tribunal (Sala). [Caso X (asunto).] Sentencia núm. N, de fecha[, ECLI].
+   La plantilla de jurisprudencia vale también en los demás estilos: las guías dicen que se aplica sea cual sea el estilo elegido. ---- */
+const LAW_T = new Set(['legislacion', 'jurisprudencia']);
+const fechaEs = s => okDate(s) ? `${+s.slice(8)} de ${MES.es[+s.slice(5, 7) - 1]} de ${s.slice(0, 4)}` : '';   // 29 de marzo de 2017 (el Derecho se cita en español)
+const RANKS = [['Ley Orgánica', 'LO'], ['Real Decreto-ley', 'RDL'], ['Real Decreto Legislativo', 'RDLeg'], ['Real Decreto', 'RD'], ['Decreto-ley', 'DL'], ['Decreto Legislativo', 'DLeg'], ['Decreto', 'D.'], ['Ley', 'Ley'], ['Orden', 'O.'],
+  ['Reglamento', 'R'], ['Directiva', 'Dir.'], ['Decisión', 'Dec.'], ['Recomendación', 'Rec.'], ['Dictamen', 'Dict.'], ['Resolución', 'Res.'], ['Circular', 'Circ.'], ['Instrucción', 'Instr.']];   // rango → abreviatura en el texto (de la más larga a la más corta)
+const EU_R = new Set(['R', 'Dir.', 'Dec.', 'Rec.', 'Dict.']);   // normas de la UE: la cita corta lleva el año de la fecha (Dir. 2015/2376 del Consejo, de 8 de diciembre de 2015)
+const unacc = s => String(s ?? '').normalize('NFC').normalize('NFD').replace(/[̀-ͯ]/g, '');   // mismas posiciones que el texto en NFC
+const LAW_ORG = '(?:del?|de la)\\s+(?:Parlamento Europeo y del Consejo|Consejo Europeo|Consejo|Comision|Banco Central Europeo)';
+const LAW_RX = new RegExp(`^(${RANKS.map(([n]) => unacc(n).replace(/[-\s]/g, '[-\\s]')).join('|')})(?![a-z])(?:\\s*\\(([^)]{1,20})\\))?(?:\\s+(${LAW_ORG}))?(?:\\s+(?:n\\.?\\s*[º°o]\\.?\\s*)?((?:[A-Z]{2,5}\\/)?\\d+\\/\\d{2,4}(?:\\/[A-Z]+(?:\\s*,\\s*Euratom)?)?))?(?:\\s+(${LAW_ORG}))?,?(?:\\s+de\\s+(\\d{1,2}\\s+de\\s+[a-z]+)(?:\\s+de\\s+(\\d{4}))?)?`, 'id');
+function lawParse(p) {   // «Ley 40/2015, de 2 de octubre, de …» → {ab: 'Ley', par, num: '40/2015', org, d: '2 de octubre', y: '2015'}; null si el título no empieza por un rango conocido
+  const t = String(p.title ?? '').normalize('NFC').trim(), m = LAW_RX.exec(unacc(t)); if (!m) return null;
+  const g = i => m.indices[i] ? t.slice(...m.indices[i]).replace(/\s+/g, ' ') : '';
+  const ab = RANKS.find(([n]) => unacc(n).toLowerCase().replace(/[-\s]/g, ' ') === unacc(g(1)).toLowerCase().replace(/[-\s]/g, ' '))[1];
+  const x = {ab, par: g(2), org: g(3) || g(5), num: g(4), d: g(6), y: g(7)}; return x.num || x.d ? x : null; }
+const numYear = s => (String(s ?? '').match(/\b(1[89]\d\d|20\d\d)\b/) || [])[1] || '';   // año dentro del número (40/2015, 2015/2376, PRA/157/2017)
+const lawShort = p => { const x = lawParse(p); if (!x) return '';   // cita corta: RDL 18/2020, de 12 de mayo · Res. de 6 de junio de 2016 · R (UE) 658/2017 del Consejo, de 6 de abril de 2017
+  const y = x.y || numYear(x.num) || p.year, full = EU_R.has(x.ab) || !x.num;   // solo el reglamento conserva «(UE)» (UAM, UMA)
+  return ea(`${x.ab}${x.par && x.ab === 'R' ? ` (${x.par})` : ''}${x.num ? ' ' + x.num : ''}${x.org ? ' ' + x.org : ''}${x.d ? `${x.num || x.org ? ',' : ''} de ${x.d}${full && y ? ' de ' + y : ''}` : ''}`); };
+const RANK_N = Object.fromEntries(RANKS.map(([n, a]) => [a, n]));
+const legName = p => { const t = ea(String(p.title ?? '').trim().replace(/\.$/, '')), m = /^(.+?), (?:hecho|firmado|adoptado|celebrado) en .+? el (\d{1,2} de \S+ de \d{4})/i.exec(t); return m ? `${m[1]}, ${m[2]}` : t; };   // tratado: «Tratado de …, 5 de febrero de 2008»
+function lawKey(p) {   // fecha para el orden cronológico de los anexos (aaaa-mm-dd; sin fecha, al final)
+  if (p.type === 'legislacion') { const x = lawParse(p), m = x && /^(\d{1,2}) de (\S+)$/.exec(x.d), mo = m ? MES.es.indexOf(unacc(m[2]).toLowerCase().replace('setiembre', 'septiembre')) + 1 : 0, y = x && (x.y || numYear(x.num) || p.year);
+    if (mo && y) return `${y}-${String(mo).padStart(2, '0')}-${m[1].padStart(2, '0')}`; }
+  return okDate(p.pubDate) ? p.pubDate : p.year ? `${p.year}-00-00` : '9999'; }
+const COURTS = [[/constitucional|^TC$/i, 'TC', 'del Tribunal Constitucional'], [/supremo|^TS$/i, 'TS', 'del Tribunal Supremo'], [/audiencia nacional|^AN$/i, 'AN', 'de la Audiencia Nacional'],
+  [/superior de justicia|^TSJ\b/i, 'TSJ', 'del Tribunal Superior de Justicia'], [/audiencia provincial|^AP\b/i, 'AP', 'de la Audiencia Provincial'], [/derechos humanos|^TEDH$/i, 'TEDH', 'del Tribunal Europeo de Derechos Humanos'],
+  [/tribunal general|^TGUE$/i, 'TGUE', 'del Tribunal General de la Unión Europea'], [/justicia de la uni[oó]n europea|^TJUE$/i, 'TJUE', 'del Tribunal de Justicia de la Unión Europea'], [/justicia de las comunidades europeas|^TJCE$/i, 'TJCE', 'del Tribunal de Justicia de las Comunidades Europeas']];
+const RES_K = {S: 'Sentencia', A: 'Auto', D: 'Declaración', P: 'Providencia'};
+const resK = p => { const s = unacc(p.subtype).trim().toLowerCase(); return !s || s.startsWith('sentencia') ? 'S' : s.startsWith('auto') ? 'A' : s.startsWith('declaracion') ? 'D' : s.startsWith('providencia') ? 'P' : ''; };
+const court = p => { const v = String(p.venue ?? '').trim(), c = COURTS.find(([rx]) => rx.test(v)); if (!c) return null;
+  const reg = ['TSJ', 'AP'].includes(c[1]) ? (/(?:superior de justicia|audiencia provincial|TSJ|AP)\s+(?:de\s+(?:la\s+|las\s+|los\s+)?|del\s+)?(.+)$/i.exec(v) || [])[1] || '' : '';
+  return {ab: c[1], of: c[2], reg: reg.replace(/[.,]$/, '')}; };   // STSJ Madrid · ATSJ País Vasco
+const jurAbbr = p => { if (String(p.abbr ?? '').trim()) return ea(p.abbr.trim()); const c = court(p), k = resK(p); return c && k ? ea(k + c.ab + (c.reg ? ' ' + c.reg : '')) : ''; };
+const jurLoc = (p, loc) => { loc = String(loc ?? '').trim(); if (!loc) return ''; if (!/^\d/.test(loc)) return ', ' + ea(loc); const c = court(p)?.ab;   // número solo → FJ (TC, TS, AN), FD (TSJ, AP), ap. (tribunales europeos)
+  return `, ${['TSJ', 'AP'].includes(c) ? 'FD' : ['TEDH', 'TGUE', 'TJUE', 'TJCE'].includes(c) ? 'ap.' : 'FJ'} ${ea(loc)}`; };
+const jurIsId = (p, T) => !T || /^[SADP](TC|TS|AN|TSJ|AP|TEDH|TGUE|TJUE|TJCE)\b/.test(T) || (jurAbbr(p) && T.startsWith(jurAbbr(p))) || unacc(T).toLowerCase() === unacc(p.venue).toLowerCase();   // el título es la identificación, no el nombre del caso
+const accEs = (p, o, on) => on && p.accessed && !p.hideAccessed ? `[consultado ${fdate(p.accessed, {...o, lang: 'es'})}]` : '';
+function legRef(p, o) {   // anexo de legislación (UMA, con los elementos de la UAM)
+  const T = ea(String(p.title ?? '').trim().replace(/\.$/, '')), V = ea(p.venue || ''), iss = ea(String(p.issue ?? '').trim()), pg = ea(p.pages || ''), link = ea(citeLink(p));
+  const ser = /^[A-Z]{1,2}\s*\d/.test(iss), d = fechaEs(p.pubDate) || (p.year ? String(p.year) : '');   // DOUE: la serie va pegada al diario (Diario Oficial de la Unión Europea L 94)
+  const pub = V ? [V + (ser ? ' ' + iss : ''), d, iss && !ser && `núm. ${iss}`, pg && pgs(pg, true)].filter(Boolean).join(', ') : '';
+  return [p.place && endDot(ea(p.place.trim())), endDot(T + (link ? ' [Internet]' : '')), pub && endDot(pub), p.docNumber && endDot(ea(p.docNumber.trim())), accEs(p, o, link) && endDot(accEs(p, o, link)), link && `Disponible en: ${link}`].filter(Boolean).join(' ').trim(); }
+function jurRef(p, o) {   // anexo de jurisprudencia: [Ámbito.] Tribunal (Sala, Sección). [Caso X (asunto).] Sentencia núm. N, de fecha[, asunto][, ECLI] [Internet]. [Versión electrónica. Base de datos de X] [consultado …]. Disponible en: url
+  const V = ea(String(p.venue ?? '').trim()), sala = ea(String(p.series ?? '').trim()), num = ea(String(p.docNumber ?? '').trim()), as = ea(String(p.seriesNumber ?? '').trim()), ecli = ea(String(p.ecli ?? '').trim()), db = ea(String(p.publisher ?? '').trim()), link = ea(citeLink(p));
+  const T = ea(String(p.title ?? '').trim().replace(/\.$/, '')), cs = jurIsId(p, T) ? '' : (/^(caso|asunto|case)\b/i.test(T) ? T : 'Caso ' + T) + (as ? ` (${as})` : '');
+  const d = fechaEs(p.pubDate) || (p.year && !num.includes(String(p.year)) ? String(p.year) : '');
+  const res = [ea(String(p.subtype ?? '').trim() || 'Sentencia'), num && `núm. ${num}`].filter(Boolean).join(' ') + (d ? `${num ? ',' : ''} de ${d}` : '') + (as && !cs ? `, ${as}` : '') + (ecli ? `, ${ecli}` : '');
+  const tail = [db && `[Versión electrónica. Base de datos de ${db}]`, accEs(p, o, link || db)].filter(Boolean).join(' ');
+  return [p.place && endDot(ea(p.place.trim())), V && endDot(V + (sala ? ` (${sala})` : '')), cs && endDot(cs), endDot(res + (link && !db ? ' [Internet]' : '')), tail && endDot(tail), link && `Disponible en: ${link}`].filter(Boolean).join(' ').trim(); }
+function lawInText(p, o, loc) {   // cita en el texto: (art. 22.1 CE) · (RDL 18/2020, de 12 de mayo) · (STS 1229/2017 de 29 de marzo, FJ 3) · (STEDH de 21 de febrero de 2017)
+  const l = String(loc ?? '').trim();
+  if (p.type === 'jurisprudencia') {
+    const num = ea(String(p.docNumber ?? '').trim()), d = fechaEs(p.pubDate), sd = num && d ? d.replace(/ de \d{4}$/, '') : d, lc = jurLoc(p, l);   // con número, la fecha sin el año
+    const pre = jurAbbr(p) || [ea(String(p.subtype ?? '').trim() || 'Sentencia'), court(p) ? court(p).of : ea(p.venue ? 'de ' + p.venue : '')].filter(Boolean).join(' ');
+    const out = [{k: 'Cita en el texto', t: `(${pre}${num ? ' ' + num : ''}${sd ? ' de ' + sd : !num && p.year ? ' de ' + p.year : ''}${lc})`}];
+    if (num && sd) out.push({k: 'Abreviada (sin fecha)', t: `(${pre} ${num}${lc})`}); return out; }
+  const ab = ea(String(p.abbr ?? '').trim()), sh = ab || lawShort(p) || legName(p), lc = !l ? '' : /^\d/.test(l) ? `art. ${ea(l)} ` : ea(l) + ' ';
+  const out = [{k: 'Cita en el texto', t: `(${lc}${sh})`}]; if (ab) out.push({k: 'Primera mención', t: `${legName(p)} (${ab})`}); return out; }
+function lawAbbrs(L) {   // lista de abreviaturas utilizadas: las de la legislación (CE, LOPJ…), los rangos abreviados (RDL, LO…) y los tribunales (STS, ATC…)
+  const m = new Map(), add = (k, v) => { if (k && v && k !== v && !m.has(k)) m.set(k, v); };
+  for (const p of L) {
+    if (p.type === 'legislacion') { const ab = String(p.abbr ?? '').trim(), x = lawParse(p); if (ab) add(ea(ab), legName(p)); else if (x) add(x.ab, RANK_N[x.ab]); }
+    else if (p.type === 'jurisprudencia') { const c = court(p), k = resK(p), ab = String(p.abbr ?? '').trim();
+      if (ab) add(ea(ab), `${ea(String(p.subtype ?? '').trim() || 'Sentencia')} ${c ? c.of : ea(p.venue ? 'de ' + p.venue : '')}`.trim()); else if (c && k) add(k + c.ab, `${RES_K[k]} ${c.of}`); } }
+  return [...m].sort((a, b) => a[0].localeCompare(b[0], 'es')); }
+function lawSecs(L, o) {   // bloques de la exportación: lista de abreviaturas, bibliografía (doctrina) y anexos de legislación y de jurisprudencia (cronológicos)
+  const ty = p => baseT(p.type), key = p => lawKey(effP(p)), chrono = A => [...A].sort((a, b) => key(a).localeCompare(key(b)) || String(a.title).localeCompare(String(b.title), 'es'));
+  const doc = L.filter(p => !LAW_T.has(ty(p))), leg = chrono(L.filter(p => ty(p) === 'legislacion')), jur = chrono(L.filter(p => ty(p) === 'jurisprudencia')), ab = o.abbrList === false ? [] : lawAbbrs([...leg, ...jur].map(effP));
+  return [ab.length && {h: 'Lista de abreviaturas', lines: ab.map(([k, v]) => `${k}: ${v}`)}, doc.length && {h: o.title || 'Bibliografía', L: doc}, leg.length && {h: 'Anexo de legislación', L: leg}, jur.length && {h: 'Anexo de jurisprudencia', L: jur}].filter(Boolean); }
+const apaX = (p, o) => XTYPES.has(p.type) ? xFn(p, o, 'apa') : apaFn(p, o, false);   // doctrina del estilo de Derecho: APA 7 (variante 1)
 const STYLES = {   // order: 'alpha' = bibliografía alfabética; 'list' = en el orden de la lista · dis: true = estilo autor-año que distingue 2020a/2020b · numFmt: numeración propia ('br' = [1]; por defecto 'dot' = 1.)
   apa: {name: 'APA 7 · Variante 1', order: 'alpha', dis: true, omit: p => p.type === 'personal', fn: withX((p, o) => apaFn(p, o, false), 'apa')},
   apa2: {name: 'APA 7 · Variante 2 (nombre completo)', order: 'alpha', dis: true, omit: p => p.type === 'personal', fn: withX((p, o) => apaFn(p, o, true), 'apa2')},
@@ -464,7 +545,9 @@ const STYLES = {   // order: 'alpha' = bibliografía alfabética; 'list' = en el
   chicago_af: {name: 'Chicago · Autor-fecha', order: 'alpha', dis: true, omit: p => p.type === 'personal' || (p.type === 'ia' && !citeLink(p)), fn: withX((p, o) => chiFn(p, o, true), 'chicago_af'), note: 'Chicago 17.ª ed., lista de referencias autor-fecha (la cita «(Autor año, pág)» en el texto llega en la fase F4). Más de 10 autores: 7 + et al. Sin año: n.d. y fecha de acceso. El mes del artículo sale solo si rellenas «Fecha de publicación» (se usa solo el mes). En español el punto va fuera de las comillas; en inglés, dentro. Verificar: congreso inédito, tesis y nombre del sitio web (la guía tiene puntuación inconsistente).'},
   chicago_nb: {name: 'Chicago · Notas y bibliografía', order: 'alpha', omit: p => p.type === 'personal' || p.type === 'redsocial' || (p.type === 'ia' && !citeLink(p)), fn: withX((p, o) => chiFn(p, o, false), 'chicago_nb'), note: 'Chicago 17.ª ed., solo la bibliografía del sistema notas y bibliografía: año tras la editorial (Lugar: Editorial, Año). Las notas a pie (completas y abreviadas, ibid.) llegan en la fase F4; Chicago prefiere notas abreviadas. Más de 10 autores: 7 + et al. Sin año no se escribe n.d. y se añade la fecha de acceso. El mes del artículo sale solo si rellenas «Fecha de publicación» (las estaciones, p. ej. Spring 2017, no existen en la app). En español el punto va fuera de las comillas; en inglés, dentro. El congreso inédito lleva solo el año (la app no guarda las fechas del congreso). Verificar: congreso inédito, tesis y nombre del sitio web (la guía tiene puntuación inconsistente).'},
   une_nf: {name: 'UNE-ISO 690 · Nombre-fecha', order: 'alpha', dis: true, fn: withX((p, o) => uneFn(p, o, true), 'une_nf'), note: 'UNE-ISO 690:2024, lista de referencias nombre-fecha: APELLIDO, Nombre, año. Título… Los apellidos van en mayúsculas y las entidades enteras en mayúsculas; el 2.º y siguientes autores en orden directo (PARKER, T. J. y W. A. HASWELL). Más de 3 autores: primero + et al. Sin año: [s.f.]. Fecha de consulta en dd-mm-aaaa (ISO aaaa-mm-dd si lo eliges; la fecha larga no se usa). TODO este estilo es «verificar»: el orden de los elementos está deducido de los ejemplos de la guía, porque las tablas oficiales de metadatos no se incluyeron. No hay ISBN/ISSN (fase F3) ni cita en el texto (fase F4). Capítulos y comunicaciones: páginas tras el año.'},
-  une_num: {name: 'UNE-ISO 690 · Numérico', order: 'list', numbered: true, numFmt: 'br', fn: withX((p, o) => uneFn(p, o, false), 'une_num'), note: 'UNE-ISO 690:2024, lista numérica: el año va al final (tras la editorial) y la lista se numera siempre; el formato [1] / 1. / (1) se elige abajo. La app no conoce las citas del texto (fase F4): el número sigue el orden de la lista que fijes a mano, no el de primera cita. Más de 3 autores: primero + et al. Fecha de consulta en dd-mm-aaaa (ISO si lo eliges). TODO este estilo es «verificar»: el orden de los elementos está deducido de los ejemplos de la guía (las tablas oficiales no se incluyeron). No hay ISBN/ISSN (fase F3).'}
+  une_num: {name: 'UNE-ISO 690 · Numérico', order: 'list', numbered: true, numFmt: 'br', fn: withX((p, o) => uneFn(p, o, false), 'une_num'), note: 'UNE-ISO 690:2024, lista numérica: el año va al final (tras la editorial) y la lista se numera siempre; el formato [1] / 1. / (1) se elige abajo. La app no conoce las citas del texto (fase F4): el número sigue el orden de la lista que fijes a mano, no el de primera cita. Más de 3 autores: primero + et al. Fecha de consulta en dd-mm-aaaa (ISO si lo eliges). TODO este estilo es «verificar»: el orden de los elementos está deducido de los ejemplos de la guía (las tablas oficiales no se incluyeron). No hay ISBN/ISSN (fase F3).'},
+  derecho: {name: 'Derecho y jurisprudencia', group: 'law', order: 'alpha', dis: true, omit: p => p.type === 'personal', sections: lawSecs, fn: (p, o = ex()) => p.type === 'legislacion' ? legRef(p, o) : p.type === 'jurisprudencia' ? jurRef(p, o) : apaX(p, o),
+    note: 'Derecho y jurisprudencia (guías de la UAM, la UMA, la UC3M y la UCM): la legislación y la jurisprudencia no van en la bibliografía, sino en un Anexo de legislación y otro de jurisprudencia, de la más antigua a la más reciente; al principio, la lista de abreviaturas utilizadas. La doctrina (libros, artículos, capítulos, webs…) se cita en APA 7. En la cita en el texto se usa la abreviatura (CE, LOPJ) o el rango, número y fecha (RDL 18/2020, de 12 de mayo), y en la jurisprudencia el tribunal abreviado (STS, ATC, STSJ Madrid, STEDH) con el número y la fecha. La legislación y la jurisprudencia se escriben siempre en español.'}
 };
 /* ---- F4: cita en el texto y notas (opcional; oculta salvo que se active settings.export.inText). Reglas: guía 4.4 (APA), 5.3 (Chicago), 6.4 (MLA), 7.6 (IEEE), 8.4 (Vancouver), 9.4 (UNE). IEEE y Vancouver: convención NO incluida en la guía → «verificar». ---- */
 const IND_T = new Set(['libro', 'tesis', 'congreso', 'web', 'informe', 'norma', 'dataset', 'software', 'mapa', 'basedatos', 'audiovisual', 'audio', 'presentacion', 'ia']);   // título en cursiva (obra independiente); el resto, entre comillas
@@ -473,6 +556,8 @@ const locLbl = (loc, bare) => {   // página o parte citada: «87» → «p. 87�
   loc = String(loc ?? '').trim(); if (!loc) return ''; const num = loc.replace(/^(pp?\.|págs?\.|pages?)\s*/i, '');
   if (bare) return num; if (/^(párr|cap|sec|fig|tabla|vol|art|ch)/i.test(loc)) return loc; return (/^[A-Za-z]?\d+$/.test(num) ? 'p. ' : 'pp. ') + num; };
 const inTextFn = (p, o, st, loc) => {   // devuelve [{k: etiqueta, t: texto con *cursiva*}]; loc = página o parte citada (opcional)
+  if (p.type === 'jurisprudencia' || (st === 'derecho' && p.type === 'legislacion')) return lawInText(p, o, loc);   // Derecho: abreviaturas; la doctrina, como APA
+  if (st === 'derecho') st = 'apa';
   const en = o.lang === 'en', L = L10[en ? 'en' : 'es'], P = authP(p), n = P.length, yr = p.year ? String(p.year) : '', Y = (yr || L.sd) + (o.ys || ''), tl = String(loc ?? '').trim();
   const nm = a => ea(noAbbr(a.l)), ab = a => a.org ? abbrOf(a.l) || (n === 1 && OWN(p) ? abbrOf(p.venue) : '') : '';
   const title = ea(shortT(p.title, /^(apa|mla)/.test(st) ? 5 : 4)), tt = IND_T.has(p.type) ? it(title) : `“${title}”`;   // APA: primeras palabras (la guía muestra 5)
@@ -529,15 +614,18 @@ const TYPE_WARN = {
     une_nf: 'UNE-ISO 690: la guía no cubre la prensa impresa; en línea sigue el ejemplo de periódico (la fecha sustituye a volumen y número). Verificar.', une_num: 'UNE-ISO 690: la guía no cubre la prensa impresa; en línea sigue el ejemplo de periódico (la fecha sustituye a volumen y número). Verificar.'},
   blog: {vancouver: 'Vancouver: solo se cita la contribución (autor, título, fecha) y «En: blog [Internet]»; lugar y editorial del blog no se guardan. Verificar.', vancouver2: 'Vancouver: solo se cita la contribución (autor, título, fecha) y «En: blog [Internet]»; lugar y editorial del blog no se guardan. Verificar.',
     ieee: 'IEEE: la guía no trae plantilla de blog; se usa la de Internet. Verificar.', une_nf: 'UNE-ISO 690: la guía no trae plantilla de blog; se usa la de sitio web con «Entrada de blog.» tras el título. Verificar.', une_num: 'UNE-ISO 690: la guía no trae plantilla de blog; se usa la de sitio web con «Entrada de blog.» tras el título. Verificar.'}};
-const typeWarn = (style, type) => STYLES[style]?.custom ? '' : TYPE_WARN[baseT(type)]?.[style] || (XTYPES.has(baseT(type)) ? xWarn(style, baseT(type)) : '');
+const typeWarn = (style, type) => { const t = baseT(type); if (STYLES[style]?.custom) return '';
+  if (style === 'derecho') return LAW_T.has(t) ? '' : typeWarn('apa', type);   // la doctrina se cita en APA: sus mismos avisos
+  if (t === 'jurisprudencia') return `${STYLES[style]?.name}: ningún estilo general trae plantilla de jurisprudencia; se usa la del estilo Derecho y jurisprudencia (las guías la recomiendan sea cual sea el estilo).`;
+  return TYPE_WARN[t]?.[style] || (XTYPES.has(t) ? xWarn(style, t) : ''); };
 // estilo con numeración propia (IEEE, UNE numérico…): numbered: true · idioma fijo: fixedLang: 'en' · aviso en Exportar: note
-const BASADO = 'Basado en: Chicago 17.ª ed., MLA 8.ª/9.ª, APA 7.ª, UNE-ISO 690:2024, IEEE (guía fuente), Vancouver (variante con nombre completo).';
+const BASADO = 'Basado en: Chicago 17.ª ed., MLA 8.ª/9.ª, APA 7.ª, UNE-ISO 690:2024, IEEE (guía fuente), Vancouver (variante con nombre completo); Derecho y jurisprudencia: guías de la UAM, la UMA, la UC3M y la UCM.';
 /* ===== Tipos de documento propios (Configuración → settings.customTypes del JSON) =====
    Un tipo propio (clave ct_<id>) decide qué campos enseña el formulario y cómo se llaman; los estilos de serie lo tratan como
    el tipo predefinido en «Se cita como» y los estilos propios pueden tener plantilla específica para él. */
 const CT_NAMES = {volume: 'Volumen', issue: 'Número', pages: 'Páginas', publisher: 'Editorial (del libro o actas)', place: 'Lugar de edición', edition: 'Edición', editors: 'Editores del libro', pubDate: 'Fecha de publicación completa', thesisType: 'Tipo de trabajo',
   isbn: 'ISBN', issn: 'ISSN', institution: 'Institución', series: 'Serie o colección', seriesNumber: 'Número en la serie', docNumber: 'Número de documento', conferenceName: 'Nombre del congreso', conferencePlace: 'Lugar del congreso', conferenceDates: 'Fechas del congreso',
-  subtype: 'Designación', authorRole: 'Función del autor', userHandle: 'Usuario (@)'};
+  subtype: 'Designación', authorRole: 'Función del autor', userHandle: 'Usuario (@)', abbr: 'Abreviatura', ecli: 'ECLI'};
 const CTYPES = new Map();   // clave ct_<id> → {id, name, like, fields, labels}
 const baseT = t => CTYPES.get(t)?.like || t;
 const effP = p => CTYPES.has(p.type) ? {...p, type: CTYPES.get(p.type).like} : p;   // los estilos de serie ven el tipo predefinido equivalente
@@ -561,7 +649,7 @@ const CU_F = [['authors', 'Autores'], ['author1', 'Primer autor'], ['authorsShor
   ['date', 'Fecha completa de publicación'], ['datey', 'Fecha completa o, si no hay, el año'], ['venue', 'Revista / editorial / sitio'], ['publisher', 'Editorial del libro o actas'], ['place', 'Lugar de edición'], ['edition', 'Edición'], ['volume', 'Volumen'], ['issue', 'Número'],
   ['pages', 'Páginas'], ['loc', 'Página citada (solo cita en el texto)'], ['doi', 'DOI (sin https://doi.org/)'], ['doiurl', 'DOI como enlace'], ['url', 'URL'], ['link', 'Enlace (DOI o URL según el paper)'], ['accessed', 'Fecha de consulta'],
   ['isbn', 'ISBN'], ['issn', 'ISSN'], ['institution', 'Institución'], ['docNumber', 'Número de documento'], ['series', 'Serie o colección'], ['seriesNumber', 'Número en la serie'], ['conferenceName', 'Nombre del congreso'],
-  ['conferencePlace', 'Lugar del congreso'], ['conferenceDates', 'Fechas del congreso'], ['subtype', 'Designación'], ['authorRole', 'Función del autor'], ['userHandle', 'Usuario (@)'], ['thesisType', 'Tipo de trabajo'], ['type', 'Tipo de documento']];
+  ['conferencePlace', 'Lugar del congreso'], ['conferenceDates', 'Fechas del congreso'], ['subtype', 'Designación'], ['authorRole', 'Función del autor'], ['userHandle', 'Usuario (@)'], ['abbr', 'Abreviatura (Derecho)'], ['ecli', 'ECLI'], ['thesisType', 'Tipo de trabajo'], ['type', 'Tipo de documento']];
 const CU_M = {i: 'Cursiva', b: 'Negrita', q: '«Comillas»', qq: '“Comillas inglesas”', par: '(Paréntesis)', br: '[Corchetes]', up: 'MAYÚSCULAS', low: 'minúsculas', cap: 'Primera en mayúscula', nodot: 'Quitar punto final', dot: 'Añadir punto final', title: 'Título (Cada Palabra)', sent: 'Solo la primera en mayúscula', pp: 'Páginas con p./pp.', dash: 'Rango con raya (–)', first: 'Solo la primera página', raw: 'Texto tal cual (edición)'};
 const CU_AU = {ap_ini: 'Apellido, N. N.', ap_ini_sp: 'Apellido NN (Vancouver)', ap_nom: 'Apellido, Nombre', nom_ap: 'Nombre Apellido', ini_ap: 'N. N. Apellido', ap: 'Solo el apellido'};
 const CU_LAST = {auto: 'Según idioma (y / &)', ' y ': ' y ', ' & ': ' & ', ' and ': ' and ', ', & ': ', & ', ', ': ', (solo coma)', ' / ': ' / ', '; ': '; '};
@@ -666,6 +754,10 @@ function syncStyles(list, exp) {   // registra los estilos propios junto a los d
     note: 'Estilo personalizado: se edita en Configuración → Estilos de cita personalizados.'};
   if (exp && !STYLES[exp.style]) exp.style = 'apa';
 }
+const STY_G = [['', 'Estilos generales'], ['law', 'Derecho y jurisprudencia'], ['custom', 'Estilos propios']];   // secciones del selector de estilos
+const styGroup = s => s.custom ? 'custom' : s.group || '';
+const styOpts = cur => STY_G.map(([g, t]) => { const E = Object.entries(STYLES).filter(([, s]) => styGroup(s) === g);
+  return E.length ? `<optgroup label="${t}">${E.map(([k, s]) => `<option value="${k}" ${k === cur ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}</optgroup>` : ''; }).join('');
 const isNum = o => !!(o.num || STYLES[o.style]?.numbered);
 
 const numLbl = (i, o) => { const f = !o.numFmt || o.numFmt === 'auto' ? STYLES[o.style]?.numFmt || 'dot' : o.numFmt; return {dot: `${i}. `, br: `[${i}] `, par: `(${i}) `}[f] || `${i}. `; };   // etiqueta de numeración
@@ -704,7 +796,7 @@ function validate(d) {
   const sIn = d.settings && typeof d.settings === 'object' ? d.settings : {};
   d.settings = {...defSettings(), ...sIn, shortcuts: {...SC_DEF}};
   d.settings.export = {...defSettings().export, ...(sIn.export && typeof sIn.export === 'object' ? sIn.export : {})};
-  const xo = d.settings.export; if (!['es', 'en'].includes(xo.lang)) xo.lang = 'es'; if (!['long', 'dmy', 'iso'].includes(xo.dateFmt)) xo.dateFmt = 'long'; xo.vanAll = !!xo.vanAll; xo.ppChap = !!xo.ppChap; xo.disamb = !!xo.disamb; if (!['auto', 'dot', 'br', 'par'].includes(xo.numFmt)) xo.numFmt = 'auto';
+  const xo = d.settings.export; if (!['es', 'en'].includes(xo.lang)) xo.lang = 'es'; if (!['long', 'dmy', 'iso'].includes(xo.dateFmt)) xo.dateFmt = 'long'; xo.vanAll = !!xo.vanAll; xo.ppChap = !!xo.ppChap; xo.disamb = !!xo.disamb; xo.abbrList = xo.abbrList !== false; if (!['auto', 'dot', 'br', 'par'].includes(xo.numFmt)) xo.numFmt = 'auto';
   d.settings.showProgress = !!d.settings.showProgress; d.settings.pdfDrive = !!d.settings.pdfDrive; d.settings.fmtOpen = !!d.settings.fmtOpen; d.settings.view = d.settings.view === 'table' ? 'table' : 'cards';
   if (!Array.isArray(d.settings.templates)) d.settings.templates = defSettings().templates;
   d.settings.templates = d.settings.templates.filter(t => t && typeof t.name === 'string' && typeof t.text === 'string').map(t => ({id: t.id || uid(), name: t.name, text: t.text}));
@@ -781,12 +873,12 @@ const ACC = {"'": '\u0301', '`': '\u0300', '"': '\u0308', '^': '\u0302', '~': '\
 const untex = s => s.replace(/\\(['`"^~])\s*\{?\\?([a-zA-Z])\}?/g, (_, a, c) => (c + ACC[a]).normalize('NFC')).replace(/\\c\s*\{?([cC])\}?/g, (_, c) => (c + '\u0327').normalize('NFC'))
   .replace(/\\ss\b/g, 'ß').replace(/\\&/g, '&').replace(/[{}]/g, '').replace(/\s+/g, ' ').trim();
 const fixAuthor = a => { a = a.trim(); if (a.includes(',')) return a.replace(/\s*,\s*/, ', '); const w = a.split(/\s+/); return w.length > 1 ? `${w.at(-1)}, ${w.slice(0, -1).join(' ')}` : a; };   // → «Apellido, Nombre»
-const BIBT = {article: 'articulo', book: 'libro', incollection: 'capitulo', inbook: 'capitulo', inproceedings: 'congreso', conference: 'congreso', proceedings: 'congreso', phdthesis: 'tesis', mastersthesis: 'tesis', techreport: 'informe', report: 'informe', standard: 'norma', patent: 'patente', dataset: 'dataset', software: 'software', legislation: 'legislacion', movie: 'audiovisual', video: 'audiovisual', music: 'audio', audio: 'audio', misc: 'web', online: 'web', electronic: 'web'};
-const RIST = {RPRT: 'informe', STAND: 'norma', PAT: 'patente', MAP: 'mapa', DATA: 'dataset', COMP: 'software', DBASE: 'basedatos', VIDEO: 'audiovisual', MPCT: 'audiovisual', ADVS: 'audiovisual', SOUND: 'audio', MUSIC: 'audio', PCOMM: 'personal', SLIDE: 'presentacion', DICT: 'diccionario', ENCYC: 'diccionario', STAT: 'legislacion', BILL: 'legislacion', LEGAL: 'legislacion', NEWS: 'prensa', MGZN: 'prensa', BLOG: 'blog', JOUR: 'articulo', BOOK: 'libro', CHAP: 'capitulo', CONF: 'congreso', CPAPER: 'congreso', THES: 'tesis', ELEC: 'web', WEB: 'web'};
+const BIBT = {article: 'articulo', book: 'libro', incollection: 'capitulo', inbook: 'capitulo', inproceedings: 'congreso', conference: 'congreso', proceedings: 'congreso', phdthesis: 'tesis', mastersthesis: 'tesis', techreport: 'informe', report: 'informe', standard: 'norma', patent: 'patente', dataset: 'dataset', software: 'software', legislation: 'legislacion', jurisdiction: 'jurisprudencia', movie: 'audiovisual', video: 'audiovisual', music: 'audio', audio: 'audio', misc: 'web', online: 'web', electronic: 'web'};
+const RIST = {RPRT: 'informe', STAND: 'norma', PAT: 'patente', MAP: 'mapa', DATA: 'dataset', COMP: 'software', DBASE: 'basedatos', VIDEO: 'audiovisual', MPCT: 'audiovisual', ADVS: 'audiovisual', SOUND: 'audio', MUSIC: 'audio', PCOMM: 'personal', SLIDE: 'presentacion', DICT: 'diccionario', ENCYC: 'diccionario', STAT: 'legislacion', BILL: 'legislacion', LEGAL: 'legislacion', CASE: 'jurisprudencia', NEWS: 'prensa', MGZN: 'prensa', BLOG: 'blog', JOUR: 'articulo', BOOK: 'libro', CHAP: 'capitulo', CONF: 'congreso', CPAPER: 'congreso', THES: 'tesis', ELEC: 'web', WEB: 'web'};
 const CRT = {dataset: 'dataset', report: 'informe', 'report-component': 'informe', 'report-series': 'informe', standard: 'norma', 'journal-article': 'articulo', book: 'libro', monograph: 'libro', 'edited-book': 'libro', 'book-chapter': 'capitulo', 'reference-entry': 'capitulo', 'proceedings-article': 'congreso', dissertation: 'tesis'};
 const P2_F = ['isbn', 'issn', 'series', 'seriesNumber', 'institution', 'docNumber', 'conferenceName', 'conferencePlace', 'conferenceDates'];
-const P3_F = ['subtype', 'authorRole', 'userHandle'];   // F3d–F3e
-const IMP_F = ['volume', 'issue', 'pages', 'publisher', 'place', 'edition', 'pubDate', 'thesisType', ...P2_F, 'subtype', 'authorRole', 'userHandle', 'editors', 'authorType', 'accessed'];   // campos que traen los importadores además de los básicos
+const P3_F = ['subtype', 'authorRole', 'userHandle', 'abbr', 'ecli'];   // F3d–F3e · abreviatura y ECLI (Derecho)
+const IMP_F = ['volume', 'issue', 'pages', 'publisher', 'place', 'edition', 'pubDate', 'thesisType', ...P2_F, ...P3_F, 'editors', 'authorType', 'accessed'];   // campos que traen los importadores además de los básicos
 const MON = {jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6, jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12, ene: 1, abr: 4, ago: 8, dic: 12};
 const monNum = m => { m = String(m ?? '').trim().toLowerCase(); return /^\d{1,2}$/.test(m) ? (+m >= 1 && +m <= 12 ? +m : 0) : MON[m.slice(0, 3)] || 0; };
 const isoDate = (y, m, d) => { y = String(y ?? '').match(/\d{4}/)?.[0]; m = monNum(m); d = +(String(d ?? '').match(/\d{1,2}/)?.[0] || 0);   // solo si hay año, mes y día
@@ -825,7 +917,7 @@ function parseBib(t) {   // recorrido propio: las expresiones regulares fallan c
     const names = v => (v || '').split(/\s+and\s+/i).map(a => a.trim()).filter(a => a && !/^others$/i.test(a));
     const nm = a => /^\{.*\}$/.test(a) ? untex(a) : fixAuthor(untex(a)), raw = names(f.author);
     const GV = pick('organization', 'institution', 'publisher', 'journal', 'journaltitle', 'booktitle') || (/https?:|\\url|^(blog|norma|standard)$/i.test(how.trim()) ? '' : how);   // venue de los tipos F3c–F3e
-    const V = {prensa: pick('journal', 'journaltitle'), informe: pick('institution', 'publisher', 'organization'), norma: pick('organization', 'institution', 'publisher'), patente: GV, mapa: GV, dataset: GV, software: GV, basedatos: GV, audiovisual: GV, audio: GV, redsocial: GV, ia: GV, diccionario: GV, presentacion: GV, personal: GV, legislacion: GV,
+    const V = {prensa: pick('journal', 'journaltitle'), informe: pick('institution', 'publisher', 'organization'), norma: pick('organization', 'institution', 'publisher'), patente: GV, mapa: GV, dataset: GV, software: GV, basedatos: GV, audiovisual: GV, audio: GV, redsocial: GV, ia: GV, diccionario: GV, presentacion: GV, personal: GV, legislacion: GV, jurisprudencia: pick('institution', 'organization'),
       blog: pick('journal', 'journaltitle', 'booktitle', 'organization', 'publisher') || (/https?:|\\url|^blog$/i.test(how.trim()) ? '' : how), articulo: pick('journal', 'journaltitle'), libro: pick('publisher'), capitulo: pick('booktitle'), congreso: pick('booktitle'), tesis: pick('school', 'institution'),
       web: pick('journal', 'booktitle', 'publisher', 'organization') || (/https?:|\\url/i.test(how) ? '' : how)}[ty];
     const venue = V || pick('journal', 'journaltitle', 'booktitle', 'publisher', 'school', 'institution');
@@ -834,7 +926,7 @@ function parseBib(t) {   // recorrido propio: las expresiones regulares fallan c
       ...refFields(ty, {volume: g('volume'), issue: pick('issue', 'number'), pages: normPages(g('pages')), publisher: pub && pub !== venue ? pub : '', place: pick('address', 'location'), edition: g('edition'),
         pubDate: /^\d{4}-\d{2}-\d{2}$/.test(dt) ? dt : isoDate(g('year'), g('month'), g('day')), thesisType: ty === 'tesis' ? thesisFrom(g('type'), type) : '', editors: names(f.editor).map(nm),
         isbn: g('isbn'), issn: g('issn'), series: g('series'), seriesNumber: g('seriesnumber'), institution: g('institution') !== venue ? g('institution') : '',
-        docNumber: g('docnumber') || (ty === 'legislacion' ? '' : g('number')), subtype: g('type'), authorRole: g('authorrole'), userHandle: g('userhandle'), conferenceName: ty === 'congreso' || ty === 'capitulo' ? '' : g('booktitle'), conferencePlace: '', conferenceDates: '',
+        docNumber: g('docnumber') || (ty === 'legislacion' ? '' : g('number')), subtype: g('type'), authorRole: g('authorrole'), userHandle: g('userhandle'), abbr: g('shorthand'), ecli: g('ecli'), conferenceName: ty === 'congreso' || ty === 'capitulo' ? '' : g('booktitle'), conferencePlace: '', conferenceDates: '',
         authorType: raw.length && raw.every(a => /^\{[^,]*\}$/.test(a)) ? 'entidad' : 'auto', accessed: /^\d{4}-\d{2}-\d{2}$/.test(g('urldate')) ? g('urldate') : ''})});
   }
   return out;
@@ -842,13 +934,13 @@ function parseBib(t) {   // recorrido propio: las expresiones regulares fallan c
 function finRis(r) {   // convierte los campos RIS acumulados (r.raw) en una referencia de la app
   const R = r.raw, gk = /gestor:(\w+)/.exec(R.N1 || ''), ty = gk && Object.hasOwn(TYPES, gk[1]) ? gk[1] : r.type, f = (...ks) => ks.map(k => R[k]).find(Boolean) || '';
   const GV = f('PB', 'T2', 'JO');
-  const V = {informe: GV, norma: GV, patente: GV, mapa: GV, dataset: GV, software: GV, basedatos: GV, audiovisual: GV, audio: GV, redsocial: GV, ia: GV, presentacion: GV, personal: GV, legislacion: GV, diccionario: f('T2', 'BT', 'PB'), prensa: f('JO', 'JF', 'J2', 'T2'), blog: f('T2', 'JO', 'PB'), articulo: f('JO', 'JF', 'J2', 'T2'), libro: f('PB', 'T2'), capitulo: f('T2', 'BT', 'JO'), congreso: f('T2', 'JO', 'BT'), tesis: f('PB', 'T2'), web: f('T2', 'JO', 'PB')}[ty];
+  const V = {informe: GV, norma: GV, patente: GV, mapa: GV, dataset: GV, software: GV, basedatos: GV, audiovisual: GV, audio: GV, redsocial: GV, ia: GV, presentacion: GV, personal: GV, legislacion: GV, jurisprudencia: GV, diccionario: f('T2', 'BT', 'PB'), prensa: f('JO', 'JF', 'J2', 'T2'), blog: f('T2', 'JO', 'PB'), articulo: f('JO', 'JF', 'J2', 'T2'), libro: f('PB', 'T2'), capitulo: f('T2', 'BT', 'JO'), congreso: f('T2', 'JO', 'BT'), tesis: f('PB', 'T2'), web: f('T2', 'JO', 'PB')}[ty];
   const venue = V || f('JO', 'JF', 'J2', 'T2', 'PB'), da = (R.DA || '').split('/'), y2 = (R.Y2 || '').split('/');
   const pages = R.SP && R.EP ? (R.SP === R.EP ? R.SP : `${R.SP}-${R.EP}`) : normPages(R.SP || '');
   return {title: f('TI', 'T1'), authors: r.authors, year: f('PY', 'Y1', 'DA').match(/\d{4}/)?.[0] || '', venue, doi: normDoi(R.DO || ''), url: R.UR || '', type: ty,
-    ...refFields(ty, {volume: R.VL, issue: R.IS, pages, publisher: R.PB && R.PB !== venue ? R.PB : '', place: R.CY, edition: R.ET, pubDate: isoDate(...da), thesisType: ty === 'tesis' ? thesisFrom(R.M3, '') : '',
+    ...refFields(ty, {volume: R.VL, issue: R.IS, pages, publisher: ty === 'jurisprudencia' ? R.DB : R.PB && R.PB !== venue ? R.PB : '', place: R.CY, edition: R.ET, pubDate: isoDate(...da), thesisType: ty === 'tesis' ? thesisFrom(R.M3, '') : '',
       editors: r.editors, accessed: isoDate(...y2),
-      isbn: ty === 'articulo' ? '' : R.SN, issn: ty === 'articulo' ? R.SN : '', series: R.T3, seriesNumber: ty === 'articulo' ? '' : R.IS, conferencePlace: R.AD, docNumber: R.M1, subtype: R.M3, authorRole: R.C1, userHandle: R.C2})};
+      isbn: ty === 'articulo' ? '' : R.SN, issn: ty === 'articulo' ? R.SN : '', series: R.T3, seriesNumber: ty === 'articulo' ? '' : R.IS, conferencePlace: R.AD, docNumber: R.M1, subtype: R.M3, authorRole: R.C1, userHandle: R.C2, abbr: R.J2, ecli: R.C3})};
 }
 function parseRis(t) {
   const out = []; let r = null;
@@ -1107,6 +1199,9 @@ const CU_BASE = (() => {   // estilos de serie como punto de partida: plantillas
         prensa: '{authors}. {title}. En línea. {venue:i}. {date}[, pp. {pages}]. Disponible en: {link}.' + CONS})}
   };
 })();
+CU_BASE.derecho = {...CU_BASE.apa, name: 'Derecho y jurisprudencia', group: 'law', tpl: {...CU_BASE.apa.tpl,   // doctrina en APA; legislación y jurisprudencia como en los anexos
+  legislacion: '[{place}. ]{title}. [{venue}][, {date:pat=D de MMMM de YYYY}][, núm. {issue}][, {pages:pp}]. [\\[consultado {accessed}\\]. ][Disponible en: {url}]',
+  jurisprudencia: '[{place}. ]{venue}[ ({series})]. [Caso {title}[ ({seriesNumber})]. ]{subtype|Sentencia}[ núm. {docNumber}][, de {date:pat=D de MMMM de YYYY}][, {ecli}]. [\\[Versión electrónica. Base de datos de {publisher}\\] ][\\[consultado {accessed}\\]. ][Disponible en: {url}]'}};
 /* ---- Botón derecho sobre un campo de la plantilla: opciones propias de ese campo ---- */
 let CUF = null;   // {s, e}: posición del {campo…} que se edita dentro del textarea
 function cuCtx(e) {
@@ -1166,7 +1261,7 @@ let CU = {id: '', type: '*', prev: 'ej'};
 const cuCur = () => db.settings.customStyles.find(c => c.id === CU.id) || db.settings.customStyles[0] || null;
 const cuSample = ty => NEWF({id: 'ej', title: 'Ejemplo de título del documento', authors: ['Pérez, Juan Carlos', 'Gómez Ruiz, Ana', 'Lee, Min-ho'], editors: ['Martín, Luis'], year: 2021, type: ty, venue: 'Revista de Ejemplo', publisher: 'Editorial Ejemplo',
   place: 'Madrid', edition: '2', volume: '12', issue: '3', pages: '45-67', doi: '10.1000/xyz123', url: 'https://example.org/doc', accessed: '2026-01-15', pubDate: '2021-03-09', isbn: '978-3-16-148410-0', issn: '1234-5678', institution: 'Universidad de Ejemplo',
-  docNumber: 'ABC-123', series: 'Serie Ejemplo', seriesNumber: '7', conferenceName: 'Congreso de Ejemplo', conferencePlace: 'Sevilla', conferenceDates: '3-5 de mayo de 2021', subtype: 'Informe técnico', authorRole: 'Director', userHandle: 'ejemplo',
+  docNumber: 'ABC-123', series: 'Serie Ejemplo', seriesNumber: '7', conferenceName: 'Congreso de Ejemplo', conferencePlace: 'Sevilla', conferenceDates: '3-5 de mayo de 2021', subtype: 'Informe técnico', authorRole: 'Director', userHandle: 'ejemplo', abbr: 'EJ', ecli: 'ECLI:ES:TS:2021:123',
   thesisType: 'Tesis doctoral', notes: [], tagIds: [], cites: {}, sectionIds: [], related: [], refTo: [], history: [], general: ''});
 function cuPrev() {
   const el = $('#cuPrev'), c = cuCur(), st = c && STYLES['cu_' + c.id]; if (!el || !st) return;
@@ -1179,7 +1274,7 @@ function cuUI() {
   const L = db.settings.customStyles, c = cuCur(); if (c) CU.id = c.id;
   let h = `<small>Crea tu propio estilo: una plantilla por tipo de documento con los campos de los papers. Sale en Exportar y en la pestaña Cita, y se guarda en el JSON. <a onclick="openHelp('estilos')">Ver la ayuda</a></small>
     <div class="row" style="margin:8px 0">${L.length ? `<select onchange="CU.id=this.value;CU.type='*';drawCfg()">${L.map(x => `<option value="${x.id}" ${c.id === x.id ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select>` : ''}
-      <button onclick="cuAdd()">+ Nuevo estilo</button><select onchange="cuFromBase(this.value);this.value=''" title="Empieza con las plantillas de uno de los estilos de serie y modifícalas"><option value="">+ Nuevo a partir de…</option>${Object.entries(CU_BASE).map(([k, b]) => `<option value="${k}">${esc(b.name)}</option>`).join('')}</select>${c ? '<button onclick="cuDup()">Duplicar</button><button class="danger" onclick="cuDel()">Eliminar</button>' : ''}</div>`;
+      <button onclick="cuAdd()">+ Nuevo estilo</button><select onchange="cuFromBase(this.value);this.value=''" title="Empieza con las plantillas de uno de los estilos de serie y modifícalas"><option value="">+ Nuevo a partir de…</option>${STY_G.slice(0, 2).map(([g, t]) => `<optgroup label="${t}">${Object.entries(CU_BASE).filter(([, b]) => (b.group || '') === g).map(([k, b]) => `<option value="${k}">${esc(b.name)}</option>`).join('')}</optgroup>`).join('')}</select>${c ? '<button onclick="cuDup()">Duplicar</button><button class="danger" onclick="cuDel()">Eliminar</button>' : ''}</div>`;
   if (!c) return h + '<p class="empty">Aún no hay estilos personalizados.</p>';
   const sel = (k, o, v, f) => `<select onchange="${f}('${k}',this.value)">${Object.entries(o).map(([a, b]) => `<option value="${esc(a)}" ${String(v) === a ? 'selected' : ''}>${esc(b)}</option>`).join('')}</select>`;
   const au = c.au, tpl = c.tpl[CU.type] ?? c.tpl['*'] ?? '', over = CU.type !== '*' && c.tpl[CU.type] != null;
@@ -1290,9 +1385,19 @@ function helpHTML() {
       <h4>Historial</h4><p>Lista los cambios hechos <b>hoy</b> en ese paper. Solo vive en memoria: no se guarda en el JSON.</p>`],
     exportar: ['Exportar citas', `<p>«Exportar citas» (${kb('exportCites')}) abre la ventana de exportación de los papers <b>seleccionados</b> (o de los visibles si no hay selección).</p>
       <ul><li><b>Formato</b>: texto, Word (.doc o .docx), BibTeX o RIS. En los dos últimos no hay estilo de cita.</li>
-      <li><b>Estilo de cita</b>: APA 7, Vancouver, MLA, IEEE, Chicago (autor-fecha y notas-bibliografía), UNE-ISO 690 (nombre-fecha y numérico) y <b>tus estilos personalizados</b> (marcados con ✎). Algunos estilos avisan de los tipos que la guía no cubre.</li>
+      <li><b>Estilo de cita</b>, en tres secciones: <b>Estilos generales</b> (APA 7, Vancouver, MLA, IEEE, Chicago autor-fecha y notas-bibliografía, UNE-ISO 690 nombre-fecha y numérico), <b>Derecho y jurisprudencia</b> (ver su apartado de la ayuda) y <b>Estilos propios</b> (tus estilos personalizados, marcados con ✎). Algunos estilos avisan de los tipos que la guía no cubre.</li>
       <li><b>Orden</b>: automático (alfabético o por lista según el estilo), lista, alfabético o por año. <b>Numerar</b>, formato del número, idioma de los conectores (es/en), formato de la fecha de consulta, incluir notas, listar todos los autores en Vancouver…</li>
       <li>El texto de la vista previa es editable. <b>Copiar</b> copia texto; <b>Copiar con formato</b> conserva cursiva y sangría francesa para Word o Docs. También puedes guardar el archivo.</li></ul>`],
+    derecho: ['Derecho y jurisprudencia', `<p>Un estilo para trabajos de Derecho (TFG, TFM, tesis) que une las guías de la <b>UAM</b> (Facultad de Derecho), la <b>UMA</b>, la <b>UC3M</b> y la <b>UCM</b>. Está en la sección «Derecho y jurisprudencia» del selector de estilos (Exportar y pestaña Cita).</p>
+      <h4>Qué hace al exportar</h4><ol><li><b>Lista de abreviaturas</b> utilizadas (CE, LOPJ, RDL, STS…), al principio. Se puede desactivar.</li>
+      <li><b>Bibliografía</b>: la doctrina (libros, artículos, capítulos, webs…), en orden alfabético y con las plantillas de <b>APA 7</b>, como recomiendan la UAM y la UCM.</li>
+      <li><b>Anexo de legislación</b> y <b>Anexo de jurisprudencia</b>, de la norma o resolución más antigua a la más reciente. La legislación y la jurisprudencia nunca van en la bibliografía.</li></ol>
+      <h4>Legislación</h4><p>Tipo «Legislación». Escribe en <b>Título</b> el título completo y exacto (<i>Ley 40/2015, de 2 de octubre, de Régimen Jurídico del Sector Público</i>); de él se sacan el rango, el número y la fecha para la cita corta y para el orden del anexo. Rellena también el ámbito (España, Extremadura, Unión Europea…), el boletín (en el DOUE el número lleva la serie: <i>L 94</i>), la fecha de publicación, las páginas y, si la tiene, la <b>abreviatura</b> (CE, LOPJ, LRJSP).</p>
+      ${helpTbl([['Anexo', 'España. Ley 40/2015, de 2 de octubre, de Régimen Jurídico del Sector Público. Boletín Oficial del Estado, 2 de octubre de 2015, núm. 236, pp. 89411 a 89530.'], ['En el texto', '(art. 19 LRJSP) · sin abreviatura: (RDL 18/2020, de 12 de mayo) · UE: (Dir. 2015/2376 del Consejo, de 8 de diciembre de 2015)']])}
+      <h4>Jurisprudencia</h4><p>Tipo «Jurisprudencia». Campos: tribunal, sala y sección, tipo de resolución (sentencia, auto, declaración), número, fecha, caso o partes (en Título; si no hay, pon la identificación, como «STS 1229/2017»), asunto y ECLI (tribunales europeos), base de datos y abreviatura propia (si no, se deduce: STS, STC, ATC, SAN, STSJ Madrid, SAP Sevilla, STEDH, STJUE).</p>
+      ${helpTbl([['Anexo', 'España. Tribunal Supremo (Sala de lo Penal, Sección 1.ª). Sentencia núm. 1229/2017, de 29 de marzo de 2017.'], ['Caso europeo', 'Tribunal de Justicia de la Unión Europea. Caso Schempp (C-403/03). Sentencia de 12 de julio de 2005, EU:C:2005:446.'], ['En el texto', '(STS 1229/2017 de 29 de marzo, FJ 3) · abreviada: (STS 1229/2017) · (STSJ Madrid de 14 de junio de 2002, FD 2) · (STEDH de 21 de febrero de 2017, ap. 45)']])}
+      <p>En la <b>cita en el texto</b> (si la activas en Configuración), «Página o parte citada» es el artículo en la legislación (<i>22.1</i> → art. 22.1 CE) y el fundamento o apartado en la jurisprudencia (<i>3</i> → FJ 3 en el TC, el TS y la AN; FD 3 en los TSJ y las audiencias provinciales; ap. 3 en los tribunales europeos). Puedes escribirlo tal cual (<i>Preámbulo</i>, <i>DA 2.ª</i>).</p>
+      <p>Los <b>demás estilos</b> citan la jurisprudencia con esta misma plantilla, porque las guías dicen que se aplica sea cual sea el estilo, y lo avisan. La legislación sigue en ellos como hasta ahora.</p>`],
     importar: ['Importar referencias', `<p>Menú <b>Archivo ▾</b> → «Importar referencias» (o ${kb('import')}): desde un archivo <code>.bib</code>/<code>.ris</code>, pegando texto BibTeX/RIS o buscando por <b>DOI</b>. Antes de añadir se revisa la lista, y puedes asignar sección, etiqueta y estado de lectura a todas. Dentro de un paper, «Buscar» junto al DOI propone rellenar solo los campos vacíos o los que marques.</p>`],
     config: ['Configuración', `<p>⚙️ en la barra lateral, con cuatro pestañas: <b>Apariencia</b>, <b>Notas y citas</b>, <b>Atajos</b> y <b>Datos y Drive</b>. Es común a todos los proyectos y se guarda también en cada JSON.</p><ul><li><b>Nombre de la aplicación</b>, <b>paleta de colores</b> (o personalizada), mostrar el archivo abierto en la cabecera y, si quieres, el <b>progreso de lectura</b> (papers leídos) junto al nombre del proyecto (desactivado por defecto).</li>
       <li><b>Mostrar la imagen</b> del paper en tarjetas y tabla (Apariencia). <b>Barra de formato</b> de las notas desplegada por defecto. <b>Cita en el texto</b> (Chicago) en la pestaña Cita.</li>
@@ -1620,20 +1725,24 @@ function exList() {
 }
 let EXOM = 0, EXTYPES = [];   // cuántos papers se omitieron en la última exportación · tipos presentes antes de omitir (para los avisos)
 const cite = (p, o, ys) => p.cites[o.style] ?? STYLES[o.style].fn(p, ys ? {...o, ys} : o);
+const exSecs = (L, o) => isTl(o.fmt) && STYLES[o.style]?.sections ? STYLES[o.style].sections(L, o) : [{h: o.title, L}];   // bloques con título: uno solo, salvo en los estilos con anexos (Derecho)
 function exText(L, o) {
-  const sx = yearSuffixes(L, o);
-  const items = L.map((p, i) => { let t = (isNum(o) ? numLbl(i + 1, o) : '') + citeTxt(cite(p, o, sx.get(p.id)));
-    if (o.notes) p.notes.filter(n => n.content.trim()).forEach(n => t += `\n   [${secName(n.sectionId)}] ${mdPlain(n.content.trim())}`);
-    return t; });
-  return (o.title ? o.title + '\n\n' : '') + items.join('\n\n');
+  return exSecs(L, o).map(S => { if (S.lines) return S.h + '\n\n' + S.lines.join('\n');
+    const sx = yearSuffixes(S.L, o);
+    const items = S.L.map((p, i) => { let t = (isNum(o) ? numLbl(i + 1, o) : '') + citeTxt(cite(p, o, sx.get(p.id)));
+      if (o.notes) p.notes.filter(n => n.content.trim()).forEach(n => t += `\n   [${secName(n.sectionId)}] ${mdPlain(n.content.trim())}`);
+      return t; });
+    return (S.h ? S.h + '\n\n' : '') + items.join('\n\n'); }).join('\n\n\n');
 }
 function exHtml(L, o) {   // sangría francesa de 1,27 cm (36 pt); las notas se exportan con su formato
-  const sx = yearSuffixes(L, o);
-  const items = L.map((p, i) => {
-    const notes = o.notes ? p.notes.filter(n => n.content.trim()).map(n => `<div style="margin:0 0 6pt 36pt;font-size:10pt"><i>[${esc(secName(n.sectionId))}]</i>${md(n.content)}</div>`).join('') : '';
-    return `<p style="margin:0 0 ${notes ? 2 : 8}pt 36pt;text-indent:-36pt">${citeHtml((isNum(o) ? numLbl(i + 1, o) : '') + cite(p, o, sx.get(p.id)))}</p>${notes}`;
-  });
-  return `<div style="font-family:'Times New Roman',serif;font-size:12pt;line-height:1.15">${o.title ? `<h2 style="font-size:14pt">${esc(o.title)}</h2>` : ''}${items.join('')}</div>`;
+  const body = exSecs(L, o).map(S => { const h = S.h ? `<h2 style="font-size:14pt">${esc(S.h)}</h2>` : '';
+    if (S.lines) return h + S.lines.map(l => `<p style="margin:0 0 4pt">${citeHtml(l)}</p>`).join('');
+    const sx = yearSuffixes(S.L, o);
+    return h + S.L.map((p, i) => {
+      const notes = o.notes ? p.notes.filter(n => n.content.trim()).map(n => `<div style="margin:0 0 6pt 36pt;font-size:10pt"><i>[${esc(secName(n.sectionId))}]</i>${md(n.content)}</div>`).join('') : '';
+      return `<p style="margin:0 0 ${notes ? 2 : 8}pt 36pt;text-indent:-36pt">${citeHtml((isNum(o) ? numLbl(i + 1, o) : '') + cite(p, o, sx.get(p.id)))}</p>${notes}`;
+    }).join(''); });
+  return `<div style="font-family:'Times New Roman',serif;font-size:12pt;line-height:1.15">${body.join('')}</div>`;
 }
 // ---- Word real (.docx): paquete OOXML mínimo en un ZIP sin compresión, sin dependencias. Sangría francesa de 1,27 cm, cursiva y negrita reales.
 const CRC_T = (() => { const t = new Uint32Array(256); for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
@@ -1654,11 +1763,15 @@ const docxRuns = (s, sz) => {   // *cursiva* y **negrita** (y \* literal) → ru
     out.push(`<w:r>${b || i || sz ? `<w:rPr>${b ? '<w:b/>' : ''}${i ? '<w:i/>' : ''}${sz ? `<w:sz w:val="${sz}"/>` : ''}</w:rPr>` : ''}<w:t xml:space="preserve">${esc(t)}</w:t></w:r>`); }
   return out.join(''); };
 function exDocx(L, o) {
-  const sx = yearSuffixes(L, o), W = 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"', P = (inner, ppr = '') => `<w:p>${ppr ? `<w:pPr>${ppr}</w:pPr>` : ''}${inner}</w:p>`, H = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
-  const body = [o.title ? P(`<w:r><w:t xml:space="preserve">${esc(o.title)}</w:t></w:r>`, '<w:pStyle w:val="Heading1"/>') : ''];
-  L.forEach((p, i) => {
-    body.push(P(docxRuns((isNum(o) ? numLbl(i + 1, o) : '') + cite(p, o, sx.get(p.id))), '<w:ind w:left="720" w:hanging="720"/>'));   // sangría francesa
-    if (o.notes) p.notes.filter(n => n.content.trim()).forEach(n => n.content.trim().split('\n').forEach((ln, j) => body.push(P(docxRuns(j ? '' : `*[${secName(n.sectionId)}]* `, 20) + noteRuns(ln, 20), '<w:spacing w:after="40"/><w:ind w:left="720"/>')))); });
+  const W = 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"', P = (inner, ppr = '') => `<w:p>${ppr ? `<w:pPr>${ppr}</w:pPr>` : ''}${inner}</w:p>`, H = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
+  const body = [];
+  for (const S of exSecs(L, o)) {
+    if (S.h) body.push(P(`<w:r><w:t xml:space="preserve">${esc(S.h)}</w:t></w:r>`, '<w:pStyle w:val="Heading1"/>'));
+    if (S.lines) { S.lines.forEach(l => body.push(P(docxRuns(l), '<w:spacing w:after="40"/>'))); continue; }
+    const sx = yearSuffixes(S.L, o);
+    S.L.forEach((p, i) => {
+      body.push(P(docxRuns((isNum(o) ? numLbl(i + 1, o) : '') + cite(p, o, sx.get(p.id))), '<w:ind w:left="720" w:hanging="720"/>'));   // sangría francesa
+      if (o.notes) p.notes.filter(n => n.content.trim()).forEach(n => n.content.trim().split('\n').forEach((ln, j) => body.push(P(docxRuns(j ? '' : `*[${secName(n.sectionId)}]* `, 20) + noteRuns(ln, 20), '<w:spacing w:after="40"/><w:ind w:left="720"/>')))); }); }
   const R = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
   return zipStore([
     ['[Content_Types].xml', `${H}<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/></Types>`],
@@ -1668,8 +1781,8 @@ function exDocx(L, o) {
     ['word/document.xml', `${H}<w:document ${W}><w:body>${body.join('')}<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1417" w:right="1701" w:bottom="1417" w:left="1701" w:header="708" w:footer="708" w:gutter="0"/></w:sectPr></w:body></w:document>`]]);
 }
 const wordDoc = (L, o) => `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"><title>Bibliografía</title></head><body>${exHtml(L, o)}</body></html>`;
-const BIBK = {articulo: 'article', libro: 'book', capitulo: 'incollection', congreso: 'inproceedings', tesis: 'phdthesis', web: 'misc', prensa: 'article', blog: 'online', informe: 'techreport', norma: 'standard', patente: 'patent', dataset: 'dataset', software: 'software', audiovisual: 'video', audio: 'audio', legislacion: 'legislation', mapa: 'misc', basedatos: 'misc', redsocial: 'misc', ia: 'misc', diccionario: 'misc', presentacion: 'misc', personal: 'misc'};
-const BIBV = {informe: 'institution', norma: 'organization', patente: 'organization', mapa: 'organization', dataset: 'organization', software: 'organization', basedatos: 'organization', audiovisual: 'organization', audio: 'organization', redsocial: 'organization', ia: 'organization', diccionario: 'organization', presentacion: 'organization', personal: 'organization', legislacion: 'organization', prensa: 'journal', blog: 'journal', articulo: 'journal', capitulo: 'booktitle', congreso: 'booktitle', tesis: 'school', libro: 'publisher'};
+const BIBK = {articulo: 'article', libro: 'book', capitulo: 'incollection', congreso: 'inproceedings', tesis: 'phdthesis', web: 'misc', prensa: 'article', blog: 'online', informe: 'techreport', norma: 'standard', patente: 'patent', dataset: 'dataset', software: 'software', audiovisual: 'video', audio: 'audio', legislacion: 'legislation', jurisprudencia: 'jurisdiction', mapa: 'misc', basedatos: 'misc', redsocial: 'misc', ia: 'misc', diccionario: 'misc', presentacion: 'misc', personal: 'misc'};
+const BIBV = {informe: 'institution', norma: 'organization', patente: 'organization', mapa: 'organization', dataset: 'organization', software: 'organization', basedatos: 'organization', audiovisual: 'organization', audio: 'organization', redsocial: 'organization', ia: 'organization', diccionario: 'organization', presentacion: 'organization', personal: 'organization', legislacion: 'organization', jurisprudencia: 'institution', prensa: 'journal', blog: 'journal', articulo: 'journal', capitulo: 'booktitle', congreso: 'booktitle', tesis: 'school', libro: 'publisher'};
 const STOPW = new Set(['the', 'and', 'for', 'del', 'los', 'las', 'una', 'con', 'por', 'que']);
 const texEsc = s => String(s).replace(/([&%$#_])/g, '\\$1');
 const bibName = (p, x) => { x = x.trim(); return p.authorType === 'entidad' || (p.authorType !== 'persona' && isOrg(x)) ? `{${texEsc(x)}}` : texEsc(x); };   // entidades entre llaves
@@ -1684,20 +1797,20 @@ function bibtex(L) {
     if (ty === 'tesis' && p.thesisType && p.thesisType !== 'Tesis doctoral') { bk = 'mastersthesis'; tf.push(['type', texEsc(p.thesisType)]); }
     const dp = okDate(p.pubDate) ? p.pubDate.split('-') : [], pg = String(p.pages || '').replace(/(\d)\s*[-–—]+\s*(\d)/g, '$1--$2');
     const f = [['author', au.map(a => bibName(p, a)).join(' and ')], ['editor', (p.editors || []).map(a => bibName({}, a)).join(' and ')], ['title', `{${texEsc(p.title)}}`], ['year', p.year], ['month', dp[1] && +dp[1]], ['day', dp[2] && +dp[2]],
-      [BIBV[ty] || 'howpublished', texEsc(p.venue || '')], ['publisher', ['capitulo', 'congreso'].includes(ty) ? texEsc(p.publisher || '') : ''], ['address', shows('place', ty) ? texEsc(p.place || '') : ''], ['edition', shows('edition', ty) ? texEsc(p.edition || '') : ''],
+      [BIBV[ty] || 'howpublished', texEsc(p.venue || '')], ['publisher', ['capitulo', 'congreso', 'jurisprudencia'].includes(ty) ? texEsc(p.publisher || '') : ''], ['address', shows('place', ty) ? texEsc(p.place || '') : ''], ['edition', shows('edition', ty) ? texEsc(p.edition || '') : ''],
       ['volume', ty === 'articulo' ? texEsc(p.volume || '') : ''], ['number', ty === 'articulo' || ty === 'legislacion' ? texEsc(p.issue || '') : ''], ['pages', shows('pages', ty) ? pg : ''], ['entrysubtype', ty === 'prensa' ? 'newspaper' : ty === 'blog' ? 'blog' : BIBK[ty] === 'misc' && ty !== 'web' ? ty : ''], ...tf,
-      ...[['subtype', 'type'], ['authorRole', 'authorrole'], ['userHandle', 'userhandle'], ['seriesNumber', 'seriesnumber'], ['isbn', 'isbn'], ['issn', 'issn'], ['series', 'series'], ['institution', 'institution'], ['docNumber', ty === 'legislacion' ? 'docnumber' : 'number']].filter(([k]) => shows(k, ty) && !(k === 'institution' && ty === 'tesis' && !p.institution)).map(([k, b]) => [b, texEsc(p[k] || '')]),
+      ...[['subtype', 'type'], ['authorRole', 'authorrole'], ['userHandle', 'userhandle'], ['seriesNumber', 'seriesnumber'], ['isbn', 'isbn'], ['issn', 'issn'], ['series', 'series'], ['institution', 'institution'], ['docNumber', ty === 'legislacion' ? 'docnumber' : 'number'], ['abbr', 'shorthand'], ['ecli', 'ecli']].filter(([k]) => shows(k, ty) && !(k === 'institution' && ty === 'tesis' && !p.institution)).map(([k, b]) => [b, texEsc(p[k] || '')]),
       ['doi', normDoi(p.doi)], ['url', p.url], ['urldate', p.accessed]].filter(([, v]) => v);
     return `@${bk}{${n ? base + String.fromCharCode(96 + n) : base},\n${f.map(([k, v]) => `  ${k} = {${v}}`).join(',\n')}\n}`;
   }).join('\n\n');
 }
-const RISK = {articulo: 'JOUR', libro: 'BOOK', capitulo: 'CHAP', congreso: 'CONF', tesis: 'THES', web: 'ELEC', prensa: 'NEWS', blog: 'BLOG', informe: 'RPRT', norma: 'STAND', patente: 'PAT', mapa: 'MAP', dataset: 'DATA', software: 'COMP', basedatos: 'DBASE', audiovisual: 'VIDEO', audio: 'SOUND', redsocial: 'GEN', ia: 'GEN', diccionario: 'DICT', presentacion: 'SLIDE', personal: 'PCOMM', legislacion: 'STAT'};
-const RISV = {libro: 'PB', tesis: 'PB', capitulo: 'T2', congreso: 'T2', web: 'T2', blog: 'T2', diccionario: 'T2', informe: 'PB', norma: 'PB', patente: 'PB', mapa: 'PB', dataset: 'PB', software: 'PB', basedatos: 'PB', audiovisual: 'PB', audio: 'PB', redsocial: 'PB', ia: 'PB', presentacion: 'PB', personal: 'PB', legislacion: 'PB'};   // etiqueta RIS donde va «venue» (por defecto JO)
+const RISK = {articulo: 'JOUR', libro: 'BOOK', capitulo: 'CHAP', congreso: 'CONF', tesis: 'THES', web: 'ELEC', prensa: 'NEWS', blog: 'BLOG', informe: 'RPRT', norma: 'STAND', patente: 'PAT', mapa: 'MAP', dataset: 'DATA', software: 'COMP', basedatos: 'DBASE', audiovisual: 'VIDEO', audio: 'SOUND', redsocial: 'GEN', ia: 'GEN', diccionario: 'DICT', presentacion: 'SLIDE', personal: 'PCOMM', legislacion: 'STAT', jurisprudencia: 'CASE'};
+const RISV = {libro: 'PB', tesis: 'PB', capitulo: 'T2', congreso: 'T2', web: 'T2', blog: 'T2', diccionario: 'T2', informe: 'PB', norma: 'PB', patente: 'PB', mapa: 'PB', dataset: 'PB', software: 'PB', basedatos: 'PB', audiovisual: 'PB', audio: 'PB', redsocial: 'PB', ia: 'PB', presentacion: 'PB', personal: 'PB', legislacion: 'PB', jurisprudencia: 'PB'};   // etiqueta RIS donde va «venue» (por defecto JO)
 const ris = L => L.map(effP).map(p => { const ty = p.type, pg = /^(.+?)\s*[-–—]\s*(.+)$/.exec(String(p.pages || '')) || [0, p.pages || ''], dd = d => d.replace(/-/g, '/') + '/';
   return ['TY  - ' + (RISK[ty] || 'GEN'), ...(p.authorType === 'sin_autor' ? [] : p.authors.map(a => 'AU  - ' + a)), ...(p.editors || []).map(e => 'A2  - ' + e), 'TI  - ' + p.title, p.year && 'PY  - ' + p.year, okDate(p.pubDate) && 'DA  - ' + dd(p.pubDate),
-    p.venue && `${RISV[ty] || 'JO'}  - ${p.venue}`, ['capitulo', 'congreso'].includes(ty) && p.publisher && 'PB  - ' + p.publisher, ty === 'articulo' && p.volume && 'VL  - ' + p.volume, ty === 'articulo' && p.issue && 'IS  - ' + p.issue,
+    p.venue && `${RISV[ty] || 'JO'}  - ${p.venue}`, ['capitulo', 'congreso'].includes(ty) && p.publisher && 'PB  - ' + p.publisher, ty === 'jurisprudencia' && p.publisher && 'DB  - ' + p.publisher, ty === 'articulo' && p.volume && 'VL  - ' + p.volume, ty === 'articulo' && p.issue && 'IS  - ' + p.issue,
     shows('pages', ty) && pg[1] && 'SP  - ' + pg[1], shows('pages', ty) && pg[2] && 'EP  - ' + pg[2], shows('place', ty) && p.place && 'CY  - ' + p.place,
-    shows('edition', ty) && p.edition && 'ET  - ' + p.edition, shows('subtype', ty) && p.subtype && 'M3  - ' + p.subtype, shows('authorRole', ty) && p.authorRole && 'C1  - ' + p.authorRole, shows('userHandle', ty) && p.userHandle && 'C2  - ' + p.userHandle, shows('docNumber', ty) && p.docNumber && 'M1  - ' + p.docNumber, ty === 'legislacion' && p.issue && 'IS  - ' + p.issue, ['redsocial', 'ia'].includes(ty) && 'N1  - gestor:' + ty, ty === 'tesis' && p.thesisType && 'M3  - ' + p.thesisType, shows('isbn', ty) && p.isbn && 'SN  - ' + p.isbn, shows('issn', ty) && p.issn && 'SN  - ' + p.issn, shows('series', ty) && p.series && 'T3  - ' + p.series, shows('seriesNumber', ty) && p.seriesNumber && 'IS  - ' + p.seriesNumber, shows('conferencePlace', ty) && p.conferencePlace && 'AD  - ' + p.conferencePlace,
+    shows('edition', ty) && p.edition && 'ET  - ' + p.edition, shows('subtype', ty) && p.subtype && 'M3  - ' + p.subtype, shows('authorRole', ty) && p.authorRole && 'C1  - ' + p.authorRole, shows('userHandle', ty) && p.userHandle && 'C2  - ' + p.userHandle, shows('docNumber', ty) && p.docNumber && 'M1  - ' + p.docNumber, shows('abbr', ty) && p.abbr && 'J2  - ' + p.abbr, shows('ecli', ty) && p.ecli && 'C3  - ' + p.ecli, ty === 'legislacion' && p.issue && 'IS  - ' + p.issue, ['redsocial', 'ia'].includes(ty) && 'N1  - gestor:' + ty, ty === 'tesis' && p.thesisType && 'M3  - ' + p.thesisType, shows('isbn', ty) && p.isbn && 'SN  - ' + p.isbn, shows('issn', ty) && p.issn && 'SN  - ' + p.issn, shows('series', ty) && p.series && 'T3  - ' + p.series, shows('seriesNumber', ty) && p.seriesNumber && 'IS  - ' + p.seriesNumber, shows('conferencePlace', ty) && p.conferencePlace && 'AD  - ' + p.conferencePlace,
     p.doi && 'DO  - ' + normDoi(p.doi), p.url && 'UR  - ' + p.url, p.accessed && 'Y2  - ' + dd(p.accessed), 'ER  - '].filter(Boolean).join('\r\n'); }).join('\r\n\r\n');
 function openEx() {   // ventana emergente de exportación; se cierra con un clic fuera
   const o = ex(); if (!STYLES[o.style]) o.style = 'apa'; if (!EXF[o.fmt]) o.fmt = 'txt'; if (!EXO[o.order]) o.order = 'auto';
@@ -1716,12 +1829,12 @@ function exUI() {
   $('#exOpts').innerHTML = `<div class="grid">
     <label>Papers<select onchange="EXS=this.value;drawEx()"><option value="sel" ${EXS === 'sel' ? 'selected' : ''}>Seleccionados (${SEL.size})</option><option value="vis" ${EXS === 'vis' ? 'selected' : ''}>Visibles con los filtros (${visible().length})</option><option value="all" ${EXS === 'all' ? 'selected' : ''}>Todos (${db.papers.length})</option></select></label>
     <label>Formato${sel('fmt', Object.fromEntries(Object.entries(EXF).map(([k, v]) => [k, v[0]])), o.fmt)}</label>
-    ${tl ? `<label>Estilo de cita${sel('style', Object.fromEntries(Object.entries(STYLES).map(([k, v]) => [k, v.name])), o.style)}</label>` : ''}
+    ${tl ? `<label>Estilo de cita<select onchange="exSet('style',this.value)">${styOpts(o.style)}</select></label>` : ''}
     <label>Orden${sel('order', EXO, o.order)}</label>
     ${tl ? `<label>Idioma de los conectores${STYLES[o.style]?.fixedLang ? `<select disabled><option>${STYLES[o.style].fixedLang === 'en' ? 'English (fijo en este estilo)' : 'Español (fijo en este estilo)'}</option></select>` : sel('lang', {es: 'Español (y, En, consultado)', en: 'English (&, In, cited)'}, o.lang)}</label><label>Fecha de consulta${sel('dateFmt', {long: '20 de octubre de 2026', dmy: '20-10-2026', iso: '2026-10-20'}, o.dateFmt)}</label>` : ''}
     ${tl && isNum(o) ? `<label>Formato de la numeración${sel('numFmt', {auto: 'Según el estilo', dot: '1.', br: '[1]', par: '(1)'}, o.numFmt)}</label>` : ''}
     ${tl ? `<label>Título del documento<input value="${esc(o.title)}" placeholder="Referencias" oninput="exSet('title',this.value,1)"></label>` : ''}
-    <div class="w exchk">${tl ? (STYLES[o.style]?.numbered ? '' : chk('num', 'Numerar')) + chk('notes', 'Incluir notas') + chk('vanAll', 'Vancouver: listar todos los autores (por defecto, 6 y «et al.»)') + chk('ppChap', 'APA: «pp.» antes de las páginas de un capítulo') + (STYLES[o.style]?.dis ? chk('disamb', 'Distinguir obras del mismo autor y año (2020a, 2020b)') : '') : ''}${chk('particles', 'Ignorar partículas al ordenar (de, del, la, van…)')}</div>
+    <div class="w exchk">${tl ? (STYLES[o.style]?.numbered ? '' : chk('num', 'Numerar')) + chk('notes', 'Incluir notas') + chk('vanAll', 'Vancouver: listar todos los autores (por defecto, 6 y «et al.»)') + chk('ppChap', 'APA: «pp.» antes de las páginas de un capítulo') + (STYLES[o.style]?.dis ? chk('disamb', 'Distinguir obras del mismo autor y año (2020a, 2020b)') : '') + (STYLES[o.style]?.sections ? chk('abbrList', 'Lista de abreviaturas al principio (legislación y jurisprudencia)') : '') : ''}${chk('particles', 'Ignorar partículas al ordenar (de, del, la, van…)')}</div>
     ${tl ? `<small class="w">${STYLES[o.style]?.note ? esc(STYLES[o.style].note) + '<br>' : ''}${(exList(), EXTYPES).map(t => typeWarn(o.style, t)).filter(Boolean).map(w => '⚠ ' + esc(w) + '<br>').join('')}${esc(BASADO)}</small>` : ''}
     <small class="w">Para un caso concreto («de la Torre» bajo la T o bajo la D), rellena «Clave de orden» en la pestaña Datos del paper: tiene prioridad.</small></div>`;
 }
@@ -1779,7 +1892,7 @@ function drawD() {
   const blk = (id, t, body, always) => tab === 'all' || tab === 'cls' ? `<details class="cs" ${ALL_FOLD.has(id) ? '' : 'open'} ontoggle="this.open ? ALL_FOLD.delete('${id}') : ALL_FOLD.add('${id}');uiSoon()"><summary>${t}</summary><div class="csb">${body}</div></details>`   // en «Ver todo» cada bloque lleva su título y se pliega
     : (always ? `<h2 class="grp">${t}</h2>` : '') + body;
   let h = `<div class="dh"><h2>${esc(D.alias || D.title) || 'Nuevo paper'}</h2><div class="dbtn"><button class="pri" onclick="commit()">Guardar paper</button><button onclick="$('#dlg').close()">Cancelar</button></div></div><div class="tabs">${Object.entries(T).map(([k, v]) => `<button class="${tab === k ? 'on' : ''}" onclick="tab='${k}';drawD()">${v}</button>`).join('')}</div>`;
-  if (tab === 'data' || tab === 'all') h += blk('data', 'Datos', `<div class="grid"><div class="w titlerow"><div class="pimgbox">${pimgHTML(D, 'big', `role="button" tabindex="0" onclick="imgOpen()" title="Imagen del paper (opcional): pulsa para poner una URL o un archivo, o pega una imagen copiada con Ctrl+V"`)}</div><div class="titlecol">${inp('title', 'Título *')}${inp('alias', 'Título personalizado (opcional; solo para mostrar, la cita usa el título original)')}</div></div>
+  if (tab === 'data' || tab === 'all') h += blk('data', 'Datos', `<div class="grid"><div class="w titlerow"><div class="pimgbox">${pimgHTML(D, 'big', `role="button" tabindex="0" onclick="imgOpen()" title="Imagen del paper (opcional): pulsa para poner una URL o un archivo, o pega una imagen copiada con Ctrl+V"`)}</div><div class="titlecol">${inp('title', lbl('title', 'Título *'))}${inp('alias', 'Título personalizado (opcional; solo para mostrar, la cita usa el título original)')}</div></div>
     <label class="w">Autores (uno por línea: «Apellido, Nombre»)<textarea oninput="D.authors=this.value.split('\\n').map(s=>s.trim()).filter(Boolean)">${esc(D.authors.join('\n'))}</textarea></label>
     ${inp('sortKey', 'Clave de orden en la bibliografía (opcional): p. ej. «Torre» para «de la Torre, Ana»', 'text', 'w')}<label>Año<input type="number" data-k="year" value="${esc(D.year)}" oninput="D.year=this.value;pubSync()"></label><label>Tipo<select onchange="typeChange(this.value)">${Object.entries(TYPES).filter(([k]) => !CTYPES.has(k)).map(([k, v]) => `<option value="${k}" ${D.type === k ? 'selected' : ''}>${v}</option>`).join('')}${CTYPES.size ? `<optgroup label="Tipos propios">${[...CTYPES].map(([k, t]) => `<option value="${k}" ${D.type === k ? 'selected' : ''}>${esc(t.name)}</option>`).join('')}</optgroup>` : ''}<option value="__new">➕ Crear un tipo propio…</option></select></label>
     ${inp('url', 'URL', 'url', 'w')}<div class="w pdfrow"><span>📄 PDF: ${D.pdf ? `<b>${esc(D.pdf.name)}</b>` : '<i>ninguno</i>'}</span><button onclick="pdfPick()">${D.pdf ? 'Cambiar…' : 'Enlazar un PDF…'}</button>${D.pdf ? `<button onclick="pdfOpen('${D.id}')">Abrir</button><label>Página <input type="number" min="1" style="width:5em" value="${D.pdf.page || ''}" oninput="pdfSetPage(this.value)" placeholder="1"></label><button class="x" onclick="pdfClear()" title="Quitar el enlace al PDF">✕</button>` : ''}<small>${db.settings.pdfDrive ? 'El PDF se copia a tu Google Drive privado (Configuración).' : 'El archivo no se sube a ningún sitio: solo se recuerda su nombre.'}</small></div>${inp('venue', lbl('venue', 'Revista / editorial / sitio'))}<label>DOI (sin https://doi.org/)<span class="row" style="flex-wrap:nowrap"><input style="flex:1;min-width:0" value="${esc(D.doi)}" oninput="D.doi=this.value"><button onclick="doiFill()" title="Rellenar con los datos de CrossRef">Buscar</button></span></label>${inp('accessed', 'Fecha de consulta', 'date')}
@@ -1787,10 +1900,10 @@ function drawD() {
     <label class="chk"><input type="checkbox" ${D.hideAccessed ? 'checked' : ''} onchange="D.hideAccessed=this.checked"> Omitir «[consultado …]» en la cita (aunque la fecha esté rellena)</label>
     <label>Tipo de autor<select onchange="D.authorType=this.value">${Object.entries(AUTH_T).map(([k, v]) => `<option value="${k}" ${D.authorType === k ? 'selected' : ''}>${v}</option>`).join('')}</select></label>
     ${shows('volume', D.type) ? inp('volume', 'Volumen') : ''}${shows('issue', D.type) ? inp('issue', lbl('issue', 'Número')) : ''}${shows('pages', D.type) ? inp('pages', 'Páginas (p. ej. 73-98)') : ''}
-    ${shows('edition', D.type) ? inp('edition', lbl('edition', 'Edición (desde la 2.ª; p. ej. «2.ª»)')) : ''}${shows('publisher', D.type) ? inp('publisher', 'Editorial (del libro o actas)') : ''}${shows('place', D.type) ? inp('place', lbl('place', 'Lugar de edición')) : ''}
+    ${shows('edition', D.type) ? inp('edition', lbl('edition', 'Edición (desde la 2.ª; p. ej. «2.ª»)')) : ''}${shows('publisher', D.type) ? inp('publisher', lbl('publisher', 'Editorial (del libro o actas)')) : ''}${shows('place', D.type) ? inp('place', lbl('place', 'Lugar de edición')) : ''}
     ${shows('editors', D.type) ? `<label class="w">Editores del libro (uno por línea: «Apellido, Nombre»)<textarea oninput="D.editors=this.value.split('\\n').map(s=>s.trim()).filter(Boolean)">${esc(D.editors.join('\n'))}</textarea></label>` : ''}
-    ${[['isbn', 'ISBN'], ['issn', 'ISSN'], ['institution', 'Institución (facultad, departamento…)'], ['docNumber', 'Número de documento'], ['series', 'Serie o colección'], ['seriesNumber', 'Número en la serie'], ['conferenceName', 'Nombre del congreso'], ['conferencePlace', 'Lugar del congreso'], ['conferenceDates', 'Fechas del congreso']].map(([k, l]) => shows(k, D.type) ? inp(k, lbl(k, l)) : '').join('')}
-    ${shows('subtype', D.type) ? `<label>Designación (opcional; p. ej. «${esc((FSUB[baseT(D.type)] || [''])[0])}»)<input type="text" data-k="subtype" list="dl_sub" value="${esc(D.subtype)}" oninput="D.subtype=this.value"><datalist id="dl_sub">${(FSUB[baseT(D.type)] || []).map(v => `<option value="${esc(v)}">`).join('')}</datalist></label>` : ''}
+    ${[['isbn', 'ISBN'], ['issn', 'ISSN'], ['institution', 'Institución (facultad, departamento…)'], ['docNumber', 'Número de documento'], ['series', 'Serie o colección'], ['seriesNumber', 'Número en la serie'], ['conferenceName', 'Nombre del congreso'], ['conferencePlace', 'Lugar del congreso'], ['conferenceDates', 'Fechas del congreso'], ['abbr', 'Abreviatura'], ['ecli', 'ECLI (p. ej. ECLI:ES:TS:2017:1229 o EU:C:2005:446)']].map(([k, l]) => shows(k, D.type) ? inp(k, lbl(k, l)) : '').join('')}
+    ${shows('subtype', D.type) ? `<label>${esc(lbl('subtype', `Designación (opcional; p. ej. «${(FSUB[baseT(D.type)] || [''])[0]}»)`))}<input type="text" data-k="subtype" list="dl_sub" value="${esc(D.subtype)}" oninput="D.subtype=this.value"><datalist id="dl_sub">${(FSUB[baseT(D.type)] || []).map(v => `<option value="${esc(v)}">`).join('')}</datalist></label>` : ''}
     ${shows('authorRole', D.type) ? inp('authorRole', 'Función del autor (p. ej. Director, Presentador)') : ''}${shows('userHandle', D.type) ? inp('userHandle', 'Usuario (sin @)') : ''}
     ${shows('pubDate', D.type) ? `<label>${lbl('pubDate', 'Fecha de publicación completa')}<input type="date" data-k="pubDate" value="${esc(D.pubDate)}" oninput="D.pubDate=this.value;pubSync()"><small id="pdWarn">${pdWarn()}</small></label>` : ''}
     ${shows('thesisType', D.type) ? `<label>Tipo de trabajo<select onchange="D.thesisType=this.value"><option value="">(sin especificar)</option>${THESIS.map(v => `<option ${D.thesisType === v ? 'selected' : ''}>${v}</option>`).join('')}</select></label>` : ''}
@@ -1811,8 +1924,9 @@ function drawD() {
     h += blk('secs', 'Secciones', db.sections.map(s => chip(s, D.sectionIds.includes(s.id), `toggleS('${s.id}')`)).join('') || '<p class="empty">No hay secciones. Créalas con «Gestionar secciones».</p>', true);
   }
   if (tab === 'cite' || tab === 'all') {
-    h += blk('cite', 'Cita', `<small>Cursiva: *texto*. Un asterisco literal se escribe \\*. El idioma y el formato de fecha se eligen en «Exportar».</small>${ex().inText ? `<label>Página o parte citada (opcional, para la cita en el texto y las notas)<input id="locIn" value="${esc(CLOC)}" placeholder="p. ej. 87 o 87-90" oninput="CLOC=this.value;drawIT()"></label>` : ''}`
-      + (tab === 'all' ? `<label>Estilo<select onchange="CITE_SEL=this.value;drawD()">${Object.entries(STYLES).map(([k, s]) => `<option value="${k}" ${citeSel() === k ? 'selected' : ''}>${s.name}</option>`).join('')}</select></label>` + citeOne(citeSel(), STYLES[citeSel()]) : Object.entries(STYLES).map(([k, s]) => citeOne(k, s)).join('')), false);
+    h += blk('cite', 'Cita', `<small>Cursiva: *texto*. Un asterisco literal se escribe \\*. El idioma y el formato de fecha se eligen en «Exportar».</small>${ex().inText ? `<label>Página o parte citada (opcional, para la cita en el texto y las notas)<input id="locIn" value="${esc(CLOC)}" placeholder="${LAW_T.has(baseT(D.type)) ? 'p. ej. 22.1 (artículo) o 3 (FJ, FD o apartado)' : 'p. ej. 87 o 87-90'}" oninput="CLOC=this.value;drawIT()"></label>` : ''}`
+      + (tab === 'all' ? `<label>Estilo<select onchange="CITE_SEL=this.value;drawD()">${styOpts(citeSel())}</select></label>` + citeOne(citeSel(), STYLES[citeSel()])
+        : STY_G.map(([g, t]) => { const E = Object.entries(STYLES).filter(([, s]) => styGroup(s) === g); return E.length ? `<h2 class="grp">${t}</h2>` + E.map(([k, s]) => citeOne(k, s)).join('') : ''; }).join('')), false);
   }
   if (fold) {
     h += blk('tags', 'Etiquetas', db.tags.map(t => chip(t, D.tagIds.includes(t.id), `toggleT('${t.id}')`)).join('') || '<p class="empty">No hay etiquetas. Créalas con «Gestionar etiquetas».</p>', true);
