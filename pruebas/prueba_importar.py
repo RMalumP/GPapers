@@ -31,6 +31,7 @@ with sync_playwright() as pw:
     pg.on('pageerror', lambda e: errs.append(str(e))); pg.on('dialog', lambda d: d.accept())
     pg.goto('file://' + str(folder / 'index.html')); pg.wait_for_timeout(400)
     # ---- botón «Importar» en la barra principal
+    eq('Importar está en la cabecera, a la izquierda de Exportar citas', pg.evaluate("(b => [!!b.closest('header'), b.nextElementSibling?.textContent])([...document.querySelectorAll('button')].find(b => b.textContent === '📥 Importar'))"), [True, 'Exportar citas'])
     pg.click('button:has-text("📥 Importar")')
     eq('el botón Importar abre el menú con las tres formas', pg.evaluate("[...document.querySelectorAll('#ctx button')].map(b => b.textContent)"), ['📄 Desde archivo (.bib, .ris o .txt)', '📋 Pegar BibTeX, RIS o citas de Google Scholar', '🔎 Buscar por DOI'])
     pg.click('#ctx button:has-text("Pegar")')
