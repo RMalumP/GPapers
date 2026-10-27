@@ -1256,6 +1256,7 @@ function helpHTML() {
       <li><b>Ordenar ⇅</b>: varios criterios en cascada (título, autor, año, revista, lectura, valoración, fecha de creación o modificación…), cada uno ascendente o descendente. Aquí también está «Agrupar por sección» y la <b>valoración mínima</b>.</li>
       <li><b>Secciones 📁</b> y <b>Etiquetas 🏷️</b>: filtran la lista. «✎ Gestionar» crea, renombra, recolorea, ordena y borra. Las etiquetas se pueden combinar con «al menos una» o «todas». Clic derecho en una sección abre sus notas.</li>
       <li><b>Lectura 📖</b>: filtra por estado. <b>Selección ☑️</b>: seleccionar visibles/quitar y exportar.</li>
+      <li><b>Información ℹ️</b> (plegada): Ayuda, <b>Añadir app</b> (solo si no está instalada) y Créditos.</li>
       <li><b>Relaciones 🕸️</b>: gráfico de los papers relacionados o que se citan entre sí. <b>Papelera 🗑️</b>: los papers eliminados se guardan <b>5 días</b> y se pueden restaurar.</li></ul>`],
     paper: ['Editar un paper', `<p>«+ Nuevo paper» o «Editar». Pestañas: <b>Ver todo</b> (todos los bloques, plegables y con una sola variante de cita), <b>Datos</b>, <b>Cita</b>, <b>Notas</b>, <b>Secciones, etiquetas y relacionados</b> e <b>Historial</b>. «Guardar paper» confirma; «Cancelar» o cerrar sin guardar descarta el borrador.</p>
       <h4>Datos</h4><ul><li><b>Imagen</b> (recuadro junto a los títulos): una <i>URL</i>, un <i>archivo local enlazado</i> (solo Chrome/Edge: el JSON guarda el nombre y el enlace queda en ese navegador) o una <i>copia reducida incrustada</i> en el JSON. También puedes <b>pegar con Ctrl+V</b> una imagen copiada (por ejemplo de Google Imágenes).</li>
@@ -1307,6 +1308,7 @@ function helpHTML() {
     pwa: ['Aplicación instalada (PWA), sesión y actualizaciones', `<p>Puedes instalar la aplicación desde el navegador (icono de instalar en la barra de direcciones o «Instalar aplicación» en el menú). Funciona sin conexión.</p>
       <ul><li><b>Datos de la aplicación</b>: además de tu JSON, la aplicación guarda en el almacenamiento del navegador una <b>copia de la sesión</b> de cada proyecto (tus datos tal como los tienes ahora, aunque no hayas guardado) y el <b>estado de la interfaz</b> (filtros, orden, barra lateral plegada, bloques abiertos). Al volver a abrirla sigues donde lo dejaste; si había cambios sin guardar, un aviso te lo recuerda.</li>
       <li><b>Tu archivo JSON sigue siendo el original</b>: la copia de sesión no lo sustituye. Guarda (${kb('save')}) para escribir en el archivo; si la aplicación recuerda el archivo, te pedirá permiso para escribir en él.</li>
+      <li><b>Instalar</b>: en «Información», bajo Configuración, el botón <b>Añadir app</b> la instala en este dispositivo (en los navegadores que no lo permiten, explica cómo). Solo aparece si la aplicación aún no está instalada.</li>
       <li><b>Actualizaciones</b>: la aplicación busca versiones nuevas sola (al abrirla, al volver a ella y cada media hora). Cuando hay una, aparece un aviso «Hay una versión nueva» con el botón <b>Recargar ahora</b>; antes de recargar guarda la copia de sesión. <b>No hace falta borrar los datos de la aplicación</b>: se guardan aparte de lo que se actualiza.</li>
       <li>Versión instalada: <b>v${APP_V}</b>. <button onclick="checkUpdate()">Buscar actualizaciones</button> <button class="danger" onclick="forgetAppData()" title="Borra de este navegador las copias de trabajo de los proyectos; no toca tus archivos JSON ni Google Drive">Olvidar la copia de sesión</button></li>
       <li>El navegador puede borrar los datos de los sitios si se queda sin espacio; la aplicación pide almacenamiento persistente para evitarlo, pero tu <b>JSON</b> sigue siendo la copia que debes conservar.</li></ul>`],
@@ -2702,6 +2704,27 @@ document.addEventListener('visibilitychange', () => { if (!syAuto()) return;
 setInterval(() => { if (syAuto() && !document.hidden && syTokGet()) syRun(false); }, 5 * 60 * 1000);   // trae los cambios de los otros dispositivos
 document.addEventListener('close', e => { if (SY.wait && e.target.tagName === 'DIALOG') sySoon(300); }, true);
 
+/* ===== Instalar la aplicación (PWA) =====
+   «Añadir app» (Información, en la barra lateral) solo se ve si la aplicación se abre desde la web y aún no está instalada.
+   Chrome y Edge ofrecen la instalación con un evento (beforeinstallprompt); en los demás navegadores se explica cómo hacerlo. */
+let INST = null, INSTALLED = false;   // instalación ofrecida por el navegador · instalada en esta sesión
+const isInstalled = () => ['standalone', 'window-controls-overlay', 'minimal-ui', 'fullscreen'].some(m => matchMedia(`(display-mode: ${m})`).matches) || navigator.standalone === true;
+const instShow = () => { const b = $('#instBtn'); if (b) b.hidden = !location.protocol.startsWith('http') || INSTALLED || isInstalled(); };
+addEventListener('beforeinstallprompt', e => { e.preventDefault(); INST = e; instShow(); });
+addEventListener('appinstalled', () => { INST = null; INSTALLED = true; instShow(); toast('Aplicación instalada: ábrela desde tu escritorio o tu pantalla de inicio.', [], 6000); });
+['standalone', 'window-controls-overlay'].forEach(m => matchMedia(`(display-mode: ${m})`).addEventListener('change', instShow));
+async function appInstall() {
+  if (INST) { const e = INST; INST = null; try { await e.prompt(); await e.userChoice; } catch (x) {} return instShow(); }   // el navegador pide confirmar
+  const ios = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1), li = t => `<li>${t}</li>`;
+  syDlg('Añadir la aplicación', `<p>Instalada, la aplicación se abre en su propia ventana, desde tu escritorio o tu pantalla de inicio, y funciona sin conexión.</p>
+    <ul>${(ios ? [li('<b>iPhone o iPad (Safari)</b>: botón Compartir → «Añadir a pantalla de inicio».')] : []).join('')}
+    ${li('<b>Chrome o Edge (ordenador)</b>: el icono de instalar de la barra de direcciones, o el menú ⋮ → «Guardar y compartir» → «Instalar…» (Edge: ⋯ → «Aplicaciones» → «Instalar este sitio como aplicación»).')}
+    ${li('<b>Chrome en Android</b>: menú ⋮ → «Instalar aplicación» o «Añadir a la pantalla de inicio».')}
+    ${ios ? '' : li('<b>Safari en iPhone o iPad</b>: botón Compartir → «Añadir a pantalla de inicio». <b>Safari en Mac</b>: Archivo → «Añadir al Dock».')}
+    ${li('<b>Firefox</b> en ordenador no permite instalarla; en Android, menú ⋮ → «Instalar».')}</ul>
+    <p>Si ya la tienes instalada, ábrela desde su icono y este botón no aparecerá.</p>`, [['Entendido', null, true]]);
+}
+
 /* ===== Privacidad ===== */
 function privHTML() {
   const on = syOn(), p = syP();
@@ -2894,7 +2917,7 @@ async function bootApp() {
     if (!pj && location.protocol.startsWith('http')) try { const r = await fetch('ejemplo_papers.json'); if (r.ok && !dirty && !db.papers.length) await loadText(await r.text(), 'ejemplo_papers.json', true); } catch (e) {}   // la primera vez se abre el ejemplo
     if (!pj) PJ.list[0].name = pjNameFor(path);
   }
-  pjShow(); applyUI(ui); BOOTED = true; lastUi = JSON.stringify(uiState()); if (restored) uiNow();
+  pjShow(); instShow(); applyUI(ui); BOOTED = true; lastUi = JSON.stringify(uiState()); if (restored) uiNow();
   if (pj && !restored) pjSave(); else await sessionNow();
   if (old) { if (handle) rememberHandle(); idb('readwrite', st => st.delete('session')).catch(() => {}); }
 }

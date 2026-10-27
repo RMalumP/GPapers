@@ -26,6 +26,10 @@ Los ajustes son comunes a todos: nombre de la aplicación, colores, atajos, tipo
 - La biblioteca de versiones anteriores pasa sola a ser el primer proyecto (con el nombre de su archivo).
 - **Google Drive** guarda todos los proyectos: un índice común (`gpapers-projects.json`, lista de proyectos y ajustes comunes) y los archivos de cada uno (el primero conserva los nombres de siempre, `gpapers-snap.json`…; los demás, `gpapers-p-<id>-…`). Cada vuelta sincroniza el índice y el proyecto abierto; los proyectos de otros dispositivos salen en ▾ con ☁ y se descargan al abrirlos. Renombrar o borrar un proyecto llega a todos los dispositivos.
 
+## Añadir app
+En la barra lateral, dentro de «Información» (plegada, bajo Configuración), el botón **Añadir app** (mismo estilo que Ayuda) instala la aplicación en el dispositivo. Solo se ve si se abre desde la web y aún no está instalada
+(se oculta al abrirla como app y al instalarse). En Chrome y Edge la instalación la ofrece el navegador; en los demás se explica cómo hacerlo.
+
 ## Citas (APA 7, Vancouver, MLA, IEEE y Chicago)
 La plantilla depende del tipo de fuente (artículo, libro, capítulo, congreso, tesis, web, artículo de prensa y entrada de blog). Las citas llevan *cursiva* real: en texto plano se quita,
 y en «Copiar con formato» y en Word se convierte. En la pestaña «Cita» puedes escribir `*texto*` para cursiva (un asterisco literal, `\*`).
