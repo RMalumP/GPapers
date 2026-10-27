@@ -2199,7 +2199,7 @@ async function svCopyRich() { $('#svMsg').textContent = (await copyRich(svHtml()
 const svSave = () => saveText(svMarkdown(), 'notas.md', 'text/markdown', 'md', 'Markdown');
 
 /* ===== Gráfico de relaciones ===== */
-let GR = {all: false, vis: false};
+let GR = {all: false, vis: false, help: false};   // help: explicación desplegada con relaciones (la primera vez que se abre y con el botón ❓)
 function grLayout(n, edges, W, H) {   // disposición de fuerzas determinista: repulsión entre nodos, muelles en las aristas y gravedad al centro
   const P = Array.from({length: n}, (_, i) => ({x: W / 2 + Math.cos(2 * Math.PI * i / Math.max(n, 1)) * W * .35, y: H / 2 + Math.sin(2 * Math.PI * i / Math.max(n, 1)) * H * .35, vx: 0, vy: 0}));
   for (let it = 0; it < 300; it++) {
@@ -2215,24 +2215,27 @@ function grData() {   // nodos y aristas del ámbito elegido (todos o solo los v
   const linked = new Set(E.flatMap(e => [e.a, e.b])), nodes = base.filter(p => GR.all || linked.has(p.id));
   return {nodes, E};
 }
-function grOpen() { grDraw(); $('#gr').showModal(); }
+function grOpen() {
+  let seen = false; try { seen = !!localStorage.getItem('gp-gr-seen'); localStorage.setItem('gp-gr-seen', '1'); } catch (e) {}
+  GR.help = !seen; grDraw(); $('#gr').showModal();   // quien lo abre por primera vez ve la explicación; después, el gráfico
+}
 function grDraw() {
   const {nodes, E} = grData(), W = 880, H = 560, ix = new Map(nodes.map((p, i) => [p.id, i])), P = grLayout(nodes.length, E.map(e => [ix.get(e.a), ix.get(e.b)]), W, H);
   const lbl = p => esc(shortTxt(p.alias || p.title, 28)) + (p.year ? ' · ' + p.year : '');
   $('#gr').innerHTML = `<h2>Relaciones entre papers</h2>
-    <div class="row"><label class="row"><input type="checkbox" ${GR.vis ? 'checked' : ''} onchange="GR.vis=this.checked;grDraw()"> Solo los papers visibles con los filtros actuales</label><label class="row"><input type="checkbox" ${GR.all ? 'checked' : ''} onchange="GR.all=this.checked;grDraw()"> Incluir los que no tienen relaciones</label></div>
+    <div class="row"><label class="row"><input type="checkbox" ${GR.vis ? 'checked' : ''} onchange="GR.vis=this.checked;grDraw()"> Solo los papers visibles con los filtros actuales</label><label class="row"><input type="checkbox" ${GR.all ? 'checked' : ''} onchange="GR.all=this.checked;grDraw()"> Incluir los que no tienen relaciones</label><button class="sm" style="margin-left:auto" onclick="GR.help=!GR.help;grDraw()" aria-expanded="${GR.help}">${GR.help ? 'Ocultar la explicación' : '❓ ¿Para qué sirve?'}</button></div>
     <small id="grInfo">${nodes.length} papers · ${E.length} relaciones · <span style="color:#7c5cc4">━ relacionado</span> · <span style="color:#0f8b8d">➜ cita a</span> · clic en un paper para abrirlo</small>
-    ${E.length ? '' : grHelp()}
+    ${E.length ? (GR.help ? grHelp(true) : '') : grHelp()}
     ${nodes.length ? `<svg id="grSvg" viewBox="0 0 ${W} ${H}" role="img" aria-label="Gráfico de relaciones"><defs><marker id="grAr" viewBox="0 0 10 10" refX="17" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#0f8b8d"/></marker></defs>
       ${E.map(e => { const a = P[ix.get(e.a)], b = P[ix.get(e.b)]; return `<line class="ed" data-a="${e.a}" data-b="${e.b}" x1="${a.x.toFixed(1)}" y1="${a.y.toFixed(1)}" x2="${b.x.toFixed(1)}" y2="${b.y.toFixed(1)}" stroke="${e.dir ? '#0f8b8d' : '#7c5cc4'}" stroke-width="1.6" ${e.dir ? 'marker-end="url(#grAr)"' : ''}/>`; }).join('')}
       ${nodes.map((p, i) => `<g class="nd" data-id="${p.id}" onclick="grGo('${p.id}')" tabindex="0" onkeydown="if(event.key==='Enter')grGo('${p.id}')"><title>${esc(p.title)}</title><circle cx="${P[i].x.toFixed(1)}" cy="${P[i].y.toFixed(1)}" r="8" fill="var(--pri)" stroke="var(--card)" stroke-width="2"/><text x="${(P[i].x + 12).toFixed(1)}" y="${(P[i].y + 4).toFixed(1)}">${lbl(p)}</text></g>`).join('')}</svg>` : ''}
     <div class="row" style="margin-top:12px"><button style="margin-left:auto" onclick="$('#gr').close()">Cerrar</button></div>`;
 }
 function grGo(id) { $('#gr').close(); openPaper(id); }
-function grHelp() {   // sin relaciones: qué es esta función y cómo empezar, atenuado porque es un texto provisional
+function grHelp(on) {   // sin relaciones: qué es esta función y cómo empezar, atenuado porque es un texto provisional; on = pedido con el botón ❓ (con relaciones), sin atenuar
   const any = db.papers.some(p => (p.related || []).length || (p.refTo || []).length);
-  if (any) return '<div class="grhelp"><p>Con los filtros actuales no se ve ninguna relación. Desmarca «Solo los papers visibles con los filtros actuales» o cambia los filtros de la barra lateral.</p></div>';
-  return `<div class="grhelp"><h3>¿Para qué sirve?</h3>
+  if (any && !on) return '<div class="grhelp"><p>Con los filtros actuales no se ve ninguna relación. Desmarca «Solo los papers visibles con los filtros actuales» o cambia los filtros de la barra lateral.</p></div>';
+  return `<div class="grhelp${on ? ' on' : ''}"><h3>¿Para qué sirve?</h3>
     <p>Este gráfico dibuja cómo se conectan tus papers: cada punto es un paper y cada línea, una relación entre dos. Así ves de un vistazo qué trabajos van juntos, cuáles sirven de base a otros y qué grupos de lectura se forman en tu bibliografía.</p>
     <h3>Dos tipos de relación</h3>
     <ul><li><b style="color:#7c5cc4">━ Relacionado</b>: tratan el mismo tema o se complementan. Es mutua: aparece en los dos papers.</li>
@@ -2246,7 +2249,7 @@ function grHelp() {   // sin relaciones: qué es esta función y cómo empezar, 
     <ul><li>Pulsa un paper para abrirlo y editarlo.</li>
     <li><b>«Solo los papers visibles con los filtros actuales»</b> limita el gráfico a lo que muestran tus filtros (búsqueda, sección, etiquetas, lectura…).</li>
     <li><b>«Incluir los que no tienen relaciones»</b> muestra también los papers sueltos, para ver cuáles faltan por conectar.</li></ul>
-    <p class="grtmp">Este texto desaparece en cuanto añadas la primera relación.</p></div>`;
+    <p class="grtmp">${on ? 'Puedes volver a verlo cuando quieras con «❓ ¿Para qué sirve?».' : 'Este texto desaparece en cuanto añadas la primera relación.'}</p></div>`;
 }
 
 /* ===== Papelera ===== */
@@ -3235,7 +3238,7 @@ function pjMenu(e) {
    Aparte del JSON, la app guarda (1) una copia de trabajo, para reabrir justo donde lo dejaste aunque no hayas guardado, y
    (2) el estado de la interfaz (filtros, orden, barra lateral, bloques plegados). Viven fuera de la caché de la aplicación,
    así que las actualizaciones no los tocan y no hace falta borrar datos para recibir una versión nueva. */
-const APP_V = '33.0';   // debe coincidir con la versión de sw.js
+const APP_V = '33.1';   // debe coincidir con la versión de sw.js
 let BOOTED = false, RELOADING = false, SWREG = null, tSes = 0, tUi = 0, lastUi = '';
 const sessionNow = () => { clearTimeout(tSes); if (!BOOTED) return Promise.resolve();   // copia de trabajo del proyecto abierto (y la lista de proyectos)
   const p = pjCur(); if (p) { Object.assign(p, {n: db.papers.length, file: path, dirty}); delete p.remote; }
