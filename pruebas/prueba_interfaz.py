@@ -16,7 +16,7 @@ with sync_playwright() as pw:
     A.on('pageerror', lambda e: errs.append(str(e))); A.on('dialog', lambda d: d.accept())
     A.goto('http://localhost:8797/index.html'); A.wait_for_timeout(1200)
     # cabecera
-    eq('cabecera: Drive, Guardar, Exportar y Archivo', A.evaluate("[...document.querySelectorAll('header .row > button, header .row > .fm > button')].map(b => b.textContent.trim().replace(/\\s+/g, ' '))"), ['🔄Conectar con Google Drive', '💾', 'Exportar citas', 'Archivo ▾'])
+    eq('cabecera: Drive, Guardar, Importar, Exportar y Archivo', A.evaluate("[...document.querySelectorAll('header .row > button, header .row > .fm > button')].map(b => b.textContent.trim().replace(/\\s+/g, ' '))"), ['🔄Conectar con Google Drive', '💾', '📥 Importar', 'Exportar citas', 'Archivo ▾'])
     eq('ya no están Abrir, Reabrir último, Guardar como ni Autoguardado a la vista', A.evaluate("['#reopen'].map(s => !!$(s)).concat([!$('#auto').offsetParent])"), [False, True])
     A.click('#fmBtn')
     eq('Archivo abre el menú y marca aria-expanded', A.evaluate("[!$('#fmenu').hidden, $('#fmBtn').getAttribute('aria-expanded')]"), [True, 'true'])
