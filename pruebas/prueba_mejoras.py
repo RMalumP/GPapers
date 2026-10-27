@@ -16,7 +16,7 @@ with sync_playwright() as pw:
     def device():
         c = b.new_context(viewport={'width': 1200, 'height': 800}, service_workers='block')
         p = c.new_page(); p.on('pageerror', lambda e: errs.append(str(e))); p.on('console', lambda m: errs.append(m.text) if m.type == 'error' and 'favicon' not in m.text else None); p.on('dialog', lambda d: d.accept())
-        p.goto('http://localhost:8795/index.html'); p.wait_for_timeout(1200); p.evaluate(f"window.P = {PAPER}"); return c, p
+        p.goto('http://localhost:8795/index.html'); p.wait_for_timeout(1200); p.evaluate(f"window.P = {PAPER}"); p.evaluate("DATA_ALL = true"); return c, p
     cA, A = device()
     A.evaluate("db.papers.length = 0; db.papers.push(P('a', 'Uno'), P('b', 'Dos')); markDirty(); render()")
 
@@ -134,7 +134,7 @@ with sync_playwright() as pw:
     def devD():
         c = b.new_context(viewport={'width': 1200, 'height': 800}, service_workers='block'); c.add_init_script(GOOGLE); c.route('https://www.googleapis.com/**', drive)
         p = c.new_page(); p.on('pageerror', lambda e: errs.append(str(e))); p.on('dialog', lambda d: d.accept())
-        p.goto('http://localhost:8795/index.html'); p.wait_for_timeout(1200); p.evaluate(f"window.P = {PAPER}"); return c, p
+        p.goto('http://localhost:8795/index.html'); p.wait_for_timeout(1200); p.evaluate(f"window.P = {PAPER}"); p.evaluate("DATA_ALL = true"); return c, p
     cP, P1 = devD()
     P1.evaluate("db.papers.length = 0; db.papers.push(P('k1', 'Con PDF'), P('k2', 'Sin PDF')); markDirty(); null")
     P1.click('#syncBtn'); P1.click('#sy button:has-text("Continuar")'); P1.wait_for_timeout(1000); P1.click('#sy button:has-text("Aceptar")')
