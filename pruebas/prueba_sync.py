@@ -82,7 +82,12 @@ with sync_playwright() as pw:
     cR, RD = device()   # lector: reconstruye lo que hay en Drive (copia + cambios + imágenes) sin iniciar sesión
     remote = lambda: {'db': RD.evaluate("(async () => { const t = await syToken(false), f = await syLs(t), N = syNames('main'), R = await syRemote(t, f, N); return R.w ? syNorm(await syUnwire(t, R.w, f, N)) : null; })()")}
     cA, A = device('allow')
-    eq('el botón de Google Drive está a la izquierda de Abrir', A.evaluate("[!$('#syncBtn').hidden, $('#syncBtn').nextElementSibling.getAttribute('aria-label'), $('#syncBtn').dataset.st, $('#syncBtn').previousElementSibling]"), [True, 'Abrir', 'off', None])
+    eq('el botón de Google Drive está a la izquierda de Guardar', A.evaluate("[!$('#syncBtn').hidden, $('#syncBtn').nextElementSibling.getAttribute('aria-label'), $('#syncBtn').dataset.st, $('#syncBtn').previousElementSibling]"), [True, 'Guardar', 'off', None])
+    eq('cabecera: solo Drive, Guardar, Exportar y «Archivo ▾»', A.evaluate("[...document.querySelectorAll('header .row > button, header .row > .fm > button')].map(b => b.textContent.trim().replace(/\\s+/g, ' '))"), ['🔄Conectar con Google Drive', '💾', 'Exportar citas', 'Archivo ▾'])
+    A.click('#fmBtn')
+    eq('el menú Archivo: abrir, guardar como, importar y autoguardado', A.evaluate("[...document.querySelectorAll('#fmenu button, #fmenu label')].map(b => b.textContent.trim())"), ['📂 Abrir un archivo JSON…', '💾 Guardar como…', '📄 Desde archivo (.bib / .ris)…', '📋 Pegar texto BibTeX / RIS…', '🔎 Buscar por DOI…', 'Autoguardado'])
+    A.keyboard.press('Escape')
+    eq('Esc lo cierra', A.evaluate("$('#fmenu').hidden"), True)
     eq('sin conectar dice «Conectar con Google Drive»', (A.inner_text('#syncBtn').strip(), A.evaluate("$('#syncBtn').title")), ('🔄Conectar con Google Drive', 'Conectar con Google Drive'))
     eq('final de la barra lateral: Configuración, una línea e «Información»', A.evaluate("[...document.querySelectorAll('#side > *')].slice(-4).map(e => e.tagName === 'HR' ? '——' : e.id || e.className || e.textContent.trim())"), ['sh cfgb', '——', 'sg-more', 'sbinfo'])
     eq('«Información» está plegada por defecto', (A.evaluate("$('#sg-more').classList.contains('fold')"), A.is_visible('#side button:has-text("Créditos")')), (True, False))
@@ -115,12 +120,13 @@ with sync_playwright() as pw:
     eq('primera conexión: crea la copia completa y el índice de proyectos en la carpeta oculta', (names(), snapf()['parents']), (['gpapers-projects.json', 'gpapers-snap.json'], ['appDataFolder']))
     eq('la copia lleva la biblioteca', (json.loads(snapf()['content'])['app'], len(remote()['db']['papers']) == A.evaluate("db.papers.length"), 'history' in snapf()['content']), ('gpapers', True, False))
     eq('mensaje de sincronizado y autoguardado activado', ('Sincronizado' in A.inner_text('#sy'), A.evaluate("[syOn(), syAuto(), $('#auto').checked, $('#syncBtn').dataset.st]")), (True, [True, True, True, 'ok']))
+    eq('un único estado de guardado junto al nombre del proyecto', A.evaluate("[$('#fname').textContent.startsWith('Guardado en Google Drive'), $('#fname').dataset.st]"), [True, 'ok'])
     eq('recuerda la cuenta', A.evaluate("syP().who"), 'yo@example.com')
     eq('usa el ID de cliente del proyecto «Gestor de papers» y lo recuerda', (A.evaluate("window.__cid"), A.evaluate("syP().cid")), ('143923429984-45e8m3bmn1315r9ceet2sb19iuq4f9qj.apps.googleusercontent.com',) * 2)
     eq('conectado ya no muestra el texto, solo el icono', A.evaluate("getComputedStyle($('#syncBtn .syl')).display"), 'none')
     A.click('#sy button:has-text("Aceptar")')
     A.evaluate("db.papers[0].title = 'Cambio en A'; markDirty()")
-    eq('un cambio deja el icono pendiente', A.evaluate("$('#syncBtn').dataset.st"), 'pend')
+    eq('un cambio deja el icono pendiente', A.evaluate("[$('#syncBtn').dataset.st, $('#fname').textContent.startsWith('Sin guardar'), $('#fname').dataset.st]"), ['pend', True, 'pend'])
     A.wait_for_timeout(3800)
     eq('autoguardado: el cambio se sube solo', remote()['db']['papers'][0]['title'], 'Cambio en A')
     d = deltas()
@@ -191,13 +197,13 @@ with sync_playwright() as pw:
     A.click('#sy button:has-text("Aceptar")')
 
     # autoguardado desactivado desde la casilla: sincroniza a mano
-    A.click('#auto')
+    A.click('#fmBtn'); A.click('#auto'); A.keyboard.press('Escape')
     eq('casilla sin marcar: autoguardado en Drive desactivado', A.evaluate("syAuto()"), False)
     A.evaluate("db.papers[0].title = 'manual'; markDirty()"); A.wait_for_timeout(3500)
     eq('no se sube solo', (remote()['db']['papers'][0]['title'], A.evaluate("$('#syncBtn').dataset.st")), ('sin acceso', 'manual'))
     A.click('#syncBtn'); A.click('#ctx button:has-text("Sincronizar ahora")'); A.wait_for_timeout(600)
     eq('«Sincronizar ahora» lo sube', remote()['db']['papers'][0]['title'], 'manual')
-    A.click('#auto'); eq('se vuelve a activar', A.evaluate("syAuto()"), True)
+    A.click('#fmBtn'); A.click('#auto'); A.keyboard.press('Escape'); eq('se vuelve a activar', A.evaluate("syAuto()"), True)
 
     # al recargar sigue la sesión y se traen los cambios
     B.evaluate("db.papers[0].title = 'desde B'; markDirty()"); B.wait_for_timeout(3800)

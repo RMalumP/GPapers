@@ -103,6 +103,8 @@ with sync_playwright() as pw:
     A.evaluate("""db.papers.length = 0; db.sections.length = 0; db.tags.length = 0; db.tags.push({id: 'tg1', name: 'Clave', color: '#000'});
       db.papers.push(P('c1', 'Primero', {authors: ['Pérez, Ana'], year: 2020, venue: 'Revista X', reading: 'leido', tagIds: ['tg1']}), P('c2', 'Segundo', {reading: 'leyendo'}), P('c3', 'Tercero'), P('c4', 'Cuarto', {reading: 'leido'}));
       markDirty(); render(); null""")
+    eq('el progreso está desactivado por defecto', A.evaluate("[db.settings.showProgress, $('#pjProg').hidden]"), [False, True])
+    A.evaluate("setCfg('showProgress', true)")
     eq('progreso en la cabecera: leídos del total', A.evaluate("[$('#pjProg').hidden, $('#pjProg small').textContent, $('#pjProg').title]"), [False, '2/4 leídos', 'Leído: 2 · Leyendo: 1 · Por leer: 1 (de 4 papers)'])
     eq('la barra tiene un tramo de leídos y otro de leyendo', A.evaluate("[...document.querySelectorAll('#pjProg .pjb i')].map(i => i.style.width)"), ['50%', '25%'])
     A.evaluate("db.papers.length = 0; render()")
@@ -127,6 +129,36 @@ with sync_playwright() as pw:
     eq('si una etiqueta ya no existe se ignora sin romper', A.evaluate("[F.tags.size, F.read]"), [0, 'leido'])
     A.evaluate("window.confirm = () => true"); A.select_option('#favSel', '0'); A.click('#favDel'); A.wait_for_timeout(200)
     eq('borrar los filtros guardados', A.evaluate("[FAV.length, $('#favDel').hidden]"), [0, True])
+    # ---- 6. PDF a Google Drive
+    from drive_falso import STORE, GOOGLE, drive, names, now
+    def devD():
+        c = b.new_context(viewport={'width': 1200, 'height': 800}, service_workers='block'); c.add_init_script(GOOGLE); c.route('https://www.googleapis.com/**', drive)
+        p = c.new_page(); p.on('pageerror', lambda e: errs.append(str(e))); p.on('dialog', lambda d: d.accept())
+        p.goto('http://localhost:8795/index.html'); p.wait_for_timeout(1200); p.evaluate(f"window.P = {PAPER}"); return c, p
+    cP, P1 = devD()
+    P1.evaluate("db.papers.length = 0; db.papers.push(P('k1', 'Con PDF'), P('k2', 'Sin PDF')); markDirty(); null")
+    P1.click('#syncBtn'); P1.click('#sy button:has-text("Continuar")'); P1.wait_for_timeout(1000); P1.click('#sy button:has-text("Aceptar")')
+    P1.evaluate("""window.showOpenFilePicker = async () => [{name: 'articulo.pdf', queryPermission: async () => 'granted', requestPermission: async () => 'granted', getFile: async () => new File(['%PDF-1.4 prueba'], 'articulo.pdf', {type: 'application/pdf'})}]; null""")
+    P1.evaluate("openPaper('k1'); tab = 'data'; drawD()"); P1.click('#dlg .pdfrow button:has-text("Enlazar")'); P1.wait_for_timeout(200); P1.evaluate("commit()"); P1.wait_for_timeout(3800)
+    eq('con la opción desactivada el PDF no se sube', names('gpapers-pdf-'), [])
+    P1.evaluate("openCfg('da')")
+    eq('en Configuración está la opción, con su explicación', ('Subir a mi Google Drive los PDF enlazados' in P1.inner_text('#cfg'), 'carpeta privada y oculta' in P1.inner_text('#cfg')), (True, True))
+    P1.click('#cfg label:has-text("Subir a mi Google Drive") input'); P1.wait_for_timeout(300); P1.evaluate("$('#cfg').close()"); P1.wait_for_timeout(4200)
+    eq('al activarla se sube el PDF a la carpeta oculta, tal cual', (names('gpapers-pdf-'), [f['content'] for f in STORE.values() if f['name'].startswith('gpapers-pdf-')], [f['parents'] for f in STORE.values() if f['name'].startswith('gpapers-pdf-')]), (['gpapers-pdf-k1'], ['%PDF-1.4 prueba'], [['appDataFolder']]))
+    n1 = len([f for f in STORE.values() if f['name'].startswith('gpapers-pdf-')]); P1.evaluate("syRun(false)"); P1.wait_for_timeout(800)
+    eq('si no cambia no se vuelve a subir', len([f for f in STORE.values() if f['name'].startswith('gpapers-pdf-')]), n1)
+    eq('la opción se sincroniza con los ajustes comunes', P1.evaluate("db.settings.pdfDrive"), True)
+    cQ, Q1 = devD()
+    Q1.click('#syncBtn'); Q1.click('#sy button:has-text("Continuar")'); Q1.wait_for_timeout(1200); Q1.click('#sy button:has-text("Aceptar")')
+    Q1.evaluate("window.__open = []; window.open = u => { window.__open.push(u); }; window.showOpenFilePicker = async () => { window.__pick = 1; throw Object.assign(Error('x'), {name: 'AbortError'}); }; null")
+    eq('otro dispositivo: el paper llega con su PDF', Q1.evaluate("db.papers.find(p => p.id === 'k1').pdf"), {'name': 'articulo.pdf'})
+    Q1.evaluate("pdfOpen('k1')"); Q1.wait_for_timeout(1000)
+    eq('y lo abre descargándolo de Drive, sin pedir el archivo', Q1.evaluate("[window.__open.length, (window.__open[0] || '').startsWith('blob:'), window.__pick || 0]"), [1, True, 0])
+    P1.evaluate("db.papers.find(p => p.id === 'k1').pdf = null; markDirty()"); P1.wait_for_timeout(3800)
+    for f in STORE.values():
+        if f['name'].startswith('gpapers-pdf-'): f['mt'] = '2020-01-01T00:00:00.000Z'
+    P1.evaluate("syRun(false)"); P1.wait_for_timeout(1000)
+    eq('al quitar el enlace se borra de Drive (pasado un día)', names('gpapers-pdf-'), [])
     eq('sin errores', [e for e in errs if 'could not be cloned' not in e], [])
     srv.terminate(); b.close()
 print(f'{n - fail}/{n} pruebas correctas'); sys.exit(1 if fail else 0)

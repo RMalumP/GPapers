@@ -39,7 +39,7 @@ with sync_playwright() as pw:
     A.evaluate("save(true)"); A.wait_for_timeout(300)
     eq('Guardar como propone el nombre del proyecto', A.evaluate("[window.__sug, path, JSON.parse(window.__files['Tesis.json']).papers.length]"), ['Tesis.json', 'Tesis.json', nTesis])
     A.click('#pjBtn')
-    eq('menú de proyectos', (menu(A), A.evaluate("[...document.querySelectorAll('#ctx > button:not(.pji)')].map(b => b.textContent)")), ([f'✓ Tesis {nTesis} papers'], ['＋ Nuevo proyecto', '📂 Abrir un JSON como proyecto…', '✏️ Cambiar el nombre', '🕘 Copias de seguridad…', '🗑 Borrar este proyecto…']))
+    eq('menú de proyectos', (menu(A), A.evaluate("[...document.querySelectorAll('#ctx > button:not(.pji)')].map(b => b.textContent)")), ([f'✓ Tesis {nTesis} papers'], ['＋ Nuevo proyecto', '📂 Abrir un JSON como proyecto…', '✏️ Cambiar el nombre', '↻ Volver a leer «Tesis.json»', '🔍 Buscar duplicados…', '🕘 Copias de seguridad…', '🗑 Borrar este proyecto…']))
     A.click('#ctx button:has-text("Nuevo proyecto")'); A.wait_for_timeout(500)
     eq('nuevo proyecto: vacío y con el nombre listo para escribir', A.evaluate("[PJ.list.length, db.papers.length, db.sections.length, pjCur().name, document.activeElement.id, path]"), [2, 0, 0, 'Proyecto nuevo', 'pjName', None])
     A.keyboard.type('TFM'); A.keyboard.press('Enter'); A.wait_for_timeout(200)
