@@ -1064,7 +1064,7 @@ document.addEventListener('keydown', e => {
   if (recAct) return;
   const combo = comboOf(e); if (!combo) return;
   const act = Object.keys(SC_DEF).find(a => db.settings.shortcuts[a] === combo); if (!act) return;
-  if (act === 'bold' || act === 'italic') { const ed = e.target.closest?.('.ned'); if (ed) { e.preventDefault(); edCmd(ed.dataset.key, act === 'bold' ? 'bold' : 'italic'); } return; }   // solo dentro de una nota
+  if (act === 'bold' || act === 'italic') { const ed = e.target.closest?.('.ned'), ce = e.target.closest?.('.ced'); if (ed || ce) { e.preventDefault(); ed ? edCmd(ed.dataset.key, act) : citeCmd(act); } return; }   // solo dentro de una nota o de una cita
   const inText = /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName) || e.target.isContentEditable;
   // Dentro de campos de texto o con una ventana abierta, solo funciona Guardar; lo demás es el comportamiento nativo (p. ej. Ctrl+Z en una nota)
   if (act !== 'save' && (inText || document.querySelector('dialog[open]'))) return;
@@ -1383,7 +1383,7 @@ function helpHTML() {
       <li><b>Título</b> y <b>título personalizado</b> (solo para mostrar; la cita usa el original). <b>Autores</b>: uno por línea, «Apellido, Nombre»; una entidad se escribe sin coma. <b>Clave de orden</b>: para ordenar «de la Torre» por «Torre».</li>
       <li><b>Tipo</b>: decide qué campos aparecen. Incluye tus <i>tipos propios</i> y la opción «➕ Crear un tipo propio…».</li>
       <li><b>DOI → Buscar</b> rellena los datos desde CrossRef (internet). <b>Enlace en la cita</b>: DOI, URL, automático o ninguno. <b>Fecha de consulta</b>: se escribe en la cita salvo que la omitas.</li></ul>
-      <h4>Cita</h4><p>Muestra la cita del paper en <b>todos los estilos</b> (los de serie y los tuyos), con tu <b>estilo principal</b> primero; si en Configuración marcas «mostrar solo el estilo principal», sale solo ese y el botón «Ver todos los estilos». Arriba, la barra de <b>formato</b>: <i>Cursiva</i> pone <code>*…*</code> alrededor de lo seleccionado, <i>Asterisco literal</i> escribe <code>\*</code>, e <i>Idioma</i> y <i>Fecha de consulta</i> son los mismos ajustes que en Exportar. Puedes <i>editarla a mano</i> (queda marcada «editada a mano»), <i>Regenerar desde los datos</i>, <i>Copiar</i> (texto) o <i>Copiar con formato</i> (cursiva real, para pegar en Word o Docs). Con la opción de Configuración «Mostrar la cita en el texto», aparece también la cita en el texto y las notas de Chicago, con el campo de página.</p>
+      <h4>Cita</h4><p>Muestra la cita del paper en <b>todos los estilos</b> (los de serie y los tuyos), con tu <b>estilo principal</b> primero; si en Configuración marcas «mostrar solo el estilo principal», sale solo ese y el botón «Ver todos los estilos». La cita se edita <b>con su formato</b>: la cursiva se ve como cursiva, sin asteriscos. Arriba, la barra de <b>formato</b>: <i>Cursiva</i> y <i>Negrita</i> sobre lo seleccionado (también con el atajo de cursiva), e <i>Idioma</i> y <i>Fecha de consulta</i> (cómo se escribe «[consultado el …]» en las páginas web), los mismos ajustes que en Exportar. Puedes <i>editarla a mano</i> (queda marcada «editada a mano»), <i>Regenerar desde los datos</i>, <i>Copiar</i> (texto) o <i>Copiar con formato</i> (cursiva real, para pegar en Word o Docs). Con la opción de Configuración «Mostrar la cita en el texto», aparece también la cita en el texto y las notas de Chicago, con el campo de página.</p>
       <h4>Notas</h4><p>Hay una <b>nota general</b> y <b>notas por sección</b>. El editor muestra el formato al escribir, como WhatsApp: <code>*cursiva*</code>, <code>**negrita**</code>, <code>~~tachado~~</code>, <code>__subrayado__</code>, listas con «- » o «1. ». La barra «Aa» (arriba del cuadro) trae esos botones, plantillas y enlaces 🔗 a otros papers o notas; la chincheta la mantiene desplegada. Se guardan y se copian con los símbolos, y al exportar solo se ve el formato.</p>
       <h4>Secciones, etiquetas y relacionados</h4><p>Marca las secciones y etiquetas del paper. En «Relacionados» enlazas papers entre sí (relación simétrica) o indicas que <i>este paper cita a</i> otro; el otro mostrará «citado por».</p>
       <h4>Historial</h4><p>Lista los cambios hechos <b>hoy</b> en ese paper. Solo vive en memoria: no se guarda en el JSON.</p>`],
@@ -1934,7 +1934,7 @@ function drawD() {
       <button class="danger" onclick="D.notes.splice(${i},1);drawD()">Quitar</button></div>${edBox(n.id, n.content)}</div>`).join('') +
     (db.sections.length ? `<button onclick="addNote()" oncontextmenu="addNoteMenu(event)" title="Clic derecho: nueva nota con plantilla">+ Añadir nota</button><button onclick="addNoteMenu(event)" title="Nueva nota con plantilla">▾</button>` : ''), true);
   const citeOne = (k, s) => `<h3>${s.name}${D.cites[k] != null ? ' (editada a mano)' : ''}</h3>${typeWarn(k, D.type) ? `<small>⚠ ${esc(typeWarn(k, D.type))}</small>` : ''}
-    <textarea id="c_${k}" oninput="D.cites['${k}']=this.value">${esc(D.cites[k] ?? s.fn(D))}</textarea>
+    <div class="ced" id="c_${k}" data-k="${k}" contenteditable="true" role="textbox" aria-multiline="true" aria-label="Cita ${esc(s.name)}" oninput="D.cites['${k}']=ceVal(this)">${ceHtml(D.cites[k] ?? s.fn(D))}</div>
     <div class="row"><button onclick="copyC('${k}',0,this)">Copiar</button><button onclick="copyC('${k}',1,this)" title="Con cursiva, para pegar en Word o Docs">Copiar con formato</button><button onclick="delete D.cites['${k}'];drawD()">Regenerar desde los datos</button></div>${ex().inText ? `<div class="itx" id="it_${k}">${itHtml(k)}</div>` : ''}`;
   const fold = tab === 'all' || tab === 'cls';   // «Ver todo» y la pestaña de clasificación comparten diseño: bloques plegables
   if (fold) {
@@ -2130,18 +2130,29 @@ function relFields(p, st = mainSty()) {   // campos que el estilo usa para el ti
   return R.size ? R : new Set(F);   // si el estilo no da cita para este tipo, se ve todo
 }
 let CITE_ALL = false, DATA_ALL = false;   // «Ver todos los estilos» puntual (con «solo el principal») y Datos desplegado (se recuerda en la sesión)
-let CITE_TA = '';   // última cita (textarea) con el foco: la barra de formato de la pestaña Cita actúa sobre ella
-const citeBar = () => { const o = ex(), fx = STYLES[citeSel()]?.fixedLang, sel = (k, opts) => `<select title="${k === 'lang' ? 'Idioma de los conectores' : 'Formato de la fecha de consulta'}" onchange="citeOpt('${k}',this.value)">${Object.entries(opts).map(([v, t]) => `<option value="${v}" ${v === o[k] ? 'selected' : ''}>${t}</option>`).join('')}</select>`;
-  return `<div class="cbar" onmousedown="if(event.target.tagName==='BUTTON')event.preventDefault()"><div class="cbg"><span class="cbt">Formato</span><button onclick="citeMark('i')" title="Pone *…* alrededor de lo seleccionado en la cita"><i>Cursiva</i></button><button onclick="citeMark('ast')" title="Un * que no abre cursiva se escribe \\*">\\* Asterisco literal</button></div>
-    <div class="cbg"><span class="cbt">Idioma</span>${sel('lang', {es: 'Español', en: 'English'})}<span class="cbt">Fecha de consulta</span>${sel('dateFmt', {long: '20 de octubre de 2026', dmy: '20-10-2026', iso: '2026-10-20'})}</div>
-    <small>Se escribe <code>*cursiva*</code> en el texto de la cita. El idioma y la fecha son los mismos que en «Exportar»${fx ? ` (${esc(STYLES[citeSel()].name)} usa siempre el ${fx === 'en' ? 'inglés' : 'español'})` : ''}.</small></div>`; };
-document.addEventListener('focusin', e => { if (/^c_/.test(e.target.id || '')) CITE_TA = e.target.id; });
-function citeMark(m) {   // Cursiva: *…* alrededor de la selección; Asterisco literal: \*
-  const t = document.getElementById(CITE_TA) || $('#dlg textarea[id^=c_]'); if (!t) return;
-  const a = t.selectionStart, b = t.selectionEnd, v = t.value, s = v.slice(a, b);
-  const ins = m === 'i' ? `*${s}*` : '\\*'; t.value = v.slice(0, a) + ins + v.slice(b); t.focus();
-  m === 'i' && !s ? t.setSelectionRange(a + 1, a + 1) : t.setSelectionRange(a + ins.length, a + ins.length);
-  t.dispatchEvent(new Event('input'));
+let CITE_TA = '';   // última cita con el foco: la barra de formato de la pestaña Cita actúa sobre ella
+/* Cada cita se edita ya con su formato (cursiva y negrita reales) y se guarda con las marcas de siempre: *cursiva*, **negrita**, \* literal. */
+const ceHtml = t => citeHtml(t).replace(/\n/g, '<br>');
+function ceVal(el) {   // DOM del cuadro de cita → texto con marcas
+  const run = (n, f) => [...n.childNodes].map(c => { if (c.nodeType === 3) return c.data.replace(/\u00a0/g, ' ').replace(/\*/g, '\\*'); if (c.nodeType !== 1) return '';
+    if (c.tagName === 'BR') return c.nextSibling ? '\n' : ''; const st = c.style || {}, blk = /^(DIV|P)$/.test(c.tagName) && c.previousSibling ? '\n' : '';
+    const b = /^(B|STRONG)$/.test(c.tagName) || /^(bold|[6-9]00)$/.test(st.fontWeight), i = /^(I|EM)$/.test(c.tagName) || st.fontStyle === 'italic';
+    const nf = {b: f.b || b, i: f.i || i}, inner = run(c, nf), mk = (b && !f.b ? '**' : '') + (i && !f.i ? '*' : ''), m = /^(\s*)([\s\S]*?)(\s*)$/.exec(inner);
+    return blk + (mk && m[2] ? m[1] + mk + m[2] + [...mk].reverse().join('') + m[3] : inner); }).join('');   // los espacios de los bordes quedan fuera de la marca
+  return run(el, {});
+}
+const citeRaw = k => { const e = document.getElementById('c_' + k); return e ? ceVal(e) : D.cites[k] ?? STYLES[k].fn(D); };
+const citeBar = () => { const o = ex(), fx = STYLES[citeSel()]?.fixedLang, sel = (k, opts, tt) => `<select title="${tt}" onchange="citeOpt('${k}',this.value)">${Object.entries(opts).map(([v, t]) => `<option value="${v}" ${v === o[k] ? 'selected' : ''}>${t}</option>`).join('')}</select>`;
+  return `<div class="cbar" onmousedown="if(event.target.tagName==='BUTTON')event.preventDefault()"><div class="cbg"><span class="cbt">Formato</span><button onclick="citeCmd('italic')" title="Cursiva en lo seleccionado de la cita (${esc(db.settings.shortcuts.italic)})"><i>K</i> Cursiva</button><button onclick="citeCmd('bold')" title="Negrita en lo seleccionado de la cita"><b>N</b> Negrita</button></div>
+    <div class="cbg"><span class="cbt">Idioma</span>${sel('lang', {es: 'Español (y, En, consultado)', en: 'English (&, In, cited)'}, 'Idioma de los conectores de la cita')}<span class="cbt">Fecha de consulta</span>${sel('dateFmt', {long: '20 de octubre de 2026', dmy: '20-10-2026', iso: '2026-10-20'}, 'Cómo se escribe la fecha de consulta (el «[consultado el …]» de las páginas web)')}</div>
+    <small>Las citas se editan con su formato: selecciona y pulsa Cursiva. «Fecha de consulta» es cómo se escribe el día en que viste una página web («[consultado el 20 de octubre de 2026]»); solo sale si el paper la tiene rellena. Idioma y fecha son los mismos ajustes que en «Exportar»${fx ? ` (${esc(STYLES[citeSel()].name)} usa siempre el ${fx === 'en' ? 'inglés' : 'español'})` : ''}.</small></div>`; };
+document.addEventListener('focusin', e => { if (e.target.classList?.contains('ced')) CITE_TA = e.target.id; });
+document.addEventListener('paste', e => { const el = e.target.closest?.('.ced'); if (!el) return;   // se pega como texto, sin el formato de otra página
+  e.preventDefault(); document.execCommand('insertText', false, e.clipboardData.getData('text/plain').replace(/\s*\n\s*/g, ' ')); });
+function citeCmd(cmd) {   // Cursiva o negrita en la cita con el foco (o en la primera)
+  const el = document.getElementById(CITE_TA) || $('#dlg .ced'); if (!el) return;
+  if (!el.contains(getSelection().anchorNode)) el.focus();
+  document.execCommand('styleWithCSS', false, false); document.execCommand(cmd); el.dispatchEvent(new Event('input'));
 }
 function citeOpt(k, v) { ex()[k] = v; lastSnap = JSON.stringify(db); dirty = true; touch(); drawD(); }   // mismo ajuste que en Exportar (sin pasos de deshacer)
 const tplText = t => t.text.replace(/\{fecha\}/g, new Date().toLocaleDateString('es-ES')).replace(/\{paper\}/g, D?.title || '');
@@ -2416,7 +2427,7 @@ async function copyIT(k, i, rich, b) {   // copia la cita en el texto (texto pla
   if (b) { const o = b.textContent; b.textContent = 'Copiado ✓'; setTimeout(() => b.textContent = o, 1400); }
 }
 async function copyC(k, rich, b) {   // copia la cita sin marcas (texto) o con cursiva real (formato)
-  const raw = $('#c_' + k).value, host = $('#dlg');
+  const raw = citeRaw(k), host = $('#dlg');
   if (rich) await clipHtml(`<p style="font-family:'Times New Roman',serif;font-size:12pt">${citeHtml(raw)}</p>`, citeTxt(raw), host); else await clipText(citeTxt(raw), host);
   if (b) { const t = b.textContent; b.textContent = 'Copiado ✓'; setTimeout(() => b.textContent = t, 1400); }
 }
@@ -3284,7 +3295,7 @@ function pjMenu(e) {
    Aparte del JSON, la app guarda (1) una copia de trabajo, para reabrir justo donde lo dejaste aunque no hayas guardado, y
    (2) el estado de la interfaz (filtros, orden, barra lateral, bloques plegados). Viven fuera de la caché de la aplicación,
    así que las actualizaciones no los tocan y no hace falta borrar datos para recibir una versión nueva. */
-const APP_V = '35.0';   // debe coincidir con la versión de sw.js
+const APP_V = '35.1';   // debe coincidir con la versión de sw.js
 let BOOTED = false, RELOADING = false, SWREG = null, tSes = 0, tUi = 0, lastUi = '';
 const sessionNow = () => { clearTimeout(tSes); if (!BOOTED) return Promise.resolve();   // copia de trabajo del proyecto abierto (y la lista de proyectos)
   const p = pjCur(); if (p) { Object.assign(p, {n: db.papers.length, file: path, dirty}); delete p.remote; }

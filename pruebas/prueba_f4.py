@@ -30,7 +30,7 @@ with sync_playwright() as pw:
     pg.fill('#c_apa', 'Cita editada a mano'); pg.fill('#locIn', '24-25')
     eq('la página se aplica a las líneas', ('pp. 24-25' in t('apa'), '24-25' in t('chicago_nb'), '(Minow y LaMay 2008, 24-25)' in t('chicago_af'), 'Said' in t('mla')), (True, True, True, False))
     eq('MLA sin coma entre autor y página', '(Minow y LaMay 24-25)' in t('mla'), True)
-    eq('la cita editada a mano se conserva', (pg.input_value('#c_apa'), pg.evaluate("D.cites.apa")), ('Cita editada a mano', 'Cita editada a mano'))
+    eq('la cita editada a mano se conserva', (pg.evaluate("citeRaw('apa')"), pg.evaluate("D.cites.apa")), ('Cita editada a mano', 'Cita editada a mano'))
     eq('la página no se guarda en el paper', pg.evaluate("JSON.stringify(D).includes('24-25')"), False)
     pg.fill('#locIn', '')
     eq('sin página vuelve al formato simple', 'pp.' in t('apa'), False)
