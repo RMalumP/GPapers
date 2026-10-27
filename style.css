@@ -168,3 +168,4 @@ aside{border-left:0;border-radius:0 10px 10px 0;padding-left:6px}
 .sybt{margin-top:14px;justify-content:flex-end}.sypv{margin-top:14px;padding:10px;border:1px solid var(--bd);border-radius:8px;background:var(--card)}
 .dpg{border:1px solid var(--bd);border-radius:8px;padding:8px 10px;margin:10px 0}.dpt{font-size:12px;font-weight:600;opacity:.7;margin-bottom:4px}#bk .irow small,#dp .irow small{opacity:.75}
 #ps .pji2{display:block;width:100%;text-align:left;margin:4px 0}#ps .pji2 small{opacity:.6;margin-left:6px}
+.pdfrow{display:flex;flex-wrap:wrap;gap:8px;align-items:center}.pdfrow small{flex-basis:100%;opacity:.7}.pdfrow label{display:flex;align-items:center;gap:4px}

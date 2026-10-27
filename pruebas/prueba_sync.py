@@ -57,7 +57,7 @@ with sync_playwright() as pw:
         pg.mouse.click(5, 5); res[i] = [dentro, pg.evaluate(f"$('#{i}').open")]
         pg.evaluate(f"$('#{i}').open && $('#{i}').close()")
     eq('cada ventana sigue abierta con un clic dentro y se cierra con uno fuera', {k: v for k, v in res.items() if v != [True, False]}, {})
-    eq('se comprueban todas las ventanas', len(ids), 15)
+    eq('se comprueban todas las ventanas', len(ids), 18)
     pg.evaluate("openCfg()"); pg.mouse.click(5, 5)
     eq('Configuración también, con su contenido real', pg.evaluate("$('#cfg').open"), False)
     # Relaciones: sin ninguna, explicación atenuada que desaparece con la primera

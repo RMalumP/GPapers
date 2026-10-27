@@ -69,6 +69,7 @@ function NEWF(p) {   // rellena los campos nuevos de un paper (JSON antiguo, imp
   p.editors = Array.isArray(p.editors) ? p.editors.filter(x => typeof x === 'string' && x.trim()) : [];
   p.authorType = Object.hasOwn(AUTH_T, p.authorType) ? p.authorType : 'auto';
   p.linkMode = Object.hasOwn(LINK_MODES, p.linkMode) ? p.linkMode : 'auto'; p.hideAccessed = !!p.hideAccessed; p.image = imgOk(p.image);
+  p.pdf = p.pdf && typeof p.pdf === 'object' && typeof p.pdf.name === 'string' && p.pdf.name ? {name: p.pdf.name.slice(0, 260), ...(pdfPage(p.pdf.page) ? {page: pdfPage(p.pdf.page)} : {})} : null;
   return p;
 }
 
@@ -1473,7 +1474,7 @@ const starsHTML = p => `<span class="stv${p.rating ? '' : ' none'}" oncontextmen
 const rdHTML = p => `<span class="rd"><button class="rst" style="--c:${READ_C[p.reading]}" title="Clic: cambiar el estado de lectura" onclick="cycleRead('${p.id}')">${READ[p.reading]}</button>${starsHTML(p)}</span>`;
 function starMenu(e, id) { ctxShow(e, '<div class="ctxh">Valoración</div>' + [5, 4, 3, 2, 1, 0].map(n => `<button onclick="setRating('${id}',${n})">${n ? '★'.repeat(n) + '☆'.repeat(5 - n) : 'Sin valorar'}</button>`).join('')); }
 function setRating(id, n) { const p = db.papers.find(x => x.id === id); ctxClose(); if (!p || p.rating === n) return; logChange(p, `Valoración: ${p.rating || '—'} → ${n || '—'}`); p.rating = n; markDirty(); render(); }
-const card = (p, from) => `<article class="card" data-id="${p.id}" ${F.group ? `draggable="true" data-from="${from || ''}"` : ''}><div class="ct"><label class="sel"><input type="checkbox" ${SEL.has(p.id) ? 'checked' : ''} onchange="toggleSel('${p.id}')"> Seleccionar</label><button class="sm" onclick="openPaper('${p.id}')">Editar</button>${p.tagIds.length ? `<span class="tl">${tagsOf(p)}</span>` : ''}${rdHTML(p)}<button class="x" title="Eliminar" onclick="delPaper('${p.id}')">✕</button></div><div class="th">${thumbHTML(p, 'sm')}<h3>${esc(p.alias || p.title)}</h3></div>${p.alias ? `<div class="sub">${esc(p.title)}</div>` : ''}
+const card = (p, from) => `<article class="card" data-id="${p.id}" ${F.group ? `draggable="true" data-from="${from || ''}"` : ''}><div class="ct"><label class="sel"><input type="checkbox" ${SEL.has(p.id) ? 'checked' : ''} onchange="toggleSel('${p.id}')"> Seleccionar</label><button class="sm" onclick="openPaper('${p.id}')">Editar</button>${p.pdf ? `<button class="sm" onclick="pdfOpen('${p.id}')" title="Abrir el PDF enlazado: ${esc(p.pdf.name)}">📄 PDF</button>` : ''}${p.tagIds.length ? `<span class="tl">${tagsOf(p)}</span>` : ''}${rdHTML(p)}<button class="x" title="Eliminar" onclick="delPaper('${p.id}')">✕</button></div><div class="th">${thumbHTML(p, 'sm')}<h3>${esc(p.alias || p.title)}</h3></div>${p.alias ? `<div class="sub">${esc(p.title)}</div>` : ''}
     <div class="au"><span>${esc(p.authors.join('; '))} ${p.year ? '(' + esc(p.year) + ')' : ''}</span></div>
     ${/^https?:/i.test(p.url) ? `<a href="${esc(p.url)}" target="_blank" rel="noopener noreferrer">${esc(p.url)}</a>` : ''}
     
@@ -1749,7 +1750,7 @@ function drawD() {
   if (tab === 'data' || tab === 'all') h += blk('data', 'Datos', `<div class="grid"><div class="w titlerow"><div class="pimgbox">${pimgHTML(D, 'big', `role="button" tabindex="0" onclick="imgOpen()" title="Imagen del paper (opcional): pulsa para poner una URL o un archivo, o pega una imagen copiada con Ctrl+V"`)}</div><div class="titlecol">${inp('title', 'Título *')}${inp('alias', 'Título personalizado (opcional; solo para mostrar, la cita usa el título original)')}</div></div>
     <label class="w">Autores (uno por línea: «Apellido, Nombre»)<textarea oninput="D.authors=this.value.split('\\n').map(s=>s.trim()).filter(Boolean)">${esc(D.authors.join('\n'))}</textarea></label>
     ${inp('sortKey', 'Clave de orden en la bibliografía (opcional): p. ej. «Torre» para «de la Torre, Ana»', 'text', 'w')}<label>Año<input type="number" data-k="year" value="${esc(D.year)}" oninput="D.year=this.value;pubSync()"></label><label>Tipo<select onchange="typeChange(this.value)">${Object.entries(TYPES).filter(([k]) => !CTYPES.has(k)).map(([k, v]) => `<option value="${k}" ${D.type === k ? 'selected' : ''}>${v}</option>`).join('')}${CTYPES.size ? `<optgroup label="Tipos propios">${[...CTYPES].map(([k, t]) => `<option value="${k}" ${D.type === k ? 'selected' : ''}>${esc(t.name)}</option>`).join('')}</optgroup>` : ''}<option value="__new">➕ Crear un tipo propio…</option></select></label>
-    ${inp('url', 'URL', 'url', 'w')}${inp('venue', lbl('venue', 'Revista / editorial / sitio'))}<label>DOI (sin https://doi.org/)<span class="row" style="flex-wrap:nowrap"><input style="flex:1;min-width:0" value="${esc(D.doi)}" oninput="D.doi=this.value"><button onclick="doiFill()" title="Rellenar con los datos de CrossRef">Buscar</button></span></label>${inp('accessed', 'Fecha de consulta', 'date')}
+    ${inp('url', 'URL', 'url', 'w')}<div class="w pdfrow"><span>📄 PDF: ${D.pdf ? `<b>${esc(D.pdf.name)}</b>` : '<i>ninguno</i>'}</span><button onclick="pdfPick()">${D.pdf ? 'Cambiar…' : 'Enlazar un PDF…'}</button>${D.pdf ? `<button onclick="pdfOpen('${D.id}')">Abrir</button><label>Página <input type="number" min="1" style="width:5em" value="${D.pdf.page || ''}" oninput="pdfSetPage(this.value)" placeholder="1"></label><button class="x" onclick="pdfClear()" title="Quitar el enlace al PDF">✕</button>` : ''}<small>El archivo no se sube a ningún sitio: solo se recuerda su nombre.</small></div>${inp('venue', lbl('venue', 'Revista / editorial / sitio'))}<label>DOI (sin https://doi.org/)<span class="row" style="flex-wrap:nowrap"><input style="flex:1;min-width:0" value="${esc(D.doi)}" oninput="D.doi=this.value"><button onclick="doiFill()" title="Rellenar con los datos de CrossRef">Buscar</button></span></label>${inp('accessed', 'Fecha de consulta', 'date')}
     <label>Enlace en la cita (si hay DOI y URL)<select onchange="D.linkMode=this.value">${Object.entries(LINK_MODES).map(([k, v]) => `<option value="${k}" ${D.linkMode === k ? 'selected' : ''}>${v}</option>`).join('')}</select></label>
     <label class="chk"><input type="checkbox" ${D.hideAccessed ? 'checked' : ''} onchange="D.hideAccessed=this.checked"> Omitir «[consultado …]» en la cita (aunque la fecha esté rellena)</label>
     <label>Tipo de autor<select onchange="D.authorType=this.value">${Object.entries(AUTH_T).map(([k, v]) => `<option value="${k}" ${D.authorType === k ? 'selected' : ''}>${v}</option>`).join('')}</select></label>
@@ -2232,6 +2233,8 @@ function commit() {
   const i = db.papers.findIndex(p => p.id === D.id), old = i < 0 ? null : db.papers[i];
   logChange(D, ...(old ? diffPaper(old, D) : ['Creado']));
   if (PEND.has(D.id)) idb('readwrite', st => st.put(PEND.get(D.id), 'img:' + D.id)).catch(() => {});
+  if (PEND_PDF.has(D.id)) idb('readwrite', st => st.put(PEND_PDF.get(D.id), 'pdf:' + D.id)).catch(() => {});
+  if (!D.pdf) idb('readwrite', st => st.delete('pdf:' + D.id)).catch(() => {});
   syncRelated(old ? old.related : [], D);
   i < 0 ? db.papers.push(D) : db.papers[i] = D;
   markDirty(); $('#dlg').close(); render();
@@ -2797,6 +2800,40 @@ function dpDraw() {
     ${G.length ? G.map((g, gi) => `<div class="dpg"><div class="dpt">${g.length} papers · ${g.some((p, i) => g.some((q, j) => i < j && normDoi(p.doi) && normDoi(p.doi) === normDoi(q.doi))) ? 'mismo DOI' : 'mismo título'}</div>
       ${g.map(p => `<div class="irow"><span><b>${esc(p.alias || p.title)}</b><br><small>${esc(svAuth(p))}${p.venue ? ' · ' + esc(p.venue) : ''}${p.doi ? ' · ' + esc(p.doi) : ''}<br>${p.notes.length} notas · ${p.tagIds.length} etiquetas · ${p.related.length} relaciones</small></span><button class="sm" style="margin-left:auto" onclick="dpMerge('${p.id}', ${esc(JSON.stringify(g.map(x => x.id)).replace(/"/g, '&quot;'))});dpDraw()">Quedarme con este</button></div>`).join('')}
       <div class="row"><button class="sm" onclick="DP_IGN.add('${g.map(p => p.id).sort().join()}');dpDraw()">No son duplicados</button></div></div>`).join('') : '<p class="empty">No hay papers duplicados.</p>'}`;
+}
+
+/* ===== PDF enlazado =====
+   Como la imagen enlazada: en el JSON solo va el nombre (y la página donde abrir, si se indica) y el enlace al archivo vive en este
+   navegador (IndexedDB). Nada se sube a Google Drive. En otro dispositivo, o si el archivo se movió, al abrirlo se pide elegirlo de nuevo.
+   En navegadores sin acceso a archivos hay que elegir el PDF cada vez que se abre. */
+const PDF_T = [{description: 'PDF', accept: {'application/pdf': ['.pdf']}}], PEND_PDF = new Map(), PDF_FILES = new Map();   // PEND_PDF: elegidos en el borrador · PDF_FILES: archivos de esta sesión (sin acceso a archivos)
+const pdfPage = v => { v = parseInt(v, 10); return Number.isInteger(v) && v > 0 && v < 100000 ? v : 0; };
+async function pdfChoose(id) {   // elige el archivo de un paper (guardándolo en el borrador o en el paper); devuelve el File
+  if (FSA) { const [h] = await showOpenFilePicker({types: PDF_T}); PEND_PDF.set(id, h); return {file: await h.getFile(), h}; }
+  const file = await new Promise(res => { const i = document.createElement('input'); i.type = 'file'; i.accept = '.pdf,application/pdf'; i.onchange = () => res(i.files[0] || null); i.oncancel = () => res(null); i.click(); });
+  if (!file) throw Object.assign(Error('cancelado'), {name: 'AbortError'}); PDF_FILES.set(id, file); return {file};
+}
+async function pdfPick() {
+  try { const {file} = await pdfChoose(D.id); D.pdf = {name: file.name, ...(pdfPage(D.pdf?.page) ? {page: D.pdf.page} : {})}; drawD(); }
+  catch (e) { if (e.name !== 'AbortError') alert('No se pudo elegir el archivo: ' + e.message); }
+}
+function pdfClear() { PEND_PDF.delete(D.id); PDF_FILES.delete(D.id); D.pdf = null; drawD(); }
+function pdfSetPage(v) { if (D.pdf) { const n = pdfPage(v); n ? D.pdf.page = n : delete D.pdf.page; } }
+async function pdfOpen(id) {
+  const p = D && D.id === id && $('#dlg').open ? D : db.papers.find(x => x.id === id); if (!p || !p.pdf) return;   // con el editor abierto, el borrador
+  try {
+    let file = PDF_FILES.get(id);
+    if (!file && FSA) {
+      const h = PEND_PDF.get(id) || await idb('readonly', st => st.get('pdf:' + id)).catch(() => null);
+      if (h) try { if (await h.queryPermission({mode: 'read'}) === 'granted' || await h.requestPermission({mode: 'read'}) === 'granted') file = await h.getFile(); else return toast('Sin permiso para leer el PDF.'); } catch (e) { toast(`No se encuentra «${p.pdf.name}»: elígelo de nuevo.`, [], 4000); }
+    }
+    if (!file) {   // otro dispositivo o archivo movido: se vuelve a enlazar
+      const r = await pdfChoose(id); file = r.file; if (r.h) idb('readwrite', st => st.put(r.h, 'pdf:' + id)).catch(() => {});
+      if (file.name !== p.pdf.name) toast(`Has elegido «${file.name}», distinto de «${p.pdf.name}».`, [], 4000);
+    }
+    const url = URL.createObjectURL(file.type === 'application/pdf' ? file : new Blob([file], {type: 'application/pdf'})) + (pdfPage(p.pdf.page) ? '#page=' + pdfPage(p.pdf.page) : '');
+    window.open(url, '_blank'); setTimeout(() => URL.revokeObjectURL(url.split('#')[0]), 120000);
+  } catch (e) { if (e.name !== 'AbortError') alert('No se pudo abrir el PDF: ' + e.message); }
 }
 
 /* ===== Mover o copiar papers a otro proyecto =====
