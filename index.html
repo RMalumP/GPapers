@@ -7,12 +7,18 @@
   <h1 id="appName">Papers</h1><span class="pj"><span class="pjs" aria-hidden="true">/</span><input id="pjName" maxlength="60" spellcheck="false" autocomplete="off" aria-label="Nombre del proyecto" title="Nombre del proyecto (su archivo JSON se llama igual). Escribe para cambiarlo." placeholder="Proyecto" oninput="this.size=Math.max(6,this.value.length+1)" onchange="pjRename(this.value)" onkeydown="if(event.key==='Enter')this.blur();else if(event.key==='Escape'){this.value=pjCur().name;this.blur()}"><button id="pjBtn" onclick="pjMenu(event)" title="Proyectos: cambiar, crear o borrar" aria-label="Proyectos">▾</button></span><span id="pjProg" hidden><span class="pjb"></span><small></small></span><span id="fname"></span>
   <div class="row">
     <button id="syncBtn" onclick="syClick(event)" title="Conectar con Google Drive" aria-label="Conectar con Google Drive" data-st="off" hidden><span class="syi">🔄</span><span class="syl">Conectar con Google Drive</span><span class="syb"></span></button>
-    <button onclick="doOpen()" oncontextmenu="openMenu(event)" title="Clic: abrir archivo · Clic derecho: importar referencias" aria-label="Abrir">📂</button>
-    <button id="reopen" onclick="reopenLast()" title="Reabrir el último archivo" hidden>Reabrir<br>último</button>
-    <button onclick="save(false)" title="Guardar" aria-label="Guardar">💾</button>
-    <button onclick="save(true)">Guardar como</button>
+    <button onclick="save(false)" title="Guardar (Ctrl+S)" aria-label="Guardar">💾</button>
     <button class="pri" onclick="openEx()">Exportar citas</button>
-    <label><input type="checkbox" id="auto" onchange="setAuto(this)"> Autoguardado</label>
+    <span class="fm"><button id="fmBtn" onclick="fmToggle(event)" aria-haspopup="true" aria-expanded="false" title="Abrir, guardar como, importar y autoguardado">Archivo ▾</button>
+      <div id="fmenu" hidden>
+        <button onclick="fmClose();doOpen()">📂 Abrir un archivo JSON…</button>
+        <button onclick="fmClose();save(true)">💾 Guardar como…</button>
+        <hr><div class="fmh">Importar referencias</div>
+        <button onclick="fmClose();openImport('file')">📄 Desde archivo (.bib / .ris)…</button>
+        <button onclick="fmClose();openImport('text')">📋 Pegar texto BibTeX / RIS…</button>
+        <button onclick="fmClose();openImport('doi')">🔎 Buscar por DOI…</button>
+        <hr><label><input type="checkbox" id="auto" onchange="setAuto(this)"> Autoguardado</label>
+      </div></span>
   </div>
 </header>
 <div id="app">
@@ -23,14 +29,12 @@
         <div class="row"><select id="favSel" onchange="favApply(this.value)" aria-label="Filtros guardados"><option value="">⭐ Filtros guardados…</option></select><button onclick="favSave()" title="Guardar los filtros actuales con un nombre">＋</button><button id="favDel" onclick="favDel()" title="Borrar los filtros elegidos" hidden>✕</button></div></div></div>
     <div class="sg" id="sg-sort"><button class="sh" onclick="sbGroup('sort')" title="Ordenar"><span class="ic">⇅</span><span class="lbl">Ordenar</span><span class="dot" id="d-sort" hidden></span></button>
       <div class="sb"><div id="sortUI"></div><label><input type="checkbox" id="grpChk" onchange="F.group=this.checked;render()"> Agrupar por sección</label><label>Valoración mínima <select id="minR" onchange="F.minRating=+this.value;render()"><option value="0">Cualquiera</option><option value="1">Al menos ★1</option><option value="2">Al menos ★2</option><option value="3">Al menos ★3</option><option value="4">Al menos ★4</option><option value="5">Al menos ★5</option></select></label></div></div>
-    <div class="sg" id="sg-sec"><div class="sgh"><button class="sh" onclick="sbGroup('sec')" title="Secciones"><span class="ic">📁</span><span class="lbl">Secciones</span><span class="dot" id="d-sec" hidden></span></button><button class="mgb" onclick="openMg('sections')" title="Gestionar secciones">✎ Gestionar</button></div>
-      <div class="sb"><div id="secF"></div><button onclick="svOpen(F.sec)">📄 Ver notas de la sección</button></div></div>
-    <div class="sg" id="sg-tags"><div class="sgh"><button class="sh" onclick="sbGroup('tags')" title="Etiquetas"><span class="ic">🏷️</span><span class="lbl">Etiquetas</span><span class="dot" id="d-tags" hidden></span></button><button class="mgb" onclick="openMg('tags')" title="Gestionar etiquetas">✎ Gestionar</button></div>
-      <div class="sb"><div id="tagF"></div></div></div>
-    <div class="sg" id="sg-read"><button class="sh" onclick="sbGroup('read')" title="Lectura"><span class="ic">📖</span><span class="lbl">Lectura</span><span class="dot" id="d-read" hidden></span></button>
-      <div class="sb"><div id="readF"></div></div></div>
-    <div class="sg" id="sg-sel"><button class="sh" onclick="sbGroup('sel')" title="Selección y exportación"><span class="ic">☑️</span><span class="lbl">Selección</span><span class="dot" id="d-sel" hidden></span></button>
-      <div class="sb"><small id="selN"></small><button onclick="selVisible()">Seleccionar visibles</button><button onclick="selNone()">Quitar selección</button><button onclick="psOpen()">Mover o copiar a otro proyecto…</button><button onclick="dpOpen()">Buscar duplicados…</button><button class="pri" onclick="openEx()">Exportar citas…</button></div></div>
+    <div class="sg" id="sg-filt"><button class="sh" onclick="sbGroup('filt')" title="Filtros: secciones, etiquetas y lectura"><span class="ic">🎚️</span><span class="lbl">Filtros</span><span class="dot" id="d-filt" hidden></span></button>
+      <div class="sb"><div class="fh2"><b>📁 Secciones</b><button class="mgb" onclick="openMg('sections')" title="Gestionar secciones">✎ Gestionar</button></div><div id="secF"></div><button onclick="svOpen(F.sec)">📄 Ver notas de la sección</button>
+        <div class="fh2"><b>🏷️ Etiquetas</b><button class="mgb" onclick="openMg('tags')" title="Gestionar etiquetas">✎ Gestionar</button></div><div id="tagF"></div>
+        <div class="fh2"><b>📖 Lectura</b></div><div id="readF"></div></div></div>
+    <div class="sg" id="sg-sel" hidden><button class="sh" onclick="sbGroup('sel')" title="Papers seleccionados"><span class="ic">☑️</span><span class="lbl" id="selT">Selección</span></button>
+      <div class="sb"><button class="pri" onclick="openEx()">Exportar citas…</button><button onclick="psOpen()">Mover o copiar a otro proyecto…</button><button onclick="selNone()">Quitar selección</button></div></div>
   <button class="sh" onclick="grOpen()" title="Gráfico de relaciones entre papers"><span class="ic">🕸️</span><span class="lbl">Relaciones</span></button>
   <button class="sh trb" onclick="trOpen()" title="Papelera"><span class="ic">🗑️</span><span class="lbl" id="trLbl">Papelera</span><span class="dot" id="d-tr" hidden></span></button>
   <button class="sh cfgb" onclick="openCfg()" title="Configuración"><span class="ic">⚙️</span><span class="lbl">Configuración</span></button>
@@ -42,7 +46,7 @@
   <p class="sbinfo">Gestor papers: organiza tus papers y sincronízalos con tu Google Drive. · <a href="privacidad.html" onclick="event.preventDefault();openPriv()">Política de privacidad</a></p>
   </aside>
   <main>
-    <div class="row"><button class="pri" onclick="openPaper()">+ Nuevo paper</button><button id="tbView" class="tg" onclick="setView(db.settings.view==='table'?'cards':'table')" title="Cambiar entre tarjetas y tabla compacta"></button><div class="bar"><button id="tbSec" class="tg" onclick="F.tbSec=!F.tbSec;render()" oncontextmenu="groupMenu(event)" title="Clic: mostrar u ocultar las secciones · Clic derecho: agrupar por sección"></button><div id="secF2" class="chips" hidden></div></div><div class="bar"><button id="tbTag" class="tg" onclick="F.tbTag=!F.tbTag;render()" oncontextmenu="modeMenu(event)" title="Clic: mostrar u ocultar las etiquetas · Clic derecho: cómo combinarlas"></button><div id="tagF2" class="chips"></div></div><span id="count"></span></div>
+    <div class="row"><button class="pri" onclick="openPaper()">+ Nuevo paper</button><button id="tbView" class="tg" onclick="setView(db.settings.view==='table'?'cards':'table')" title="Cambiar entre tarjetas y tabla compacta"></button><div class="bar"><button id="tbSec" class="tg" onclick="F.tbSec=!F.tbSec;render()" oncontextmenu="groupMenu(event)" title="Clic: mostrar u ocultar las secciones · Clic derecho: agrupar por sección"></button><div id="secF2" class="chips" hidden></div></div><div class="bar"><button id="tbTag" class="tg" onclick="F.tbTag=!F.tbTag;render()" oncontextmenu="modeMenu(event)" title="Clic: mostrar u ocultar las etiquetas · Clic derecho: cómo combinarlas"></button><div id="tagF2" class="chips"></div></div><button id="selAll" class="tg" onclick="selVisible()" title="Seleccionar todos los papers que se ven">☑ Seleccionar visibles</button><span id="count"></span></div>
     <div id="list"></div>
   </main>
 </div>

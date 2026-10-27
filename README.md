@@ -14,7 +14,7 @@ o usa ⋮ → Guardar y compartir → Crear acceso directo → «Abrir como vent
 ## Datos y autoguardado
 Tus datos viven en archivos JSON locales que eliges tú (uno por proyecto); nada se envía a ningún servidor.
 El autoguardado usa la API de acceso a archivos (solo Chrome/Edge de escritorio); en otros navegadores el guardado es una descarga.
-Chrome pide confirmar el acceso al archivo al reabrirlo en una sesión nueva («Reabrir último»).
+Chrome pide confirmar el acceso al archivo al volver a leerlo en una sesión nueva (▾ del proyecto → «Volver a leer…»).
 
 ## Proyectos
 Cada proyecto es una biblioteca aparte (papers, notas, secciones, etiquetas, relaciones y papelera) con **su propio archivo JSON, que se llama como el proyecto** (`Tesis` → `Tesis.json`).
@@ -25,6 +25,13 @@ Los ajustes son comunes a todos: nombre de la aplicación, colores, atajos, tipo
 - **Abrir 📂** abre un JSON como proyecto: el suyo si ya lo es (mismo archivo), o uno nuevo con el nombre del archivo. Un JSON de versiones anteriores se abre igual.
 - La biblioteca de versiones anteriores pasa sola a ser el primer proyecto (con el nombre de su archivo).
 - **Google Drive** guarda todos los proyectos: un índice común (`gpapers-projects.json`, lista de proyectos y ajustes comunes) y los archivos de cada uno (el primero conserva los nombres de siempre, `gpapers-snap.json`…; los demás, `gpapers-p-<id>-…`). Cada vuelta sincroniza el índice y el proyecto abierto; los proyectos de otros dispositivos salen en ▾ con ☁ y se descargan al abrirlos. Renombrar o borrar un proyecto llega a todos los dispositivos.
+
+## Interfaz simplificada (v33)
+- **Cabecera**: solo Google Drive 🔄, Guardar 💾 y Exportar citas; Abrir, Guardar como, Importar referencias y Autoguardado están en **Archivo ▾**. «Reabrir último» pasó al menú ▾ del proyecto («↻ Volver a leer…», solo si el proyecto tiene archivo) y «Buscar duplicados» también.
+- **Estado de guardado único** junto al nombre del proyecto («Guardado», «Sin guardar», «Guardado en Google Drive», «Sincronizando…»…), con un punto de color.
+- **Barra lateral**: Secciones, Etiquetas y Lectura en un solo grupo **Filtros**; **Selección** solo aparece con papers marcados («☑ Seleccionar visibles» está sobre la lista).
+- **Configuración por pestañas**: Apariencia, Notas y citas, Atajos, Datos y Drive. El progreso de lectura es opcional (desactivado por defecto).
+- **Ayuda**: «Empezar aquí» y, bajo «Ver toda la ayuda», el resto (la búsqueda abre todo).
 
 ## Copias, duplicados, PDF y filtros
 - **Copias de seguridad** por proyecto (IndexedDB `bk:<id>`): una al abrir cada día y antes de restaurar o de sustituirlo todo por Drive, las últimas 10; crear, descargar, restaurar (deshacible) y borrar desde ▾ → «Copias de seguridad…». Solo en el navegador.
@@ -70,7 +77,7 @@ En «Exportar citas» eliges idioma de los conectores (español/inglés), format
 - **Notas** (generales y por sección) con un editor que muestra el formato al escribir, como WhatsApp: `*cursiva*`, `**negrita**`, `~~tachado~~`, `__subrayado__`, listas con «- » o «1. ». Se guardan y copian con esos símbolos; al exportar solo se ve el formato.
 
 ## Pruebas
-`node pruebas/pruebas_citas.js app.js`, `python3 pruebas/prueba_f4.py .`, `python3 pruebas/prueba_ui.py .`, `python3 pruebas/prueba_sync.py .`, `python3 pruebas/prueba_proyectos.py .` y `python3 pruebas/prueba_mejoras.py .` (necesitan Playwright con Chromium; la de sincronización simula Google y Drive).
+`node pruebas/pruebas_citas.js app.js`, `python3 pruebas/prueba_f4.py .`, `python3 pruebas/prueba_ui.py .`, `python3 pruebas/prueba_sync.py .`, `python3 pruebas/prueba_proyectos.py .`, `python3 pruebas/prueba_mejoras.py .` y `python3 pruebas/prueba_interfaz.py .` (necesitan Playwright con Chromium; la de sincronización simula Google y Drive).
 
 ## Cambios de la ronda F7–F9
 - **Tabla:** columna *Secciones* (se puede seguir agrupando por sección). La pestaña **Cita** va justo después de **Datos**. La **valoración mínima** está en el grupo *Ordenar*.
@@ -88,7 +95,7 @@ En «Exportar citas» eliges idioma de los conectores (español/inglés), format
 ## Sincronización con Google Drive, Privacidad y Créditos (F14)
 - **Final de la barra lateral**: Papelera, Configuración, una línea, «ℹ️ Información» (Ayuda y Créditos, discretos y plegada por defecto; se recuerda si la abres) y, siempre visible y con la misma letra, una línea que explica qué es la app con el enlace **Política de privacidad** (v31.1: sustituye al botón Privacidad; Google lo pide en la página principal para verificar la marca).
 - **©️ Créditos** (barra lateral, en «Información»): dirección, desarrollo, derechos (licencia CC BY-SA) y la versión de la aplicación.
-- **Icono 🔄 a la izquierda de 📂** (sin conectar muestra «Conectar con Google Drive»): guarda la biblioteca entera (papers, notas, secciones, etiquetas, papelera y ajustes) en la carpeta oculta `appDataFolder` del **propio Google Drive** de cada persona, como en Supuestos C1 (permiso `drive.appdata`: la app no ve el resto del Drive; sin servidor intermedio). Archivos (todos `gpapers-…`): ver «Solo cambios» abajo.
+- **Icono 🔄 a la izquierda de 💾** (sin conectar muestra «Conectar con Google Drive»): guarda la biblioteca entera (papers, notas, secciones, etiquetas, papelera y ajustes) en la carpeta oculta `appDataFolder` del **propio Google Drive** de cada persona, como en Supuestos C1 (permiso `drive.appdata`: la app no ve el resto del Drive; sin servidor intermedio). Archivos (todos `gpapers-…`): ver «Solo cambios» abajo.
 - **Autoguardado activado al conectar**: cada cambio se sube a los 3 s; al abrir la app, al volver a ella y cada 5 min se traen los cambios de los otros dispositivos. La casilla «Autoguardado» lo activa o desactiva (con Drive funciona en cualquier navegador, también en el móvil). El punto del icono indica el estado (verde, azul girando, amarillo, rojo).
 - **Con la sesión iniciada, clic en 🔄**: sincronizar ahora, autoguardado en Drive, ¿cómo funciona?, **cerrar sesión** y **borrar mis datos de Google Drive** (Privacidad está en la barra lateral) (solo en ese dispositivo; los demás siguen sincronizando).
 - **Fusión a tres bandas** con la última versión sincronizada (guardada en IndexedDB): altas, ediciones y borrados de cada dispositivo se combinan paper a paper y campo a campo (notas una a una); si los dos cambian el mismo campo gana el paper modificado más tarde; una edición gana a un borrado. La vista (tarjetas/tabla) es de cada dispositivo. Lo que llega de Drive se puede deshacer. Con una ventana de edición abierta se espera a que se cierre.

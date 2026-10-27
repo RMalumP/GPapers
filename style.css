@@ -169,5 +169,11 @@ aside{border-left:0;border-radius:0 10px 10px 0;padding-left:6px}
 .dpg{border:1px solid var(--bd);border-radius:8px;padding:8px 10px;margin:10px 0}.dpt{font-size:12px;font-weight:600;opacity:.7;margin-bottom:4px}#bk .irow small,#dp .irow small{opacity:.75}
 #ps .pji2{display:block;width:100%;text-align:left;margin:4px 0}#ps .pji2 small{opacity:.6;margin-left:6px}
 .pdfrow{display:flex;flex-wrap:wrap;gap:8px;align-items:center}.pdfrow small{flex-basis:100%;opacity:.7}.pdfrow label{display:flex;align-items:center;gap:4px}
+.fm{position:relative}#fmenu{position:absolute;right:0;top:calc(100% + 4px);z-index:60;display:flex;flex-direction:column;min-width:240px;padding:4px;background:var(--card);border:1px solid var(--bd);border-radius:8px;box-shadow:0 4px 16px #0004}#fmenu[hidden]{display:none}#fmenu button{border:0;background:none;text-align:left}#fmenu button:hover{background:var(--bg)}#fmenu hr{border:0;border-top:1px solid var(--bd);margin:4px 0;width:100%}#fmenu label{display:flex;gap:6px;align-items:center;padding:6px 10px;cursor:pointer}.fmh{font-size:12px;opacity:.7;padding:4px 10px}
+#fname::before{content:'●';margin-right:5px;font-size:10px;color:var(--bd)}#fname[data-st=ok]::before{color:#27ae60}#fname[data-st=pend]::before{color:#e0a100}#fname[data-st=err]::before{color:var(--red,#c0392b)}#fname[data-st=busy]::before{color:var(--pri)}#fname:empty::before{content:none}
+.sg[hidden]{display:none}.fh2{display:flex;align-items:center;gap:6px;margin:10px 0 4px;font-size:13px}.fh2:first-child{margin-top:2px}.fh2 b{flex:1;font-weight:600}.fh2 .mgb{flex:0 0 auto}#selAll{font-size:13px}
 #pjProg{display:flex;align-items:center;gap:6px;font-size:12px;opacity:.85}.pjb{display:flex;width:70px;height:7px;border-radius:99px;background:var(--bd);overflow:hidden}.pjb i{display:block;height:100%}.cpb{padding:2px 6px}#sg-search .sb .row select{flex:1;min-width:0}
 .cfgnote{display:block;margin:-2px 0 8px 24px;opacity:.7}
+.ctabs{display:flex;gap:4px;flex-wrap:wrap;margin:8px 0 12px;border-bottom:1px solid var(--bd)}.ctabs button{border:0;border-bottom:2px solid transparent;border-radius:6px 6px 0 0;background:none}.ctabs button.on{border-bottom-color:var(--pri);font-weight:600}.cfgnote2{margin:0 0 10px}
+.hpmore{display:block;width:100%;margin:10px 0}
+#pjProg[hidden]{display:none}#fmenu{min-width:270px}#fmenu button{white-space:nowrap}

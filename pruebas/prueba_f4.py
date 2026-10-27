@@ -16,7 +16,7 @@ with sync_playwright() as pw:
     eq('por defecto el ajuste está desactivado', pg.evaluate("ex().inText"), False)
     eq('desactivado: no hay cita en el texto ni campo de página', (pg.locator('.itx').count(), pg.locator('#locIn').count()), (0, 0))
     eq('JSON antiguo: el ajuste se rellena a false', pg.evaluate("(d => { validate(d); return d.settings.export.inText })({papers: [], tags: [], sections: []})"), False)
-    pg.evaluate("$('#dlg').close(); openCfg()")
+    pg.evaluate("$('#dlg').close(); openCfg('no')")
     eq('Configuración ofrece el ajuste', 'Mostrar la cita en el texto' in pg.inner_text('#cfg'), True)
     pg.locator('#cfg input[onchange^="setInText"]').check()
     eq('activar guarda el ajuste', (pg.evaluate("ex().inText"), pg.evaluate("JSON.parse(JSON.stringify(db)).settings.export.inText")), (True, True))

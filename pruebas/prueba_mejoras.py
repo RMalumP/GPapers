@@ -103,6 +103,8 @@ with sync_playwright() as pw:
     A.evaluate("""db.papers.length = 0; db.sections.length = 0; db.tags.length = 0; db.tags.push({id: 'tg1', name: 'Clave', color: '#000'});
       db.papers.push(P('c1', 'Primero', {authors: ['Pérez, Ana'], year: 2020, venue: 'Revista X', reading: 'leido', tagIds: ['tg1']}), P('c2', 'Segundo', {reading: 'leyendo'}), P('c3', 'Tercero'), P('c4', 'Cuarto', {reading: 'leido'}));
       markDirty(); render(); null""")
+    eq('el progreso está desactivado por defecto', A.evaluate("[db.settings.showProgress, $('#pjProg').hidden]"), [False, True])
+    A.evaluate("setCfg('showProgress', true)")
     eq('progreso en la cabecera: leídos del total', A.evaluate("[$('#pjProg').hidden, $('#pjProg small').textContent, $('#pjProg').title]"), [False, '2/4 leídos', 'Leído: 2 · Leyendo: 1 · Por leer: 1 (de 4 papers)'])
     eq('la barra tiene un tramo de leídos y otro de leyendo', A.evaluate("[...document.querySelectorAll('#pjProg .pjb i')].map(i => i.style.width)"), ['50%', '25%'])
     A.evaluate("db.papers.length = 0; render()")
@@ -139,7 +141,7 @@ with sync_playwright() as pw:
     P1.evaluate("""window.showOpenFilePicker = async () => [{name: 'articulo.pdf', queryPermission: async () => 'granted', requestPermission: async () => 'granted', getFile: async () => new File(['%PDF-1.4 prueba'], 'articulo.pdf', {type: 'application/pdf'})}]; null""")
     P1.evaluate("openPaper('k1'); tab = 'data'; drawD()"); P1.click('#dlg .pdfrow button:has-text("Enlazar")'); P1.wait_for_timeout(200); P1.evaluate("commit()"); P1.wait_for_timeout(3800)
     eq('con la opción desactivada el PDF no se sube', names('gpapers-pdf-'), [])
-    P1.evaluate("openCfg()")
+    P1.evaluate("openCfg('da')")
     eq('en Configuración está la opción, con su explicación', ('Subir a mi Google Drive los PDF enlazados' in P1.inner_text('#cfg'), 'carpeta privada y oculta' in P1.inner_text('#cfg')), (True, True))
     P1.click('#cfg label:has-text("Subir a mi Google Drive") input'); P1.wait_for_timeout(300); P1.evaluate("$('#cfg').close()"); P1.wait_for_timeout(4200)
     eq('al activarla se sube el PDF a la carpeta oculta, tal cual', (names('gpapers-pdf-'), [f['content'] for f in STORE.values() if f['name'].startswith('gpapers-pdf-')], [f['parents'] for f in STORE.values() if f['name'].startswith('gpapers-pdf-')]), (['gpapers-pdf-k1'], ['%PDF-1.4 prueba'], [['appDataFolder']]))

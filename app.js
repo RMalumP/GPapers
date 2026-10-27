@@ -17,7 +17,7 @@ const TPL_DEF = [   // plantillas de nota de serie; {fecha} y {paper} se sustitu
   {id: 't_res', name: 'Resumen del paper', text: '**Objetivo:** \n**Método:** \n**Resultados:** \n**Limitaciones:** '},
   {id: 't_cit', name: 'Cita textual', text: '**Cita:** \n**Página:** \n**Comentario:** '},
   {id: 't_ide', name: 'Idea propia', text: '**Idea:** \n**Relación con mi tema:** \n**Siguiente paso:** '}];
-const defSettings = () => ({palette: 'azul', appName: 'Papers', showFile: true, showImg: true, pdfDrive: false, customTypes: [], customStyles: [], shortcuts: {...SC_DEF}, fmtOpen: false, view: 'cards', templates: TPL_DEF.map(t => ({...t})), export: {fmt: 'txt', style: 'apa', order: 'auto', num: false, notes: false, particles: false, title: '', lang: 'es', dateFmt: 'long', vanAll: false, ppChap: true, numFmt: 'auto', disamb: true, inText: false}});   // ajustes por defecto (se guardan en el JSON)
+const defSettings = () => ({palette: 'azul', appName: 'Papers', showFile: true, showImg: true, showProgress: false, pdfDrive: false, customTypes: [], customStyles: [], shortcuts: {...SC_DEF}, fmtOpen: false, view: 'cards', templates: TPL_DEF.map(t => ({...t})), export: {fmt: 'txt', style: 'apa', order: 'auto', num: false, notes: false, particles: false, title: '', lang: 'es', dateFmt: 'long', vanAll: false, ppChap: true, numFmt: 'auto', disamb: true, inText: false}});   // ajustes por defecto (se guardan en el JSON)
 let db = {version: 1, sections: [], tags: [], papers: [], trash: [], settings: defSettings()}, path = null, dirty = false, auto = false, D, tab = 'data', MG, timer;
 const F = {q: '', sorts: [{k: 'title', d: 1}], group: false, sec: '', tags: new Set(), read: '', minRating: 0, inNotes: false, mode: 'any', tbSec: false, tbTag: true};
 const SEL = new Set();   // ids de papers seleccionados
@@ -688,7 +688,7 @@ const JSON_T = [{description: 'Datos de papers (JSON)', accept: {'application/js
 const idb = (mode, fn) => new Promise((res, rej) => {   // IndexedDB: recuerda el último archivo entre sesiones
   const r = indexedDB.open('gestor-papers', 1); r.onupgradeneeded = () => r.result.createObjectStore('k'); r.onerror = () => rej(r.error);
   r.onsuccess = () => { const t = r.result.transaction('k', mode), q = fn(t.objectStore('k')); t.oncomplete = () => res(q.result); t.onerror = () => rej(t.error); }; });
-const rememberHandle = () => idb('readwrite', st => { st.put(handle, 'h:' + PJ.cur); return st.put(handle, 'last'); }).then(() => $('#reopen').hidden = false).catch(() => {});   // el archivo de cada proyecto y el último abierto
+const rememberHandle = () => idb('readwrite', st => { st.put(handle, 'h:' + PJ.cur); return st.put(handle, 'last'); }).catch(() => {});   // el archivo de cada proyecto
 function validate(d) {
   if (!d || typeof d !== 'object' || !['papers', 'tags', 'sections'].every(k => Array.isArray(d[k])))
     throw Error('faltan las listas "papers", "tags" o "sections"');
@@ -705,7 +705,7 @@ function validate(d) {
   d.settings = {...defSettings(), ...sIn, shortcuts: {...SC_DEF}};
   d.settings.export = {...defSettings().export, ...(sIn.export && typeof sIn.export === 'object' ? sIn.export : {})};
   const xo = d.settings.export; if (!['es', 'en'].includes(xo.lang)) xo.lang = 'es'; if (!['long', 'dmy', 'iso'].includes(xo.dateFmt)) xo.dateFmt = 'long'; xo.vanAll = !!xo.vanAll; xo.ppChap = !!xo.ppChap; xo.disamb = !!xo.disamb; if (!['auto', 'dot', 'br', 'par'].includes(xo.numFmt)) xo.numFmt = 'auto';
-  d.settings.pdfDrive = !!d.settings.pdfDrive; d.settings.fmtOpen = !!d.settings.fmtOpen; d.settings.view = d.settings.view === 'table' ? 'table' : 'cards';
+  d.settings.showProgress = !!d.settings.showProgress; d.settings.pdfDrive = !!d.settings.pdfDrive; d.settings.fmtOpen = !!d.settings.fmtOpen; d.settings.view = d.settings.view === 'table' ? 'table' : 'cards';
   if (!Array.isArray(d.settings.templates)) d.settings.templates = defSettings().templates;
   d.settings.templates = d.settings.templates.filter(t => t && typeof t.name === 'string' && typeof t.text === 'string').map(t => ({id: t.id || uid(), name: t.name, text: t.text}));
   d.settings.customTypes = [...new Map((Array.isArray(sIn.customTypes) ? sIn.customTypes : []).map(ctClean).filter(Boolean).map(c => [c.id, c])).values()];
@@ -727,11 +727,11 @@ async function doOpen() {   // cada archivo JSON se abre como proyecto (ver Proy
     else { const r = await pickFile(); if (r) await pjOpenFile(r.text, r.path, null); }
   } catch (e) { if (e.name !== 'AbortError') alert('No se pudo abrir el archivo: ' + e.message); }
 }
-async function reopenLast() {   // Chrome pide confirmar el acceso al archivo en cada sesión
-  try { const h = await idb('readonly', st => st.get('last')); if (!h) return;
-    if (await h.requestPermission({mode: 'readwrite'}) !== 'granted') return alert('Sin permiso para acceder al archivo.');
-    await pjOpenFile(await (await h.getFile()).text(), h.name, h);
-  } catch (e) { alert('No se pudo reabrir el archivo: ' + e.message); }
+async function pjReload() {   // vuelve a leer el archivo del proyecto (Chrome pide confirmar el acceso en cada sesión)
+  ctxClose(); if (!handle) return;
+  try { if (await handle.requestPermission({mode: 'readwrite'}) !== 'granted') return alert('Sin permiso para acceder al archivo.');
+    await pjOpenFile(await (await handle.getFile()).text(), handle.name, handle);
+  } catch (e) { alert('No se pudo leer el archivo: ' + e.message); }
 }
 async function writeTo(h, text) { const w = await h.createWritable(); await w.write(text); await w.close(); }   // el archivo solo cambia al cerrar: escritura segura
 function download(text, name, type) { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], {type})); a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000); }
@@ -1005,7 +1005,7 @@ function applySettings() {
   const c = db.settings, root = document.documentElement.style, dark = matchMedia('(prefers-color-scheme: dark)').matches, v = c.palette === 'custom' && c.custom ? c.custom : (PAL[c.palette] || PAL.azul)[dark ? 'd' : 'l'];
   VARS.forEach(k => v[k] ? root.setProperty('--' + k, v[k]) : root.removeProperty('--' + k));
   $('#appName').textContent = c.appName || 'Papers';   // solo cambia la cabecera; el título «Gestor de papers» no se toca
-  hdr();
+  hdr(); progDraw();
 }
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applySettings);
 function pickCustom() {   // «Personalizada» parte de los colores que se ven ahora
@@ -1018,21 +1018,29 @@ function setCustom(k, v) { db.settings.custom[k] = v; applySettings(); markDirty
 function resetPal() { delete db.settings.custom; setCfg('palette', 'azul'); drawCfg(); }
 function setInText(v) { db.settings.export.inText = !!v; markDirty(); }   // ajuste opcional (F4): por defecto oculto
 function setCfg(k, v) { db.settings[k] = v; applySettings(); markDirty(); }
-function openCfg() { drawCfg(); $('#cfg').showModal(); }
+let CFG_TAB = 'ap';   // pestaña abierta de Configuración
+const CFG_TABS = [['ap', 'Apariencia'], ['no', 'Notas y citas'], ['sc', 'Atajos'], ['da', 'Datos y Drive']];
+function cfgTab(t) { CFG_TAB = t; if (t === 'sc') CFG_OPEN.add('sc'); drawCfg(); }
+function openCfg(tab) { if (tab) CFG_TAB = tab; drawCfg(); $('#cfg').showModal(); }
 function drawCfg() {
-  const c = db.settings;
-  $('#cfg').innerHTML = `<div class="dh"><h2>Configuración</h2><div class="dbtn"><button onclick="$('#cfg').close()">Cerrar ✕</button></div></div>
-    <label>Nombre de la aplicación<input value="${esc(c.appName)}" maxlength="30" oninput="setCfg('appName', this.value)"></label>
+  const c = db.settings, on = syOn(), p = syP();
+  const T = {
+    ap: `<label>Nombre de la aplicación<input value="${esc(c.appName)}" maxlength="30" oninput="setCfg('appName', this.value)"></label>
     ${cfgSec('pal', 'Paleta de colores', `<div style="margin:6px 0 10px">${Object.entries(PAL).map(([k, p]) => chip({name: p.n, color: p.c}, c.palette === k, `setCfg('palette','${k}');drawCfg()`)).join('')}${chip({name: 'Personalizada', color: c.custom?.pri || '#888888'}, c.palette === 'custom', 'pickCustom()')}</div>${c.palette === 'custom' && c.custom ? `<div class="cpick">${LAB.map(([k, t]) => `<label class="row"><input type="color" value="${c.custom[k]}" oninput="setCustom('${k}', this.value)"> ${t}</label>`).join('')}<button onclick="resetPal()">Restablecer a Azul</button></div>` : ''}`)}
     <label class="row"><input type="checkbox" ${c.showImg !== false ? 'checked' : ''} onchange="setCfg('showImg', this.checked);render()"> Mostrar la imagen del paper en las tarjetas y la tabla</label>
     <label class="row"><input type="checkbox" ${c.showFile ? 'checked' : ''} onchange="setCfg('showFile', this.checked)"> Mostrar el archivo abierto en la cabecera</label>
+    <label class="row"><input type="checkbox" ${c.showProgress ? 'checked' : ''} onchange="setCfg('showProgress', this.checked)"> Mostrar el progreso de lectura (papers leídos) junto al nombre del proyecto</label>`,
+    no: `<label class="row"><input type="checkbox" ${c.fmtOpen ? 'checked' : ''} onchange="setFmtDefault(this.checked)"> Barra de formato de las notas desplegada por defecto</label>
+    <label class="row"><input type="checkbox" ${c.export.inText ? 'checked' : ''} onchange="setInText(this.checked)"> Mostrar la cita en el texto y las notas (Chicago) en la pestaña «Cita» de cada paper</label>
+    ${cfgSec('ct', 'Tipos de documento propios', ctUI())}${cfgSec('cu', 'Estilos de cita personalizados', cuUI())}${cfgSec('tpl', 'Plantillas de nota', tplUI())}`,
+    sc: `${cfgSec('sc', 'Atajos de teclado', `<div class="sct"><small>(clic en una combinación para cambiarla; Retroceso la quita)</small>${Object.keys(SC_NAMES).map(a => `<div class="scr"><span>${SC_NAMES[a]}</span><span class="scb"><button class="${recAct === a ? 'rec' : ''}" onclick="recAct='${a}';drawCfg()">${recAct === a ? 'Pulsa una tecla… (Esc cancela)' : esc(c.shortcuts[a]) || 'Sin asignar'}</button>${c.shortcuts[a] ? `<button title="Quitar" onclick="setSC('${a}','')">✕</button>` : ''}</span></div>`).join('')}<button onclick="resetSC()">Restablecer atajos</button></div>`)}`,
+    da: `<p class="cfgnote2">${on ? `Google Drive: <b>sesión iniciada</b>${p.who ? ' como ' + esc(p.who) : ''}. El resto de opciones de Drive (sincronizar ahora, autoguardado, cerrar sesión, borrar mis datos) están en el botón 🔄 de la cabecera.` : 'Google Drive: <b>sin conectar</b>. Pulsa el botón 🔄 de la cabecera para sincronizar tus proyectos con tu Google Drive.'}</p>
     <label class="row"><input type="checkbox" ${c.pdfDrive ? 'checked' : ''} onchange="setPdfDrive(this.checked)"> Subir a mi Google Drive los PDF enlazados</label>
     <small class="cfgnote">${syOn() ? 'Cada PDF enlazado se copia solo a la carpeta privada y oculta de tu Google Drive (la misma de la sincronización) y se puede abrir desde otros dispositivos. Nadie más lo ve. Máx. 100 MB por PDF.' : 'Necesita la sesión de Google Drive iniciada (botón 🔄 de la cabecera).'}</small>
-    <label class="row"><input type="checkbox" ${c.fmtOpen ? 'checked' : ''} onchange="setFmtDefault(this.checked)"> Barra de formato de las notas desplegada por defecto</label>
-    <label class="row"><input type="checkbox" ${c.export.inText ? 'checked' : ''} onchange="setInText(this.checked)"> Mostrar la cita en el texto y las notas (Chicago) en la pestaña «Cita» de cada paper</label>
-    ${cfgSec('ct', 'Tipos de documento propios', ctUI())}${cfgSec('cu', 'Estilos de cita personalizados', cuUI())}${cfgSec('tpl', 'Plantillas de nota', tplUI())}${cfgSec('sc', 'Atajos de teclado', `<div class="sct"><small>(clic en una combinación para cambiarla; Retroceso la quita)</small>${Object.keys(SC_NAMES).map(a => `<div class="scr"><span>${SC_NAMES[a]}</span><span class="scb"><button class="${recAct === a ? 'rec' : ''}" onclick="recAct='${a}';drawCfg()">${recAct === a ? 'Pulsa una tecla… (Esc cancela)' : esc(c.shortcuts[a]) || 'Sin asignar'}</button>${c.shortcuts[a] ? `<button title="Quitar" onclick="setSC('${a}','')">✕</button>` : ''}</span></div>`).join('')}<button onclick="resetSC()">Restablecer atajos</button></div>`)}
-    <small>Estos ajustes se guardan en el mismo archivo JSON.</small>
-`;
+    <small>Estos ajustes son comunes a todos los proyectos y se guardan también en el JSON de cada uno.</small>`};
+  $('#cfg').innerHTML = `<div class="dh"><h2>Configuración</h2><div class="dbtn"><button onclick="$('#cfg').close()">Cerrar ✕</button></div></div>
+    <div class="ctabs" role="tablist">${CFG_TABS.map(([k, t]) => `<button role="tab" aria-selected="${CFG_TAB === k}" class="${CFG_TAB === k ? 'on' : ''}" onclick="cfgTab('${k}')">${t}</button>`).join('')}</div>
+    ${T[CFG_TAB]}`;
 }
 /* ---- Editor de estilos personalizados (Configuración) ---- */
 const CU_BASE = (() => {   // estilos de serie como punto de partida: plantillas aproximadas (en español, salvo IEEE) que se ajustan a mano
@@ -1225,21 +1233,24 @@ function cuModIns(m) {
 }
 /* ===== Ayuda: botón ❓ de la cabecera (o F1) ===== */
 const HELP_OPEN = new Set(['inicio']);
-const helpSec = (id, title, body) => `<details class="cs" id="hp_${id}" ${HELP_OPEN.has(id) ? 'open' : ''} ontoggle="this.open ? HELP_OPEN.add('${id}') : HELP_OPEN.delete('${id}');uiSoon()"><summary>${title}</summary><div class="csb hp">${body}</div></details>`;
+let HP_ALL = false;   // ayuda completa desplegada (por defecto solo «Empezar aquí»)
+const helpSec = (id, title, body, rest) => `<details class="cs${rest ? ' hprest' : ''}" id="hp_${id}" ${rest && !HP_ALL ? 'hidden' : ''} ${HELP_OPEN.has(id) ? 'open' : ''} ontoggle="this.open ? HELP_OPEN.add('${id}') : HELP_OPEN.delete('${id}');uiSoon()"><summary>${title}</summary><div class="csb hp">${body}</div></details>`;
 const helpTbl = rows => `<table class="hpt">${rows.map(r => `<tr>${r.map((c, i) => i ? `<td>${c}</td>` : `<th>${c}</th>`).join('')}</tr>`).join('')}</table>`;
 function helpHTML() {
   const sc = db.settings.shortcuts, kb = a => `<kbd>${esc(sc[a] || 'sin asignar')}</kbd>`;
   const S = {
-    inicio: ['Primeros pasos', `<p>Esta aplicación guarda tus papers, secciones, etiquetas y notas por <b>proyectos</b>: cada proyecto en <b>su propio archivo JSON</b>, que se llama como el proyecto. No hay cuenta ni servidor: todo está en tu navegador y en tus archivos.</p>
-      <ul><li><b>Proyecto</b>: su nombre va arriba, al lado del de la aplicación; escríbelo ahí para cambiarlo. Con <b>▾</b> cambias de proyecto o creas uno nuevo (ver «Proyectos»).</li>
-      <li><b>Abrir 📂</b> (${kb('open')}): abre un archivo JSON como proyecto. Clic derecho en 📂 para <i>importar</i> referencias (.bib, .ris, texto o DOI).</li>
+    inicio: ['Empezar aquí', `<ul><li><b>Proyectos</b>: cada proyecto es una biblioteca con su propio archivo JSON. Su nombre está arriba, junto al de la aplicación; con <b>▾</b> cambias de proyecto o creas uno.</li>
+      <li><b>Guardar 💾</b> (${kb('save')}) guarda el proyecto en su archivo. En <b>«Archivo ▾»</b> tienes Abrir, Guardar como, Importar referencias y el Autoguardado.</li>
+      <li><b>Google Drive 🔄</b>: guarda todos tus proyectos en tu propio Drive y los mantiene iguales en todos tus dispositivos.</li>
+      <li><b>+ Nuevo paper</b> añade el primero; los filtros y el orden están en la barra lateral, y «Exportar citas» arriba.</li>
+      <li>Sin cuenta ni servidor: todo está en tu navegador y en tus archivos. Al empezar se abre un ejemplo para probar. Esta ayuda: <kbd>F1</kbd>; todo lo demás, en «Ver toda la ayuda».</li></ul>`],
+    archivos: ['Archivos, guardado y autoguardado', `<ul><li><b>Archivo ▾ → Abrir</b> (${kb('open')}): abre un archivo JSON como proyecto. También ahí: <b>Guardar como</b>, <b>Importar referencias</b> (.bib, .ris, texto o DOI; ${kb('import')}) y el <b>Autoguardado</b>.</li>
       <li><b>Guardar 💾</b> (${kb('save')}) y <b>Guardar como</b> guardan el proyecto abierto en su archivo, con el nombre del proyecto: en Chrome y Edge de escritorio escriben directamente en el archivo; en otros navegadores se descarga una copia.</li>
       <li><b>Autoguardado</b> (solo Chrome/Edge): guarda solo, un segundo después de cada cambio. La primera vez pide el archivo. Con Google Drive conectado funciona en cualquier navegador y guarda en tu Drive.</li>
-      <li><b>Google Drive 🔄</b> (a la izquierda de 📂; sin conectar pone «Conectar con Google Drive»): guarda tu biblioteca en tu Google Drive y la mantiene igual en todos tus dispositivos (ver «Sincronización con Google Drive»).</li>
-      <li><b>Reabrir último</b>: aparece tras abrir un archivo y vuelve a cargarlo en la siguiente sesión (el navegador pide permiso).</li>
-      <li>En la versión web se abre al principio <code>ejemplo_papers.json</code> para que pruebes; guarda tu trabajo con «Guardar como».</li>
+      <li><b>Estado de guardado</b> (junto al nombre del proyecto): «Guardado», «Sin guardar» o, con Drive conectado, «Guardado en Google Drive», «Sincronizando…» o «Sin guardar…».</li>
+      <li><b>Volver a leer el archivo</b>: ▾ del proyecto → «↻ Volver a leer…» (el navegador pide permiso en cada sesión).</li>
       <li>Deshacer ${kb('undo')} y rehacer ${kb('redo')} funcionan sobre los cambios de la sesión.</li></ul>
-      <p>Qué se guarda en el JSON: papers (con su fecha de creación, notas e imagen), secciones, etiquetas, papelera y todos los ajustes (paleta, atajos, plantillas de nota, tipos y estilos de cita propios). <b>No</b> se guarda el historial de cambios del día ni los enlaces a archivos de imagen locales.</p>`],
+      <p>Qué se guarda en el JSON: papers (con su fecha de creación, notas e imagen), secciones, etiquetas, papelera y todos los ajustes (paleta, atajos, plantillas de nota, tipos y estilos de cita propios). <b>No</b> se guarda el historial de cambios del día ni los enlaces a archivos de imagen o PDF locales.</p>`],
     proyectos: ['Proyectos', `<p>Un <b>proyecto</b> es una biblioteca aparte: sus papers, notas, secciones, etiquetas, relaciones y papelera. Al abrir un proyecto solo ves sus papers. Lo demás es <b>común a todos</b>: el nombre de la aplicación, los colores, los atajos, los tipos y estilos propios, las plantillas de nota y las opciones de exportación.</p>
       <ul><li><b>Nombre</b>: arriba, al lado del nombre de la aplicación. Haz clic, escribe y pulsa Intro. Su archivo JSON se llama igual (<code>Tesis</code> → <code>Tesis.json</code>); en Chrome y Edge el archivo se renombra, y si no se puede, el siguiente «Guardar» crea el del nombre nuevo.</li>
       <li><b>Cambiar de proyecto</b>: botón <b>▾</b> → elige uno. Es inmediato: el navegador guarda la copia de trabajo de cada proyecto, también los cambios sin guardar, y al volver está como lo dejaste.</li>
@@ -1249,12 +1260,12 @@ function helpHTML() {
       <li><b>Borrar</b>: ▾ → «Borrar este proyecto»; desaparece de la aplicación (y de tu Google Drive si está conectado). Tu archivo JSON no se toca.</li>
       <li><b>Con Google Drive</b> se guardan todos los proyectos y en tus otros dispositivos aparecen en la lista ▾ (☁ = aún no descargado: se descarga al abrirlo). Al cambiar de proyecto, primero se sube lo pendiente.</li></ul>`],
     extras: ['Copias, duplicados, PDF y filtros guardados', `<ul><li><b>Copias de seguridad</b>: ▾ junto al nombre del proyecto → «Copias de seguridad…». Se guarda una al abrir la aplicación cada día (las últimas 10) y otra antes de restaurar o de sustituirlo todo por lo de Drive; también puedes crear una a mano, descargarla o borrarla. «Restaurar» sustituye los papers, notas, secciones, etiquetas y papelera de ese proyecto (los ajustes no cambian) y se puede deshacer. Solo viven en este navegador y se borran con el proyecto.</li>
-      <li><b>Buscar duplicados</b>: grupo <b>Selección</b> de la barra lateral. Agrupa papers con el mismo DOI o título; «Quedarme con este» conserva ese paper, le añade lo que falte de los otros (campos vacíos, etiquetas, secciones, notas, relaciones y enlaces de las notas) y manda los demás a la papelera. «No son duplicados» los descarta hasta cerrar la aplicación.</li>
-      <li><b>Mover o copiar a otro proyecto</b>: marca papers con «Seleccionar» y pulsa «Mover o copiar a otro proyecto…» (grupo Selección). Se llevan las notas, etiquetas y secciones (se buscan por nombre y, si no existen en el destino, se crean) y las relaciones entre los papers elegidos. Se ve al abrir el otro proyecto.</li>
+      <li><b>Buscar duplicados</b>: ▾ junto al nombre del proyecto. Agrupa papers con el mismo DOI o título; «Quedarme con este» conserva ese paper, le añade lo que falte de los otros (campos vacíos, etiquetas, secciones, notas, relaciones y enlaces de las notas) y manda los demás a la papelera. «No son duplicados» los descarta hasta cerrar la aplicación.</li>
+      <li><b>Mover o copiar a otro proyecto</b>: marca papers con «Seleccionar» y pulsa «Mover o copiar a otro proyecto…» (grupo Selección, que aparece al marcar papers). Se llevan las notas, etiquetas y secciones (se buscan por nombre y, si no existen en el destino, se crean) y las relaciones entre los papers elegidos. Se ve al abrir el otro proyecto.</li>
       <li><b>PDF enlazado</b>: en «Datos» de cada paper, «Enlazar un PDF…» (y, si quieres, la página donde abrirlo). Solo se guarda el <b>nombre</b> en el JSON; el archivo no se sube a ningún sitio, salvo que actives en Configuración <b>«Subir a mi Google Drive los PDF enlazados»</b> (con la sesión de Drive iniciada): entonces cada PDF se copia solo a la carpeta privada y oculta de tu Drive (máx. 100 MB cada uno) y se abre desde cualquier dispositivo con tu sesión; se borra de allí si quitas el enlace. Se abre con «📄 PDF» en la tarjeta o la tabla. En otro dispositivo, o si lo moviste, te pide elegirlo de nuevo. Sin acceso a archivos (no Chrome ni Edge de escritorio), hay que elegirlo cada vez.</li>
       <li><b>Copiar cita 📋</b>: en cada tarjeta y fila copia la cita en el estilo elegido en Exportar, con cursiva al pegar en Word o Docs.</li>
       <li><b>Filtros guardados ⭐</b>: en el grupo Buscar, «＋» guarda la búsqueda, el orden, la sección, las etiquetas, la lectura y la valoración actuales con un nombre; elígelo para aplicarlo. Son de cada proyecto y de este navegador.</li>
-      <li><b>Progreso</b>: junto al nombre del proyecto, una barra con los papers leídos y leyendo (el detalle, al pasar el ratón).</li></ul>`],
+      <li><b>Progreso</b> (opcional: Configuración → Apariencia): junto al nombre del proyecto, una barra con los papers leídos y leyendo (el detalle, al pasar el ratón).</li></ul>`],
     lista: ['Lista principal', `<ul><li><b>Tarjetas o tabla</b>: el botón «Tabla / Tarjetas» cambia la vista. La tabla muestra imagen, título, autores, año, revista, lectura, valoración, secciones, etiquetas y notas.</li>
       <li><b>En cada tarjeta</b>: casilla para seleccionar, <i>Editar</i>, las etiquetas del paper, el estado de lectura, las estrellas y la ✕ (a la papelera). Si las etiquetas no caben en la barra, pasan a su propia línea.</li>
       <li><b>Estado de lectura</b>: un clic lo cambia (por leer → leyendo → leído). <b>Estrellas</b>: clic derecho para elegir la valoración.</li>
@@ -1264,8 +1275,8 @@ function helpHTML() {
     lateral: ['Barra lateral', `<ul><li>☰ pliega o despliega la barra; con la barra plegada, cada icono la abre en su grupo.</li>
       <li><b>Buscar 🔍</b> (${kb('find')}): por título, autor o año; la casilla amplía a notas y citas editadas.</li>
       <li><b>Ordenar ⇅</b>: varios criterios en cascada (título, autor, año, revista, lectura, valoración, fecha de creación o modificación…), cada uno ascendente o descendente. Aquí también está «Agrupar por sección» y la <b>valoración mínima</b>.</li>
-      <li><b>Secciones 📁</b> y <b>Etiquetas 🏷️</b>: filtran la lista. «✎ Gestionar» crea, renombra, recolorea, ordena y borra. Las etiquetas se pueden combinar con «al menos una» o «todas». Clic derecho en una sección abre sus notas.</li>
-      <li><b>Lectura 📖</b>: filtra por estado. <b>Selección ☑️</b>: seleccionar visibles/quitar y exportar.</li>
+      <li><b>Filtros 🎚️</b>: Secciones, Etiquetas y Lectura en un solo grupo. «✎ Gestionar» crea, renombra, recolorea, ordena y borra secciones y etiquetas. Las etiquetas se pueden combinar con «al menos una» o «todas». Clic derecho en una sección abre sus notas.</li>
+      <li><b>Selección ☑️</b>: el botón «☑ Seleccionar visibles» está sobre la lista; cuando hay papers marcados aparece el grupo <b>Selección</b> con Exportar citas, Mover o copiar a otro proyecto y Quitar selección.</li>
       <li><b>Información ℹ️</b> (plegada): Ayuda, <b>Añadir app</b> (solo si no está instalada) y Créditos.</li>
       <li><b>Relaciones 🕸️</b>: gráfico de los papers relacionados o que se citan entre sí. <b>Papelera 🗑️</b>: los papers eliminados se guardan <b>5 días</b> y se pueden restaurar.</li></ul>`],
     paper: ['Editar un paper', `<p>«+ Nuevo paper» o «Editar». Pestañas: <b>Ver todo</b> (todos los bloques, plegables y con una sola variante de cita), <b>Datos</b>, <b>Cita</b>, <b>Notas</b>, <b>Secciones, etiquetas y relacionados</b> e <b>Historial</b>. «Guardar paper» confirma; «Cancelar» o cerrar sin guardar descarta el borrador.</p>
@@ -1282,9 +1293,9 @@ function helpHTML() {
       <li><b>Estilo de cita</b>: APA 7, Vancouver, MLA, IEEE, Chicago (autor-fecha y notas-bibliografía), UNE-ISO 690 (nombre-fecha y numérico) y <b>tus estilos personalizados</b> (marcados con ✎). Algunos estilos avisan de los tipos que la guía no cubre.</li>
       <li><b>Orden</b>: automático (alfabético o por lista según el estilo), lista, alfabético o por año. <b>Numerar</b>, formato del número, idioma de los conectores (es/en), formato de la fecha de consulta, incluir notas, listar todos los autores en Vancouver…</li>
       <li>El texto de la vista previa es editable. <b>Copiar</b> copia texto; <b>Copiar con formato</b> conserva cursiva y sangría francesa para Word o Docs. También puedes guardar el archivo.</li></ul>`],
-    importar: ['Importar referencias', `<p>Clic derecho en 📂 (o ${kb('import')}): desde un archivo <code>.bib</code>/<code>.ris</code>, pegando texto BibTeX/RIS o buscando por <b>DOI</b>. Antes de añadir se revisa la lista, y puedes asignar sección, etiqueta y estado de lectura a todas. Dentro de un paper, «Buscar» junto al DOI propone rellenar solo los campos vacíos o los que marques.</p>`],
-    config: ['Configuración', `<p>⚙️ en la barra lateral. Es común a todos los proyectos y se guarda también en cada JSON.</p><ul><li><b>Nombre de la aplicación</b>, <b>paleta de colores</b> (o personalizada) y mostrar el archivo abierto en la cabecera.</li>
-      <li><b>Mostrar la imagen</b> del paper en tarjetas y tabla. <b>Barra de formato</b> de las notas desplegada por defecto. <b>Cita en el texto</b> (Chicago) en la pestaña Cita.</li>
+    importar: ['Importar referencias', `<p>Menú <b>Archivo ▾</b> → «Importar referencias» (o ${kb('import')}): desde un archivo <code>.bib</code>/<code>.ris</code>, pegando texto BibTeX/RIS o buscando por <b>DOI</b>. Antes de añadir se revisa la lista, y puedes asignar sección, etiqueta y estado de lectura a todas. Dentro de un paper, «Buscar» junto al DOI propone rellenar solo los campos vacíos o los que marques.</p>`],
+    config: ['Configuración', `<p>⚙️ en la barra lateral, con cuatro pestañas: <b>Apariencia</b>, <b>Notas y citas</b>, <b>Atajos</b> y <b>Datos y Drive</b>. Es común a todos los proyectos y se guarda también en cada JSON.</p><ul><li><b>Nombre de la aplicación</b>, <b>paleta de colores</b> (o personalizada), mostrar el archivo abierto en la cabecera y, si quieres, el <b>progreso de lectura</b> (papers leídos) junto al nombre del proyecto (desactivado por defecto).</li>
+      <li><b>Mostrar la imagen</b> del paper en tarjetas y tabla (Apariencia). <b>Barra de formato</b> de las notas desplegada por defecto. <b>Cita en el texto</b> (Chicago) en la pestaña Cita.</li>
       <li><b>Tipos de documento propios</b> y <b>Estilos de cita personalizados</b>: ver las dos secciones siguientes.</li>
       <li><b>Plantillas de nota</b>: textos de partida para las notas; <code>{fecha}</code> y <code>{paper}</code> se sustituyen al insertarlas.</li>
       <li><b>Atajos de teclado</b>: clic en una combinación para cambiarla (Retroceso la quita).</li></ul>`],
@@ -1322,7 +1333,7 @@ function helpHTML() {
       <li><b>Actualizaciones</b>: la aplicación busca versiones nuevas sola (al abrirla, al volver a ella y cada media hora). Cuando hay una, aparece un aviso «Hay una versión nueva» con el botón <b>Recargar ahora</b>; antes de recargar guarda la copia de sesión. <b>No hace falta borrar los datos de la aplicación</b>: se guardan aparte de lo que se actualiza.</li>
       <li>Versión instalada: <b>v${APP_V}</b>. <button onclick="checkUpdate()">Buscar actualizaciones</button> <button class="danger" onclick="forgetAppData()" title="Borra de este navegador las copias de trabajo de los proyectos; no toca tus archivos JSON ni Google Drive">Olvidar la copia de sesión</button></li>
       <li>El navegador puede borrar los datos de los sitios si se queda sin espacio; la aplicación pide almacenamiento persistente para evitarlo, pero tu <b>JSON</b> sigue siendo la copia que debes conservar.</li></ul>`],
-    sync: ['Sincronización con Google Drive', `<p>El icono <b>🔄</b> de la barra de arriba, a la izquierda de 📂 (sin conectar pone «Conectar con Google Drive»), guarda <b>todos tus proyectos</b> (papers, notas, secciones, etiquetas, papelera y ajustes) en una <b>carpeta oculta de tu propio Google Drive</b>, para tenerlos igual en el ordenador, la tablet y el móvil.</p>
+    sync: ['Sincronización con Google Drive', `<p>El icono <b>🔄</b> de la barra de arriba, a la izquierda de 💾 (sin conectar pone «Conectar con Google Drive»), guarda <b>todos tus proyectos</b> (papers, notas, secciones, etiquetas, papelera y ajustes) en una <b>carpeta oculta de tu propio Google Drive</b>, para tenerlos igual en el ordenador, la tablet y el móvil.</p>
       <ul><li><b>Conectar</b>: pulsa 🔄 → «Continuar», elige tu cuenta de Google y da permiso. Si en Drive ya había una biblioteca de otro dispositivo, eliges si combinarlas o quedarte con una.</li>
       <li><b>Autoguardado activado</b>: con la sesión iniciada, cada cambio se sube solo a los pocos segundos (solo lo que cambió, no la biblioteca entera), y al abrir la aplicación o volver a ella se traen los cambios de los otros dispositivos. La casilla «Autoguardado» lo activa o desactiva (sin ella, sincroniza a mano).</li>
       <li><b>El punto del icono</b>: verde, sincronizado; azul y girando, sincronizando; amarillo, cambios pendientes o hay que volver a conectar; rojo, error (se reintenta).</li>
@@ -1342,15 +1353,16 @@ function helpHTML() {
   };
   return `<div class="dh"><h2>Ayuda</h2><div class="dbtn"><button onclick="$('#help').close()">Cerrar ✕</button></div></div>
     <input id="hpq" type="search" placeholder="Buscar en la ayuda…" oninput="helpFilter(this.value)" aria-label="Buscar en la ayuda">
-    <div id="hpb">${Object.entries(S).map(([id, [t, b]]) => helpSec(id, t, b)).join('')}</div>`;
+    <div id="hpb">${Object.entries(S).map(([id, [t, b]]) => helpSec(id, t, b, id !== 'inicio')).join('')}<button id="hpMore" class="hpmore" onclick="hpMore()">${HP_ALL ? 'Ocultar el resto de la ayuda ▴' : `Ver toda la ayuda (${Object.keys(S).length - 1} temas) ▾`}</button></div>`;
 }
 function helpFilter(q) {
-  q = norm(q).trim(); let n = 0;
-  document.querySelectorAll('#hpb > details').forEach(d => { const hit = !q || norm(d.textContent).includes(q); d.hidden = !hit; if (hit) n++; if (q && hit) d.open = true; });
+  q = norm(q).trim(); let n = 0; $('#hpMore').hidden = !!q;   // al buscar se busca en toda la ayuda
+  document.querySelectorAll('#hpb > details').forEach(d => { const hit = !q || norm(d.textContent).includes(q); d.hidden = !hit || (!q && d.classList.contains('hprest') && !HP_ALL); if (hit) n++; if (q && hit) d.open = true; });
   $('#hpEmpty')?.remove(); if (!n) $('#hpb').insertAdjacentHTML('beforeend', '<p class="empty" id="hpEmpty">Nada encontrado.</p>');
 }
+function hpMore() { HP_ALL = !HP_ALL; $('#help').innerHTML = helpHTML(); }
 function openHelp(id) {
-  if (id) HELP_OPEN.add(id); $('#help').innerHTML = helpHTML(); if (!$('#help').open) $('#help').showModal();
+  if (id) { HELP_OPEN.add(id); if (id !== 'inicio') HP_ALL = true; } $('#help').innerHTML = helpHTML(); if (!$('#help').open) $('#help').showModal();
   if (id) setTimeout(() => document.getElementById('hp_' + id)?.scrollIntoView({block: 'start'}));
 }
 document.addEventListener('keydown', e => { if (e.key === 'F1') { e.preventDefault(); openHelp(); } });
@@ -1390,7 +1402,7 @@ function ctDel() {
   db.settings.customTypes = db.settings.customTypes.filter(x => x.id !== c.id); CTS.id = ''; ctTouch(); syncStyles(db.settings.customStyles, db.settings.export); render(); drawCfg();
 }
 function typeChange(v) {   // desplegable «Tipo» del paper; la última opción crea un tipo propio al vuelo
-  if (v === '__new') { const c = ctNew(); D.type = 'ct_' + c.id; CFG_OPEN.add('ct'); drawD(); openCfg(); return; }
+  if (v === '__new') { const c = ctNew(); D.type = 'ct_' + c.id; CFG_OPEN.add('ct'); drawD(); openCfg('no'); return; }
   D.type = v; drawD();
 }
 $('#cfg').addEventListener('close', () => { if ($('#dlg').open) drawD(); });   // al volver del editor de tipos, el formulario se pone al día
@@ -1401,7 +1413,14 @@ const cfgSec = (id, title, body) => `<details class="cs" ${CFG_OPEN.has(id) ? 'o
 const chip = (t, on, click, drag, ctx) => `<span class="chip ${on ? 'on' : ''}" style="--c:${esc(t.color || '#888888')}" ${click ? `onclick="${click}"` : ''} ${drag ? `draggable="true" data-tag="${t.id}"` : ''} ${ctx ? `oncontextmenu="${ctx}"` : ''}>${esc(t.name)}</span>`;
 const tagById = i => db.tags.find(t => t.id === i);
 const secChips = id => (db.sections.find(s => s.id === id)?.tagIds || []).map(tagById).filter(Boolean).map(t => chip(t, 1)).join('');
-const hdr = () => { $('#fname').textContent = db.settings.showFile ? (path ? path.split(/[\\/]/).pop() : '(sin archivo)') + (dirty ? ' • sin guardar' : '') : (dirty ? '• sin guardar' : ''); syIcon(); };
+const hdr = () => syIcon();   // syIcon también redibuja el estado de guardado
+function fnameDraw() {   // un único indicador de guardado, junto al nombre del proyecto
+  const el = $('#fname'), f = path ? path.split(/[\\/]/).pop() : '', on = syOn(), s = on ? syState() : '';
+  const T = !on ? (dirty ? ['pend', 'Sin guardar'] : path ? ['ok', 'Guardado'] : ['', '(sin archivo)'])
+    : {busy: ['busy', 'Sincronizando…'], wait: ['pend', 'Cierra la ventana abierta para sincronizar'], reconnect: ['err', 'Sin conexión con Drive: se reconecta con tu próximo clic'], error: ['err', 'No se pudo sincronizar (se reintenta)'],
+       pend: ['pend', 'Sin guardar…'], manual: ['pend', 'Sin guardar (autoguardado en Drive desactivado)'], ok: ['ok', 'Guardado en Google Drive']}[s] || ['', ''];
+  el.dataset.st = T[0]; el.textContent = T[1] + (db.settings.showFile && f && T[1] !== '(sin archivo)' ? ' · ' + f : '');
+}
 function sortList(L) {   // ordena por todos los criterios, en cascada; d = 1 ascendente, -1 descendente
   return [...L].sort((a, b) => { for (const {k, d} of F.sorts) { const x = KEY[k](a), y = KEY[k](b);
     if (k === 'rating' && !x !== !y) return x ? -1 : 1;   // sin valorar: siempre al final, en ambos sentidos
@@ -1524,8 +1543,9 @@ function render() {
   const tg = (id, open, label, active) => { const b = $(id); b.textContent = `${label} ${open ? '▾' : '▸'}${!open && active ? ' •' : ''}`; b.classList.toggle('on', open); };   // «•» = hay filtro activo con la lista plegada
   tg('#tbSec', F.tbSec, 'Sección', F.sec); tg('#tbTag', F.tbTag, 'Etiquetas', F.tags.size);
   $('#secF2').hidden = !F.tbSec; $('#tagF2').hidden = !F.tbTag; $('#grpChk').checked = F.group;
-  $('#selN').textContent = SEL.size ? `${SEL.size} seleccionados` : 'Ningún paper seleccionado';
-  $('#d-search').hidden = !F.q; $('#d-sec').hidden = !F.sec; $('#d-tags').hidden = !F.tags.size; $('#d-sel').hidden = !SEL.size; $('#d-read').hidden = !F.read; $('#d-sort').hidden = !F.minRating; $('#d-tr').hidden = !db.trash.length; $('#trLbl').textContent = 'Papelera' + (db.trash.length ? ` (${db.trash.length})` : ''); $('#tbView').textContent = db.settings.view === 'table' ? '▦ Tarjetas' : '☰ Tabla';
+  const sg = $('#sg-sel'), hadSel = !sg.hidden; sg.hidden = !SEL.size; if (SEL.size && !hadSel) sg.classList.remove('fold');   // la barra de selección solo sale con papers marcados
+  $('#selT').textContent = `Selección (${SEL.size})`;
+  $('#d-search').hidden = !F.q; $('#d-filt').hidden = !(F.sec || F.tags.size || F.read); $('#d-sort').hidden = !F.minRating; $('#d-tr').hidden = !db.trash.length; $('#trLbl').textContent = 'Papelera' + (db.trash.length ? ` (${db.trash.length})` : ''); $('#tbView').textContent = db.settings.view === 'table' ? '▦ Tarjetas' : '☰ Tabla';
   $('#readF').innerHTML = [['', 'Todos'], ...Object.entries(READ)].map(([k, v]) => chip({name: v, color: k ? READ_C[k] : '#888888'}, F.read === k, `setRead('${k}')`)).join(''); $('#minR').value = F.minRating;   // puntos de filtro activo
   const nextKey = Object.keys(SORTS).find(k => !F.sorts.some(s => s.k === k)) || 'title';
   $('#sortUI').innerHTML = F.sorts.map((s, i) => `<div class="row"><select onchange="F.sorts[${i}].k=this.value;render()">${Object.entries(SORTS).map(([k, v]) => `<option value="${k}" ${s.k === k ? 'selected' : ''}>${v}</option>`).join('')}</select>
@@ -1551,7 +1571,10 @@ function tagMenu(e, pid, tid) { ctxShow(e, `<div class="ctxh">Etiqueta «${esc(d
 function delTagFrom(pid, tid) { const p = db.papers.find(x => x.id === pid); if (p) { p.tagIds = p.tagIds.filter(x => x !== tid); logChange(p, 'Etiqueta quitada: ' + (db.tags.find(t => t.id === tid)?.name || '?')); } ctxClose(); markDirty(); render(); }
 const ctxClose = () => { const m = $('#ctx'); if (m) { m.hidden = true; document.body.appendChild(m); } };
 document.addEventListener('click', e => { if (!e.target.closest('#ctx')) ctxClose(); });
-document.addEventListener('keydown', e => { if (e.key === 'Escape') ctxClose(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { ctxClose(); fmClose(); } });
+const fmClose = () => { $('#fmenu').hidden = true; $('#fmBtn').setAttribute('aria-expanded', 'false'); };   // menú «Archivo» de la cabecera
+function fmToggle(e) { e.stopPropagation(); const m = $('#fmenu'), open = m.hidden; ctxClose(); m.hidden = !open; $('#fmBtn').setAttribute('aria-expanded', String(open)); }
+document.addEventListener('click', e => { if (!e.target.closest('.fm')) fmClose(); });
 document.addEventListener('contextmenu', e => { if (!e.target.closest('[oncontextmenu]')) ctxClose(); });   // clic derecho en otro sitio también cierra
 function setSecF(id) { F.sec = id && F.sec === id ? '' : id; render(); }   // '' = Todas; pulsar la sección activa también vuelve a «Todas»
 function sbToggle() { $('#side').classList.toggle('min'); uiSoon(); }
@@ -2659,7 +2682,7 @@ const syAgo = ts => { const m = Math.round((Date.now() - ts) / 6e4); if (m < 1) 
   const h = Math.round(m / 60); if (h < 24) return `hace ${h} ${h === 1 ? 'hora' : 'horas'}`; const d = Math.round(h / 24); return `hace ${d} ${d === 1 ? 'día' : 'días'}`; };
 const syState = () => !syOn() ? 'off' : ['busy', 'wait', 'reconnect', 'error'].includes(SY.st) ? SY.st : dirty ? (syAuto() ? 'pend' : 'manual') : 'ok';
 function syIcon() {
-  const b = $('#syncBtn'); if (!b) return; b.hidden = !syAvail();
+  fnameDraw(); const b = $('#syncBtn'); if (!b) return; b.hidden = !syAvail();
   const st = syState(), p = syP(); b.dataset.st = st;
   b.title = st === 'off' ? SY_TXT.off : `Google Drive: ${SY_TXT[st]}${p.last ? ' · última vez ' + syAgo(p.last) : ''} (clic: opciones)`; b.setAttribute('aria-label', b.title);
 }
@@ -2877,7 +2900,7 @@ function favApply(v) {
 }
 function favDel() { const i = +$('#favSel').value; if (!FAV[i] || !confirm(`¿Borrar los filtros «${FAV[i].name}»?`)) return; FAV.splice(i, 1); favPut(); favDraw(); }
 function progDraw() {   // barra de progreso de lectura del proyecto, en la cabecera
-  const el = $('#pjProg'), n = db.papers.length; el.hidden = !n; if (!n) return;
+  const el = $('#pjProg'), n = db.papers.length; el.hidden = !n || !db.settings.showProgress; if (el.hidden) return;
   const c = {leido: 0, leyendo: 0, por_leer: 0}; db.papers.forEach(p => c[p.reading in c ? p.reading : 'por_leer']++);
   el.querySelector('.pjb').innerHTML = ['leido', 'leyendo'].map(k => `<i style="width:${c[k] / n * 100}%;background:${READ_C[k]}"></i>`).join('');
   el.querySelector('small').textContent = `${c.leido}/${n} leídos`; el.title = `${READ.leido}: ${c.leido} · ${READ.leyendo}: ${c.leyendo} · ${READ.por_leer}: ${c.por_leer} (de ${n} papers)`;
@@ -3091,14 +3114,14 @@ function pjMenu(e) {
   e.stopPropagation(); const r = e.currentTarget.getBoundingClientRect(), L = [...PJ.list].sort((a, b) => a.name.localeCompare(b.name, 'es'));
   ctxShow({preventDefault() {}, stopPropagation() {}, clientX: r.left, clientY: r.bottom + 4}, '<div class="ctxh">Proyectos</div>'
     + L.map(p => `<button class="pji" onclick="pjOpen('${p.id}')">${tick(p.id === PJ.cur)}${esc(p.name)} <small>${p.remote ? '☁ en Google Drive' : (p.id === PJ.cur ? db.papers.length : p.n || 0) + ' papers'}</small></button>`).join('')
-    + '<hr><button onclick="pjNew()">＋ Nuevo proyecto</button><button onclick="ctxClose();doOpen()">📂 Abrir un JSON como proyecto…</button><button onclick="ctxClose();pjEdit()">✏️ Cambiar el nombre</button><button onclick="bkOpen()">🕘 Copias de seguridad…</button><button class="danger" onclick="pjDel()">🗑 Borrar este proyecto…</button>');
+    + '<hr><button onclick="pjNew()">＋ Nuevo proyecto</button><button onclick="ctxClose();doOpen()">📂 Abrir un JSON como proyecto…</button><button onclick="ctxClose();pjEdit()">✏️ Cambiar el nombre</button>' + (handle ? `<button onclick="pjReload()" title="Vuelve a leer «${esc(path || '')}» del disco (descarta lo que no hayas guardado)">↻ Volver a leer «${esc(path || '')}»</button>` : '') + '<button onclick="ctxClose();dpOpen()">🔍 Buscar duplicados…</button><button onclick="bkOpen()">🕘 Copias de seguridad…</button><button class="danger" onclick="pjDel()">🗑 Borrar este proyecto…</button>');
 }
 
 /* ===== Datos de la aplicación (PWA): copia de la sesión y estado de la interfaz, en IndexedDB =====
    Aparte del JSON, la app guarda (1) una copia de trabajo, para reabrir justo donde lo dejaste aunque no hayas guardado, y
    (2) el estado de la interfaz (filtros, orden, barra lateral, bloques plegados). Viven fuera de la caché de la aplicación,
    así que las actualizaciones no los tocan y no hace falta borrar datos para recibir una versión nueva. */
-const APP_V = '32.2';   // debe coincidir con la versión de sw.js
+const APP_V = '33.0';   // debe coincidir con la versión de sw.js
 let BOOTED = false, RELOADING = false, SWREG = null, tSes = 0, tUi = 0, lastUi = '';
 const sessionNow = () => { clearTimeout(tSes); if (!BOOTED) return Promise.resolve();   // copia de trabajo del proyecto abierto (y la lista de proyectos)
   const p = pjCur(); if (p) { Object.assign(p, {n: db.papers.length, file: path, dirty}); delete p.remote; }
@@ -3175,8 +3198,7 @@ bootApp().then(() => { syIcon(); try { const t = JSON.parse(localStorage.getItem
 render();
 lastSnap = JSON.stringify(db);
 applySettings();
-if (FSA) idb('readonly', st => st.get('last')).then(h => $('#reopen').hidden = !h).catch(() => {});
-else if (!syOn()) { $('#auto').disabled = true; $('#auto').parentElement.title = 'El autoguardado del archivo solo está disponible en Chrome o Edge de escritorio (en cualquier navegador, con Google Drive 🔄)'; }
+if (!FSA && !syOn()) { $('#auto').disabled = true; $('#auto').parentElement.title = 'El autoguardado del archivo solo está disponible en Chrome o Edge de escritorio (en cualquier navegador, con Google Drive 🔄)'; }
 if (syOn()) $('#auto').checked = syAuto();
 $('#cfg').addEventListener('close', () => { recAct = null; });
 document.addEventListener('scroll', e => {   // la cabecera fija de un diálogo se estrecha al bajar (con histéresis para que no parpadee)
