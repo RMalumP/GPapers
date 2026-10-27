@@ -26,6 +26,13 @@ Los ajustes son comunes a todos: nombre de la aplicación, colores, atajos, tipo
 - La biblioteca de versiones anteriores pasa sola a ser el primer proyecto (con el nombre de su archivo).
 - **Google Drive** guarda todos los proyectos: un índice común (`gpapers-projects.json`, lista de proyectos y ajustes comunes) y los archivos de cada uno (el primero conserva los nombres de siempre, `gpapers-snap.json`…; los demás, `gpapers-p-<id>-…`). Cada vuelta sincroniza el índice y el proyecto abierto; los proyectos de otros dispositivos salen en ▾ con ☁ y se descargan al abrirlos. Renombrar o borrar un proyecto llega a todos los dispositivos.
 
+## Copias, duplicados, PDF y filtros
+- **Copias de seguridad** por proyecto (IndexedDB `bk:<id>`): una al abrir cada día y antes de restaurar o de sustituirlo todo por Drive, las últimas 10; crear, descargar, restaurar (deshacible) y borrar desde ▾ → «Copias de seguridad…». Solo en el navegador.
+- **Buscar duplicados** (grupo Selección): mismo DOI o título; «Quedarme con este» fusiona campos vacíos, etiquetas, secciones, notas y relaciones, y manda los demás a la papelera.
+- **Mover o copiar a otro proyecto** (grupo Selección): notas, etiquetas y secciones (por nombre; se crean si faltan) y relaciones entre los elegidos.
+- **PDF enlazado** (Datos): solo el nombre y la página van al JSON; el enlace al archivo vive en el navegador y no se sube a Drive.
+- **Copiar cita 📋** en tarjetas y tabla; **filtros guardados ⭐** por proyecto (IndexedDB `fav:<id>`); **barra de progreso** de lectura junto al nombre del proyecto.
+
 ## Añadir app
 En la barra lateral, dentro de «Información» (plegada, bajo Configuración), el botón **Añadir app** (mismo estilo que Ayuda) instala la aplicación en el dispositivo. Solo se ve si se abre desde la web y aún no está instalada
 (se oculta al abrirla como app y al instalarse). En Chrome y Edge la instalación la ofrece el navegador; en los demás se explica cómo hacerlo.
@@ -63,7 +70,7 @@ En «Exportar citas» eliges idioma de los conectores (español/inglés), format
 - **Notas** (generales y por sección) con un editor que muestra el formato al escribir, como WhatsApp: `*cursiva*`, `**negrita**`, `~~tachado~~`, `__subrayado__`, listas con «- » o «1. ». Se guardan y copian con esos símbolos; al exportar solo se ve el formato.
 
 ## Pruebas
-`node pruebas/pruebas_citas.js app.js`, `python3 pruebas/prueba_f4.py .`, `python3 pruebas/prueba_ui.py .`, `python3 pruebas/prueba_sync.py .` y `python3 pruebas/prueba_proyectos.py .` (necesitan Playwright con Chromium; la de sincronización simula Google y Drive).
+`node pruebas/pruebas_citas.js app.js`, `python3 pruebas/prueba_f4.py .`, `python3 pruebas/prueba_ui.py .`, `python3 pruebas/prueba_sync.py .`, `python3 pruebas/prueba_proyectos.py .` y `python3 pruebas/prueba_mejoras.py .` (necesitan Playwright con Chromium; la de sincronización simula Google y Drive).
 
 ## Cambios de la ronda F7–F9
 - **Tabla:** columna *Secciones* (se puede seguir agrupando por sección). La pestaña **Cita** va justo después de **Datos**. La **valoración mínima** está en el grupo *Ordenar*.

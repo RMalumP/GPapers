@@ -1246,6 +1246,13 @@ function helpHTML() {
       <li><b>Guardar 💾</b> guarda solo el proyecto abierto en su archivo; <b>Guardar como</b> propone <code>&lt;nombre del proyecto&gt;.json</code>. El autoguardado escribe en el archivo de cada proyecto.</li>
       <li><b>Borrar</b>: ▾ → «Borrar este proyecto»; desaparece de la aplicación (y de tu Google Drive si está conectado). Tu archivo JSON no se toca.</li>
       <li><b>Con Google Drive</b> se guardan todos los proyectos y en tus otros dispositivos aparecen en la lista ▾ (☁ = aún no descargado: se descarga al abrirlo). Al cambiar de proyecto, primero se sube lo pendiente.</li></ul>`],
+    extras: ['Copias, duplicados, PDF y filtros guardados', `<ul><li><b>Copias de seguridad</b>: ▾ junto al nombre del proyecto → «Copias de seguridad…». Se guarda una al abrir la aplicación cada día (las últimas 10) y otra antes de restaurar o de sustituirlo todo por lo de Drive; también puedes crear una a mano, descargarla o borrarla. «Restaurar» sustituye los papers, notas, secciones, etiquetas y papelera de ese proyecto (los ajustes no cambian) y se puede deshacer. Solo viven en este navegador y se borran con el proyecto.</li>
+      <li><b>Buscar duplicados</b>: grupo <b>Selección</b> de la barra lateral. Agrupa papers con el mismo DOI o título; «Quedarme con este» conserva ese paper, le añade lo que falte de los otros (campos vacíos, etiquetas, secciones, notas, relaciones y enlaces de las notas) y manda los demás a la papelera. «No son duplicados» los descarta hasta cerrar la aplicación.</li>
+      <li><b>Mover o copiar a otro proyecto</b>: marca papers con «Seleccionar» y pulsa «Mover o copiar a otro proyecto…» (grupo Selección). Se llevan las notas, etiquetas y secciones (se buscan por nombre y, si no existen en el destino, se crean) y las relaciones entre los papers elegidos. Se ve al abrir el otro proyecto.</li>
+      <li><b>PDF enlazado</b>: en «Datos» de cada paper, «Enlazar un PDF…» (y, si quieres, la página donde abrirlo). Solo se guarda el <b>nombre</b> en el JSON; el archivo no se sube a ningún sitio, ni a Google Drive. Se abre con «📄 PDF» en la tarjeta o la tabla. En otro dispositivo, o si lo moviste, te pide elegirlo de nuevo. Sin acceso a archivos (no Chrome ni Edge de escritorio), hay que elegirlo cada vez.</li>
+      <li><b>Copiar cita 📋</b>: en cada tarjeta y fila copia la cita en el estilo elegido en Exportar, con cursiva al pegar en Word o Docs.</li>
+      <li><b>Filtros guardados ⭐</b>: en el grupo Buscar, «＋» guarda la búsqueda, el orden, la sección, las etiquetas, la lectura y la valoración actuales con un nombre; elígelo para aplicarlo. Son de cada proyecto y de este navegador.</li>
+      <li><b>Progreso</b>: junto al nombre del proyecto, una barra con los papers leídos y leyendo (el detalle, al pasar el ratón).</li></ul>`],
     lista: ['Lista principal', `<ul><li><b>Tarjetas o tabla</b>: el botón «Tabla / Tarjetas» cambia la vista. La tabla muestra imagen, título, autores, año, revista, lectura, valoración, secciones, etiquetas y notas.</li>
       <li><b>En cada tarjeta</b>: casilla para seleccionar, <i>Editar</i>, las etiquetas del paper, el estado de lectura, las estrellas y la ✕ (a la papelera). Si las etiquetas no caben en la barra, pasan a su propia línea.</li>
       <li><b>Estado de lectura</b>: un clic lo cambia (por leer → leyendo → leído). <b>Estrellas</b>: clic derecho para elegir la valoración.</li>
@@ -1474,7 +1481,7 @@ const starsHTML = p => `<span class="stv${p.rating ? '' : ' none'}" oncontextmen
 const rdHTML = p => `<span class="rd"><button class="rst" style="--c:${READ_C[p.reading]}" title="Clic: cambiar el estado de lectura" onclick="cycleRead('${p.id}')">${READ[p.reading]}</button>${starsHTML(p)}</span>`;
 function starMenu(e, id) { ctxShow(e, '<div class="ctxh">Valoración</div>' + [5, 4, 3, 2, 1, 0].map(n => `<button onclick="setRating('${id}',${n})">${n ? '★'.repeat(n) + '☆'.repeat(5 - n) : 'Sin valorar'}</button>`).join('')); }
 function setRating(id, n) { const p = db.papers.find(x => x.id === id); ctxClose(); if (!p || p.rating === n) return; logChange(p, `Valoración: ${p.rating || '—'} → ${n || '—'}`); p.rating = n; markDirty(); render(); }
-const card = (p, from) => `<article class="card" data-id="${p.id}" ${F.group ? `draggable="true" data-from="${from || ''}"` : ''}><div class="ct"><label class="sel"><input type="checkbox" ${SEL.has(p.id) ? 'checked' : ''} onchange="toggleSel('${p.id}')"> Seleccionar</label><button class="sm" onclick="openPaper('${p.id}')">Editar</button>${p.pdf ? `<button class="sm" onclick="pdfOpen('${p.id}')" title="Abrir el PDF enlazado: ${esc(p.pdf.name)}">📄 PDF</button>` : ''}${p.tagIds.length ? `<span class="tl">${tagsOf(p)}</span>` : ''}${rdHTML(p)}<button class="x" title="Eliminar" onclick="delPaper('${p.id}')">✕</button></div><div class="th">${thumbHTML(p, 'sm')}<h3>${esc(p.alias || p.title)}</h3></div>${p.alias ? `<div class="sub">${esc(p.title)}</div>` : ''}
+const card = (p, from) => `<article class="card" data-id="${p.id}" ${F.group ? `draggable="true" data-from="${from || ''}"` : ''}><div class="ct"><label class="sel"><input type="checkbox" ${SEL.has(p.id) ? 'checked' : ''} onchange="toggleSel('${p.id}')"> Seleccionar</label><button class="sm" onclick="openPaper('${p.id}')">Editar</button><button class="sm cpb" onclick="copyCardCite('${p.id}',this)" title="Copiar la cita (estilo elegido en Exportar), con cursiva al pegar en Word">📋</button>${p.pdf ? `<button class="sm" onclick="pdfOpen('${p.id}')" title="Abrir el PDF enlazado: ${esc(p.pdf.name)}">📄 PDF</button>` : ''}${p.tagIds.length ? `<span class="tl">${tagsOf(p)}</span>` : ''}${rdHTML(p)}<button class="x" title="Eliminar" onclick="delPaper('${p.id}')">✕</button></div><div class="th">${thumbHTML(p, 'sm')}<h3>${esc(p.alias || p.title)}</h3></div>${p.alias ? `<div class="sub">${esc(p.title)}</div>` : ''}
     <div class="au"><span>${esc(p.authors.join('; '))} ${p.year ? '(' + esc(p.year) + ')' : ''}</span></div>
     ${/^https?:/i.test(p.url) ? `<a href="${esc(p.url)}" target="_blank" rel="noopener noreferrer">${esc(p.url)}</a>` : ''}
     
@@ -1489,7 +1496,7 @@ const rowHTML = (p, from) => `<tr class="rw" data-id="${p.id}" ${F.group ? `drag
   <td class="tt"><a class="tl2" onclick="openPaper('${p.id}')" title="Editar">${esc(p.alias || p.title)}</a></td><td>${esc(p.authors.join('; '))}</td><td>${esc(p.year)}</td><td>${esc(p.venue)}</td>
   <td><button class="rst" style="--c:${READ_C[p.reading]}" title="Clic: cambiar el estado de lectura" onclick="cycleRead('${p.id}')">${READ[p.reading]}</button></td><td>${starsHTML(p)}</td>
   <td>${p.sectionIds.map(id => db.sections.find(s => s.id === id)).filter(Boolean).map(s => chip(s, 1)).join('')}</td><td>${tagsOf(p)}</td>
-  <td class="nw"><button class="sm" onclick="toggleNotes('${p.id}')" oncontextmenu="viewNotes(event,'${p.id}')" title="Clic: desplegar · Clic derecho: visor de notas">${p.notes.filter(n => n.content.trim()).length} ${EXP.has(p.id) ? '▾' : '▸'}</button>${relCount(p) ? `<button class="sm" onclick="viewRel('${p.id}')" title="Relaciones">🔗 ${relCount(p)}</button>` : ''}</td>
+  <td class="nw"><button class="sm cpb" onclick="copyCardCite('${p.id}',this)" title="Copiar la cita (estilo elegido en Exportar), con cursiva al pegar en Word">📋</button>${p.pdf ? `<button class="sm" onclick="pdfOpen('${p.id}')" title="Abrir el PDF enlazado: ${esc(p.pdf.name)}">📄</button>` : ''}<button class="sm" onclick="toggleNotes('${p.id}')" oncontextmenu="viewNotes(event,'${p.id}')" title="Clic: desplegar · Clic derecho: visor de notas">${p.notes.filter(n => n.content.trim()).length} ${EXP.has(p.id) ? '▾' : '▸'}</button>${relCount(p) ? `<button class="sm" onclick="viewRel('${p.id}')" title="Relaciones">🔗 ${relCount(p)}</button>` : ''}</td>
   <td><button class="x" title="Eliminar" onclick="delPaper('${p.id}')">✕</button></td></tr>${EXP.has(p.id) ? `<tr class="rn"><td></td><td colspan="11">${notesHTML(p)}</td></tr>` : ''}`;
 const tableHTML = (L, from) => `<div class="twrap"><table class="tbl"><thead><tr><th></th>${TH.map(([k, t]) => k ? `<th class="sortable" onclick="thSort('${k}')">${t}${F.sorts[0]?.k === k ? (F.sorts[0].d > 0 ? ' ▲' : ' ▼') : ''}</th>` : `<th>${t}</th>`).join('')}</tr></thead><tbody>${L.map(p => rowHTML(p, from)).join('')}</tbody></table></div>`;
 const items = (l, from) => db.settings.view === 'table' ? (l.length ? tableHTML(l, from) : '') : l.map(p => card(p, from)).join('');
@@ -1526,7 +1533,7 @@ function render() {
   const L = visible();
   $('#list').innerHTML = listHTML(L) || '<p class="empty">No hay papers que mostrar. Crea uno con «Nuevo paper» o ajusta los filtros.</p>';
   fitTags(); hydrateImgs(); uiSoon();
-  $('#count').textContent = `${L.length} de ${db.papers.length} papers · ${SEL.size} seleccionados`;
+  $('#count').textContent = `${L.length} de ${db.papers.length} papers · ${SEL.size} seleccionados`; progDraw();
 }
 function toggleF(id) { F.tags.has(id) ? F.tags.delete(id) : F.tags.add(id); render(); }
 function ctxShow(e, html) {   // menú contextual genérico
@@ -2744,7 +2751,8 @@ function privHTML() {
     <h4>Cómo retirar el permiso o borrar los datos</h4><ul><li><b>Cerrar sesión</b> (menú del icono 🔄): deja de sincronizar en este dispositivo y olvida lo anterior. Tus datos siguen aquí y en tu Drive.</li>
     <li><b>Borrar la copia de Google Drive</b>: menú del icono 🔄 → «Borrar mis datos de Google Drive», o el botón de abajo (con la sesión iniciada).</li>
     <li><b>Quitar el permiso a la aplicación</b> en todos tus dispositivos: <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener">myaccount.google.com/permissions</a>.</li>
-    <li><b>Datos de este navegador</b>: Ayuda → «Aplicación instalada» → «Olvidar la copia de sesión», o borra los datos del sitio desde el navegador. Tus archivos JSON solo los borras tú.</li></ul>
+    <li><b>Datos de este navegador</b>: Ayuda → «Aplicación instalada» → «Olvidar la copia de sesión», o borra los datos del sitio desde el navegador. Tus archivos JSON solo los borras tú.</li>
+    <li><b>Copias de seguridad, filtros guardados y enlaces a PDF</b> se guardan solo en este navegador (nunca en Google Drive); los PDF enlazados no se leen ni se envían a ningún sitio.</li></ul>
     ${syAvail() ? `<p class="sypv">${on ? `Google Drive: <b>sesión iniciada</b>${p.who ? ' como ' + esc(p.who) : ''}${p.last ? ' · última sincronización ' + syAgo(p.last) : ''}.</p><p class="row"><button onclick="syLogout()">🚪 Cerrar sesión</button><button class="danger" onclick="syWipe()">🗑 Borrar mi copia de Google Drive</button>` : 'Google Drive: <b>sin conectar</b>. <button onclick="$(\'#pv\').close();syIntro()">🔄 Sincronizar…</button>'}</p>` : ''}
     <h4>Contacto</h4><p>Dudas sobre esta política: <a href="mailto:r.malumbresp@gmail.com">r.malumbresp@gmail.com</a> o <a href="mailto:rmalum01@ucm.es">rmalum01@ucm.es</a>. Versión para enlazar: <a href="privacidad.html" target="_blank" rel="noopener">privacidad.html</a>.</p></div>`;
 }
@@ -2800,6 +2808,39 @@ function dpDraw() {
     ${G.length ? G.map((g, gi) => `<div class="dpg"><div class="dpt">${g.length} papers · ${g.some((p, i) => g.some((q, j) => i < j && normDoi(p.doi) && normDoi(p.doi) === normDoi(q.doi))) ? 'mismo DOI' : 'mismo título'}</div>
       ${g.map(p => `<div class="irow"><span><b>${esc(p.alias || p.title)}</b><br><small>${esc(svAuth(p))}${p.venue ? ' · ' + esc(p.venue) : ''}${p.doi ? ' · ' + esc(p.doi) : ''}<br>${p.notes.length} notas · ${p.tagIds.length} etiquetas · ${p.related.length} relaciones</small></span><button class="sm" style="margin-left:auto" onclick="dpMerge('${p.id}', ${esc(JSON.stringify(g.map(x => x.id)).replace(/"/g, '&quot;'))});dpDraw()">Quedarme con este</button></div>`).join('')}
       <div class="row"><button class="sm" onclick="DP_IGN.add('${g.map(p => p.id).sort().join()}');dpDraw()">No son duplicados</button></div></div>`).join('') : '<p class="empty">No hay papers duplicados.</p>'}`;
+}
+
+/* ===== Extras: copiar cita, filtros guardados y progreso del proyecto ===== */
+async function copyCardCite(id, b) {   // la cita del paper en el estilo elegido en Exportar, con cursiva real al pegar en Word o Docs
+  const p = db.papers.find(x => x.id === id); if (!p) return; const raw = cite(p, ex());
+  await clipHtml(`<p style="font-family:'Times New Roman',serif;font-size:12pt">${citeHtml(raw)}</p>`, citeTxt(raw), document.body);
+  if (b) { const t = b.textContent; b.textContent = '✓'; setTimeout(() => b.textContent = t, 1200); }
+}
+let FAV = [];   // filtros guardados de este proyecto (solo en este navegador): [{name, q, sorts, group, sec, tags, read, minRating, inNotes, mode}]
+const favLoad = async () => { FAV = await idb('readonly', st => st.get('fav:' + PJ.cur)).then(a => Array.isArray(a) ? a : []).catch(() => []); favDraw(); };
+const favPut = () => idb('readwrite', st => st.put(FAV, 'fav:' + PJ.cur)).catch(() => {});
+function favDraw() {
+  const s = $('#favSel'); if (!s) return; s.innerHTML = `<option value="">⭐ Filtros guardados${FAV.length ? ` (${FAV.length})` : ''}…</option>` + FAV.map((f, i) => `<option value="${i}">${esc(f.name)}</option>`).join('');
+  $('#favDel').hidden = true;
+}
+function favSave() {
+  const name = (prompt('Nombre para estos filtros (búsqueda, orden, sección, etiquetas, lectura y valoración):') || '').trim().slice(0, 40); if (!name) return;
+  const f = {name, q: F.q, sorts: F.sorts.map(s => ({...s})), group: F.group, sec: F.sec, tags: [...F.tags], read: F.read, minRating: F.minRating, inNotes: F.inNotes, mode: F.mode}, i = FAV.findIndex(x => x.name.toLowerCase() === name.toLowerCase());
+  if (i >= 0) FAV[i] = f; else FAV.push(f); favPut(); favDraw(); $('#favSel').value = String(i >= 0 ? i : FAV.length - 1); $('#favDel').hidden = false;
+}
+function favApply(v) {
+  const f = FAV[+v]; $('#favDel').hidden = !f; if (!f) return;
+  F.q = typeof f.q === 'string' ? f.q : ''; $('#q').value = F.q; F.group = !!f.group; F.sec = db.sections.some(s => s.id === f.sec) ? f.sec : '';   // lo que ya no existe se ignora
+  F.tags = new Set((f.tags || []).filter(id => db.tags.some(t => t.id === id))); F.read = Object.hasOwn(READ, f.read) ? f.read : ''; F.minRating = Number.isInteger(f.minRating) && f.minRating >= 0 && f.minRating <= 5 ? f.minRating : 0;
+  F.inNotes = !!f.inNotes; F.mode = f.mode === 'all' ? 'all' : 'any'; const so = (f.sorts || []).filter(x => x && Object.hasOwn(SORTS, x.k) && (x.d === 1 || x.d === -1)).slice(0, 3); if (so.length) F.sorts = so.map(x => ({k: x.k, d: x.d}));
+  document.querySelector('#sg-search .sb input[type=checkbox]').checked = F.inNotes; render(); $('#favSel').value = v; $('#favDel').hidden = false;
+}
+function favDel() { const i = +$('#favSel').value; if (!FAV[i] || !confirm(`¿Borrar los filtros «${FAV[i].name}»?`)) return; FAV.splice(i, 1); favPut(); favDraw(); }
+function progDraw() {   // barra de progreso de lectura del proyecto, en la cabecera
+  const el = $('#pjProg'), n = db.papers.length; el.hidden = !n; if (!n) return;
+  const c = {leido: 0, leyendo: 0, por_leer: 0}; db.papers.forEach(p => c[p.reading in c ? p.reading : 'por_leer']++);
+  el.querySelector('.pjb').innerHTML = ['leido', 'leyendo'].map(k => `<i style="width:${c[k] / n * 100}%;background:${READ_C[k]}"></i>`).join('');
+  el.querySelector('small').textContent = `${c.leido}/${n} leídos`; el.title = `${READ.leido}: ${c.leido} · ${READ.leyendo}: ${c.leyendo} · ${READ.por_leer}: ${c.por_leer} (de ${n} papers)`;
 }
 
 /* ===== PDF enlazado =====
@@ -2921,7 +2962,7 @@ const pjFile = n => (String(n).replace(/[\\/:*?"<>|\u0000-\u001f]/g, '-').trim()
 const pjNameFor = f => { const b = String(f || '').split(/[\\/]/).pop().replace(/\.json$/i, '').trim(); return !b ? 'Mi biblioteca' : b === 'ejemplo_papers' ? 'Ejemplo' : b.slice(0, 60); };
 const pjUnique = (n, skip) => { let o = n, i = 2; while (PJ.list.some(p => p.id !== skip && p.name.toLowerCase() === o.toLowerCase())) o = `${n} (${i++})`; return o; };
 const pjSave = () => BOOTED ? idb('readwrite', st => st.put({v: 1, cur: PJ.cur, list: PJ.list, gone: PJ.gone}, 'projects')).catch(() => {}) : Promise.resolve();
-const pjDrop = id => { const N = syNames(id); return idb('readwrite', st => { ['proj:' + id, 'h:' + id, 'bk:' + id, 'syncBase' + N.key, 'syncCache' + N.key].forEach(k => st.delete(k)); return st.count(); }).catch(() => {}); };
+const pjDrop = id => { const N = syNames(id); return idb('readwrite', st => { ['proj:' + id, 'h:' + id, 'bk:' + id, 'fav:' + id, 'syncBase' + N.key, 'syncCache' + N.key].forEach(k => st.delete(k)); return st.count(); }).catch(() => {}); };
 function pjShow() {
   const p = pjCur(), i = $('#pjName'); if (!p || !i) return;
   if (document.activeElement !== i) i.value = p.name; i.size = Math.max(6, i.value.length + 1); document.title = p.name + ' · Gestor de papers';
@@ -2945,7 +2986,7 @@ async function pjLoad(id, text, file, h) {   // abre un proyecto: su copia de tr
   if (!syOn()) $('#auto').checked = auto;
   if (h) rememberHandle(); hdr(); await sessionNow();
   if (text != null) syLoaded(); else if (syAuto()) sySoon(300);
-  bkDaily();
+  bkDaily(); favLoad();
 }
 async function pjOpen(id) {   // cambiar de proyecto (menú ▾ de la cabecera)
   ctxClose(); const p = PJ.list.find(x => x.id === id); if (!p || id === PJ.cur) return;
@@ -3016,7 +3057,7 @@ function pjMenu(e) {
    Aparte del JSON, la app guarda (1) una copia de trabajo, para reabrir justo donde lo dejaste aunque no hayas guardado, y
    (2) el estado de la interfaz (filtros, orden, barra lateral, bloques plegados). Viven fuera de la caché de la aplicación,
    así que las actualizaciones no los tocan y no hace falta borrar datos para recibir una versión nueva. */
-const APP_V = '32.0';   // debe coincidir con la versión de sw.js
+const APP_V = '32.1';   // debe coincidir con la versión de sw.js
 let BOOTED = false, RELOADING = false, SWREG = null, tSes = 0, tUi = 0, lastUi = '';
 const sessionNow = () => { clearTimeout(tSes); if (!BOOTED) return Promise.resolve();   // copia de trabajo del proyecto abierto (y la lista de proyectos)
   const p = pjCur(); if (p) { Object.assign(p, {n: db.papers.length, file: path, dirty}); delete p.remote; }
@@ -3047,7 +3088,7 @@ async function forgetAppData() {
   if (!confirm(`Se borrarán de este navegador ${n === 1 ? 'el proyecto' : `los ${n} proyectos`} (copias de trabajo) y el estado de la interfaz. Tus archivos JSON y tu Google Drive no se tocan: guarda antes lo que no tengas guardado. ¿Continuar?`)) return;
   BOOTED = false; clearTimeout(tSes); clearTimeout(tUi);
   const ks = await idb('readonly', st => st.getAllKeys()).catch(() => []);
-  await idb('readwrite', st => { ks.filter(k => typeof k === 'string' && /^(session|ui|projects|proj:|h:|bk:|sync)/.test(k)).forEach(k => st.delete(k)); return st.count(); }).catch(() => {});
+  await idb('readwrite', st => { ks.filter(k => typeof k === 'string' && /^(session|ui|projects|proj:|h:|bk:|fav:|sync)/.test(k)).forEach(k => st.delete(k)); return st.count(); }).catch(() => {});
   toast('Datos de este navegador borrados. La próxima vez la aplicación arrancará limpia.');   // en esta pestaña ya no se guarda nada más
 }
 const reloadApp = async () => { RELOADING = true; await sessionNow(); await uiNow(); location.reload(); };
@@ -3076,7 +3117,7 @@ async function bootApp() {
   pjShow(); instShow(); applyUI(ui); BOOTED = true; lastUi = JSON.stringify(uiState()); if (restored) uiNow();
   if (pj && !restored) pjSave(); else await sessionNow();
   if (old) { if (handle) rememberHandle(); idb('readwrite', st => st.delete('session')).catch(() => {}); }
-  bkDaily();
+  bkDaily(); favLoad();
 }
 document.addEventListener('visibilitychange', () => { if (document.hidden) { sessionNow(); uiNow(); } });
 addEventListener('pagehide', () => { sessionNow(); uiNow(); });
