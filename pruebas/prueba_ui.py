@@ -16,7 +16,7 @@ with sync_playwright() as pw:
     kw = {'executable_path': '/opt/pw-browsers/chromium'} if os.path.exists('/opt/pw-browsers/chromium') else {}
     b = pw.chromium.launch(**kw); ctx = b.new_context(permissions=['clipboard-read', 'clipboard-write'], viewport={'width': 1200, 'height': 800}, service_workers='block'); pg = ctx.new_page(); errs = []
     pg.on('pageerror', lambda e: errs.append(str(e))); pg.on('console', lambda m: errs.append(m.text) if m.type == 'error' else None); pg.on('dialog', lambda d: d.accept())
-    pg.goto('file://' + str(folder / 'index.html')); pg.wait_for_timeout(300)
+    pg.goto('file://' + str(folder / 'index.html')); pg.wait_for_timeout(300); pg.evaluate('DATA_ALL = true')   # formulario completo (la vista simplificada se prueba en prueba_principal.py)
     pg.evaluate(SEED)
     # ---- Fase 1
     eq('papelera: 5 días', pg.evaluate("TRASH_DAYS"), 5)
@@ -80,7 +80,7 @@ with sync_playwright() as pw:
     pg.evaluate("drawD()")
     eq('el plegado se conserva al redibujar', pg.evaluate("document.querySelectorAll('#dlg details.cs:not([open])').length"), 1)
     pg.evaluate("tab = 'cite'; drawD()")
-    eq('pestaña Cita propia: todas las variantes', (pg.locator('#dlg textarea[id^=c_]').count(), pg.locator('#dlg details').count()), (10, 0))
+    eq('pestaña Cita propia: todas las variantes', (pg.locator('#dlg textarea[id^=c_]').count(), pg.locator('#dlg details').count()), (11, 0))
     pg.evaluate("ALL_FOLD.clear(); tab = 'cls'; drawD()")
     eq('la pestaña de clasificación usa el diseño de Ver todo (bloques plegables)', pg.evaluate("[...document.querySelectorAll('#dlg details.cs > summary')].map(s => s.textContent)"), ['Secciones', 'Etiquetas', 'Relacionados'])
     eq('y no lleva la cita', pg.locator('#dlg textarea[id^=c_]').count(), 0)
@@ -163,7 +163,7 @@ with sync_playwright() as pw:
     # (el almacenamiento privado del navegador y los enlaces a archivos necesitan http, no file://)
     srv = subprocess.Popen([sys.executable, '-I', '-m', 'http.server', '8791', '-d', str(folder)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL); time.sleep(1)
     pg = ctx.new_page(); pg.on('pageerror', lambda e: errs.append(str(e))); pg.on('dialog', lambda d: d.accept())
-    pg.goto('http://localhost:8791/index.html'); pg.wait_for_timeout(600); pg.evaluate(SEED)
+    pg.goto('http://localhost:8791/index.html'); pg.wait_for_timeout(600); pg.evaluate(SEED); pg.evaluate('DATA_ALL = true')
     PNG = str(folder / 'pruebas' / 'img_prueba.png')
     pg.evaluate("openPaper('p1'); tab = 'data'; drawD()")
     eq('Datos: recuadro con el icono de imagen', pg.inner_text('#dlg .pimgbox .pimg.big').strip(), '🖼️')
@@ -273,7 +273,7 @@ with sync_playwright() as pw:
     eq('opciones de campo: mayúsculas y primera página', (cu('{title:sent}', '{"title": "UN TÍTULO LARGO"}'), cu('{title:title}', '{"title": "un título largo"}'), cu('{pages:first}'), cu('{edition:raw}')), ('Un título largo', 'Un Título Largo', '45', '2'))
     eq('el valor con caracteres reservados se codifica', pg.evaluate("[cuEnc('a:b|c}d[e]=f%'), cuDec(cuEnc('a:b|c}d[e]=f%'))]"), ['a%3ab%7cc%7dd%5be%5d%3df%25', 'a:b|c}d[e]=f%'])
     pg.evaluate("CFG_OPEN.add('cu'); openCfg('no')"); pg.wait_for_timeout(200)
-    pg.select_option('#cfg select:has(option[value=une_nf])', 'une_nf'); pg.wait_for_timeout(300)
+    pg.select_option('#cfg select[onchange^=cuFromBase]', 'une_nf'); pg.wait_for_timeout(300)
     eq('nuevo estilo a partir de uno de serie', pg.evaluate("[db.settings.customStyles.length, db.settings.customStyles[0].name, db.settings.customStyles[0].au.first, Object.keys(db.settings.customStyles[0].tpl).includes('capitulo')]"), [1, 'UNE-ISO 690 nombre-fecha (personalizado)', '{L}, {g}', True])
     eq('y sale igual que el original', pg.evaluate("(st => st.fn(cuSample('libro'), {...ex(), ys: ''}) === STYLES.une_nf.fn(cuSample('libro'), {...ex(), ys: ''}))(STYLES[Object.keys(STYLES).find(k => k.startsWith('cu_'))])"), True)
     # botón derecho sobre un campo dentro de la plantilla

@@ -53,6 +53,8 @@ En «Exportar citas» eliges idioma de los conectores (español/inglés), format
 
 ## Derecho y jurisprudencia
 Los estilos de cita salen agrupados en tres secciones: **Estilos generales**, **Derecho y jurisprudencia** y **Estilos propios** (en Exportar, en la pestaña Cita y en «Nuevo a partir de…»).
+
+**Estilo de cita principal** (Configuración → Notas y citas; APA 7 por defecto): sale primero en la pestaña Cita, o solo él si se marca «mostrar solo el estilo principal» (con un botón para ver todos); al elegirlo pasa a ser también el estilo de Exportar. La pestaña **Datos** abre en una **versión simplificada** con lo básico y los campos que ese estilo usa para el tipo del paper (se detectan probando la cita, así que vale también para los estilos propios); los campos con datos nunca se ocultan y «Mostrar todos los campos» despliega el resto bajo «Otros campos». La pestaña Cita lleva arriba una barra de **formato** (Cursiva, Asterisco literal, Idioma y Fecha de consulta, los mismos ajustes que Exportar).
 El estilo **Derecho y jurisprudencia** une las guías de la UAM (Facultad de Derecho), la UMA, la UC3M y la UCM:
 - **Exportación en bloques**: lista de abreviaturas utilizadas (opcional), bibliografía de la doctrina en APA 7, **Anexo de legislación** y **Anexo de jurisprudencia**, estos dos de lo más antiguo a lo más reciente. La legislación y la jurisprudencia no van en la bibliografía.
 - **Legislación** (UMA): `España. Ley 40/2015, de 2 de octubre, de Régimen Jurídico del Sector Público. Boletín Oficial del Estado, 2 de octubre de 2015, núm. 236, pp. 89411 a 89530.` En el texto, la abreviatura (`art. 22.1 CE`) o, si no hay, rango, número y fecha sacados del título (`RDL 18/2020, de 12 de mayo`; en la UE, `Dir. 2015/2376 del Consejo, de 8 de diciembre de 2015`). Campos nuevos: rango y abreviatura.
@@ -87,7 +89,7 @@ El estilo **Derecho y jurisprudencia** une las guías de la UAM (Facultad de Der
 - **Notas** (generales y por sección) con un editor que muestra el formato al escribir, como WhatsApp: `*cursiva*`, `**negrita**`, `~~tachado~~`, `__subrayado__`, listas con «- » o «1. ». Se guardan y copian con esos símbolos; al exportar solo se ve el formato.
 
 ## Pruebas
-`node pruebas/pruebas_citas.js app.js`, `python3 pruebas/prueba_f4.py .`, `python3 pruebas/prueba_ui.py .`, `python3 pruebas/prueba_sync.py .`, `python3 pruebas/prueba_proyectos.py .`, `python3 pruebas/prueba_mejoras.py .` y `python3 pruebas/prueba_interfaz.py .` (necesitan Playwright con Chromium; la de sincronización simula Google y Drive).
+`node pruebas/pruebas_citas.js app.js`, `python3 pruebas/prueba_f4.py .`, `python3 pruebas/prueba_ui.py .`, `python3 pruebas/prueba_sync.py .`, `python3 pruebas/prueba_proyectos.py .`, `python3 pruebas/prueba_mejoras.py .` y `python3 pruebas/prueba_interfaz.py .`, `python3 pruebas/prueba_derecho.py .`, `python3 pruebas/prueba_principal.py .` (necesitan Playwright con Chromium; la de sincronización simula Google y Drive).
 
 ## Cambios de la ronda F7–F9
 - **Tabla:** columna *Secciones* (se puede seguir agrupando por sección). La pestaña **Cita** va justo después de **Datos**. La **valoración mínima** está en el grupo *Ordenar*.
