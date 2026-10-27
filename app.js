@@ -2589,6 +2589,7 @@ async function syRun(inter, gesture) {   // gesture: viene de un clic o una tecl
 const sySoon = (ms = 3000) => { clearTimeout(SY.tm); SY.tm = setTimeout(() => { SY.tm = 0; syRun(false); }, ms); };
 const syAuto = () => syOn() && syP().auto !== false;
 function syApply(m, replace) {   // pone en la app lo que llega de Drive (se puede deshacer)
+  if (replace) bkTake('Antes de reemplazar por Google Drive');
   const hist = new Map(db.papers.map(p => [p.id, p.history]));
   SY.applying = true;
   try {
@@ -2754,6 +2755,123 @@ function openCred() {
   if (!$('#cr').open) $('#cr').showModal();
 }
 
+/* ===== Buscar duplicados y fusionar =====
+   Dos papers son posibles duplicados si comparten DOI o título (sin tildes ni signos). Al fusionar, el elegido conserva sus datos,
+   completa los campos vacíos con los del otro, une etiquetas, secciones, notas y relaciones (también en las notas que enlazan
+   con él) y el otro va a la papelera, por si acaso. */
+const DP_IGN = new Set();   // grupos marcados «no son duplicados» (hasta cerrar la aplicación)
+function dpGroups() {
+  const P = db.papers, par = P.map((_, i) => i), f = i => par[i] === i ? i : (par[i] = f(par[i])), u = (a, b) => { par[f(a)] = f(b); }, byD = new Map(), byT = new Map();
+  P.forEach((p, i) => { const d = normDoi(p.doi), t = normTitle(p.title); if (d) byD.has(d) ? u(i, byD.get(d)) : byD.set(d, i); if (t) byT.has(t) ? u(i, byT.get(t)) : byT.set(t, i); });
+  const g = new Map(); P.forEach((p, i) => { const r = f(i); if (!g.has(r)) g.set(r, []); g.get(r).push(p); });
+  return [...g.values()].filter(a => a.length > 1 && !DP_IGN.has(a.map(p => p.id).sort().join()));
+}
+const dpEmpty = v => v == null || v === '' || v === false || v === 'auto' || (Array.isArray(v) && !v.length);
+const dpScore = p => Object.entries(p).filter(([k, v]) => !['id', 'history', 'created', 'modified', 'notes'].includes(k) && !dpEmpty(v)).length + 3 * p.notes.length;
+function dpMerge(keepId, ids) {
+  const k = db.papers.find(p => p.id === keepId), gone = ids.filter(i => i !== keepId).map(i => db.papers.find(p => p.id === i)).filter(Boolean); if (!k) return;
+  const SKIP = new Set(['id', 'history', 'created', 'modified', 'notes', 'tagIds', 'sectionIds', 'related', 'refTo', 'cites', 'general', 'rating', 'reading']), G = new Set(gone.map(q => q.id)), uniq = a => [...new Set(a)];
+  for (const q of gone) {
+    for (const key of Object.keys(q)) if (!SKIP.has(key) && dpEmpty(k[key]) && !dpEmpty(q[key])) k[key] = structuredClone(q[key]);
+    k.tagIds = uniq([...k.tagIds, ...q.tagIds]); k.sectionIds = uniq([...(k.sectionIds || []), ...(q.sectionIds || [])]); k.notes.push(...q.notes.map(n => ({...n})));
+    for (const [s, v] of Object.entries(q.cites || {})) if (!(s in k.cites)) k.cites[s] = v;
+    if (q.general && q.general.trim() && q.general.trim() !== (k.general || '').trim()) k.general = (k.general ? k.general + '\n\n' : '') + q.general;
+    k.rating = Math.max(k.rating || 0, q.rating || 0); if ((READ_N[q.reading] || 0) > (READ_N[k.reading] || 0)) k.reading = q.reading;
+    if (q.created && (!k.created || q.created < k.created)) k.created = q.created;
+    k.related = uniq([...k.related, ...q.related]); k.refTo = uniq([...(k.refTo || []), ...(q.refTo || [])]);
+  }
+  const map = a => uniq((a || []).map(x => G.has(x) ? k.id : x));
+  for (const p of db.papers) {
+    p.related = map(p.related).filter(x => x !== p.id && !G.has(x)); p.refTo = map(p.refTo).filter(x => x !== p.id && !G.has(x));
+    const fix = t => gone.reduce((s, q) => s.split(`[[p:${q.id}]]`).join(`[[p:${k.id}]]`), String(t ?? '')); p.general = fix(p.general); p.notes.forEach(n => n.content = fix(n.content));
+  }
+  k.related.forEach(r => { const q = db.papers.find(x => x.id === r); if (q && !q.related.includes(k.id)) q.related.push(k.id); });
+  logChange(k, 'Fusionado con: ' + gone.map(q => '«' + shortTxt(q.title) + '»').join(', ')); k.modified = new Date().toISOString();
+  gone.forEach(q => trashPaper(q.id)); markDirty(); render();
+}
+function dpOpen() { dpDraw(); if (!$('#dp').open) $('#dp').showModal(); }
+function dpDraw() {
+  const G = dpGroups();
+  $('#dp').innerHTML = `<div class="dh"><h2>Posibles duplicados</h2><div class="dbtn"><button onclick="$('#dp').close()">Cerrar ✕</button></div></div>
+    <p class="empty">Papers con el mismo DOI o el mismo título. «Quedarme con este» lo conserva, le añade lo que falte de los otros (campos vacíos, etiquetas, secciones, notas, relaciones) y manda los demás a la papelera.</p>
+    ${G.length ? G.map((g, gi) => `<div class="dpg"><div class="dpt">${g.length} papers · ${g.some((p, i) => g.some((q, j) => i < j && normDoi(p.doi) && normDoi(p.doi) === normDoi(q.doi))) ? 'mismo DOI' : 'mismo título'}</div>
+      ${g.map(p => `<div class="irow"><span><b>${esc(p.alias || p.title)}</b><br><small>${esc(svAuth(p))}${p.venue ? ' · ' + esc(p.venue) : ''}${p.doi ? ' · ' + esc(p.doi) : ''}<br>${p.notes.length} notas · ${p.tagIds.length} etiquetas · ${p.related.length} relaciones</small></span><button class="sm" style="margin-left:auto" onclick="dpMerge('${p.id}', ${esc(JSON.stringify(g.map(x => x.id)).replace(/"/g, '&quot;'))});dpDraw()">Quedarme con este</button></div>`).join('')}
+      <div class="row"><button class="sm" onclick="DP_IGN.add('${g.map(p => p.id).sort().join()}');dpDraw()">No son duplicados</button></div></div>`).join('') : '<p class="empty">No hay papers duplicados.</p>'}`;
+}
+
+/* ===== Mover o copiar papers a otro proyecto =====
+   Los papers seleccionados (con sus notas, etiquetas, secciones y las relaciones entre ellos) pasan a la copia de trabajo del otro
+   proyecto. Las etiquetas y secciones se buscan por nombre y, si no existen allí, se crean. Se ve al abrir ese proyecto. */
+function psOpen() {
+  const ids = [...SEL].filter(id => db.papers.some(p => p.id === id)), T = PJ.list.filter(p => p.id !== PJ.cur && !p.remote);
+  if (!ids.length) return toast('Selecciona antes los papers que quieres mover o copiar (casilla «Seleccionar» de cada uno).', [], 4000);
+  if (!T.length) return toast('Necesitas otro proyecto en este dispositivo: crea uno con ▾ junto al nombre del proyecto.', [], 4500);
+  $('#ps').innerHTML = `<div class="dh"><h2>Mover o copiar ${ids.length} ${ids.length === 1 ? 'paper' : 'papers'}</h2><div class="dbtn"><button onclick="$('#ps').close()">Cerrar ✕</button></div></div>
+    <p class="empty">Desde «${esc(pjCur().name)}» a otro proyecto. Se llevan las notas, etiquetas y secciones (se crean en el destino si no existen) y las relaciones entre los papers elegidos.</p>
+    <label class="row"><input type="radio" name="psm" value="copy" checked> Copiar (se quedan también aquí)</label><label class="row"><input type="radio" name="psm" value="move"> Mover (dejan de estar aquí)</label>
+    <h4>Proyecto de destino</h4>${T.map(p => `<button class="pji2" onclick="psGo('${p.id}')">${esc(p.name)} <small>${p.n || 0} papers</small></button>`).join('')}`;
+  $('#ps').showModal();
+}
+async function psGo(tid) {
+  const mode = document.querySelector('#ps input[name=psm]:checked')?.value || 'copy', ids = [...SEL].filter(id => db.papers.some(p => p.id === id)), tp = PJ.list.find(p => p.id === tid);
+  const rec = await idb('readonly', st => st.get('proj:' + tid)).catch(() => null); let d; try { d = JSON.parse(rec.json); } catch (e) { return alert('No se pudo leer el proyecto de destino.'); }
+  const src = ids.map(id => structuredClone(db.papers.find(p => p.id === id))), srcTags = new Map(db.tags.map(t => [t.id, t])), srcSecs = new Map(db.sections.map(s => [s.id, s]));
+  const low = s => String(s).trim().toLowerCase(), tagMap = new Map(), secMap = new Map(), have = new Set(d.papers.map(p => p.id).concat(d.trash.map(t => t.paper.id)));
+  const mapTag = id => { const t = srcTags.get(id); if (!t) return null; if (!tagMap.has(id)) { let x = d.tags.find(y => low(y.name) === low(t.name)); if (!x) { x = {...t, id: have.has(t.id) || d.tags.some(y => y.id === t.id) ? uid() : t.id}; d.tags.push(x); } tagMap.set(id, x.id); } return tagMap.get(id); };
+  const mapSec = id => { const s = srcSecs.get(id); if (!s) return null; if (!secMap.has(id)) { let x = d.sections.find(y => low(y.name) === low(s.name)); if (!x) { x = {...s, id: d.sections.some(y => y.id === s.id) ? uid() : s.id, tagIds: (s.tagIds || []).map(mapTag).filter(Boolean)}; d.sections.push(x); } secMap.set(id, x.id); } return secMap.get(id); };
+  const idMap = new Map(src.map(p => [p.id, mode === 'move' && !have.has(p.id) ? p.id : (have.has(p.id) ? uid() : p.id)])), uq = a => [...new Set(a)];
+  for (const p of src) {
+    const old = p.id; p.id = idMap.get(old); p.history = [];
+    p.tagIds = uq(p.tagIds.map(mapTag).filter(Boolean)); p.sectionIds = uq((p.sectionIds || []).map(mapSec).filter(Boolean));
+    p.notes.forEach(n => { n.sectionId = n.sectionId ? mapSec(n.sectionId) || '' : ''; });
+    p.related = uq(p.related.filter(x => idMap.has(x)).map(x => idMap.get(x))); p.refTo = uq((p.refTo || []).filter(x => idMap.has(x)).map(x => idMap.get(x)));
+    const fix = t => [...idMap].reduce((s, [a, b]) => a === b ? s : s.split(`[[p:${a}]]`).join(`[[p:${b}]]`), String(t ?? '')); p.general = fix(p.general); p.notes.forEach(n => n.content = fix(n.content));
+    d.papers.push(p);
+  }
+  await bkTake('Antes de ' + (mode === 'move' ? 'mover' : 'copiar') + ' papers a «' + tp.name + '»', true);
+  const json = JSON.stringify(d, null, 2);
+  await idb('readwrite', st => st.put({...rec, dirty: true, at: new Date().toISOString(), json}, 'proj:' + tid)).catch(() => {});
+  Object.assign(tp, {n: d.papers.length, dirty: true});
+  if (mode === 'move') { const S = new Set(ids); db.papers = db.papers.filter(p => !S.has(p.id)); db.papers.forEach(q => { q.related = q.related.filter(x => !S.has(x)); q.refTo = (q.refTo || []).filter(x => !S.has(x)); }); SEL.clear(); markDirty(); render(); } else { SEL.clear(); render(); }
+  pjSave(); $('#ps').close();
+  toast(`${ids.length} ${ids.length === 1 ? 'paper' : 'papers'} ${mode === 'move' ? 'movido' + (ids.length === 1 ? '' : 's') : 'copiado' + (ids.length === 1 ? '' : 's')} a «${tp.name}».`, [{t: 'Abrir ese proyecto', fn: () => pjOpen(tid)}], 8000);
+}
+
+/* ===== Copias de seguridad de cada proyecto =====
+   Una copia al abrir cada día (y antes de restaurar o de sustituirlo todo por lo de Drive) en IndexedDB
+   («bk:<id>»): las últimas 10 (4 si son muy grandes). Solo viven en este navegador; la papelera y Drive no las sustituyen. */
+const BK_MAX = 10;
+const bkList = (id = PJ.cur) => idb('readonly', st => st.get('bk:' + id)).then(L => Array.isArray(L) ? L : []).catch(() => []);
+async function bkTake(why, force, id = PJ.cur) {   // la copia se hace del estado que hay al llamar (antes de cualquier await)
+  if (!BOOTED || id !== PJ.cur) return; const json = dbJSON(), n = db.papers.length, any = n + db.trash.length + db.sections.length + db.tags.length;
+  if (!any && !force) return;
+  const L = await bkList(id); if (!force && L.length && L[0].json === json) return;   // sin cambios desde la última
+  L.unshift({at: new Date().toISOString(), why, n, size: json.length, json}); L.length = Math.min(L.length, json.length > 3e6 ? 4 : BK_MAX);
+  await idb('readwrite', st => st.put(L, 'bk:' + id)).catch(() => {});
+}
+const bkDaily = async () => { const L = await bkList(); if (!L.length || Date.now() - Date.parse(L[0].at) > 864e5) await bkTake('Automática'); };
+const bkFmt = c => new Date(c.at).toLocaleString('es', {dateStyle: 'medium', timeStyle: 'short'});
+async function bkOpen() {
+  ctxClose(); const L = await bkList(), kb = x => x < 1024 ? x + ' B' : x < 1048576 ? Math.round(x / 1024) + ' KB' : (x / 1048576).toFixed(1) + ' MB';
+  $('#bk').innerHTML = `<div class="dh"><h2>Copias de seguridad · ${esc(pjCur().name)}</h2><div class="dbtn"><button onclick="$('#bk').close()">Cerrar ✕</button></div></div>
+    <p class="empty">Se guarda una copia al abrir la aplicación cada día (las últimas ${BK_MAX}) y antes de restaurar o de sustituirlo todo por lo de Drive. Solo están en este navegador y se borran con el proyecto. Restaurar sustituye papers, notas, secciones, etiquetas y papelera de este proyecto (los ajustes no cambian) y se puede deshacer.</p>
+    ${L.length ? L.map((c, i) => `<div class="irow"><span><b>${esc(bkFmt(c))}</b><br><small>${esc(c.why)} · ${c.n} papers · ${kb(c.size)}</small></span><span class="row" style="margin-left:auto;flex-wrap:nowrap"><button class="sm" onclick="bkRestore(${i})">Restaurar</button><button class="sm" onclick="bkDownload(${i})" title="Descargar esta copia como JSON">⬇</button><button class="sm x" onclick="bkDelete(${i})" title="Borrar esta copia">✕</button></span></div>`).join('') : '<p class="empty">Todavía no hay copias.</p>'}
+    <div class="row" style="margin-top:12px"><button class="pri" onclick="bkNow()">Crear copia ahora</button></div>`;
+  if (!$('#bk').open) $('#bk').showModal();
+}
+async function bkNow() { await bkTake('Manual', true); bkOpen(); }
+async function bkDownload(i) { const c = (await bkList())[i]; if (c) download(c.json, `${pjCur().name} · copia ${c.at.slice(0, 10)}.json`, 'application/json'); }
+async function bkDelete(i) { const L = await bkList(); L.splice(i, 1); await idb('readwrite', st => st.put(L, 'bk:' + PJ.cur)).catch(() => {}); bkOpen(); }
+async function bkRestore(i) {
+  const c = (await bkList())[i]; if (!c) return;
+  if (!confirm(`¿Restaurar la copia del ${bkFmt(c)} (${c.n} papers)?\nSe sustituye lo que hay ahora en «${pjCur().name}»; antes se guarda una copia del estado actual y puedes deshacerlo (${db.settings.shortcuts.undo}).`)) return;
+  let d; try { d = JSON.parse(c.json); d.settings = structuredClone(db.settings); d = validate(d); } catch (e) { return alert('La copia no es válida: ' + e.message); } finally { syncTypes(db.settings.customTypes); syncStyles(db.settings.customStyles, db.settings.export); }
+  await bkTake('Antes de restaurar', true);
+  const hist = new Map(db.papers.map(p => [p.id, p.history])); db = d; db.papers.forEach(p => p.history = hist.get(p.id) || []);
+  for (const id of [...SEL]) if (!db.papers.some(p => p.id === id)) SEL.delete(id);
+  lastRecAt = 0; record(); markDirty(); applySettings(); render(); bkOpen(); toast('Copia restaurada. Lo anterior sigue en las copias y se puede deshacer.', [], 5000);
+}
+
 /* ===== Proyectos =====
    Cada proyecto es una biblioteca aparte (papers, notas, secciones, etiquetas y papelera) con su propio archivo JSON, que se llama
    como el proyecto. Los ajustes (nombre de la aplicación, colores, atajos, tipos y estilos propios, plantillas, exportación) son
@@ -2766,7 +2884,7 @@ const pjFile = n => (String(n).replace(/[\\/:*?"<>|\u0000-\u001f]/g, '-').trim()
 const pjNameFor = f => { const b = String(f || '').split(/[\\/]/).pop().replace(/\.json$/i, '').trim(); return !b ? 'Mi biblioteca' : b === 'ejemplo_papers' ? 'Ejemplo' : b.slice(0, 60); };
 const pjUnique = (n, skip) => { let o = n, i = 2; while (PJ.list.some(p => p.id !== skip && p.name.toLowerCase() === o.toLowerCase())) o = `${n} (${i++})`; return o; };
 const pjSave = () => BOOTED ? idb('readwrite', st => st.put({v: 1, cur: PJ.cur, list: PJ.list, gone: PJ.gone}, 'projects')).catch(() => {}) : Promise.resolve();
-const pjDrop = id => { const N = syNames(id); return idb('readwrite', st => { ['proj:' + id, 'h:' + id, 'syncBase' + N.key, 'syncCache' + N.key].forEach(k => st.delete(k)); return st.count(); }).catch(() => {}); };
+const pjDrop = id => { const N = syNames(id); return idb('readwrite', st => { ['proj:' + id, 'h:' + id, 'bk:' + id, 'syncBase' + N.key, 'syncCache' + N.key].forEach(k => st.delete(k)); return st.count(); }).catch(() => {}); };
 function pjShow() {
   const p = pjCur(), i = $('#pjName'); if (!p || !i) return;
   if (document.activeElement !== i) i.value = p.name; i.size = Math.max(6, i.value.length + 1); document.title = p.name + ' · Gestor de papers';
@@ -2790,6 +2908,7 @@ async function pjLoad(id, text, file, h) {   // abre un proyecto: su copia de tr
   if (!syOn()) $('#auto').checked = auto;
   if (h) rememberHandle(); hdr(); await sessionNow();
   if (text != null) syLoaded(); else if (syAuto()) sySoon(300);
+  bkDaily();
 }
 async function pjOpen(id) {   // cambiar de proyecto (menú ▾ de la cabecera)
   ctxClose(); const p = PJ.list.find(x => x.id === id); if (!p || id === PJ.cur) return;
@@ -2853,7 +2972,7 @@ function pjMenu(e) {
   e.stopPropagation(); const r = e.currentTarget.getBoundingClientRect(), L = [...PJ.list].sort((a, b) => a.name.localeCompare(b.name, 'es'));
   ctxShow({preventDefault() {}, stopPropagation() {}, clientX: r.left, clientY: r.bottom + 4}, '<div class="ctxh">Proyectos</div>'
     + L.map(p => `<button class="pji" onclick="pjOpen('${p.id}')">${tick(p.id === PJ.cur)}${esc(p.name)} <small>${p.remote ? '☁ en Google Drive' : (p.id === PJ.cur ? db.papers.length : p.n || 0) + ' papers'}</small></button>`).join('')
-    + '<hr><button onclick="pjNew()">＋ Nuevo proyecto</button><button onclick="ctxClose();doOpen()">📂 Abrir un JSON como proyecto…</button><button onclick="ctxClose();pjEdit()">✏️ Cambiar el nombre</button><button class="danger" onclick="pjDel()">🗑 Borrar este proyecto…</button>');
+    + '<hr><button onclick="pjNew()">＋ Nuevo proyecto</button><button onclick="ctxClose();doOpen()">📂 Abrir un JSON como proyecto…</button><button onclick="ctxClose();pjEdit()">✏️ Cambiar el nombre</button><button onclick="bkOpen()">🕘 Copias de seguridad…</button><button class="danger" onclick="pjDel()">🗑 Borrar este proyecto…</button>');
 }
 
 /* ===== Datos de la aplicación (PWA): copia de la sesión y estado de la interfaz, en IndexedDB =====
@@ -2891,7 +3010,7 @@ async function forgetAppData() {
   if (!confirm(`Se borrarán de este navegador ${n === 1 ? 'el proyecto' : `los ${n} proyectos`} (copias de trabajo) y el estado de la interfaz. Tus archivos JSON y tu Google Drive no se tocan: guarda antes lo que no tengas guardado. ¿Continuar?`)) return;
   BOOTED = false; clearTimeout(tSes); clearTimeout(tUi);
   const ks = await idb('readonly', st => st.getAllKeys()).catch(() => []);
-  await idb('readwrite', st => { ks.filter(k => typeof k === 'string' && /^(session|ui|projects|proj:|h:|sync)/.test(k)).forEach(k => st.delete(k)); return st.count(); }).catch(() => {});
+  await idb('readwrite', st => { ks.filter(k => typeof k === 'string' && /^(session|ui|projects|proj:|h:|bk:|sync)/.test(k)).forEach(k => st.delete(k)); return st.count(); }).catch(() => {});
   toast('Datos de este navegador borrados. La próxima vez la aplicación arrancará limpia.');   // en esta pestaña ya no se guarda nada más
 }
 const reloadApp = async () => { RELOADING = true; await sessionNow(); await uiNow(); location.reload(); };
@@ -2920,6 +3039,7 @@ async function bootApp() {
   pjShow(); instShow(); applyUI(ui); BOOTED = true; lastUi = JSON.stringify(uiState()); if (restored) uiNow();
   if (pj && !restored) pjSave(); else await sessionNow();
   if (old) { if (handle) rememberHandle(); idb('readwrite', st => st.delete('session')).catch(() => {}); }
+  bkDaily();
 }
 document.addEventListener('visibilitychange', () => { if (document.hidden) { sessionNow(); uiNow(); } });
 addEventListener('pagehide', () => { sessionNow(); uiNow(); });
