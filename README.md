@@ -49,6 +49,14 @@ La plantilla depende del tipo de fuente (artículo, libro, capítulo, congreso, 
 y en «Copiar con formato» y en Word se convierte. En la pestaña «Cita» puedes escribir `*texto*` para cursiva (un asterisco literal, `\*`).
 En «Exportar citas» eliges idioma de los conectores (español/inglés), formato de la fecha de consulta y si Vancouver lista todos los autores.
 
+## Derecho y jurisprudencia
+Los estilos de cita salen agrupados en tres secciones: **Estilos generales**, **Derecho y jurisprudencia** y **Estilos propios** (en Exportar, en la pestaña Cita y en «Nuevo a partir de…»).
+El estilo **Derecho y jurisprudencia** une las guías de la UAM (Facultad de Derecho), la UMA, la UC3M y la UCM:
+- **Exportación en bloques**: lista de abreviaturas utilizadas (opcional), bibliografía de la doctrina en APA 7, **Anexo de legislación** y **Anexo de jurisprudencia**, estos dos de lo más antiguo a lo más reciente. La legislación y la jurisprudencia no van en la bibliografía.
+- **Legislación** (UMA): `España. Ley 40/2015, de 2 de octubre, de Régimen Jurídico del Sector Público. Boletín Oficial del Estado, 2 de octubre de 2015, núm. 236, pp. 89411 a 89530.` En el texto, la abreviatura (`art. 22.1 CE`) o, si no hay, rango, número y fecha sacados del título (`RDL 18/2020, de 12 de mayo`; en la UE, `Dir. 2015/2376 del Consejo, de 8 de diciembre de 2015`). Campos nuevos: rango y abreviatura.
+- **Jurisprudencia** (tipo nuevo): `España. Tribunal Supremo (Sala de lo Penal, Sección 1.ª). Sentencia núm. 1229/2017, de 29 de marzo de 2017.`; con caso, asunto y ECLI en los tribunales europeos (`Caso Schempp (C-403/03). Sentencia de 12 de julio de 2005, EU:C:2005:446.`), base de datos o internet. En el texto, el tribunal abreviado (STS, STC, ATC, DTC, SAN, STSJ Madrid, SAP Sevilla, STEDH, STJUE…) con número y fecha, y FJ, FD o apartado. Los demás estilos citan la jurisprudencia con la misma plantilla (las guías la recomiendan sea cual sea el estilo).
+- BibTeX (`@jurisdiction`, `shorthand`, `ecli`) y RIS (`CASE`, `J2`, `C3`, `DB`) importan y exportan los campos nuevos.
+
 ## Novedades (F0.5 y F1a)
 - Por paper puedes elegir el enlace de la cita (DOI, URL o ninguno) y omitir «[consultado …]» aunque la fecha esté rellena.
 - Campos nuevos en el formulario según el tipo: volumen, número, páginas, edición, editorial, lugar, editores, fecha de publicación, tipo de trabajo y tipo de autor (persona, entidad, sin autor).
