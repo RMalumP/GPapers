@@ -95,7 +95,7 @@ function filtDraw() {   // chips de Secciones, Etiquetas y Lectura, con cuántos
   const rp = $('#readP'); rp.hidden = !N; rp.innerHTML = N ? ['leido', 'leyendo'].map(k => `<i style="width:${cR[k] / N * 100}%;background:${READ_C[k]}"></i>`).join('') : '';
   rp.title = `Progreso de lectura: ${cR.leido} leídos, ${cR.leyendo} leyendo y ${cR.por_leer} por leer, de ${N}`;
   $('#minR').value = F.minRating; $('#yFrom').value = F.yFrom || ''; $('#yTo').value = F.yTo || '';
-  actDraw();
+  actDraw(); favDraw(); recDraw();
 }
 const tagsOf = p => p.tagIds.map(tagById).filter(Boolean).map(t => chip(t, 1, '', 0, `tagMenu(event,'${p.id}','${t.id}')`)).join('');
 const EXP = new Set();   // papers con las notas desplegadas en la lista
@@ -265,6 +265,8 @@ document.addEventListener('click', e => { if (!e.target.closest('.fm')) fmClose(
 document.addEventListener('contextmenu', e => { if (!e.target.closest('[data-oncontextmenu]')) ctxClose(); });   // clic derecho en otro sitio también cierra
 function setSecF(id) { F.sec = id && F.sec === id ? '' : id; F.noSec = false; render(); }   // '' = Todas; pulsar la sección activa también vuelve a «Todas»
 function sbToggle() { $('#side').classList.toggle('min'); uiSoon(); }
+function sbAllMenu(e) { ctxShow(e, '<div class="ctxh">Grupos de la barra</div><button data-onclick="ctxClose();sbAll(0)">Desplegar todos</button><button data-onclick="ctxClose();sbAll(1)">Plegar todos</button>'); }
+function sbAll(fold) { $('#side').classList.remove('min'); document.querySelectorAll('#side .sg').forEach(e => e.classList.toggle('fold', !!fold)); uiSoon(); }
 function sbSearchDock() {   // con la barra plegada, la búsqueda pasa a la fila de «Nuevo paper» (el resto se pliega); al desplegarla, vuelve a su sitio
   const q = $('#q'), min = $('#side').classList.contains('min'), had = document.activeElement === q;
   if (min) $('main > .row .pri').after(q); else $('#sg-search .sgh').appendChild(q);

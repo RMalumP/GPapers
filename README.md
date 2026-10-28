@@ -40,7 +40,7 @@ Los ajustes son comunes a todos: nombre de la aplicación, colores, atajos, tipo
 - **Buscar duplicados** (grupo Selección): mismo DOI o título; «Quedarme con este» fusiona campos vacíos, etiquetas, secciones, notas y relaciones, y manda los demás a la papelera.
 - **Mover o copiar a otro proyecto** (grupo Selección): notas, etiquetas y secciones (por nombre; se crean si faltan) y relaciones entre los elegidos.
 - **PDF enlazado** (Datos): solo el nombre y la página van al JSON; el enlace al archivo vive en el navegador. Opcional (Configuración → «Subir a mi Google Drive los PDF enlazados»): cada PDF se copia a la carpeta oculta de Drive (`gpapers-pdf-<id>`, subida reanudable, máx. 100 MB) y se abre desde otros dispositivos; se borra al quitar el enlace.
-- **Copiar cita 📋** en tarjetas y tabla; **filtros guardados ⭐** por proyecto (IndexedDB `fav:<id>`); **barra de progreso** de lectura junto al nombre del proyecto.
+- **Copiar cita 📋** en tarjetas y tabla; **vistas ⭐** (filtros guardados) por proyecto (IndexedDB `fav:<id>`; los recientes, en `rec:<id>`); **barra de progreso** de lectura junto al nombre del proyecto.
 
 ## Añadir app
 En la barra lateral, dentro de «Información» (plegada, bajo Configuración), el botón **Añadir app** (mismo estilo que Ayuda) instala la aplicación en el dispositivo. Solo se ve si se abre desde la web y aún no está instalada
@@ -86,6 +86,7 @@ El estilo **Derecho y jurisprudencia** une las guías de la UAM (Facultad de Der
 - **Lista principal:** el estado de lectura y las estrellas van junto a la ✕; clic derecho en las estrellas para cambiar la valoración.
 - **Barra lateral** con fondo y borde propios; «Gestionar» junto al título de Secciones y Etiquetas.
 - **Filtros** con contadores en cada chip, «Sin sección» y «Sin etiquetas», etiquetas excluidas (clic derecho en una etiqueta), valoración mínima, rango de años, buscador de etiquetas (con 6 o más) y barra de progreso de lectura. Los filtros aplicados se resumen sobre la lista, cada uno con su ✕, y con «Limpiar todo».
+- **Barra lateral en tres bloques:** buscar, filtrar y ordenar (Ordenar empieza plegado); luego **Vistas** (búsquedas y filtros guardados, un clic para aplicarlas, la activa marcada), **Recientes** (los 5 últimos papers abiertos), Selección y Relaciones; abajo Papelera, Configuración e Información. Clic derecho en «Menú» pliega o despliega todos los grupos.
 - **Barra lateral plegada:** la búsqueda sigue a la vista en la fila de «Nuevo paper»; lo demás se pliega. Etiquetas tiene la opción «Todas», como Secciones, y «☑ Visibles» selecciona los papers que se ven.
 - **Configuración** y **editar paper** con cabecera fija que se estrecha al hacer scroll; apartados plegables.
 - **Editar paper:** pestaña «Secciones, etiquetas y relacionados» con el mismo diseño plegable que «Ver todo», y la cita en su propia pestaña; «Ver todo» con bloques plegables y una sola variante de cita (selector).

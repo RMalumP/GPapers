@@ -2,7 +2,7 @@
 /* ===== Edición de paper (trabaja sobre un borrador D) ===== */
 function openPaper(id) {
   D = id ? structuredClone(db.papers.find(p => p.id === id)) : {id: uid(), created: new Date().toISOString(), title: '', alias: '', sortKey: '', related: [], refTo: [], history: [], reading: 'por_leer', rating: 0, sectionIds: F.sec ? [F.sec] : [], authors: [], year: '', url: '', type: 'articulo', venue: '', doi: '', accessed: '', general: '', tagIds: [], notes: [], cites: {}}; if (!id) NEWF(D);
-  tab = 'all'; CITE_ALL = false; drawD(); $('#dlg').showModal();
+  tab = 'all'; CITE_ALL = false; drawD(); $('#dlg').showModal(); if (id) recPush(id);
 }
 const lbl = (k, def) => CTYPES.has(D.type) ? CTYPES.get(D.type).labels[k] || def : FLBL[k]?.[D.type] ?? def;   // etiqueta del campo según el tipo del borrador
 const inp = (k, lbl, type = 'text', cls = '') => `<label class="${cls}">${lbl}<input type="${type}" data-k="${k}" value="${esc(D[k])}" data-oninput="put(D,'${k}',this.value)"></label>`;

@@ -191,3 +191,6 @@ main > .row > #q{width:220px;min-width:0;flex:0 1 220px}
 .yrs{align-items:center;gap:6px}.yrs input{width:0;flex:1;min-width:0}
 #actF{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:0 0 10px;font-size:13px}#actF[hidden]{display:none}#actF small{opacity:.7}
 #actF .af{font-size:12px;padding:2px 8px;border-radius:99px}#actF .af b{font-weight:400;opacity:.6;margin-left:2px}#actF .afx{font-size:12px;padding:2px 8px;border:0;background:none;color:var(--pri);text-decoration:underline}
+#favL{display:flex;flex-direction:column;gap:4px}.fav{display:flex;gap:4px}.fav .fva{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.fav.on .fva{border-color:var(--pri);font-weight:600}
+.fav .x{border:0;background:none;color:var(--red);padding:2px 6px}#favL small{opacity:.7}
+#recL .rec{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px}

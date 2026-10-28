@@ -25,18 +25,22 @@
 </header>
 <div id="app">
   <aside id="side">
-    <button class="sh" data-onclick="sbToggle()" title="Plegar / desplegar menú"><span class="ic">☰</span><span class="lbl">Menú</span></button>
+    <button class="sh" data-onclick="sbToggle()" data-oncontextmenu="sbAllMenu(event)" title="Plegar / desplegar menú · Clic derecho: plegar o desplegar todos los grupos"><span class="ic">☰</span><span class="lbl">Menú</span></button>
     <div class="sg" id="sg-search"><div class="sgh"><button class="sh" data-onclick="sbGroup('search')" title="Buscar" aria-label="Buscar"><span class="ic">🔍</span><span class="dot" id="d-search" hidden></span></button><input id="q" type="search" placeholder="Título, autor o año" aria-label="Buscar" data-oninput="qSet(this.value)" data-onkeydown="onEnter(event,qSet,this.value,1)"></div>
-      <div class="sb"><label><input type="checkbox" data-onchange="put(F,'inNotes',this.checked,render)"> Incluir notas y citas editadas</label>
-        <div class="row"><select id="favSel" data-onchange="favApply(this.value)" aria-label="Filtros guardados"><option value="">⭐ Filtros guardados…</option></select><button data-onclick="favSave()" title="Guardar los filtros actuales con un nombre">＋</button><button id="favDel" data-onclick="favDel()" title="Borrar los filtros elegidos" hidden>✕</button></div></div></div>
-    <div class="sg" id="sg-sort"><button class="sh" data-onclick="sbGroup('sort')" title="Ordenar"><span class="ic">⇅</span><span class="lbl">Ordenar</span><span class="dot" id="d-sort" hidden></span></button>
-      <div class="sb"><div id="sortUI"></div><label><input type="checkbox" id="grpChk" data-onchange="put(F,'group',this.checked,render)"> Agrupar por sección</label></div></div>
+      <div class="sb"><label><input type="checkbox" data-onchange="put(F,'inNotes',this.checked,render)"> Incluir notas y citas editadas</label></div></div>
     <div class="sg" id="sg-filt"><button class="sh" data-onclick="sbGroup('filt')" title="Filtros: secciones, etiquetas y lectura"><span class="ic">🎚️</span><span class="lbl">Filtros</span><span class="dot" id="d-filt" hidden></span></button>
       <div class="sb"><div class="fh2"><b>📁 Secciones</b><button class="mgb" data-onclick="openMg('sections')" title="Gestionar secciones">✎ Gestionar</button></div><div id="secF"></div><button data-onclick="svOpen(F.sec)">📄 Ver notas de la sección</button>
         <div class="fh2"><b>🏷️ Etiquetas</b><button class="mgb" data-onclick="openMg('tags')" title="Gestionar etiquetas">✎ Gestionar</button></div><input id="tagQ" type="search" placeholder="Buscar etiqueta…" aria-label="Buscar etiqueta" data-oninput="tagQSet(this.value)" hidden><div id="tagF"></div>
         <div class="fh2"><b>📖 Lectura</b></div><div id="readF"></div><div id="readP" class="pjb" title=""></div>
         <div class="fh2"><b>⭐ Valoración</b></div><select id="minR" aria-label="Valoración mínima" data-onchange="put(F,'minRating',+this.value,render)"><option value="0">Cualquiera</option><option value="1">Al menos ★1</option><option value="2">Al menos ★2</option><option value="3">Al menos ★3</option><option value="4">Al menos ★4</option><option value="5">Al menos ★5</option></select>
         <div class="fh2"><b>📅 Años</b></div><div class="row yrs"><input id="yFrom" type="number" min="0" max="9999" placeholder="Desde" aria-label="Desde el año" data-onchange="setYears()"><span>–</span><input id="yTo" type="number" min="0" max="9999" placeholder="Hasta" aria-label="Hasta el año" data-onchange="setYears()"></div></div></div>
+    <div class="sg fold" id="sg-sort"><button class="sh" data-onclick="sbGroup('sort')" title="Ordenar"><span class="ic">⇅</span><span class="lbl">Ordenar</span><span class="dot" id="d-sort" hidden></span></button>
+      <div class="sb"><div id="sortUI"></div><label><input type="checkbox" id="grpChk" data-onchange="put(F,'group',this.checked,render)"> Agrupar por sección</label></div></div>
+    <hr class="sbsep">
+    <div class="sg" id="sg-fav"><button class="sh" data-onclick="sbGroup('fav')" title="Vistas: búsquedas y filtros guardados"><span class="ic">⭐</span><span class="lbl">Vistas</span></button>
+      <div class="sb"><div id="favL"></div><button data-onclick="favSave()" title="Guardar la búsqueda, el orden y los filtros actuales con un nombre">＋ Guardar la vista actual</button></div></div>
+    <div class="sg" id="sg-rec" hidden><button class="sh" data-onclick="sbGroup('rec')" title="Papers abiertos hace poco"><span class="ic">🕘</span><span class="lbl">Recientes</span></button>
+      <div class="sb" id="recL"></div></div>
     <div class="sg" id="sg-sel" hidden><button class="sh" data-onclick="sbGroup('sel')" title="Papers seleccionados"><span class="ic">☑️</span><span class="lbl" id="selT">Selección</span></button>
       <div class="sb"><button class="pri" data-onclick="openEx()">Exportar citas…</button><button data-onclick="psOpen()">Mover o copiar a otro proyecto…</button><button data-onclick="selNone()">Quitar selección</button></div></div>
   <button class="sh" data-onclick="grOpen()" title="Gráfico de relaciones entre papers"><span class="ic">🕸️</span><span class="lbl">Relaciones</span></button>
