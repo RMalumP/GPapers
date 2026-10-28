@@ -167,6 +167,12 @@ with sync_playwright() as pw:
     # (el almacenamiento privado del navegador y los enlaces a archivos necesitan http, no file://)
     srv = subprocess.Popen([sys.executable, '-I', '-m', 'http.server', '8791', '-d', str(folder)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL); time.sleep(1)
     pg = ctx.new_page(); pg.on('pageerror', lambda e: errs.append(str(e))); pg.on('dialog', lambda d: d.accept())
+    # Chromium (desde la 153) cierra la pestaña al leer de IndexedDB un handle del almacenamiento privado (OPFS), que es lo que usa la prueba en lugar del
+    # selector de archivos. Los handles se guardan aquí en memoria (en IndexedDB queda una marca) y el resto de IndexedDB funciona como siempre.
+    pg.add_init_script("""(() => { const MEM = new Map(), P = IDBObjectStore.prototype, put = P.put, get = P.get, del = P.delete;
+      P.put = function (v, k) { if (v instanceof FileSystemHandle) { MEM.set(k, v); return put.call(this, {opfsHandle: true}, k); } MEM.delete(k); return put.call(this, v, k); };
+      P.get = function (k) { const r = get.call(this, k); if (MEM.has(k)) Object.defineProperty(r, 'result', {get: () => MEM.get(k)}); return r; };
+      P.delete = function (k) { MEM.delete(k); return del.call(this, k); }; })()""")
     pg.goto('http://localhost:8791/index.html'); pg.wait_for_timeout(600); pg.evaluate(SEED); pg.evaluate('DATA_ALL = true')
     PNG = str(folder / 'pruebas' / 'img_prueba.png')
     pg.evaluate("openPaper('p1'); tab = 'data'; drawD()")
@@ -323,9 +329,9 @@ with sync_playwright() as pw:
     pg.click('#cfg button:has-text("Eliminar")'); pg.wait_for_timeout(200)
     eq('eliminar el tipo pasa los papers al tipo base', pg.evaluate("[db.settings.customTypes.length, db.papers[0].type, !!TYPES['ct_x']]"), [0, 'audio', False]); pg.evaluate("$('#cfg').close()")
     # ayuda
-    eq('final de la barra lateral: Configuración, una línea e «Información» (Ayuda y Créditos)', pg.evaluate("[...document.querySelectorAll('#side > button.sh, #side > hr, #sg-more .sh')].slice(-5).map(b => b.tagName === 'HR' ? '——' : b.querySelector('.lbl').textContent)"), ['Configuración', '——', 'Información', 'Ayuda', 'Créditos'])
+    eq('final de la barra lateral: Configuración, una línea e «Información» (Ayuda, Añadir app desde http y Créditos)', pg.evaluate("[...document.querySelectorAll('#side > button.sh, #side > hr, #sg-more .sh')].filter(b => !b.hidden).slice(-6).map(b => b.tagName === 'HR' ? '——' : b.querySelector('.lbl').textContent)"), ['Configuración', '——', 'Información', 'Ayuda', 'Añadir app', 'Créditos'])
     pg.click('#sg-more .shm'); pg.click('#side button:has-text("Ayuda")'); pg.wait_for_timeout(200)
-    eq('el botón Ayuda abre la ventana con todas las secciones', pg.evaluate("[$('#help').open, [...document.querySelectorAll('#hpb > details > summary')].map(s => s.textContent)]"), [True, ['Primeros pasos', 'Lista principal', 'Barra lateral', 'Editar un paper', 'Exportar citas', 'Importar referencias', 'Configuración', 'Tipos de documento propios', 'Estilos de cita personalizados', 'Aplicación instalada (PWA), sesión y actualizaciones', 'Atajos de teclado', 'Datos, privacidad y consejos']])
+    eq('el botón Ayuda abre la ventana con todas las secciones', pg.evaluate("[$('#help').open, [...document.querySelectorAll('#hpb > details > summary')].map(s => s.textContent)]"), [True, ['Empezar aquí', 'Archivos, guardado y autoguardado', 'Proyectos', 'Copias, duplicados, PDF y filtros guardados', 'Lista principal', 'Barra lateral', 'Editar un paper', 'Exportar citas', 'Derecho y jurisprudencia', 'Importar referencias', 'Configuración', 'Tipos de documento propios', 'Estilos de cita personalizados', 'Aplicación instalada (PWA), sesión y actualizaciones', 'Sincronización con Google Drive', 'Atajos de teclado', 'Datos, privacidad y consejos']])
     pg.fill('#hpq', 'subrayado'); eq('el buscador filtra las secciones', pg.evaluate("[...document.querySelectorAll('#hpb > details')].filter(d => !d.hidden).map(d => d.querySelector('summary').textContent)"), ['Editar un paper'])
     pg.fill('#hpq', 'zzzzqq'); eq('y avisa si no hay resultados', pg.locator('#hpEmpty').count(), 1)
     pg.fill('#hpq', ''); pg.evaluate("$('#help').close(); openHelp('estilos')"); pg.wait_for_timeout(200)
