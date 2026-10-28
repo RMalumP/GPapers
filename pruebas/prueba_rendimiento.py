@@ -48,13 +48,13 @@ with sync_playwright() as pw:
     pg.evaluate("setView('cards')")
     # ---- Seleccionar no repinta la lista
     pg.evaluate("window._other = $('#list [data-id=\"p3\"]'); toggleSel('p2')")
-    eq('seleccionar no repinta', pg.evaluate("[$('#list [data-id=\"p3\"]') === window._other, $('#list [data-id=\"p2\"] input[type=checkbox]').checked, $('#sg-sel').hidden, $('#count').textContent]"), [True, True, False, '5 de 5 papers · 1 seleccionados'])
+    eq('seleccionar no repinta', pg.evaluate("[$('#list [data-id=\"p3\"]') === window._other, $('#list [data-id=\"p2\"] input[type=checkbox]').checked, $('#sg-sel').hidden, $('#count').textContent]"), [True, True, False, '5 de 5 · 1 sel.'])
     pg.evaluate("toggleSel('p2')")
     eq('quitar la selección', pg.evaluate("[$('#list [data-id=\"p2\"] input[type=checkbox]').checked, $('#sg-sel').hidden]"), [False, True])
     # ---- Listas largas por partes
     pg.evaluate(SEED, 400)
     eq('400 papers: se pintan 150 y el botón', pg.evaluate("[document.querySelectorAll('#list .card').length, !!$('#list > .more')]"), [150, True])
-    eq('el contador cuenta todos', pg.evaluate("$('#count').textContent"), '400 de 400 papers · 0 seleccionados')
+    eq('el contador cuenta todos', pg.evaluate("$('#count').textContent"), '400 de 400 · 0 sel.')
     pg.evaluate("listMore()")
     eq('mostrar más añade otros 150', pg.evaluate("document.querySelectorAll('#list .card').length"), 300)
     pg.evaluate("listMore()")
