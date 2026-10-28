@@ -20,7 +20,7 @@ const TPL_DEF = [   // plantillas de nota de serie; {fecha} y {paper} se sustitu
   {id: 't_ide', name: 'Idea propia', text: '**Idea:** \n**Relación con mi tema:** \n**Siguiente paso:** '}];
 const defSettings = () => ({palette: 'azul', appName: 'Papers', showFile: true, showImg: true, showProgress: false, pdfDrive: false, customTypes: [], customStyles: [], mainStyle: 'apa', citeOnlyMain: false, shortcuts: {...SC_DEF}, fmtOpen: false, view: 'cards', templates: TPL_DEF.map(t => ({...t})), export: {fmt: 'txt', style: 'apa', order: 'auto', num: false, notes: false, particles: false, title: '', lang: 'es', dateFmt: 'long', vanAll: false, ppChap: true, numFmt: 'auto', disamb: true, abbrList: true, inText: false}});   // ajustes por defecto (se guardan en el JSON)
 let db = {version: 1, sections: [], tags: [], papers: [], trash: [], settings: defSettings()}, path = null, dirty = false, auto = false, D, tab = 'data', MG, timer;
-const F = {q: '', sorts: [{k: 'title', d: 1}], group: false, sec: '', tags: new Set(), read: '', minRating: 0, inNotes: false, mode: 'any', tbSec: false, tbTag: true};
+const F = {q: '', sorts: [{k: 'title', d: 1}], group: false, sec: '', tags: new Set(), read: '', minRating: 0, inNotes: false, mode: 'any', tbSec: false, tbTag: true, exTags: new Set(), noTag: false, noSec: false, yFrom: 0, yTo: 0};   // exTags: etiquetas excluidas · noTag / noSec: solo papers sin etiquetas / sin sección · yFrom, yTo: años (0 = sin límite)
 const SEL = new Set();   // ids de papers seleccionados
 const READ = {por_leer: 'Por leer', leyendo: 'Leyendo', leido: 'Leído'};   // estado de lectura (único por paper)
 const READ_N = {por_leer: 0, leyendo: 1, leido: 2}, READ_C = {por_leer: '#888888', leyendo: '#2457c5', leido: '#27ae60'};

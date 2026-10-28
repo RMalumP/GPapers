@@ -100,7 +100,7 @@ async function copyCardCite(id, b) {   // la cita del paper en el estilo elegido
   await clipHtml(`<p style="font-family:'Times New Roman',serif;font-size:12pt">${citeHtml(raw)}</p>`, citeTxt(raw), document.body);
   if (b) { const t = b.textContent; b.textContent = '✓'; setTimeout(() => b.textContent = t, 1200); }
 }
-let FAV = [];   // filtros guardados de este proyecto (solo en este navegador): [{name, q, sorts, group, sec, tags, read, minRating, inNotes, mode}]
+let FAV = [];   // filtros guardados de este proyecto (solo en este navegador): [{name, q, sorts, group, sec, tags, read, minRating, inNotes, mode, exTags, noTag, noSec, yFrom, yTo}]
 const favLoad = async () => { FAV = await idb('readonly', st => st.get('fav:' + PJ.cur)).then(a => Array.isArray(a) ? a : []).catch(() => []); favDraw(); };
 const favPut = () => idb('readwrite', st => st.put(FAV, 'fav:' + PJ.cur)).catch(() => {});
 function favDraw() {
@@ -109,14 +109,14 @@ function favDraw() {
 }
 function favSave() {
   const name = (prompt('Nombre para estos filtros (búsqueda, orden, sección, etiquetas, lectura y valoración):') || '').trim().slice(0, 40); if (!name) return;
-  const f = {name, q: F.q, sorts: F.sorts.map(s => ({...s})), group: F.group, sec: F.sec, tags: [...F.tags], read: F.read, minRating: F.minRating, inNotes: F.inNotes, mode: F.mode}, i = FAV.findIndex(x => x.name.toLowerCase() === name.toLowerCase());
+  const f = {name, q: F.q, sorts: F.sorts.map(s => ({...s})), group: F.group, sec: F.sec, tags: [...F.tags], read: F.read, minRating: F.minRating, inNotes: F.inNotes, mode: F.mode, ...fExtra()}, i = FAV.findIndex(x => x.name.toLowerCase() === name.toLowerCase());
   if (i >= 0) FAV[i] = f; else FAV.push(f); favPut(); favDraw(); $('#favSel').value = String(i >= 0 ? i : FAV.length - 1); $('#favDel').hidden = false;
 }
 function favApply(v) {
   const f = FAV[+v]; $('#favDel').hidden = !f; if (!f) return;
   F.q = typeof f.q === 'string' ? f.q : ''; $('#q').value = F.q; F.group = !!f.group; F.sec = db.sections.some(s => s.id === f.sec) ? f.sec : '';   // lo que ya no existe se ignora
   F.tags = new Set((f.tags || []).filter(id => db.tags.some(t => t.id === id))); F.read = Object.hasOwn(READ, f.read) ? f.read : ''; F.minRating = Number.isInteger(f.minRating) && f.minRating >= 0 && f.minRating <= 5 ? f.minRating : 0;
-  F.inNotes = !!f.inNotes; F.mode = f.mode === 'all' ? 'all' : 'any'; const so = (f.sorts || []).filter(x => x && Object.hasOwn(SORTS, x.k) && (x.d === 1 || x.d === -1)).slice(0, 3); if (so.length) F.sorts = so.map(x => ({k: x.k, d: x.d}));
+  F.inNotes = !!f.inNotes; F.mode = f.mode === 'all' ? 'all' : 'any'; fExtraLoad(f); const so = (f.sorts || []).filter(x => x && Object.hasOwn(SORTS, x.k) && (x.d === 1 || x.d === -1)).slice(0, 3); if (so.length) F.sorts = so.map(x => ({k: x.k, d: x.d}));
   document.querySelector('#sg-search .sb input[type=checkbox]').checked = F.inNotes; render(); $('#favSel').value = v; $('#favDel').hidden = false;
 }
 function favDel() { const i = +$('#favSel').value; if (!FAV[i] || !confirm(`¿Borrar los filtros «${FAV[i].name}»?`)) return; FAV.splice(i, 1); favPut(); favDraw(); }

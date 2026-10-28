@@ -585,7 +585,7 @@ function delM(id) {
   const x = db[MG].find(y => y.id === id);
   if (!confirm(MG === 'tags' ? `¿Eliminar la etiqueta «${x.name}»? Se quitará de todos los papers y secciones.` : `¿Eliminar la sección «${x.name}»? Se borrarán las notas asociadas a ella.`)) return;
   db[MG] = db[MG].filter(y => y.id !== id);
-  if (MG === 'tags') { db.papers.forEach(p => p.tagIds = p.tagIds.filter(t => t !== id)); F.tags.delete(id); db.sections.forEach(s => s.tagIds = s.tagIds.filter(t => t !== id)); }
+  if (MG === 'tags') { db.papers.forEach(p => p.tagIds = p.tagIds.filter(t => t !== id)); F.tags.delete(id); F.exTags.delete(id); db.sections.forEach(s => s.tagIds = s.tagIds.filter(t => t !== id)); }
   else { db.papers.forEach(p => { p.notes = p.notes.filter(n => n.sectionId !== id); p.sectionIds = p.sectionIds.filter(x => x !== id); }); if (F.sec === id) F.sec = ''; }
   markDirty(); drawMg();
 }

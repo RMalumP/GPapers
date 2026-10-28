@@ -186,3 +186,8 @@ aside{border-left:0;border-radius:0 10px 10px 0;padding-left:6px}
 details.cgrp{margin-top:12px}details.cgrp>summary small{font-weight:400;opacity:.7}
 #list > .more{text-align:center;margin:12px 0}
 main > .row > #q{width:220px;min-width:0;flex:0 1 220px}
+.chip .cn{font-size:11px;opacity:.75}.chip.ex{opacity:.9;text-decoration:line-through;border-style:dashed}.chip[hidden]{display:none}
+#tagQ{width:100%;margin:0 0 4px;font-size:13px}#readP{width:100%;margin:6px 0 2px}#readP[hidden]{display:none}#minR{align-self:flex-start}
+.yrs{align-items:center;gap:6px}.yrs input{width:0;flex:1;min-width:0}
+#actF{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:0 0 10px;font-size:13px}#actF[hidden]{display:none}#actF small{opacity:.7}
+#actF .af{font-size:12px;padding:2px 8px;border-radius:99px}#actF .af b{font-weight:400;opacity:.6;margin-left:2px}#actF .afx{font-size:12px;padding:2px 8px;border:0;background:none;color:var(--pri);text-decoration:underline}
