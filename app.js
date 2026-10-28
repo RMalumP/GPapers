@@ -1576,8 +1576,10 @@ const cfgSec = (id, title, body) => `<details class="cs" ${CFG_OPEN.has(id) ? 'o
 
 /* ===== Lista principal ===== */
 const chip = (t, on, click, drag, ctx) => `<span class="chip ${on ? 'on' : ''}" style="--c:${esc(t.color || '#888888')}" ${click ? `onclick="${click}"` : ''} ${drag ? `draggable="true" data-tag="${t.id}"` : ''} ${ctx ? `oncontextmenu="${ctx}"` : ''}>${esc(t.name)}</span>`;
-const tagById = i => db.tags.find(t => t.id === i);
-const secChips = id => (db.sections.find(s => s.id === id)?.tagIds || []).map(tagById).filter(Boolean).map(t => chip(t, 1)).join('');
+const BYID = new WeakMap();   // índice por id de una lista (etiquetas, secciones); dura hasta acabar la tarea en curso, así nunca queda desfasado
+const byId = arr => { let m = BYID.get(arr); if (!m || m.n !== arr.length) { m = new Map(arr.map(x => [x.id, x])); m.n = arr.length; BYID.set(arr, m); queueMicrotask(() => BYID.delete(arr)); } return m; };
+const tagById = i => byId(db.tags).get(i), secById = i => byId(db.sections).get(i);
+const secChips = id => (secById(id)?.tagIds || []).map(tagById).filter(Boolean).map(t => chip(t, 1)).join('');
 const hdr = () => syIcon();   // syIcon también redibuja el estado de guardado
 function fnameDraw() {   // un único indicador de guardado, junto al nombre del proyecto
   const el = $('#fname'), f = path ? path.split(/[\\/]/).pop() : '', on = syOn(), s = on ? syState() : '';
@@ -1586,20 +1588,27 @@ function fnameDraw() {   // un único indicador de guardado, junto al nombre del
        pend: ['pend', 'Sin guardar…'], manual: ['pend', 'Sin guardar (autoguardado en Drive desactivado)'], ok: ['ok', 'Guardado en Google Drive']}[s] || ['', ''];
   el.dataset.st = T[0]; el.textContent = T[1] + (db.settings.showFile && f && T[1] !== '(sin archivo)' ? ' · ' + f : '');
 }
+const COLL = new Intl.Collator('es');   // igual que localeCompare(…, 'es'), pero sin crear el comparador en cada llamada
 function sortList(L) {   // ordena por todos los criterios, en cascada; d = 1 ascendente, -1 descendente
-  return [...L].sort((a, b) => { for (const {k, d} of F.sorts) { const x = KEY[k](a), y = KEY[k](b);
+  const S = F.sorts, K = L.map(p => ({p, k: S.map(s => KEY[s.k](p))}));   // cada clave se calcula una vez por paper, no en cada comparación
+  return K.sort((a, b) => { for (let i = 0; i < S.length; i++) { const {k, d} = S[i], x = a.k[i], y = b.k[i];
     if (k === 'rating' && !x !== !y) return x ? -1 : 1;   // sin valorar: siempre al final, en ambos sentidos
-    const c = typeof x === 'number' ? x - y : x.localeCompare(y, 'es'); if (c) return c * d; } return 0; });
+    const c = typeof x === 'number' ? x - y : COLL.compare(x, y); if (c) return c * d; } return 0; }).map(e => e.p);
 }
 const has = (p, t) => p.tagIds.includes(t);   // las etiquetas son independientes de las secciones
+const SEARCH = new WeakMap();   // texto de búsqueda ya normalizado de cada paper: solo se recalcula si cambia
+function searchTxt(p) {
+  const raw = [p.title, p.alias, p.year, ...p.authors, ...(F.inNotes ? [p.general, ...p.notes.map(n => n.content), ...Object.values(p.cites)] : [])].join(' ');
+  let c = SEARCH.get(p); if (!c || c.raw !== raw) SEARCH.set(p, c = {raw, n: norm(raw)}); return c.n;
+}
 function visible() {
   const q = norm(F.q);
-  return sortList(db.papers.filter(p => (!q || norm([p.title, p.alias, p.year, ...p.authors, ...(F.inNotes ? [p.general, ...p.notes.map(n => n.content), ...Object.values(p.cites)] : [])].join(' ')).includes(q))
+  return sortList(db.papers.filter(p => (!q || searchTxt(p).includes(q))
     && (!F.sec || p.sectionIds.includes(F.sec)) && (!F.read || p.reading === F.read) && p.rating >= F.minRating && (!F.tags.size || [...F.tags][F.mode === 'all' ? 'every' : 'some'](t => has(p, t)))));
 }
-const tagsOf = p => p.tagIds.map(i => db.tags.find(t => t.id === i)).filter(Boolean).map(t => chip(t, 1, '', 0, `tagMenu(event,'${p.id}','${t.id}')`)).join('');
+const tagsOf = p => p.tagIds.map(tagById).filter(Boolean).map(t => chip(t, 1, '', 0, `tagMenu(event,'${p.id}','${t.id}')`)).join('');
 const EXP = new Set();   // papers con las notas desplegadas en la lista
-const notesHTML = (p, hl) => `<div class="nts">${p.notes.filter(n => n.content.trim()).map(n => { const s = db.sections.find(x => x.id === n.sectionId);
+const notesHTML = (p, hl) => `<div class="nts">${p.notes.filter(n => n.content.trim()).map(n => { const s = secById(n.sectionId);
   return `<div class="nt${n.id === hl ? ' hl' : ''}">${s ? chip(s, 1) : '<span class="chip on" style="--c:#888888">Sin sección</span>'}<div class="ntx md">${md(n.content)}</div></div>`; }).join('') || '<small>Este paper no tiene notas.</small>'}</div>`;
 function toggleNotes(id) { EXP.has(id) ? EXP.delete(id) : EXP.add(id); render(); }
 /* ---- Imagen del paper ---- */
@@ -1681,7 +1690,7 @@ const rowHTML = (p, from) => `<tr class="rw" data-id="${p.id}" ${F.group ? `drag
   <td class="timg">${thumbHTML(p, 'xs')}</td>
   <td class="tt"><a class="tl2" onclick="openPaper('${p.id}')" title="Editar">${esc(p.alias || p.title)}</a></td><td>${esc(p.authors.join('; '))}</td><td>${esc(p.year)}</td><td>${esc(p.venue)}</td>
   <td><button class="rst" style="--c:${READ_C[p.reading]}" title="Clic: cambiar el estado de lectura" onclick="cycleRead('${p.id}')">${READ[p.reading]}</button></td><td>${starsHTML(p)}</td>
-  <td>${p.sectionIds.map(id => db.sections.find(s => s.id === id)).filter(Boolean).map(s => chip(s, 1)).join('')}</td><td>${tagsOf(p)}</td>
+  <td>${p.sectionIds.map(secById).filter(Boolean).map(s => chip(s, 1)).join('')}</td><td>${tagsOf(p)}</td>
   <td class="nw"><button class="sm cpb" onclick="copyCardCite('${p.id}',this)" title="Copiar la cita (estilo elegido en Exportar), con cursiva al pegar en Word">📋</button>${p.pdf ? `<button class="sm" onclick="pdfOpen('${p.id}')" title="Abrir el PDF enlazado: ${esc(p.pdf.name)}">📄</button>` : ''}<button class="sm" onclick="toggleNotes('${p.id}')" oncontextmenu="viewNotes(event,'${p.id}')" title="Clic: desplegar · Clic derecho: visor de notas">${p.notes.filter(n => n.content.trim()).length} ${EXP.has(p.id) ? '▾' : '▸'}</button>${relCount(p) ? `<button class="sm" onclick="viewRel('${p.id}')" title="Relaciones">🔗 ${relCount(p)}</button>` : ''}</td>
   <td><button class="x" title="Eliminar" onclick="delPaper('${p.id}')">✕</button></td></tr>${EXP.has(p.id) ? `<tr class="rn"><td></td><td colspan="11">${notesHTML(p)}</td></tr>` : ''}`;
 const tableHTML = (L, from) => `<div class="twrap"><table class="tbl"><thead><tr><th></th>${TH.map(([k, t]) => k ? `<th class="sortable" onclick="thSort('${k}')">${t}${F.sorts[0]?.k === k ? (F.sorts[0].d > 0 ? ' ▲' : ' ▼') : ''}</th>` : `<th>${t}</th>`).join('')}</tr></thead><tbody>${L.map(p => rowHTML(p, from)).join('')}</tbody></table></div>`;
@@ -1689,7 +1698,7 @@ const items = (l, from) => db.settings.view === 'table' ? (l.length ? tableHTML(
 function listHTML(L) {
   if (!F.group) return items(L, '');
   const G = db.sections.filter(s => !F.sec || s.id === F.sec).map(s => [s, L.filter(p => p.sectionIds.includes(s.id))]);
-  if (!F.sec) G.push([{id: '', name: 'Sin sección', color: '#888888'}, L.filter(p => !p.sectionIds.some(i => db.sections.some(s => s.id === i)))]);
+  if (!F.sec) G.push([{id: '', name: 'Sin sección', color: '#888888'}, L.filter(p => !p.sectionIds.some(secById))]);
   return G.map(([s, l]) => `<section class="gbox" data-sec="${s.id || ''}"><h2 class="grp" style="border-color:${esc(s.color || '#888888')}" ${s.id ? `oncontextmenu="svOpen('${s.id}',event)"` : ''}>${esc(s.name)} <small>(${l.length})</small></h2>${items(l, s.id || '') || '<p class="empty drop">Arrastra papers aquí</p>'}</section>`).join('');
 }
 function fitTags() {   // las etiquetas van en la barra superior de la tarjeta; si no caben, pasan a su propia línea entre esa barra y el título
@@ -1722,6 +1731,8 @@ function render() {
   fitTags(); hydrateImgs(); uiSoon();
   $('#count').textContent = `${L.length} de ${db.papers.length} papers · ${SEL.size} seleccionados`; progDraw();
 }
+let tQ = 0;   // la búsqueda espera a que dejes de escribir (Enter la aplica al momento)
+function qSet(v, now) { F.q = v; clearTimeout(tQ); if (now) render(); else tQ = setTimeout(render, 150); }
 function toggleF(id) { F.tags.has(id) ? F.tags.delete(id) : F.tags.add(id); render(); }
 function ctxShow(e, html) {   // menú contextual genérico
   e.preventDefault(); e.stopPropagation(); let m = $('#ctx'); if (!m) { m = document.createElement('div'); m.id = 'ctx'; }
@@ -1763,7 +1774,7 @@ const ex = () => db.settings.export;
 const EXF = {txt: ['Texto (.txt)', 'text/plain'], bib: ['BibTeX (.bib)', 'text/plain'], ris: ['RIS (.ris)', 'text/plain'], doc: ['Word (.doc)', 'application/msword'], docx: ['Word (.docx)', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document']};
 const isTl = f => f === 'txt' || f === 'doc' || f === 'docx';   // formatos de texto con estilo de cita (los demás son BibTeX y RIS)
 const EXO = {auto: 'Automático (según el estilo: APA alfabético; Vancouver, lista)', list: 'Orden de la lista', alpha: 'Alfabético', year: 'Por año'};
-const secName = id => db.sections.find(s => s.id === id)?.name || 'Sin sección';
+const secName = id => secById(id)?.name || 'Sin sección';
 const ascii = s => String(s).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '');
 const PART = /^((de|del|la|las|los|van|von|der|den|di|da|du|le|el)\s+)+/i;   // partículas de los apellidos compuestos
 let EXS = 'vis';   // alcance elegido: sel | vis | all
@@ -1776,8 +1787,8 @@ function exList() {
   const o = ex();
   let L = EXS === 'sel' ? db.papers.filter(p => SEL.has(p.id)) : EXS === 'vis' ? visible() : [...db.papers];
   const ord = o.order === 'auto' ? ((isTl(o.fmt) && STYLES[o.style]?.order === 'alpha') ? 'alpha' : 'list') : o.order;
-  const key = p => sortKeyOf(p, o.particles), cmp = (a, b) => key(a).localeCompare(key(b), 'es'), yr = p => +p.year || 0;
-  if (ord === 'alpha') L.sort((a, b) => cmp(a, b) || yr(a) - yr(b) || a.title.localeCompare(b.title, 'es'));
+  const key = p => sortKeyOf(p, o.particles), cmp = (a, b) => COLL.compare(key(a), key(b)), yr = p => +p.year || 0;
+  if (ord === 'alpha') L.sort((a, b) => cmp(a, b) || yr(a) - yr(b) || COLL.compare(a.title, b.title));
   else if (ord === 'year') L.sort((a, b) => yr(a) - yr(b) || cmp(a, b));
   else L = sortList(L);
   EXTYPES = [...new Set(L.map(p => p.type))]; EXOM = 0; if (isTl(o.fmt)) { const om = STYLES[o.style]?.omit; if (om) { const n0 = L.length; L = L.filter(p => !om(p)); EXOM = n0 - L.length; } }   // la guía excluye algunos tipos de la lista de referencias
@@ -2265,7 +2276,7 @@ function lkInsert(code) { $('#lk').close(); edInsert(LK.key, code, true); }
 /* ===== Vista de notas por sección ===== */
 let SV = {sec: '', q: '', order: 'list'};
 function orderBy(L, ord) {
-  const key = p => sortKeyOf(p, ex().particles), cmp = (a, b) => key(a).localeCompare(key(b), 'es'), yr = p => +p.year || 0;
+  const key = p => sortKeyOf(p, ex().particles), cmp = (a, b) => COLL.compare(key(a), key(b)), yr = p => +p.year || 0;
   return ord === 'alpha' ? [...L].sort((a, b) => cmp(a, b) || yr(a) - yr(b)) : ord === 'year' ? [...L].sort((a, b) => yr(a) - yr(b) || cmp(a, b)) : sortList(L);
 }
 function svData() {   // papers con notas (de la sección elegida, o de todas) que cumplen el filtro
@@ -2546,7 +2557,8 @@ const syNames = id => id === 'main' ? {snap: SY_CFG.file, legacy: SY_CFG.legacy,
   : {snap: `gpapers-p-${id}-snap.json`, legacy: null, d: `gpapers-p-${id}-d-`, img: `gpapers-p-${id}-img-`, pdf: `gpapers-p-${id}-pdf-`, key: ':' + id};
 const syPjOf = n => /^gpapers-p-([a-z0-9]+)-/.exec(n)?.[1] || (n !== SY_IDX ? 'main' : null);   // proyecto de un archivo de Drive
 const syS = v => JSON.stringify(v);
-const syPlain = d => JSON.parse(JSON.stringify(d, (k, v) => k === 'history' ? undefined : v));   // como en el JSON: sin el historial del día
+const syNoHist = (k, v) => k === 'history' ? undefined : v, syPlainS = d => JSON.stringify(d, syNoHist);   // syPlainS(d) === syS(syPlain(d)), sin el paso de ida y vuelta
+const syPlain = d => JSON.parse(syPlainS(d));   // como en el JSON: sin el historial del día
 function syNorm(d) {   // pasa por validate() para comparar siempre la misma forma; validate() ajusta los tipos y estilos globales, así que se devuelven a los de db
   try { return syPlain(validate(structuredClone(d))); } finally { syncTypes(db.settings.customTypes); syncStyles(db.settings.customStyles, db.settings.export); }
 }
@@ -2831,7 +2843,7 @@ async function syOnce(inter) {
   const tok = await syToken(inter), files = await syLs(tok), id = PJ.cur, N = syNames(id);
   const I = await syIdxGet(tok, files), iB = await idb('readonly', st => st.get('syncIdxBase')).catch(() => null);
   const R = await syRemote(tok, files, N), rw = R.w ? await syUnwire(tok, R.w, files, N) : null;
-  const plain = syPlain(db), snap = syS(plain), cur = syNorm(plain);
+  const snap = syPlainS(db), plain = JSON.parse(snap), cur = syNorm(plain);
   const iM = I.w ? syIdxMerge(syIdxLocal(plain.settings), I.w, iB) : syIdxLocal(plain.settings);
   for (const p of PJ.list) if ((p.id === id ? dirty : p.dirty) && !iM.projects.some(e => e.id === p.id)) iM.projects.push(pjEntry(p));   // borrado en otro dispositivo, pero aquí tiene cambios sin guardar: se queda
   if (!iM.projects.some(e => e.id === id)) {   // el proyecto abierto se borró en otro dispositivo: se pasa a otro
@@ -2847,8 +2859,8 @@ async function syOnce(inter) {
     else { const c = await syAsk(local, remote); if (!c) return {cancel: true};
       m = c === 'merge' ? syNorm(syMerge(local, remote, null)) : c === 'drive' ? remote : local; replace = c === 'drive'; }
   }
-  if (syS(syPlain(db)) !== snap || PJ.cur !== id) { SY.again = true; return {again: true}; }   // cambiaste algo mientras tanto: otra vuelta enseguida
-  const news = syS(m) !== syS(cur);
+  if (syPlainS(db) !== snap || PJ.cur !== id) { SY.again = true; return {again: true}; }   // cambiaste algo mientras tanto: otra vuelta enseguida
+  const mS = syS(m), news = mS !== syS(cur);
   if (news && syBlocked()) { SY.wait = true; return {wait: true}; }   // se termina al cerrar la ventana
   syIdxApply(iM);
   if (news) syApply(m, replace);
@@ -2865,7 +2877,7 @@ async function syOnce(inter) {
   await syGc(tok, files, I.w ? iF : null);
   await syBaseSet(N, m); sySet({last: Date.now()});
   await syPdfs(tok, files, m, N);
-  if (syS(syPlain(db)) === syS(m)) { dirty = false; hdr(); sessionSoon(); }   // ya está guardado en Drive
+  if (syPlainS(db) === mS) { dirty = false; hdr(); sessionSoon(); }   // ya está guardado en Drive
   return {news, first: !R.w};
 }
 async function syRun(inter, gesture) {   // gesture: viene de un clic o una tecla (el navegador deja abrir la ventana de Google)
