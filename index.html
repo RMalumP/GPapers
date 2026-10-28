@@ -25,7 +25,7 @@
 <div id="app">
   <aside id="side">
     <button class="sh" onclick="sbToggle()" title="Plegar / desplegar menú"><span class="ic">☰</span><span class="lbl">Menú</span></button>
-    <div class="sg" id="sg-search"><div class="sgh"><button class="sh" onclick="sbGroup('search')" title="Buscar" aria-label="Buscar"><span class="ic">🔍</span><span class="dot" id="d-search" hidden></span></button><input id="q" type="search" placeholder="Título, autor o año" aria-label="Buscar" oninput="F.q=this.value;render()"></div>
+    <div class="sg" id="sg-search"><div class="sgh"><button class="sh" onclick="sbGroup('search')" title="Buscar" aria-label="Buscar"><span class="ic">🔍</span><span class="dot" id="d-search" hidden></span></button><input id="q" type="search" placeholder="Título, autor o año" aria-label="Buscar" oninput="qSet(this.value)" onkeydown="if(event.key==='Enter')qSet(this.value,1)"></div>
       <div class="sb"><label><input type="checkbox" onchange="F.inNotes=this.checked;render()"> Incluir notas y citas editadas</label>
         <div class="row"><select id="favSel" onchange="favApply(this.value)" aria-label="Filtros guardados"><option value="">⭐ Filtros guardados…</option></select><button onclick="favSave()" title="Guardar los filtros actuales con un nombre">＋</button><button id="favDel" onclick="favDel()" title="Borrar los filtros elegidos" hidden>✕</button></div></div></div>
     <div class="sg" id="sg-sort"><button class="sh" onclick="sbGroup('sort')" title="Ordenar"><span class="ic">⇅</span><span class="lbl">Ordenar</span><span class="dot" id="d-sort" hidden></span></button>

@@ -1,0 +1,30 @@
+name: Pruebas
+on:
+  push:
+    branches: [main]
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  node:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node pruebas/prueba_version.js .
+      - run: node pruebas/pruebas_citas.js app.js
+  navegador:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        prueba: [f4, ui, sync, proyectos, mejoras, interfaz, derecho, principal, importar]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install playwright==1.63.0 && python -m playwright install --with-deps chromium
+      - run: python pruebas/prueba_${{ matrix.prueba }}.py .
