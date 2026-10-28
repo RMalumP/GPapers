@@ -25,6 +25,7 @@
 </header>
 <div id="app">
   <aside id="side">
+    <div id="sbGrip" data-onpointerdown="sbGripDown(event)" data-ondblclick="sbWidthReset()" title="Arrastra para cambiar el ancho de la barra · Doble clic: ancho normal" aria-hidden="true"></div>
     <button class="sh" data-onclick="sbToggle()" data-oncontextmenu="sbAllMenu(event)" title="Plegar / desplegar menú · Clic derecho: plegar o desplegar todos los grupos"><span class="ic">☰</span><span class="lbl">Menú</span></button>
     <div class="sg" id="sg-search"><div class="sgh"><button class="sh" data-onclick="sbGroup('search')" title="Buscar" aria-label="Buscar"><span class="ic">🔍</span><span class="dot" id="d-search" hidden></span></button><input id="q" type="search" placeholder="Título, autor o año" aria-label="Buscar" data-oninput="qSet(this.value)" data-onkeydown="onEnter(event,qSet,this.value,1)"></div>
       <div class="sb"><label><input type="checkbox" data-onchange="put(F,'inNotes',this.checked,render)"> Incluir notas y citas editadas</label></div></div>

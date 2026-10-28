@@ -198,6 +198,35 @@ with sync_playwright() as pw:
     pg.evaluate("render()"); eq('y sigue filtrando tras repintar', pg.evaluate("[...document.querySelectorAll('#tagF .chip[data-tag]')].filter(c => !c.hidden).length"), 1)
     pg.fill('#tagQ', ''); pg.evaluate("db.tags.splice(2); db.papers.pop(); render()")
     eq('los filtros nuevos se guardan y se validan al recuperarlos', pg.evaluate("(() => { F.exTags.add('t2'); F.noSec = true; F.yFrom = 2000; const s = JSON.parse(JSON.stringify(uiState())); fClrAll(); applyUI(s); const r = [[...F.exTags], F.noSec, F.yFrom]; fExtraLoad({exTags: ['nope', 't2'], yFrom: -3, yTo: 1e9}); r.push([...F.exTags], F.yFrom, F.yTo); fClrAll(); return r; })()"), [['t2'], True, 2000, ['t2'], 0, 0])
+    # arrastrar un paper a una sección o etiqueta de la barra
+    pg.evaluate("db.papers[0].sectionIds = []; db.papers[0].tagIds = []; render()")
+    eq('las tarjetas se pueden arrastrar también sin agrupar', pg.evaluate("$('#list article.card').draggable"), True)
+    drag = lambda src, dst: pg.evaluate("""([s, d]) => { const dt = new DataTransfer(), a = document.querySelector(s), b = document.querySelector(d);
+      a.dispatchEvent(new DragEvent('dragstart', {dataTransfer: dt, bubbles: true}));
+      const o = new DragEvent('dragover', {dataTransfer: dt, bubbles: true, cancelable: true}); b.dispatchEvent(o);
+      b.dispatchEvent(new DragEvent('drop', {dataTransfer: dt, bubbles: true, cancelable: true})); a.dispatchEvent(new DragEvent('dragend', {dataTransfer: dt, bubbles: true})); return o.defaultPrevented; }""", [src, dst])
+    eq('la barra acepta soltar un paper en una sección', drag('#list article.card', '#secF .cw[data-sec="s2"] .chip'), True)
+    eq('soltar un paper en una sección de la barra se la añade', pg.evaluate("[db.papers[0].sectionIds, db.papers[0].history.at(-1).s]"), [['s2'], 'Sección añadida: Método'])
+    drag('#list article.card', '#tagF .chip[data-tag="t1"]')
+    eq('y en una etiqueta, la etiqueta', pg.evaluate("db.papers[0].tagIds"), ['t1'])
+    drag('#list article.card', '#tagF .chip[data-tag="t1"]')
+    eq('si ya la tenía no la repite', (pg.evaluate("db.papers[0].tagIds"), 'Ya la tenía' in pg.inner_text('#toast')), (['t1'], True))
+    pg.evaluate("db.papers[0].sectionIds = ['s1']; db.papers[0].tagIds = ['t1', 't2']; render()")
+    # ancho de la barra
+    w0 = pg.evaluate("$('#side').getBoundingClientRect().width")
+    g = pg.locator('#sbGrip').bounding_box(); pg.mouse.move(g['x'] + 3, g['y'] + 200); pg.mouse.down(); pg.mouse.move(g['x'] + 83, g['y'] + 200, steps=4); pg.mouse.up()
+    eq('arrastrar el borde ensancha la barra', round(pg.evaluate("$('#side').getBoundingClientRect().width") - w0), 80)
+    pg.mouse.move(g['x'] + 83, g['y'] + 200); pg.mouse.down(); pg.mouse.move(g['x'] + 900, g['y'] + 200, steps=4); pg.mouse.up()
+    eq('con un máximo de 480 px', pg.evaluate("Math.round($('#side').getBoundingClientRect().width)"), 480)
+    eq('el ancho se guarda con la interfaz', pg.evaluate("uiState().side.w"), 480)
+    pg.evaluate("sbToggle()"); pg.wait_for_timeout(250)
+    eq('plegada mide lo mismo que siempre', pg.evaluate("Math.round($('#side').getBoundingClientRect().width)"), 48); pg.evaluate("sbToggle()"); pg.wait_for_timeout(250)
+    pg.dblclick('#sbGrip'); pg.wait_for_timeout(250)
+    eq('doble clic en el borde vuelve al ancho normal', (pg.evaluate("$('#side').getBoundingClientRect().width"), pg.evaluate("uiState().side.w")), (w0, 0))
+    # atajo para plegar la barra
+    eq('atajo para plegar la barra (Alt+M por defecto)', pg.evaluate("[SC_DEF.side, SC_NAMES.side]"), ['Alt+M', 'Plegar o desplegar la barra lateral'])
+    pg.keyboard.press('Alt+m'); eq('Alt+M pliega la barra', pg.evaluate("$('#side').classList.contains('min')"), True)
+    pg.keyboard.press('Alt+m'); eq('y la despliega', pg.evaluate("$('#side').classList.contains('min')"), False)
     eq('ya no existe el selector de posición de etiquetas', 'Etiquetas en cada paper' in pg.inner_text('#side'), False)
     order = "[...document.querySelectorAll('.card .ct > *')].map(e => e.className || e.tagName)"
     eq('etiquetas entre Editar y el estado de lectura', pg.evaluate(order), ['sel', 'sm', 'sm cpb', 'tl', 'rd', 'x'])

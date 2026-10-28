@@ -23,7 +23,7 @@ dialog::backdrop{background:#0006}.tabs{display:flex;gap:6px;margin:10px 0}.tabs
 h2.grp{border-left:6px solid;padding-left:8px;margin:20px 0 0;font-size:17px}
 .sel{display:flex;gap:6px;align-items:center;font-size:13px;opacity:.85}.sel input{width:auto}aside .row select{flex:1}
 #app{grid-template-columns:auto 1fr}main{min-width:0}
-aside{width:272px;gap:2px;transition:width .15s}aside.min{width:48px}
+aside{width:var(--sbw,272px);gap:2px;transition:width .15s;position:relative}aside.min{width:48px}aside.rs{transition:none;user-select:none}
 .sh{display:flex;gap:10px;align-items:center;width:100%;position:relative;text-align:left;background:none;border:0;padding:8px 10px;font-weight:600}
 .sh:hover{background:var(--card)}.ic{width:24px;text-align:center;font-size:17px}
 .sb{padding:2px 6px 12px;display:flex;flex-direction:column;gap:8px}.sb button{text-align:left}#sortUI{display:flex;flex-direction:column;gap:6px}
@@ -194,3 +194,5 @@ main > .row > #q{width:220px;min-width:0;flex:0 1 220px}
 #favL{display:flex;flex-direction:column;gap:4px}.fav{display:flex;gap:4px}.fav .fva{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.fav.on .fva{border-color:var(--pri);font-weight:600}
 .fav .x{border:0;background:none;color:var(--red);padding:2px 6px}#favL small{opacity:.7}
 #recL .rec{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px}
+#sbGrip{position:absolute;top:0;right:-3px;width:6px;height:100%;cursor:col-resize;z-index:2}#sbGrip:hover,aside.rs #sbGrip{background:color-mix(in srgb,var(--pri) 35%,transparent)}aside.min #sbGrip{display:none}
+#secF .cw{display:inline-block}#secF .cw.over .chip,#tagF .chip.over{outline:2px dashed var(--pri);outline-offset:1px}

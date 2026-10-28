@@ -9,9 +9,9 @@
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const uid = () => Math.random().toString(36).slice(2, 9) + Date.now().toString(36);
-const SC_NAMES = {open: 'Abrir archivo', save: 'Guardar', find: 'Buscar', newPaper: 'Nuevo paper', undo: 'Deshacer', redo: 'Rehacer', exportCites: 'Exportar citas', import: 'Importar referencias', bold: 'Negrita (dentro de una nota)', italic: 'Cursiva (dentro de una nota)'};
+const SC_NAMES = {open: 'Abrir archivo', save: 'Guardar', find: 'Buscar', newPaper: 'Nuevo paper', undo: 'Deshacer', redo: 'Rehacer', exportCites: 'Exportar citas', import: 'Importar referencias', side: 'Plegar o desplegar la barra lateral', bold: 'Negrita (dentro de una nota)', italic: 'Cursiva (dentro de una nota)'};
 // Alt+N en lugar de Ctrl+N: Chrome reserva Ctrl+N, Ctrl+T y Ctrl+W y no permite cambiarlos
-const SC_DEF = {open: 'Ctrl+O', save: 'Ctrl+S', find: 'Ctrl+F', newPaper: 'Alt+N', undo: 'Ctrl+Z', redo: 'Ctrl+Shift+Z', exportCites: 'Ctrl+Shift+E', import: 'Alt+I', bold: 'Ctrl+B', italic: 'Ctrl+I'};
+const SC_DEF = {open: 'Ctrl+O', save: 'Ctrl+S', find: 'Ctrl+F', newPaper: 'Alt+N', undo: 'Ctrl+Z', redo: 'Ctrl+Shift+Z', exportCites: 'Ctrl+Shift+E', import: 'Alt+I', side: 'Alt+M', bold: 'Ctrl+B', italic: 'Ctrl+I'};
 const TRASH_DAYS = 5;   // días que un paper eliminado permanece en la papelera
 const trashLeft = t => Math.max(0, Math.ceil(TRASH_DAYS - (Date.now() - new Date(t.at)) / 864e5));
 const TPL_DEF = [   // plantillas de nota de serie; {fecha} y {paper} se sustituyen al insertarlas
@@ -84,7 +84,7 @@ function NEWF(p) {   // rellena los campos nuevos de un paper (JSON antiguo, imp
    El HTML no lleva onclick en línea (la CSP de index.html los bloquea): cada elemento dice qué hacer en data-on<evento>, p. ej. data-onclick="openPaper('p1')".
    Ese texto no se evalúa como JavaScript: lo lee onParse, un minilenguaje de llamadas y lecturas separadas por «;» (a.b(args).c(), 'texto', "texto",
    números, true/false/null, [listas], this = el elemento, event = el evento, y ! o + delante). Los nombres se buscan en ON_VARS (app.js) y, si no, en window. */
-const ON_EV = ['click', 'change', 'input', 'keydown', 'contextmenu', 'mousedown', 'toggle', 'error'], ON_CAPT = new Set(['toggle', 'error']);   // toggle y error no burbujean
+const ON_EV = ['click', 'change', 'input', 'keydown', 'contextmenu', 'mousedown', 'pointerdown', 'dblclick', 'toggle', 'error'], ON_CAPT = new Set(['toggle', 'error']);   // toggle y error no burbujean
 const ON_AST = new Map();
 function onParse(src) {
   let i = 0; const s = src, bad = () => { throw new SyntaxError(`data-on no válido (posición ${i}): ${s}`); };

@@ -9,7 +9,7 @@ function comboOf(e) {   // p. ej. «Ctrl+Shift+Z»; null si solo se ha pulsado u
   return parts.join('+');
 }
 const SC_ACT = {
-  open: () => doOpen(), save: () => save(false), newPaper: () => openPaper(), undo, redo, exportCites: () => openEx(), import: () => openImport('file'),
+  open: () => doOpen(), save: () => save(false), newPaper: () => openPaper(), undo, redo, exportCites: () => openEx(), import: () => openImport('file'), side: () => sbToggle(),
   find: () => { if (!$('#side').classList.contains('min')) $('#sg-search').classList.remove('fold'); $('#q').focus(); }   // con la barra plegada, la búsqueda ya está en la fila de «Nuevo paper»
 };
 document.addEventListener('keydown', e => {
@@ -323,9 +323,9 @@ function helpHTML() {
       <li><b>Etiquetas</b>: clic derecho sobre una etiqueta del paper para quitársela.</li>
       <li><b>Notas</b>: el botón «Notas (n)» las despliega; clic derecho abre el visor de notas del paper. 🔗 muestra sus relaciones.</li>
       <li><b>Agrupar por sección</b>: en «Ordenar» (o clic derecho en «Sección» sobre la lista). Puedes arrastrar papers entre grupos para cambiarlos de sección.</li></ul>`],
-    lateral: ['Barra lateral', `<ul><li>☰ pliega o despliega la barra; con la barra plegada, la búsqueda pasa a la fila de «Nuevo paper» y cada icono abre la barra en su grupo. Clic derecho en ☰: plegar o desplegar todos los grupos.</li>
+    lateral: ['Barra lateral', `<ul><li>☰ (${kb('side')}) pliega o despliega la barra; arrastra su borde derecho para cambiar el ancho (doble clic lo restablece). Con la barra plegada, la búsqueda pasa a la fila de «Nuevo paper» y cada icono abre la barra en su grupo. Clic derecho en ☰: plegar o desplegar todos los grupos.</li>
       <li><b>Buscar 🔍</b> (${kb('find')}): por título, autor o año; la casilla amplía a notas y citas editadas.</li>
-      <li><b>Filtros 🎚️</b>: Secciones, Etiquetas, Lectura, Valoración mínima y Años. Cada chip dice cuántos papers tiene; «Sin sección» y «Sin etiquetas» muestran los que falta clasificar. Clic derecho en una etiqueta para <b>ocultar</b> sus papers (sale tachada). Con 6 etiquetas o más aparece un buscador de etiquetas. Bajo Lectura, el progreso del proyecto. «✎ Gestionar» crea, renombra, recolorea, ordena y borra secciones y etiquetas. Clic derecho en una sección abre sus notas.</li>
+      <li><b>Filtros 🎚️</b>: Secciones, Etiquetas, Lectura, Valoración mínima y Años. Cada chip dice cuántos papers tiene; «Sin sección» y «Sin etiquetas» muestran los que falta clasificar. Clic derecho en una etiqueta para <b>ocultar</b> sus papers (sale tachada). Con 6 etiquetas o más aparece un buscador de etiquetas. Bajo Lectura, el progreso del proyecto. «✎ Gestionar» crea, renombra, recolorea, ordena y borra secciones y etiquetas. Clic derecho en una sección abre sus notas. Arrastra un paper (o los seleccionados) a una sección o etiqueta para añadírsela.</li>
       <li><b>Filtros aplicados</b>: sobre la lista se ven todos, cada uno con su ✕ para quitarlo, y «Limpiar todo».</li>
       <li><b>Ordenar ⇅</b> (plegado al empezar): varios criterios en cascada (título, autor, año, revista, lectura, valoración, fecha de creación o modificación…), cada uno ascendente o descendente, y «Agrupar por sección».</li>
       <li><b>Vistas ⭐</b>: «＋ Guardar la vista actual» guarda la búsqueda, el orden y los filtros con un nombre; un clic la aplica y la que coincide con lo que ves sale marcada. Son de cada proyecto y de este navegador.</li>

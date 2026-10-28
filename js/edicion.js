@@ -537,6 +537,17 @@ $('#list').addEventListener('drop', e => {
   if (tag && c) { e.preventDefault(); addTag(c.dataset.id, tag); }
   else if (pap && g) { e.preventDefault(); const d = JSON.parse(pap); movePaper(d.id, d.from, g.dataset.sec); }
 });
+const sbDropT = e => [...e.dataTransfer.types].includes('application/x-paper') && e.target.closest?.('#secF .cw[data-sec], #tagF .chip[data-tag]');
+$('#side').addEventListener('dragover', e => { const t = sbDropT(e); if (!t) return; e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; clearOver(); t.classList.add('over'); });
+$('#side').addEventListener('drop', e => {   // paper -> sección o etiqueta de la barra: se la añade (a todos los seleccionados si el paper lo está)
+  const t = sbDropT(e); clearOver(); if (!t) return; e.preventDefault();
+  const {id} = JSON.parse(e.dataTransfer.getData('application/x-paper')), ids = SEL.has(id) ? [...SEL] : [id], sec = t.dataset.sec, tag = t.dataset.tag;
+  const name = sec ? secName(sec) : db.tags.find(x => x.id === tag)?.name || '?'; let n = 0;
+  ids.forEach(pid => { const p = db.papers.find(x => x.id === pid); if (!p) return;
+    if (sec && !p.sectionIds.includes(sec)) { p.sectionIds.push(sec); logChange(p, 'Sección añadida: ' + name); n++; }
+    if (tag && !p.tagIds.includes(tag)) { p.tagIds.push(tag); logChange(p, 'Etiqueta añadida: ' + name); n++; } });
+  if (n) { markDirty(); render(); } toast(n ? `«${name}» añadida a ${n === 1 ? '1 paper' : n + ' papers'}.` : `Ya la tenía${ids.length > 1 ? 'n' : ''}.`, [], 3000);
+});
 function toggleS(id) { const i = D.sectionIds.indexOf(id); i < 0 ? D.sectionIds.push(id) : D.sectionIds.splice(i, 1); drawD(); }
 function toggleT(id) { const i = D.tagIds.indexOf(id); i < 0 ? D.tagIds.push(id) : D.tagIds.splice(i, 1); drawD(); }
 let CLOC = '';   // página o parte citada que se usa en la cita en el texto (no se guarda)
