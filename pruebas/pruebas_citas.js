@@ -1,6 +1,7 @@
-// Pruebas de lógica de citas (Node, sin navegador). Uso: node pruebas_citas.js ruta/a/app.js
-const fs = require('fs');
-const src = fs.readFileSync(process.argv[2] || './app.js', 'utf8');
+// Pruebas de lógica de citas (Node, sin navegador). Uso: node pruebas/pruebas_citas.js [carpeta de la app]
+const fs = require('fs'), path = require('path');
+const dir = process.argv[2] ? (/\.js$/.test(process.argv[2]) ? path.dirname(process.argv[2]) : process.argv[2]) : '.';   // se acepta también la ruta a app.js, como antes
+const src = [...fs.readFileSync(path.join(dir, 'index.html'), 'utf8').matchAll(/<script src="([^"]+)"/g)].map(m => fs.readFileSync(path.join(dir, m[1]), 'utf8')).join('\n');   // todos los scripts, en el orden de index.html
 const cut = (a, b) => src.slice(src.indexOf(a), src.indexOf(b));
 const code = `
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
