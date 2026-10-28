@@ -135,7 +135,7 @@ let listW = 0; new ResizeObserver(([e]) => { if (Math.abs(e.contentRect.width - 
 function render() {
   hdr();
   const secH = [{name: 'Todas', color: '#888888'}, ...db.sections].map(x => chip(x, x.id ? F.sec === x.id : !F.sec, `setSecF('${x.id || ''}')`, 0, `svOpen('${x.id || ''}',event)`)).join('');
-  const tagC = (db.tags.map(t => chip(t, F.tags.has(t.id), `toggleF('${t.id}')`, 1)).join('') || '<small>Aún no hay etiquetas.</small>');
+  const tagC = db.tags.length ? chip({name: 'Todas', color: '#888888'}, !F.tags.size, 'tagsAll()') + db.tags.map(t => chip(t, F.tags.has(t.id), `toggleF('${t.id}')`, 1)).join('') : '<small>Aún no hay etiquetas.</small>';   // «Todas» quita el filtro, como en Secciones
   const modeSel = `<select class="mode" title="Cómo combinar varias etiquetas" data-onchange="put(F,'mode',this.value,render)"><option value="any" ${F.mode === 'any' ? 'selected' : ''}>Al menos una etiqueta</option><option value="all" ${F.mode === 'all' ? 'selected' : ''}>Todas las etiquetas</option></select>`;
   $('#secF').innerHTML = $('#secF2').innerHTML = secH;
   $('#tagF').innerHTML = tagC + modeSel; $('#tagF2').innerHTML = tagC;
@@ -166,7 +166,7 @@ function listMore() {   // añade la siguiente parte sin repintar lo que ya est�
 }
 const MORE_IO = 'IntersectionObserver' in window ? new IntersectionObserver(es => { if (es.some(e => e.isIntersecting)) listMore(); }, {rootMargin: '600px'}) : null;
 const moreWatch = () => { if (!MORE_IO) return; MORE_IO.disconnect(); const m = $('#list > .more'); if (m) MORE_IO.observe(m); };   // al acercarte al final, se añade sola
-const countDraw = () => { $('#count').textContent = `${LIST.n} de ${db.papers.length} papers · ${SEL.size} seleccionados`; };
+const countDraw = () => { $('#count').textContent = `${LIST.n} de ${db.papers.length} · ${SEL.size} sel.`; };
 function selDraw(count = 1) {   // barra de selección (solo sale con papers marcados) y contador
   const sg = $('#sg-sel'), hadSel = !sg.hidden; sg.hidden = !SEL.size; if (SEL.size && !hadSel) sg.classList.remove('fold');
   $('#selT').textContent = `Selección (${SEL.size})`; if (count) countDraw();
@@ -182,6 +182,7 @@ function renderPaper(id) {   // repinta solo la tarjeta o fila de un paper; si e
 let tQ = 0;   // la búsqueda espera a que dejes de escribir (Enter la aplica al momento)
 function qSet(v, now) { F.q = v; clearTimeout(tQ); if (now) render(); else tQ = setTimeout(render, 150); }
 function toggleF(id) { F.tags.has(id) ? F.tags.delete(id) : F.tags.add(id); render(); }
+function tagsAll() { F.tags.clear(); render(); }
 function ctxShow(e, html) {   // menú contextual genérico
   e.preventDefault(); e.stopPropagation(); let m = $('#ctx'); if (!m) { m = document.createElement('div'); m.id = 'ctx'; }
   (document.querySelector('dialog[open]') || document.body).appendChild(m);   // dentro de una ventana abierta, para que se vea por encima
@@ -202,6 +203,12 @@ document.addEventListener('click', e => { if (!e.target.closest('.fm')) fmClose(
 document.addEventListener('contextmenu', e => { if (!e.target.closest('[data-oncontextmenu]')) ctxClose(); });   // clic derecho en otro sitio también cierra
 function setSecF(id) { F.sec = id && F.sec === id ? '' : id; render(); }   // '' = Todas; pulsar la sección activa también vuelve a «Todas»
 function sbToggle() { $('#side').classList.toggle('min'); uiSoon(); }
+function sbSearchDock() {   // con la barra plegada, la búsqueda pasa a la fila de «Nuevo paper» (el resto se pliega); al desplegarla, vuelve a su sitio
+  const q = $('#q'), min = $('#side').classList.contains('min'), had = document.activeElement === q;
+  if (min) $('main > .row .pri').after(q); else $('#sg-search .sgh').appendChild(q);
+  if (had) q.focus();
+}
+new MutationObserver(sbSearchDock).observe($('#side'), {attributes: true, attributeFilter: ['class']});   // sirve para todo lo que pliega o despliega la barra
 function sbMore() {   // «Información» (Ayuda, Privacidad y Créditos): plegada por defecto; con la barra plegada, la despliega abierta
   const a = $('#side'), el = $('#sg-more'), wasMin = a.classList.contains('min');
   a.classList.remove('min'); wasMin ? el.classList.remove('fold') : el.classList.toggle('fold');

@@ -147,6 +147,23 @@ with sync_playwright() as pw:
     pg.evaluate("db.papers[0].title = 'Paper uno'"); pg.fill('#q', ''); pg.press('#q', 'Enter')
     pg.evaluate("sbGroup('search')")
     eq('plegado el grupo, solo queda el icono', pg.evaluate("getComputedStyle($('#q')).display"), 'none'); pg.evaluate("sbGroup('search')")
+    # barra plegada: la búsqueda se queda a la vista, en la fila de «Nuevo paper»; lo demás se pliega
+    pg.evaluate("sbToggle()")
+    eq('plegada, la búsqueda sigue visible junto a «Nuevo paper»', pg.evaluate("[$('#q').offsetParent !== null, $('#q').closest('main') !== null, $('#q').previousElementSibling.textContent]"), [True, True, '+ Nuevo paper'])
+    eq('plegada, el resto de la barra se oculta', pg.evaluate("[...document.querySelectorAll('#side .sb, #side .lbl')].every(e => e.offsetParent === null)"), True)
+    eq('plegada, la búsqueda filtra', (pg.fill('#q', 'zzz'), pg.press('#q', 'Enter'), pg.evaluate("document.querySelectorAll('#list article.card').length"))[2], 0)
+    pg.evaluate("sbToggle()")
+    eq('desplegada, la búsqueda vuelve a la barra con su texto', pg.evaluate("[$('#q').closest('#sg-search') !== null, $('#q').value, $('#q').offsetParent !== null]"), [True, 'zzz', True])
+    pg.fill('#q', ''); pg.press('#q', 'Enter')
+    pg.evaluate("sbToggle(); sbGroup('search')")
+    eq('pulsar la lupa con la barra plegada la despliega con la búsqueda en su sitio y enfocada', pg.evaluate("[$('#side').classList.contains('min'), $('#q').closest('#sg-search') !== null, document.activeElement === $('#q')]"), [False, True, True])
+    # etiquetas: opción «Todas», como en Secciones
+    eq('Etiquetas empieza por «Todas», activa sin filtro', pg.evaluate("[...['#tagF', '#tagF2']].map(s => [$(s + ' .chip').textContent, $(s + ' .chip').classList.contains('on')])"), [['Todas', True], ['Todas', True]])
+    pg.evaluate("toggleF('t1'); toggleF('t2')")
+    eq('al filtrar por etiquetas, «Todas» se apaga', pg.evaluate("$('#tagF .chip').classList.contains('on')"), False)
+    pg.locator('#tagF .chip', has_text='Todas').click()
+    eq('«Todas» quita el filtro de etiquetas', pg.evaluate("[F.tags.size, $('#tagF .chip').classList.contains('on')]"), [0, True])
+    eq('sin etiquetas no sale «Todas»', pg.evaluate("(t => { db.tags = []; render(); const r = document.querySelectorAll('#tagF .chip').length; db.tags = t; render(); return r; })(db.tags)"), 0)
     eq('ya no existe el selector de posición de etiquetas', 'Etiquetas en cada paper' in pg.inner_text('#side'), False)
     order = "[...document.querySelectorAll('.card .ct > *')].map(e => e.className || e.tagName)"
     eq('etiquetas entre Editar y el estado de lectura', pg.evaluate(order), ['sel', 'sm', 'sm cpb', 'tl', 'rd', 'x'])

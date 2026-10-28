@@ -85,6 +85,7 @@ El estilo **Derecho y jurisprudencia** une las guías de la UAM (Facultad de Der
 - **Historial:** solo muestra los cambios del día y no se guarda en el JSON (allí queda solo la fecha de creación).
 - **Lista principal:** el estado de lectura y las estrellas van junto a la ✕; clic derecho en las estrellas para cambiar la valoración.
 - **Barra lateral** con fondo y borde propios; «Gestionar» junto al título de Secciones y Etiquetas.
+- **Barra lateral plegada:** la búsqueda sigue a la vista en la fila de «Nuevo paper»; lo demás se pliega. Etiquetas tiene la opción «Todas», como Secciones, y «☑ Visibles» selecciona los papers que se ven.
 - **Configuración** y **editar paper** con cabecera fija que se estrecha al hacer scroll; apartados plegables.
 - **Editar paper:** pestaña «Secciones, etiquetas y relacionados» con el mismo diseño plegable que «Ver todo», y la cita en su propia pestaña; «Ver todo» con bloques plegables y una sola variante de cita (selector).
 - **Notas** (generales y por sección) con un editor que muestra el formato al escribir, como WhatsApp: `*cursiva*`, `**negrita**`, `~~tachado~~`, `__subrayado__`, listas con «- » o «1. ». Se guardan y copian con esos símbolos; al exportar solo se ve el formato.
