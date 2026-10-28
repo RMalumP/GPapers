@@ -810,7 +810,7 @@ function validate(d) {
 const pickFile = (acc = '.json') => new Promise(res => { const i = document.createElement('input'); i.type = 'file'; i.accept = acc;
   i.onchange = () => i.files[0] ? i.files[0].text().then(text => res({path: i.files[0].name, text})) : res(null); i.click(); });
 async function loadText(text, name, quiet) {
-  try { db = validate(JSON.parse(text)); path = name; dirty = false; F.tags.clear(); F.sec = ''; SEL.clear(); UNDO.length = 0; REDO.length = 0; lastSnap = JSON.stringify(db); fmtPinned = db.settings.fmtOpen; applySettings(); render(); sessionSoon(); return true; }
+  try { db = validate(JSON.parse(text)); path = name; dirty = false; F.tags.clear(); F.sec = ''; SEL.clear(); UNDO.length = 0; REDO.length = 0; lastSnap = snapDb(); fmtPinned = db.settings.fmtOpen; applySettings(); render(); sessionSoon(); return true; }
   catch (e) { if (!quiet) alert('Archivo no válido (se mantienen los datos actuales): ' + e.message); return false; }
 }
 async function doOpen() {   // cada archivo JSON se abre como proyecto (ver Proyectos)
@@ -847,19 +847,24 @@ async function setAuto(c) {
   else if (auto) markDirty();
 }
 const UNDO = [], REDO = [], MAXU = 50;
+/* Copias para deshacer: las imágenes incrustadas van una sola vez en IMG_POOL y cada copia lleva solo su clave (sin imágenes, la copia es snapDb()) */
+const IMG_POOL = new Map(), IMG_KEY = new Map();   // clave → data: URL · data: URL → clave
+const snapDb = () => JSON.stringify(db, (k, v) => { if (k !== 'data' || typeof v !== 'string' || !v.startsWith('data:')) return v;
+  let c = IMG_KEY.get(v); if (!c) { c = '\u0001img' + IMG_KEY.size; IMG_KEY.set(v, c); IMG_POOL.set(c, v); } return c; });
+const unsnap = json => JSON.parse(json, (k, v) => k === 'data' && typeof v === 'string' && v.startsWith('\u0001img') ? IMG_POOL.get(v) ?? v : v);
 let lastSnap = null, lastRecAt = 0;
 function record() {   // antes de cada cambio guarda el estado anterior; los cambios seguidos (<1,5 s) forman un solo paso
-  const cur = JSON.stringify(db);
+  const cur = snapDb();
   if (lastSnap === null || cur === lastSnap) { lastSnap = cur; return; }
   if (!(Date.now() - lastRecAt < 1500 && UNDO.length)) { UNDO.push(lastSnap); if (UNDO.length > MAXU) UNDO.shift(); }
   lastRecAt = Date.now(); REDO.length = 0; lastSnap = cur;
 }
 function touch() { hdr(); sessionSoon(); clearTimeout(timer); if (auto && handle) timer = setTimeout(() => save(false), 1000); if (!SY.applying && syAuto()) sySoon(); }   // con Google Drive conectado, el cambio se sube a los 3 s
 function markDirty() { record(); dirty = true; touch(); }
-function undo() { if (UNDO.length) { REDO.push(JSON.stringify(db)); restore(UNDO.pop()); } }
-function redo() { if (REDO.length) { UNDO.push(JSON.stringify(db)); restore(REDO.pop()); } }
+function undo() { if (UNDO.length) { REDO.push(snapDb()); restore(UNDO.pop()); } }
+function redo() { if (REDO.length) { UNDO.push(snapDb()); restore(REDO.pop()); } }
 function restore(json) {
-  db = JSON.parse(json); lastSnap = json; lastRecAt = 0; syncTypes(db.settings.customTypes); syncStyles(db.settings.customStyles, db.settings.export);
+  db = unsnap(json); lastSnap = json; lastRecAt = 0; syncTypes(db.settings.customTypes); syncStyles(db.settings.customStyles, db.settings.export);
   for (const id of [...SEL]) if (!db.papers.some(p => p.id === id)) SEL.delete(id);
   dirty = true; applySettings(); render(); if ($('#cfg').open) drawCfg(); touch();
 }
@@ -1610,7 +1615,7 @@ const tagsOf = p => p.tagIds.map(tagById).filter(Boolean).map(t => chip(t, 1, ''
 const EXP = new Set();   // papers con las notas desplegadas en la lista
 const notesHTML = (p, hl) => `<div class="nts">${p.notes.filter(n => n.content.trim()).map(n => { const s = secById(n.sectionId);
   return `<div class="nt${n.id === hl ? ' hl' : ''}">${s ? chip(s, 1) : '<span class="chip on" style="--c:#888888">Sin sección</span>'}<div class="ntx md">${md(n.content)}</div></div>`; }).join('') || '<small>Este paper no tiene notas.</small>'}</div>`;
-function toggleNotes(id) { EXP.has(id) ? EXP.delete(id) : EXP.add(id); render(); }
+function toggleNotes(id) { EXP.has(id) ? EXP.delete(id) : EXP.add(id); renderPaper(id); }
 /* ---- Imagen del paper ---- */
 const PEND = new Map(), IMG_URL = new Map();   // PEND: archivos elegidos en el borrador aún sin guardar · IMG_URL: URLs de objeto de los archivos enlazados
 const imgInner = i => !i ? '🖼️' : i.kind === 'url' ? `<img src="${esc(i.url)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.outerHTML='<span class=&quot;imgx&quot; title=&quot;No se pudo cargar la imagen&quot;>⚠</span>'">`
@@ -1675,7 +1680,7 @@ document.addEventListener('paste', e => {
 const starsHTML = p => `<span class="stv${p.rating ? '' : ' none'}" oncontextmenu="starMenu(event,'${p.id}')" title="Valoración ${p.rating} de 5 · Clic derecho: cambiar">${'★'.repeat(p.rating)}${'☆'.repeat(5 - p.rating)}</span>`;
 const rdHTML = p => `<span class="rd"><button class="rst" style="--c:${READ_C[p.reading]}" title="Clic: cambiar el estado de lectura" onclick="cycleRead('${p.id}')">${READ[p.reading]}</button>${starsHTML(p)}</span>`;
 function starMenu(e, id) { ctxShow(e, '<div class="ctxh">Valoración</div>' + [5, 4, 3, 2, 1, 0].map(n => `<button onclick="setRating('${id}',${n})">${n ? '★'.repeat(n) + '☆'.repeat(5 - n) : 'Sin valorar'}</button>`).join('')); }
-function setRating(id, n) { const p = db.papers.find(x => x.id === id); ctxClose(); if (!p || p.rating === n) return; logChange(p, `Valoración: ${p.rating || '—'} → ${n || '—'}`); p.rating = n; markDirty(); render(); }
+function setRating(id, n) { const p = db.papers.find(x => x.id === id); ctxClose(); if (!p || p.rating === n) return; logChange(p, `Valoración: ${p.rating || '—'} → ${n || '—'}`); p.rating = n; markDirty(); renderPaper(id); }
 const card = (p, from) => `<article class="card" data-id="${p.id}" ${F.group ? `draggable="true" data-from="${from || ''}"` : ''}><div class="ct"><label class="sel"><input type="checkbox" ${SEL.has(p.id) ? 'checked' : ''} onchange="toggleSel('${p.id}')"> Seleccionar</label><button class="sm" onclick="openPaper('${p.id}')">Editar</button><button class="sm cpb" onclick="copyCardCite('${p.id}',this)" title="Copiar la cita (estilo elegido en Exportar), con cursiva al pegar en Word">📋</button>${p.pdf ? `<button class="sm" onclick="pdfOpen('${p.id}')" title="Abrir el PDF enlazado: ${esc(p.pdf.name)}">📄 PDF</button>` : ''}${p.tagIds.length ? `<span class="tl">${tagsOf(p)}</span>` : ''}${rdHTML(p)}<button class="x" title="Eliminar" onclick="delPaper('${p.id}')">✕</button></div><div class="th">${thumbHTML(p, 'sm')}<h3>${esc(p.alias || p.title)}</h3></div>${p.alias ? `<div class="sub">${esc(p.title)}</div>` : ''}
     <div class="au"><span>${esc(p.authors.join('; '))} ${p.year ? '(' + esc(p.year) + ')' : ''}</span></div>
     ${/^https?:/i.test(p.url) ? `<a href="${esc(p.url)}" target="_blank" rel="noopener noreferrer">${esc(p.url)}</a>` : ''}
@@ -1701,8 +1706,8 @@ function listHTML(L) {
   if (!F.sec) G.push([{id: '', name: 'Sin sección', color: '#888888'}, L.filter(p => !p.sectionIds.some(secById))]);
   return G.map(([s, l]) => `<section class="gbox" data-sec="${s.id || ''}"><h2 class="grp" style="border-color:${esc(s.color || '#888888')}" ${s.id ? `oncontextmenu="svOpen('${s.id}',event)"` : ''}>${esc(s.name)} <small>(${l.length})</small></h2>${items(l, s.id || '') || '<p class="empty drop">Arrastra papers aquí</p>'}</section>`).join('');
 }
-function fitTags() {   // las etiquetas van en la barra superior de la tarjeta; si no caben, pasan a su propia línea entre esa barra y el título
-  document.querySelectorAll('#list article.card').forEach(c => { const ct = c.querySelector('.ct'), tl = ct.querySelector('.tl') || c.querySelector(':scope > .tl'); if (!tl) return;
+function fitTags(only) {   // las etiquetas van en la barra superior de la tarjeta; si no caben, pasan a su propia línea entre esa barra y el título
+  (only ? [only] : document.querySelectorAll('#list article.card')).forEach(c => { const ct = c.querySelector('.ct'), tl = ct.querySelector('.tl') || c.querySelector(':scope > .tl'); if (!tl) return;
     if (tl.parentElement !== ct) ct.insertBefore(tl, ct.querySelector('.rd'));
     if (ct.scrollWidth > ct.clientWidth + 1) ct.after(tl); });
 }
@@ -1717,8 +1722,7 @@ function render() {
   const tg = (id, open, label, active) => { const b = $(id); b.textContent = `${label} ${open ? '▾' : '▸'}${!open && active ? ' •' : ''}`; b.classList.toggle('on', open); };   // «•» = hay filtro activo con la lista plegada
   tg('#tbSec', F.tbSec, 'Sección', F.sec); tg('#tbTag', F.tbTag, 'Etiquetas', F.tags.size);
   $('#secF2').hidden = !F.tbSec; $('#tagF2').hidden = !F.tbTag; $('#grpChk').checked = F.group;
-  const sg = $('#sg-sel'), hadSel = !sg.hidden; sg.hidden = !SEL.size; if (SEL.size && !hadSel) sg.classList.remove('fold');   // la barra de selección solo sale con papers marcados
-  $('#selT').textContent = `Selección (${SEL.size})`;
+  selDraw(0);
   $('#d-search').hidden = !F.q; $('#d-filt').hidden = !(F.sec || F.tags.size || F.read); $('#d-sort').hidden = !F.minRating; $('#d-tr').hidden = !db.trash.length; $('#trLbl').textContent = 'Papelera' + (db.trash.length ? ` (${db.trash.length})` : ''); $('#tbView').textContent = db.settings.view === 'table' ? '▦ Tarjetas' : '☰ Tabla';
   $('#readF').innerHTML = [['', 'Todos'], ...Object.entries(READ)].map(([k, v]) => chip({name: v, color: k ? READ_C[k] : '#888888'}, F.read === k, `setRead('${k}')`)).join(''); $('#minR').value = F.minRating;   // puntos de filtro activo
   const nextKey = Object.keys(SORTS).find(k => !F.sorts.some(s => s.k === k)) || 'title';
@@ -1726,10 +1730,34 @@ function render() {
     <button title="${s.d > 0 ? 'Ascendente (A→Z, antiguo→reciente)' : 'Descendente (Z→A, reciente→antiguo)'}" onclick="F.sorts[${i}].d*=-1;render()">${s.d > 0 ? '▲' : '▼'}</button>
     ${F.sorts.length > 1 ? `<button onclick="F.sorts.splice(${i},1);render()">✕</button>` : ''}</div>`).join('')
     + `<button onclick="F.sorts.push({k:'${nextKey}',d:1});render()">+ Añadir criterio</button>`;
-  const L = visible();
-  $('#list').innerHTML = listHTML(L) || '<p class="empty">No hay papers que mostrar. Crea uno con «Nuevo paper» o ajusta los filtros.</p>';
-  fitTags(); hydrateImgs(); uiSoon();
-  $('#count').textContent = `${L.length} de ${db.papers.length} papers · ${SEL.size} seleccionados`; progDraw();
+  const L = visible(), part = !F.group && L.length > LIST.step;   // sin agrupar, las listas largas se pintan por partes
+  LIST.L = L; LIST.shown = part ? LIST.step : L.length;
+  $('#list').innerHTML = (listHTML(part ? L.slice(0, LIST.step) : L) + (part ? moreHTML() : '')) || '<p class="empty">No hay papers que mostrar. Crea uno con «Nuevo paper» o ajusta los filtros.</p>';
+  fitTags(); hydrateImgs(); moreWatch(); uiSoon();
+  LIST.n = L.length; countDraw(); progDraw();
+}
+const LIST = {L: [], n: 0, shown: 0, step: 150};   // lo que se ve en la lista y cuántos papers lleva pintados
+const moreHTML = () => `<p class="more"><button onclick="listMore()">Mostrar ${Math.min(LIST.step, LIST.L.length - LIST.shown)} más (quedan ${LIST.L.length - LIST.shown})</button></p>`;
+function listMore() {   // añade la siguiente parte sin repintar lo que ya está
+  const m = $('#list > .more'); if (!m) return; const add = LIST.L.slice(LIST.shown, LIST.shown += LIST.step);
+  const tb = $('#list tbody'); if (tb) tb.insertAdjacentHTML('beforeend', add.map(p => rowHTML(p, '')).join('')); else m.insertAdjacentHTML('beforebegin', add.map(p => card(p, '')).join(''));
+  m.remove(); if (LIST.shown < LIST.L.length) $('#list').insertAdjacentHTML('beforeend', moreHTML());
+  fitTags(); hydrateImgs(); moreWatch();
+}
+const MORE_IO = 'IntersectionObserver' in window ? new IntersectionObserver(es => { if (es.some(e => e.isIntersecting)) listMore(); }, {rootMargin: '600px'}) : null;
+const moreWatch = () => { if (!MORE_IO) return; MORE_IO.disconnect(); const m = $('#list > .more'); if (m) MORE_IO.observe(m); };   // al acercarte al final, se añade sola
+const countDraw = () => { $('#count').textContent = `${LIST.n} de ${db.papers.length} papers · ${SEL.size} seleccionados`; };
+function selDraw(count = 1) {   // barra de selección (solo sale con papers marcados) y contador
+  const sg = $('#sg-sel'), hadSel = !sg.hidden; sg.hidden = !SEL.size; if (SEL.size && !hadSel) sg.classList.remove('fold');
+  $('#selT').textContent = `Selección (${SEL.size})`; if (count) countDraw();
+}
+function renderPaper(id) {   // repinta solo la tarjeta o fila de un paper; si el cambio puede moverlo o sacarlo de la lista, todo
+  const p = db.papers.find(x => x.id === id), el = $(`#list [data-id="${id}"]`);
+  if (!p || !el || F.minRating || F.read || F.sorts.some(s => ['rating', 'reading', 'modified'].includes(s.k))) return render();
+  const tr = el.tagName === 'TR', t = document.createElement(tr ? 'tbody' : 'div'); t.innerHTML = (tr ? rowHTML : card)(p, el.dataset.from);
+  if (tr && el.nextElementSibling?.classList.contains('rn')) el.nextElementSibling.remove();   // la fila de notas desplegadas va justo detrás
+  const nodes = [...t.children]; el.replaceWith(...nodes); hdr();
+  if (!tr) fitTags(nodes[0]); nodes.forEach(n => n.querySelectorAll('.pimg[data-fpid]').forEach(e => hydrateImgs(false, e)));
 }
 let tQ = 0;   // la búsqueda espera a que dejes de escribir (Enter la aplica al momento)
 function qSet(v, now) { F.q = v; clearTimeout(tQ); if (now) render(); else tQ = setTimeout(render, 150); }
@@ -1744,7 +1772,7 @@ const tick = on => on ? '✓ ' : '\u2003';
 function modeMenu(e) { ctxShow(e, '<div class="ctxh">Combinar varias etiquetas</div>' + [['any', 'Al menos una'], ['all', 'Todas']].map(([k, v]) => `<button onclick="F.mode='${k}';ctxClose();render()">${tick(F.mode === k)}${v}</button>`).join('')); }
 function groupMenu(e) { ctxShow(e, `<div class="ctxh">Secciones</div><button onclick="F.group=!F.group;ctxClose();render()">${tick(F.group)}Agrupar por sección</button>`); }
 function tagMenu(e, pid, tid) { ctxShow(e, `<div class="ctxh">Etiqueta «${esc(db.tags.find(t => t.id === tid)?.name)}»</div><button onclick="delTagFrom('${pid}','${tid}')">🗑 Borrar de este paper</button>`); }
-function delTagFrom(pid, tid) { const p = db.papers.find(x => x.id === pid); if (p) { p.tagIds = p.tagIds.filter(x => x !== tid); logChange(p, 'Etiqueta quitada: ' + (db.tags.find(t => t.id === tid)?.name || '?')); } ctxClose(); markDirty(); render(); }
+function delTagFrom(pid, tid) { const p = db.papers.find(x => x.id === pid); if (p) { p.tagIds = p.tagIds.filter(x => x !== tid); logChange(p, 'Etiqueta quitada: ' + (db.tags.find(t => t.id === tid)?.name || '?')); } ctxClose(); markDirty(); F.tags.size ? render() : renderPaper(pid); }
 const ctxClose = () => { const m = $('#ctx'); if (m) { m.hidden = true; document.body.appendChild(m); } };
 document.addEventListener('click', e => { if (!e.target.closest('#ctx')) ctxClose(); });
 document.addEventListener('keydown', e => { if (e.key === 'Escape') { ctxClose(); fmClose(); } });
@@ -1764,9 +1792,10 @@ function sbGroup(g) {   // con la barra plegada, pulsar un icono la despliega en
   a.classList.remove('min'); wasMin ? el.classList.remove('fold') : el.classList.toggle('fold');
   if (g === 'search' && !el.classList.contains('fold')) $('#q').focus(); uiSoon();
 }
-function cycleRead(id) { const p = db.papers.find(x => x.id === id); if (!p) return; const k = Object.keys(READ); const was = p.reading; p.reading = k[(k.indexOf(p.reading) + 1) % k.length]; logChange(p, `Lectura: ${READ[was]} → ${READ[p.reading]}`); markDirty(); render(); }
+function cycleRead(id) { const p = db.papers.find(x => x.id === id); if (!p) return; const k = Object.keys(READ); const was = p.reading; p.reading = k[(k.indexOf(p.reading) + 1) % k.length]; logChange(p, `Lectura: ${READ[was]} → ${READ[p.reading]}`); markDirty(); renderPaper(id); }
 function setRead(k) { F.read = k; render(); }
-function toggleSel(id) { SEL.has(id) ? SEL.delete(id) : SEL.add(id); render(); }
+function toggleSel(id) { SEL.has(id) ? SEL.delete(id) : SEL.add(id);   // solo cambian la casilla, la barra de selección y el contador
+  const c = $(`#list [data-id="${id}"] input[type=checkbox]`); if (c) c.checked = SEL.has(id); selDraw(); }
 function selVisible() { visible().forEach(p => SEL.add(p.id)); render(); }
 function selNone() { SEL.clear(); render(); }
 /* ===== Exportar (texto, BibTeX, RIS, Word) y bibliografía ordenada ===== */
@@ -1891,7 +1920,7 @@ function openEx() {   // ventana emergente de exportación; se cierra con un cli
   exUI(); drawEx(); $('#ex').showModal();
 }
 function exSet(k, v, quiet) {   // las opciones se recuerdan en el JSON (sin crear pasos de deshacer)
-  ex()[k] = v; lastSnap = JSON.stringify(db); dirty = true; touch(); if (!quiet) exUI(); drawEx();
+  ex()[k] = v; lastSnap = snapDb(); dirty = true; touch(); if (!quiet) exUI(); drawEx();
 }
 function exUI() {
   const o = ex(), tl = isTl(o.fmt);
@@ -2222,7 +2251,7 @@ function citeCmd(cmd) {   // Cursiva o negrita en la cita con el foco (o en la p
   if (!el.contains(getSelection().anchorNode)) el.focus();
   document.execCommand('styleWithCSS', false, false); document.execCommand(cmd); el.dispatchEvent(new Event('input'));
 }
-function citeOpt(k, v) { ex()[k] = v; lastSnap = JSON.stringify(db); dirty = true; touch(); drawD(); }   // mismo ajuste que en Exportar (sin pasos de deshacer)
+function citeOpt(k, v) { ex()[k] = v; lastSnap = snapDb(); dirty = true; touch(); drawD(); }   // mismo ajuste que en Exportar (sin pasos de deshacer)
 const tplText = t => t.text.replace(/\{fecha\}/g, new Date().toLocaleDateString('es-ES')).replace(/\{paper\}/g, D?.title || '');
 function tplMenu(e, key) {
   ctxShow(e, '<div class="ctxh">Insertar plantilla</div>' + (db.settings.templates.map(t => `<button onclick="tplInsert('${key}','${t.id}')">${esc(t.name)}</button>`).join('') || '<div class="ctxh">No hay plantillas (créalas en Configuración)</div>'));
@@ -2401,7 +2430,7 @@ function trashRestore(id) {
 }
 function trashDelete(id) { if (!confirm('¿Borrar definitivamente este paper? No se podrá recuperar.')) return; db.trash = db.trash.filter(t => t.paper.id !== id); markDirty(); render(); trDraw(); }
 function trashEmpty() { if (!confirm('¿Vaciar la papelera? Los papers que contiene no se podrán recuperar.')) return; db.trash = []; markDirty(); render(); trDraw(); }
-function setView(v) { db.settings.view = v; lastSnap = JSON.stringify(db); dirty = true; touch(); render(); }   // la vista se recuerda en el JSON sin crear pasos de deshacer
+function setView(v) { db.settings.view = v; lastSnap = snapDb(); dirty = true; touch(); render(); }   // la vista se recuerda en el JSON sin crear pasos de deshacer
 
 /* ===== Historial de cambios y relaciones ===== */
 const shortTxt = v => { v = String(v ?? '').replace(/\s+/g, ' ').trim(); return !v ? '—' : v.length > 60 ? v.slice(0, 57) + '…' : v; };
@@ -3439,7 +3468,7 @@ bootApp().then(() => { syIcon(); try { const t = JSON.parse(localStorage.getItem
     SY.st = 'reconnect'; SY.consent = true; syIcon(); toast('La sincronización con Google Drive ha cambiado de proyecto: pulsa «Conectar» y da permiso una vez. Tus datos siguen aquí.', [{t: 'Conectar', fn: syConnect}], 0);
   } else if (syAuto()) syRun(false); });   // con la sesión de Google Drive recordada, se trae lo último al abrir
 render();
-lastSnap = JSON.stringify(db);
+lastSnap = snapDb();
 applySettings();
 if (!FSA && !syOn()) { $('#auto').disabled = true; $('#auto').parentElement.title = 'El autoguardado del archivo solo está disponible en Chrome o Edge de escritorio (en cualquier navegador, con Google Drive 🔄)'; }
 if (syOn()) $('#auto').checked = syAuto();

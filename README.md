@@ -90,7 +90,7 @@ El estilo **Derecho y jurisprudencia** une las guías de la UAM (Facultad de Der
 - **Notas** (generales y por sección) con un editor que muestra el formato al escribir, como WhatsApp: `*cursiva*`, `**negrita**`, `~~tachado~~`, `__subrayado__`, listas con «- » o «1. ». Se guardan y copian con esos símbolos; al exportar solo se ve el formato.
 
 ## Pruebas
-`node pruebas/prueba_version.js .`, `node pruebas/pruebas_citas.js app.js`, `python3 pruebas/prueba_f4.py .`, `python3 pruebas/prueba_ui.py .`, `python3 pruebas/prueba_sync.py .`, `python3 pruebas/prueba_proyectos.py .`, `python3 pruebas/prueba_mejoras.py .` y `python3 pruebas/prueba_interfaz.py .`, `python3 pruebas/prueba_derecho.py .`, `python3 pruebas/prueba_principal.py .`, `python3 pruebas/prueba_importar.py .` (necesitan Playwright con Chromium; la de sincronización simula Google y Drive).
+`node pruebas/prueba_version.js .`, `node pruebas/pruebas_citas.js app.js`, `python3 pruebas/prueba_f4.py .`, `python3 pruebas/prueba_ui.py .`, `python3 pruebas/prueba_sync.py .`, `python3 pruebas/prueba_proyectos.py .`, `python3 pruebas/prueba_mejoras.py .` y `python3 pruebas/prueba_interfaz.py .`, `python3 pruebas/prueba_derecho.py .`, `python3 pruebas/prueba_principal.py .`, `python3 pruebas/prueba_importar.py .`, `python3 pruebas/prueba_rendimiento.py .` (necesitan Playwright con Chromium; la de sincronización simula Google y Drive).
 
 ## Cambios de la ronda F7–F9
 - **Tabla:** columna *Secciones* (se puede seguir agrupando por sección). La pestaña **Cita** va justo después de **Datos**. La **valoración mínima** está en el grupo *Ordenar*.

@@ -184,3 +184,4 @@ aside{border-left:0;border-radius:0 10px 10px 0;padding-left:6px}
 .ced+.row{margin-top:6px}
 .dsep{display:flex;align-items:center;justify-content:space-between;gap:8px}.dsep button{font-size:13px;padding:3px 10px;font-weight:400}
 details.cgrp{margin-top:12px}details.cgrp>summary small{font-weight:400;opacity:.7}
+#list > .more{text-align:center;margin:12px 0}
