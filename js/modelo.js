@@ -80,3 +80,49 @@ function NEWF(p) {   // rellena los campos nuevos de un paper (JSON antiguo, imp
   p.pdf = p.pdf && typeof p.pdf === 'object' && typeof p.pdf.name === 'string' && p.pdf.name ? {name: p.pdf.name.slice(0, 260), ...(pdfPage(p.pdf.page) ? {page: pdfPage(p.pdf.page)} : {})} : null;
   return p;
 }
+/* ===== Eventos de la interfaz =====
+   El HTML no lleva onclick en línea (la CSP de index.html los bloquea): cada elemento dice qué hacer en data-on<evento>, p. ej. data-onclick="openPaper('p1')".
+   Ese texto no se evalúa como JavaScript: lo lee onParse, un minilenguaje de llamadas y lecturas separadas por «;» (a.b(args).c(), 'texto', "texto",
+   números, true/false/null, [listas], this = el elemento, event = el evento, y ! o + delante). Los nombres se buscan en ON_VARS (app.js) y, si no, en window. */
+const ON_EV = ['click', 'change', 'input', 'keydown', 'contextmenu', 'mousedown', 'toggle', 'error'], ON_CAPT = new Set(['toggle', 'error']);   // toggle y error no burbujean
+const ON_AST = new Map();
+function onParse(src) {
+  let i = 0; const s = src, bad = () => { throw new SyntaxError(`data-on no válido (posición ${i}): ${s}`); };
+  const ws = () => { while (i < s.length && /\s/.test(s[i])) i++; }, eat = c => { ws(); if (s[i] === c) { i++; return true; } return false; };
+  const str = () => { const q = s[i++]; let o = ''; while (i < s.length && s[i] !== q) { if (s[i] === '\\') { i++; o += {n: '\n', t: '\t'}[s[i]] ?? s[i]; } else o += s[i]; i++; } if (s[i++] !== q) bad(); return o; };
+  const id = () => { ws(); const m = /^[A-Za-z_$][\w$]*/.exec(s.slice(i)); if (!m) bad(); i += m[0].length; return m[0]; };
+  const args = () => { const a = []; if (eat(')')) return a; do a.push(expr()); while (eat(',')); if (!eat(')')) bad(); return a; };
+  function expr() {
+    ws(); const c = s[i];
+    if (c === '!') { i++; return {t: 'not', e: expr()}; }
+    if (c === '+') { i++; return {t: 'num', e: expr()}; }
+    if (c === '-' || /\d/.test(c)) { const m = /^-?\d+(\.\d+)?/.exec(s.slice(i)); if (!m) bad(); i += m[0].length; return {t: 'lit', v: +m[0]}; }
+    if (c === "'" || c === '"') return {t: 'lit', v: str()};
+    if (c === '[') { i++; const a = []; if (!eat(']')) { do a.push(expr()); while (eat(',')); if (!eat(']')) bad(); } return {t: 'arr', a}; }
+    const root = id(); if (root === 'true' || root === 'false' || root === 'null') return {t: 'lit', v: root === 'null' ? null : root === 'true'};
+    const ops = []; for (;;) { if (eat('.')) ops.push({p: id()}); else if (eat('(')) ops.push({a: args()}); else break; }
+    return {t: 'ref', root, ops};
+  }
+  const out = []; do { ws(); if (i < s.length) out.push(expr()); } while (eat(';')); ws(); if (i < s.length) bad();
+  return out;
+}
+function onEval(n, el, ev) {
+  if (n.t === 'lit') return n.v;
+  if (n.t === 'not') return !onEval(n.e, el, ev);
+  if (n.t === 'num') return +onEval(n.e, el, ev);
+  if (n.t === 'arr') return n.a.map(x => onEval(x, el, ev));
+  let self, v = n.root === 'this' ? el : n.root === 'event' ? ev : n.root in ON_VARS ? ON_VARS[n.root] : window[n.root];
+  if (v === undefined && n.root !== 'this') throw new ReferenceError(`data-on: «${n.root}» no existe`);
+  for (const o of n.ops) { if (o.p) { self = v; v = v[o.p]; } else { v = v.apply(self, o.a.map(x => onEval(x, el, ev))); self = undefined; } }
+  return v;
+}
+const onRun = (src, el, ev) => { let a = ON_AST.get(src); if (!a) ON_AST.set(src, a = onParse(src)); for (const n of a) onEval(n, el, ev); };
+for (const type of ON_EV) document.addEventListener(type, e => {   // se registra antes que ningún otro: así va primero, como iban los onclick en línea
+  const at = 'data-on' + type;
+  for (let el = e.target instanceof Element ? e.target : e.target?.parentElement; el; el = ON_CAPT.has(type) ? null : el.parentElement) {
+    const src = el.getAttribute(at); if (src === null) continue;
+    const ev = new Proxy(e, {get: (t, k) => k === 'currentTarget' ? el : typeof t[k] === 'function' ? t[k].bind(t) : t[k]});   // como en línea: currentTarget es el elemento
+    try { onRun(src, el, ev); } catch (x) { console.error(x); }
+    if (e.cancelBubble) { e.stopImmediatePropagation(); break; }   // stopPropagation() en un manejador también para a los demás oyentes del documento
+  }
+}, ON_CAPT.has(type));

@@ -1,6 +1,6 @@
 'use strict';
 /* ===== Lista principal ===== */
-const chip = (t, on, click, drag, ctx) => `<span class="chip ${on ? 'on' : ''}" style="--c:${esc(t.color || '#888888')}" ${click ? `onclick="${click}"` : ''} ${drag ? `draggable="true" data-tag="${t.id}"` : ''} ${ctx ? `oncontextmenu="${ctx}"` : ''}>${esc(t.name)}</span>`;
+const chip = (t, on, click, drag, ctx) => `<span class="chip ${on ? 'on' : ''}" style="--c:${esc(t.color || '#888888')}" ${click ? `data-onclick="${click}"` : ''} ${drag ? `draggable="true" data-tag="${t.id}"` : ''} ${ctx ? `data-oncontextmenu="${ctx}"` : ''}>${esc(t.name)}</span>`;
 const BYID = new WeakMap();   // índice por id de una lista (etiquetas, secciones); dura hasta acabar la tarea en curso, así nunca queda desfasado
 const byId = arr => { let m = BYID.get(arr); if (!m || m.n !== arr.length) { m = new Map(arr.map(x => [x.id, x])); m.n = arr.length; BYID.set(arr, m); queueMicrotask(() => BYID.delete(arr)); } return m; };
 const tagById = i => byId(db.tags).get(i), secById = i => byId(db.sections).get(i);
@@ -38,7 +38,7 @@ const notesHTML = (p, hl) => `<div class="nts">${p.notes.filter(n => n.content.t
 function toggleNotes(id) { EXP.has(id) ? EXP.delete(id) : EXP.add(id); renderPaper(id); }
 /* ---- Imagen del paper ---- */
 const PEND = new Map(), IMG_URL = new Map();   // PEND: archivos elegidos en el borrador aún sin guardar · IMG_URL: URLs de objeto de los archivos enlazados
-const imgInner = i => !i ? '🖼️' : i.kind === 'url' ? `<img src="${esc(i.url)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.outerHTML='<span class=&quot;imgx&quot; title=&quot;No se pudo cargar la imagen&quot;>⚠</span>'">`
+const imgInner = i => !i ? '🖼️' : i.kind === 'url' ? `<img src="${esc(i.url)}" alt="" loading="lazy" referrerpolicy="no-referrer" data-onerror="imgErr(this)">`
   : i.kind === 'data' ? `<img src="${i.data}" alt="">` : '🖼️';
 const pimgHTML = (p, cls, attrs = '') => `<div class="pimg ${cls}" ${p.image?.kind === 'file' ? `data-fpid="${p.id}" title="Imagen enlazada: ${esc(p.image.name)}"` : ''} ${attrs}>${imgInner(p.image)}</div>`;
 const thumbHTML = (p, cls) => p.image && db.settings.showImg !== false ? pimgHTML(p, cls) : '';
@@ -54,15 +54,15 @@ function hydrateImgs(ask, only) {
 }
 document.addEventListener('click', e => { const el = e.target.closest?.('.pimg.locked[data-fpid]:not(.big)'); if (el) { e.stopPropagation(); hydrateImgs(true, el); } }, true);
 const FILE_IMG_T = [{description: 'Imágenes', accept: {'image/*': ['.png', '.jpg', '.jpeg', '.webp', '.gif', '.bmp', '.svg']}}];
-function imgBox() { $('#dlg .pimgbox') && ($('#dlg .pimgbox').innerHTML = pimgHTML(D, 'big', `role="button" tabindex="0" onclick="imgOpen()" title="Añadir o cambiar la imagen"`)); hydrateImgs(); }
+function imgBox() { $('#dlg .pimgbox') && ($('#dlg .pimgbox').innerHTML = pimgHTML(D, 'big', `role="button" tabindex="0" data-onclick="imgOpen()" title="Añadir o cambiar la imagen"`)); hydrateImgs(); }
 function imgOpen() {
   const i = D.image;
-  $('#img').innerHTML = `<div class="dh"><h2>Imagen del paper</h2><div class="dbtn"><button onclick="$('#img').close()">Cerrar</button></div></div>
+  $('#img').innerHTML = `<div class="dh"><h2>Imagen del paper</h2><div class="dbtn"><button data-onclick="$('#img').close()">Cerrar</button></div></div>
     <div class="pimgprev">${pimgHTML(D, 'big')}</div>
     <div class="pastez" tabindex="0">📋 Pega aquí una imagen copiada (Ctrl+V), p. ej. con «Copiar imagen» en Google Imágenes</div>
-    <label>URL de la imagen<span class="row" style="flex-wrap:nowrap"><input id="imgUrl" type="url" placeholder="https://…" style="flex:1;min-width:0" value="${i?.kind === 'url' ? esc(i.url) : ''}" onkeydown="if(event.key==='Enter')imgSetUrl()"><button class="pri" onclick="imgSetUrl()">Usar</button></span></label>
-    <div class="row" style="margin-top:8px"><button onclick="imgPickLinked()" ${FSA ? '' : 'disabled'} title="${FSA ? 'No se copia: se guarda solo el nombre y el enlace queda en este navegador' : 'Solo disponible en Chrome o Edge de escritorio'}">📎 Archivo local (enlazado)</button>
-    <button onclick="imgPickEmbed()" title="Guarda una copia reducida dentro del JSON: viaja con el archivo">📥 Incrustar copia reducida</button><button class="danger" onclick="imgClear()" ${i ? '' : 'disabled'}>Quitar imagen</button></div>
+    <label>URL de la imagen<span class="row" style="flex-wrap:nowrap"><input id="imgUrl" type="url" placeholder="https://…" style="flex:1;min-width:0" value="${i?.kind === 'url' ? esc(i.url) : ''}" data-onkeydown="onEnter(event,imgSetUrl)"><button class="pri" data-onclick="imgSetUrl()">Usar</button></span></label>
+    <div class="row" style="margin-top:8px"><button data-onclick="imgPickLinked()" ${FSA ? '' : 'disabled'} title="${FSA ? 'No se copia: se guarda solo el nombre y el enlace queda en este navegador' : 'Solo disponible en Chrome o Edge de escritorio'}">📎 Archivo local (enlazado)</button>
+    <button data-onclick="imgPickEmbed()" title="Guarda una copia reducida dentro del JSON: viaja con el archivo">📥 Incrustar copia reducida</button><button class="danger" data-onclick="imgClear()" ${i ? '' : 'disabled'}>Quitar imagen</button></div>
     <small>Enlazada: no ocupa espacio en el JSON, pero solo se ve en el navegador donde la elegiste (puede pedir permiso al abrir). Incrustada: una copia pequeña (máx. 480 px) que se ve en cualquier sitio.</small>`;
   hydrateImgs(); $('#img').showModal();
 }
@@ -97,34 +97,34 @@ document.addEventListener('paste', e => {
   if (t.closest?.('.ned')) return;
   if (t.closest?.('#img') || ($('#dlg').open && $('#dlg .pimgbox') && !$('#img').open)) imgFromClipboard(e, field);
 });
-const starsHTML = p => `<span class="stv${p.rating ? '' : ' none'}" oncontextmenu="starMenu(event,'${p.id}')" title="Valoración ${p.rating} de 5 · Clic derecho: cambiar">${'★'.repeat(p.rating)}${'☆'.repeat(5 - p.rating)}</span>`;
-const rdHTML = p => `<span class="rd"><button class="rst" style="--c:${READ_C[p.reading]}" title="Clic: cambiar el estado de lectura" onclick="cycleRead('${p.id}')">${READ[p.reading]}</button>${starsHTML(p)}</span>`;
-function starMenu(e, id) { ctxShow(e, '<div class="ctxh">Valoración</div>' + [5, 4, 3, 2, 1, 0].map(n => `<button onclick="setRating('${id}',${n})">${n ? '★'.repeat(n) + '☆'.repeat(5 - n) : 'Sin valorar'}</button>`).join('')); }
+const starsHTML = p => `<span class="stv${p.rating ? '' : ' none'}" data-oncontextmenu="starMenu(event,'${p.id}')" title="Valoración ${p.rating} de 5 · Clic derecho: cambiar">${'★'.repeat(p.rating)}${'☆'.repeat(5 - p.rating)}</span>`;
+const rdHTML = p => `<span class="rd"><button class="rst" style="--c:${READ_C[p.reading]}" title="Clic: cambiar el estado de lectura" data-onclick="cycleRead('${p.id}')">${READ[p.reading]}</button>${starsHTML(p)}</span>`;
+function starMenu(e, id) { ctxShow(e, '<div class="ctxh">Valoración</div>' + [5, 4, 3, 2, 1, 0].map(n => `<button data-onclick="setRating('${id}',${n})">${n ? '★'.repeat(n) + '☆'.repeat(5 - n) : 'Sin valorar'}</button>`).join('')); }
 function setRating(id, n) { const p = db.papers.find(x => x.id === id); ctxClose(); if (!p || p.rating === n) return; logChange(p, `Valoración: ${p.rating || '—'} → ${n || '—'}`); p.rating = n; markDirty(); renderPaper(id); }
-const card = (p, from) => `<article class="card" data-id="${p.id}" ${F.group ? `draggable="true" data-from="${from || ''}"` : ''}><div class="ct"><label class="sel"><input type="checkbox" ${SEL.has(p.id) ? 'checked' : ''} onchange="toggleSel('${p.id}')"> Seleccionar</label><button class="sm" onclick="openPaper('${p.id}')">Editar</button><button class="sm cpb" onclick="copyCardCite('${p.id}',this)" title="Copiar la cita (estilo elegido en Exportar), con cursiva al pegar en Word">📋</button>${p.pdf ? `<button class="sm" onclick="pdfOpen('${p.id}')" title="Abrir el PDF enlazado: ${esc(p.pdf.name)}">📄 PDF</button>` : ''}${p.tagIds.length ? `<span class="tl">${tagsOf(p)}</span>` : ''}${rdHTML(p)}<button class="x" title="Eliminar" onclick="delPaper('${p.id}')">✕</button></div><div class="th">${thumbHTML(p, 'sm')}<h3>${esc(p.alias || p.title)}</h3></div>${p.alias ? `<div class="sub">${esc(p.title)}</div>` : ''}
+const card = (p, from) => `<article class="card" data-id="${p.id}" ${F.group ? `draggable="true" data-from="${from || ''}"` : ''}><div class="ct"><label class="sel"><input type="checkbox" ${SEL.has(p.id) ? 'checked' : ''} data-onchange="toggleSel('${p.id}')"> Seleccionar</label><button class="sm" data-onclick="openPaper('${p.id}')">Editar</button><button class="sm cpb" data-onclick="copyCardCite('${p.id}',this)" title="Copiar la cita (estilo elegido en Exportar), con cursiva al pegar en Word">📋</button>${p.pdf ? `<button class="sm" data-onclick="pdfOpen('${p.id}')" title="Abrir el PDF enlazado: ${esc(p.pdf.name)}">📄 PDF</button>` : ''}${p.tagIds.length ? `<span class="tl">${tagsOf(p)}</span>` : ''}${rdHTML(p)}<button class="x" title="Eliminar" data-onclick="delPaper('${p.id}')">✕</button></div><div class="th">${thumbHTML(p, 'sm')}<h3>${esc(p.alias || p.title)}</h3></div>${p.alias ? `<div class="sub">${esc(p.title)}</div>` : ''}
     <div class="au"><span>${esc(p.authors.join('; '))} ${p.year ? '(' + esc(p.year) + ')' : ''}</span></div>
     ${/^https?:/i.test(p.url) ? `<a href="${esc(p.url)}" target="_blank" rel="noopener noreferrer">${esc(p.url)}</a>` : ''}
     
-    <div class="row"><button class="sm" onclick="toggleNotes('${p.id}')" oncontextmenu="viewNotes(event,'${p.id}')" title="Clic: desplegar notas · Clic derecho: abrir el visor de notas">Notas (${p.notes.filter(n => n.content.trim()).length}) ${EXP.has(p.id) ? '▾' : '▸'}</button>${relCount(p) ? `<button class="sm" onclick="viewRel('${p.id}')" title="Relaciones: relacionados, cita a y citado por">🔗 ${relCount(p)}</button>` : ''}</div>${EXP.has(p.id) ? notesHTML(p) : ''}</article>`;
+    <div class="row"><button class="sm" data-onclick="toggleNotes('${p.id}')" data-oncontextmenu="viewNotes(event,'${p.id}')" title="Clic: desplegar notas · Clic derecho: abrir el visor de notas">Notas (${p.notes.filter(n => n.content.trim()).length}) ${EXP.has(p.id) ? '▾' : '▸'}</button>${relCount(p) ? `<button class="sm" data-onclick="viewRel('${p.id}')" title="Relaciones: relacionados, cita a y citado por">🔗 ${relCount(p)}</button>` : ''}</div>${EXP.has(p.id) ? notesHTML(p) : ''}</article>`;
 const TH = [[null, ''], ['title', 'Título'], ['author', 'Autores'], ['year', 'Año'], ['venue', 'Revista / editorial'], ['reading', 'Lectura'], ['rating', '★'], [null, 'Secciones'], [null, 'Etiquetas'], [null, 'Notas'], [null, '']];
 function thSort(k) {   // clic en una cabecera: ese criterio pasa a ser el principal; otro clic invierte el sentido
   F.sorts = F.sorts[0]?.k === k ? [{k, d: -F.sorts[0].d}, ...F.sorts.slice(1)] : [{k, d: 1}, ...F.sorts.filter(x => x.k !== k).slice(0, 2)]; render();
 }
 const rowHTML = (p, from) => `<tr class="rw" data-id="${p.id}" ${F.group ? `draggable="true" data-from="${from || ''}"` : ''}>
-  <td><input type="checkbox" aria-label="Seleccionar" ${SEL.has(p.id) ? 'checked' : ''} onchange="toggleSel('${p.id}')"></td>
+  <td><input type="checkbox" aria-label="Seleccionar" ${SEL.has(p.id) ? 'checked' : ''} data-onchange="toggleSel('${p.id}')"></td>
   <td class="timg">${thumbHTML(p, 'xs')}</td>
-  <td class="tt"><a class="tl2" onclick="openPaper('${p.id}')" title="Editar">${esc(p.alias || p.title)}</a></td><td>${esc(p.authors.join('; '))}</td><td>${esc(p.year)}</td><td>${esc(p.venue)}</td>
-  <td><button class="rst" style="--c:${READ_C[p.reading]}" title="Clic: cambiar el estado de lectura" onclick="cycleRead('${p.id}')">${READ[p.reading]}</button></td><td>${starsHTML(p)}</td>
+  <td class="tt"><a class="tl2" data-onclick="openPaper('${p.id}')" title="Editar">${esc(p.alias || p.title)}</a></td><td>${esc(p.authors.join('; '))}</td><td>${esc(p.year)}</td><td>${esc(p.venue)}</td>
+  <td><button class="rst" style="--c:${READ_C[p.reading]}" title="Clic: cambiar el estado de lectura" data-onclick="cycleRead('${p.id}')">${READ[p.reading]}</button></td><td>${starsHTML(p)}</td>
   <td>${p.sectionIds.map(secById).filter(Boolean).map(s => chip(s, 1)).join('')}</td><td>${tagsOf(p)}</td>
-  <td class="nw"><button class="sm cpb" onclick="copyCardCite('${p.id}',this)" title="Copiar la cita (estilo elegido en Exportar), con cursiva al pegar en Word">📋</button>${p.pdf ? `<button class="sm" onclick="pdfOpen('${p.id}')" title="Abrir el PDF enlazado: ${esc(p.pdf.name)}">📄</button>` : ''}<button class="sm" onclick="toggleNotes('${p.id}')" oncontextmenu="viewNotes(event,'${p.id}')" title="Clic: desplegar · Clic derecho: visor de notas">${p.notes.filter(n => n.content.trim()).length} ${EXP.has(p.id) ? '▾' : '▸'}</button>${relCount(p) ? `<button class="sm" onclick="viewRel('${p.id}')" title="Relaciones">🔗 ${relCount(p)}</button>` : ''}</td>
-  <td><button class="x" title="Eliminar" onclick="delPaper('${p.id}')">✕</button></td></tr>${EXP.has(p.id) ? `<tr class="rn"><td></td><td colspan="11">${notesHTML(p)}</td></tr>` : ''}`;
-const tableHTML = (L, from) => `<div class="twrap"><table class="tbl"><thead><tr><th></th>${TH.map(([k, t]) => k ? `<th class="sortable" onclick="thSort('${k}')">${t}${F.sorts[0]?.k === k ? (F.sorts[0].d > 0 ? ' ▲' : ' ▼') : ''}</th>` : `<th>${t}</th>`).join('')}</tr></thead><tbody>${L.map(p => rowHTML(p, from)).join('')}</tbody></table></div>`;
+  <td class="nw"><button class="sm cpb" data-onclick="copyCardCite('${p.id}',this)" title="Copiar la cita (estilo elegido en Exportar), con cursiva al pegar en Word">📋</button>${p.pdf ? `<button class="sm" data-onclick="pdfOpen('${p.id}')" title="Abrir el PDF enlazado: ${esc(p.pdf.name)}">📄</button>` : ''}<button class="sm" data-onclick="toggleNotes('${p.id}')" data-oncontextmenu="viewNotes(event,'${p.id}')" title="Clic: desplegar · Clic derecho: visor de notas">${p.notes.filter(n => n.content.trim()).length} ${EXP.has(p.id) ? '▾' : '▸'}</button>${relCount(p) ? `<button class="sm" data-onclick="viewRel('${p.id}')" title="Relaciones">🔗 ${relCount(p)}</button>` : ''}</td>
+  <td><button class="x" title="Eliminar" data-onclick="delPaper('${p.id}')">✕</button></td></tr>${EXP.has(p.id) ? `<tr class="rn"><td></td><td colspan="11">${notesHTML(p)}</td></tr>` : ''}`;
+const tableHTML = (L, from) => `<div class="twrap"><table class="tbl"><thead><tr><th></th>${TH.map(([k, t]) => k ? `<th class="sortable" data-onclick="thSort('${k}')">${t}${F.sorts[0]?.k === k ? (F.sorts[0].d > 0 ? ' ▲' : ' ▼') : ''}</th>` : `<th>${t}</th>`).join('')}</tr></thead><tbody>${L.map(p => rowHTML(p, from)).join('')}</tbody></table></div>`;
 const items = (l, from) => db.settings.view === 'table' ? (l.length ? tableHTML(l, from) : '') : l.map(p => card(p, from)).join('');
 function listHTML(L) {
   if (!F.group) return items(L, '');
   const G = db.sections.filter(s => !F.sec || s.id === F.sec).map(s => [s, L.filter(p => p.sectionIds.includes(s.id))]);
   if (!F.sec) G.push([{id: '', name: 'Sin sección', color: '#888888'}, L.filter(p => !p.sectionIds.some(secById))]);
-  return G.map(([s, l]) => `<section class="gbox" data-sec="${s.id || ''}"><h2 class="grp" style="border-color:${esc(s.color || '#888888')}" ${s.id ? `oncontextmenu="svOpen('${s.id}',event)"` : ''}>${esc(s.name)} <small>(${l.length})</small></h2>${items(l, s.id || '') || '<p class="empty drop">Arrastra papers aquí</p>'}</section>`).join('');
+  return G.map(([s, l]) => `<section class="gbox" data-sec="${s.id || ''}"><h2 class="grp" style="border-color:${esc(s.color || '#888888')}" ${s.id ? `data-oncontextmenu="svOpen('${s.id}',event)"` : ''}>${esc(s.name)} <small>(${l.length})</small></h2>${items(l, s.id || '') || '<p class="empty drop">Arrastra papers aquí</p>'}</section>`).join('');
 }
 function fitTags(only) {   // las etiquetas van en la barra superior de la tarjeta; si no caben, pasan a su propia línea entre esa barra y el título
   (only ? [only] : document.querySelectorAll('#list article.card')).forEach(c => { const ct = c.querySelector('.ct'), tl = ct.querySelector('.tl') || c.querySelector(':scope > .tl'); if (!tl) return;
@@ -136,7 +136,7 @@ function render() {
   hdr();
   const secH = [{name: 'Todas', color: '#888888'}, ...db.sections].map(x => chip(x, x.id ? F.sec === x.id : !F.sec, `setSecF('${x.id || ''}')`, 0, `svOpen('${x.id || ''}',event)`)).join('');
   const tagC = (db.tags.map(t => chip(t, F.tags.has(t.id), `toggleF('${t.id}')`, 1)).join('') || '<small>Aún no hay etiquetas.</small>');
-  const modeSel = `<select class="mode" title="Cómo combinar varias etiquetas" onchange="F.mode=this.value;render()"><option value="any" ${F.mode === 'any' ? 'selected' : ''}>Al menos una etiqueta</option><option value="all" ${F.mode === 'all' ? 'selected' : ''}>Todas las etiquetas</option></select>`;
+  const modeSel = `<select class="mode" title="Cómo combinar varias etiquetas" data-onchange="put(F,'mode',this.value,render)"><option value="any" ${F.mode === 'any' ? 'selected' : ''}>Al menos una etiqueta</option><option value="all" ${F.mode === 'all' ? 'selected' : ''}>Todas las etiquetas</option></select>`;
   $('#secF').innerHTML = $('#secF2').innerHTML = secH;
   $('#tagF').innerHTML = tagC + modeSel; $('#tagF2').innerHTML = tagC;
   const tg = (id, open, label, active) => { const b = $(id); b.textContent = `${label} ${open ? '▾' : '▸'}${!open && active ? ' •' : ''}`; b.classList.toggle('on', open); };   // «•» = hay filtro activo con la lista plegada
@@ -146,10 +146,10 @@ function render() {
   $('#d-search').hidden = !F.q; $('#d-filt').hidden = !(F.sec || F.tags.size || F.read); $('#d-sort').hidden = !F.minRating; $('#d-tr').hidden = !db.trash.length; $('#trLbl').textContent = 'Papelera' + (db.trash.length ? ` (${db.trash.length})` : ''); $('#tbView').textContent = db.settings.view === 'table' ? '▦ Tarjetas' : '☰ Tabla';
   $('#readF').innerHTML = [['', 'Todos'], ...Object.entries(READ)].map(([k, v]) => chip({name: v, color: k ? READ_C[k] : '#888888'}, F.read === k, `setRead('${k}')`)).join(''); $('#minR').value = F.minRating;   // puntos de filtro activo
   const nextKey = Object.keys(SORTS).find(k => !F.sorts.some(s => s.k === k)) || 'title';
-  $('#sortUI').innerHTML = F.sorts.map((s, i) => `<div class="row"><select onchange="F.sorts[${i}].k=this.value;render()">${Object.entries(SORTS).map(([k, v]) => `<option value="${k}" ${s.k === k ? 'selected' : ''}>${v}</option>`).join('')}</select>
-    <button title="${s.d > 0 ? 'Ascendente (A→Z, antiguo→reciente)' : 'Descendente (Z→A, reciente→antiguo)'}" onclick="F.sorts[${i}].d*=-1;render()">${s.d > 0 ? '▲' : '▼'}</button>
-    ${F.sorts.length > 1 ? `<button onclick="F.sorts.splice(${i},1);render()">✕</button>` : ''}</div>`).join('')
-    + `<button onclick="F.sorts.push({k:'${nextKey}',d:1});render()">+ Añadir criterio</button>`;
+  $('#sortUI').innerHTML = F.sorts.map((s, i) => `<div class="row"><select data-onchange="sortSet(${i},this.value)">${Object.entries(SORTS).map(([k, v]) => `<option value="${k}" ${s.k === k ? 'selected' : ''}>${v}</option>`).join('')}</select>
+    <button title="${s.d > 0 ? 'Ascendente (A→Z, antiguo→reciente)' : 'Descendente (Z→A, reciente→antiguo)'}" data-onclick="sortFlip(${i})">${s.d > 0 ? '▲' : '▼'}</button>
+    ${F.sorts.length > 1 ? `<button data-onclick="sortDel(${i})">✕</button>` : ''}</div>`).join('')
+    + `<button data-onclick="sortAdd('${nextKey}')">+ Añadir criterio</button>`;
   const L = visible(), part = !F.group && L.length > LIST.step;   // sin agrupar, las listas largas se pintan por partes
   LIST.L = L; LIST.shown = part ? LIST.step : L.length;
   $('#list').innerHTML = (listHTML(part ? L.slice(0, LIST.step) : L) + (part ? moreHTML() : '')) || '<p class="empty">No hay papers que mostrar. Crea uno con «Nuevo paper» o ajusta los filtros.</p>';
@@ -157,7 +157,7 @@ function render() {
   LIST.n = L.length; countDraw(); progDraw();
 }
 const LIST = {L: [], n: 0, shown: 0, step: 150};   // lo que se ve en la lista y cuántos papers lleva pintados
-const moreHTML = () => `<p class="more"><button onclick="listMore()">Mostrar ${Math.min(LIST.step, LIST.L.length - LIST.shown)} más (quedan ${LIST.L.length - LIST.shown})</button></p>`;
+const moreHTML = () => `<p class="more"><button data-onclick="listMore()">Mostrar ${Math.min(LIST.step, LIST.L.length - LIST.shown)} más (quedan ${LIST.L.length - LIST.shown})</button></p>`;
 function listMore() {   // añade la siguiente parte sin repintar lo que ya está
   const m = $('#list > .more'); if (!m) return; const add = LIST.L.slice(LIST.shown, LIST.shown += LIST.step);
   const tb = $('#list tbody'); if (tb) tb.insertAdjacentHTML('beforeend', add.map(p => rowHTML(p, '')).join('')); else m.insertAdjacentHTML('beforebegin', add.map(p => card(p, '')).join(''));
@@ -189,9 +189,9 @@ function ctxShow(e, html) {   // menú contextual genérico
   m.style.left = Math.max(0, Math.min(e.clientX, innerWidth - m.offsetWidth - 8)) + 'px'; m.style.top = Math.max(0, Math.min(e.clientY, innerHeight - m.offsetHeight - 8)) + 'px';
 }
 const tick = on => on ? '✓ ' : '\u2003';
-function modeMenu(e) { ctxShow(e, '<div class="ctxh">Combinar varias etiquetas</div>' + [['any', 'Al menos una'], ['all', 'Todas']].map(([k, v]) => `<button onclick="F.mode='${k}';ctxClose();render()">${tick(F.mode === k)}${v}</button>`).join('')); }
-function groupMenu(e) { ctxShow(e, `<div class="ctxh">Secciones</div><button onclick="F.group=!F.group;ctxClose();render()">${tick(F.group)}Agrupar por sección</button>`); }
-function tagMenu(e, pid, tid) { ctxShow(e, `<div class="ctxh">Etiqueta «${esc(db.tags.find(t => t.id === tid)?.name)}»</div><button onclick="delTagFrom('${pid}','${tid}')">🗑 Borrar de este paper</button>`); }
+function modeMenu(e) { ctxShow(e, '<div class="ctxh">Combinar varias etiquetas</div>' + [['any', 'Al menos una'], ['all', 'Todas']].map(([k, v]) => `<button data-onclick="ctxClose();put(F,'mode','${k}',render)">${tick(F.mode === k)}${v}</button>`).join('')); }
+function groupMenu(e) { ctxShow(e, `<div class="ctxh">Secciones</div><button data-onclick="ctxClose();put(F,'group',!F.group,render)">${tick(F.group)}Agrupar por sección</button>`); }
+function tagMenu(e, pid, tid) { ctxShow(e, `<div class="ctxh">Etiqueta «${esc(db.tags.find(t => t.id === tid)?.name)}»</div><button data-onclick="delTagFrom('${pid}','${tid}')">🗑 Borrar de este paper</button>`); }
 function delTagFrom(pid, tid) { const p = db.papers.find(x => x.id === pid); if (p) { p.tagIds = p.tagIds.filter(x => x !== tid); logChange(p, 'Etiqueta quitada: ' + (db.tags.find(t => t.id === tid)?.name || '?')); } ctxClose(); markDirty(); F.tags.size ? render() : renderPaper(pid); }
 const ctxClose = () => { const m = $('#ctx'); if (m) { m.hidden = true; document.body.appendChild(m); } };
 document.addEventListener('click', e => { if (!e.target.closest('#ctx')) ctxClose(); });
@@ -199,7 +199,7 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') { ctxClose()
 const fmClose = () => { $('#fmenu').hidden = true; $('#fmBtn').setAttribute('aria-expanded', 'false'); };   // menú «Archivo» de la cabecera
 function fmToggle(e) { e.stopPropagation(); const m = $('#fmenu'), open = m.hidden; ctxClose(); m.hidden = !open; $('#fmBtn').setAttribute('aria-expanded', String(open)); }
 document.addEventListener('click', e => { if (!e.target.closest('.fm')) fmClose(); });
-document.addEventListener('contextmenu', e => { if (!e.target.closest('[oncontextmenu]')) ctxClose(); });   // clic derecho en otro sitio también cierra
+document.addEventListener('contextmenu', e => { if (!e.target.closest('[data-oncontextmenu]')) ctxClose(); });   // clic derecho en otro sitio también cierra
 function setSecF(id) { F.sec = id && F.sec === id ? '' : id; render(); }   // '' = Todas; pulsar la sección activa también vuelve a «Todas»
 function sbToggle() { $('#side').classList.toggle('min'); uiSoon(); }
 function sbMore() {   // «Información» (Ayuda, Privacidad y Créditos): plegada por defecto; con la barra plegada, la despliega abierta
@@ -336,7 +336,7 @@ function openEx() {   // ventana emergente de exportación; se cierra con un cli
   const o = ex(); if (!STYLES[o.style]) o.style = 'apa'; if (!EXF[o.fmt]) o.fmt = 'txt'; if (!EXO[o.order]) o.order = 'auto';
   EXS = SEL.size ? 'sel' : 'vis';
   $('#ex').innerHTML = `<h2>Exportar</h2><div id="exOpts"></div><textarea id="exText"></textarea>
-    <div class="row" style="margin-top:10px"><button class="pri" onclick="exCopy()">Copiar</button><button id="exRich" onclick="exCopyRich()" title="Con sangría francesa, para pegar en Word o Docs">Copiar con formato</button><button onclick="exSave()">Guardar archivo</button><small id="exMsg"></small><button style="margin-left:auto" onclick="$('#ex').close()">Cerrar</button></div>`;
+    <div class="row" style="margin-top:10px"><button class="pri" data-onclick="exCopy()">Copiar</button><button id="exRich" data-onclick="exCopyRich()" title="Con sangría francesa, para pegar en Word o Docs">Copiar con formato</button><button data-onclick="exSave()">Guardar archivo</button><small id="exMsg"></small><button style="margin-left:auto" data-onclick="$('#ex').close()">Cerrar</button></div>`;
   exUI(); drawEx(); $('#ex').showModal();
 }
 function exSet(k, v, quiet) {   // las opciones se recuerdan en el JSON (sin crear pasos de deshacer)
@@ -344,16 +344,16 @@ function exSet(k, v, quiet) {   // las opciones se recuerdan en el JSON (sin cre
 }
 function exUI() {
   const o = ex(), tl = isTl(o.fmt);
-  const sel = (k, opts, cur) => `<select onchange="exSet('${k}',this.value)">${Object.entries(opts).map(([v, t]) => `<option value="${v}" ${v === cur ? 'selected' : ''}>${t}</option>`).join('')}</select>`;
-  const chk = (k, t) => `<label class="row"><input type="checkbox" ${o[k] ? 'checked' : ''} onchange="exSet('${k}',this.checked)"> ${t}</label>`;
+  const sel = (k, opts, cur) => `<select data-onchange="exSet('${k}',this.value)">${Object.entries(opts).map(([v, t]) => `<option value="${v}" ${v === cur ? 'selected' : ''}>${t}</option>`).join('')}</select>`;
+  const chk = (k, t) => `<label class="row"><input type="checkbox" ${o[k] ? 'checked' : ''} data-onchange="exSet('${k}',this.checked)"> ${t}</label>`;
   $('#exOpts').innerHTML = `<div class="grid">
-    <label>Papers<select onchange="EXS=this.value;drawEx()"><option value="sel" ${EXS === 'sel' ? 'selected' : ''}>Seleccionados (${SEL.size})</option><option value="vis" ${EXS === 'vis' ? 'selected' : ''}>Visibles con los filtros (${visible().length})</option><option value="all" ${EXS === 'all' ? 'selected' : ''}>Todos (${db.papers.length})</option></select></label>
+    <label>Papers<select data-onchange="exsSet(this.value)"><option value="sel" ${EXS === 'sel' ? 'selected' : ''}>Seleccionados (${SEL.size})</option><option value="vis" ${EXS === 'vis' ? 'selected' : ''}>Visibles con los filtros (${visible().length})</option><option value="all" ${EXS === 'all' ? 'selected' : ''}>Todos (${db.papers.length})</option></select></label>
     <label>Formato${sel('fmt', Object.fromEntries(Object.entries(EXF).map(([k, v]) => [k, v[0]])), o.fmt)}</label>
-    ${tl ? `<label>Estilo de cita<select onchange="exSet('style',this.value)">${styOpts(o.style)}</select></label>` : ''}
+    ${tl ? `<label>Estilo de cita<select data-onchange="exSet('style',this.value)">${styOpts(o.style)}</select></label>` : ''}
     <label>Orden${sel('order', EXO, o.order)}</label>
     ${tl ? `<label>Idioma de los conectores${STYLES[o.style]?.fixedLang ? `<select disabled><option>${STYLES[o.style].fixedLang === 'en' ? 'English (fijo en este estilo)' : 'Español (fijo en este estilo)'}</option></select>` : sel('lang', {es: 'Español (y, En, consultado)', en: 'English (&, In, cited)'}, o.lang)}</label><label>Fecha de consulta${sel('dateFmt', {long: '20 de octubre de 2026', dmy: '20-10-2026', iso: '2026-10-20'}, o.dateFmt)}</label>` : ''}
     ${tl && isNum(o) ? `<label>Formato de la numeración${sel('numFmt', {auto: 'Según el estilo', dot: '1.', br: '[1]', par: '(1)'}, o.numFmt)}</label>` : ''}
-    ${tl ? `<label>Título del documento<input value="${esc(o.title)}" placeholder="Referencias" oninput="exSet('title',this.value,1)"></label>` : ''}
+    ${tl ? `<label>Título del documento<input value="${esc(o.title)}" placeholder="Referencias" data-oninput="exSet('title',this.value,1)"></label>` : ''}
     <div class="w exchk">${tl ? (STYLES[o.style]?.numbered ? '' : chk('num', 'Numerar')) + chk('notes', 'Incluir notas') + chk('vanAll', 'Vancouver: listar todos los autores (por defecto, 6 y «et al.»)') + chk('ppChap', 'APA: «pp.» antes de las páginas de un capítulo') + (STYLES[o.style]?.dis ? chk('disamb', 'Distinguir obras del mismo autor y año (2020a, 2020b)') : '') + (STYLES[o.style]?.sections ? chk('abbrList', 'Lista de abreviaturas al principio (legislación y jurisprudencia)') : '') : ''}${chk('particles', 'Ignorar partículas al ordenar (de, del, la, van…)')}</div>
     ${tl ? `<small class="w">${STYLES[o.style]?.note ? esc(STYLES[o.style].note) + '<br>' : ''}${(exList(), EXTYPES).map(t => typeWarn(o.style, t)).filter(Boolean).map(w => '⚠ ' + esc(w) + '<br>').join('')}${esc(BASADO)}</small>` : ''}
     <small class="w">Para un caso concreto («de la Torre» bajo la T o bajo la D), rellena «Clave de orden» en la pestaña Datos del paper: tiene prioridad.</small></div>`;

@@ -396,9 +396,9 @@ function syClick(e) {
   e.stopPropagation(); if (!syOn()) return syIntro();
   const p = syP(), st = syState(), r = e.currentTarget.getBoundingClientRect();
   ctxShow({preventDefault() {}, stopPropagation() {}, clientX: r.left, clientY: r.bottom + 4}, `<div class="ctxh">Google Drive${p.who ? ' · ' + esc(p.who) : ''}<br>${esc(SY_TXT[st])}${p.last ? ' · ' + syAgo(p.last) : ''}</div>`
-    + (st === 'reconnect' ? '<button onclick="ctxClose();syConnect()">🔑 Volver a conectar</button>' : '')
-    + `<button onclick="ctxClose();syNow()">🔄 Sincronizar ahora</button><button onclick="ctxClose();syAutoSet(!syAuto())">${tick(syAuto())}Autoguardado en Drive</button>`
-    + '<button onclick="ctxClose();syIntro()">❔ ¿Cómo funciona?</button><button onclick="ctxClose();syLogout()">🚪 Cerrar sesión</button><button class="danger" onclick="ctxClose();syWipe()">🗑 Borrar mis datos de Google Drive</button>');
+    + (st === 'reconnect' ? '<button data-onclick="ctxClose();syConnect()">🔑 Volver a conectar</button>' : '')
+    + `<button data-onclick="ctxClose();syNow()">🔄 Sincronizar ahora</button><button data-onclick="ctxClose();syAutoSet(!syAuto())">${tick(syAuto())}Autoguardado en Drive</button>`
+    + '<button data-onclick="ctxClose();syIntro()">❔ ¿Cómo funciona?</button><button data-onclick="ctxClose();syLogout()">🚪 Cerrar sesión</button><button class="danger" data-onclick="ctxClose();syWipe()">🗑 Borrar mis datos de Google Drive</button>');
 }
 async function syNow() {
   const r = await syRun(false, true);

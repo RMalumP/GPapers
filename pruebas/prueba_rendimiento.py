@@ -71,6 +71,34 @@ with sync_playwright() as pw:
     eq('seleccionar visibles incluye los que aún no se han pintado', pg.evaluate("SEL.size"), 400)
     pg.evaluate("selNone(); F.q = 'paper 0399'; render()")
     eq('la búsqueda encuentra los del final', pg.evaluate("[document.querySelectorAll('#list .card').length, !!$('#list > .more')]"), [1, False])
+    # ---- Eventos sin manejadores en línea (CSP)
+    pg.evaluate(SEED, 3)
+    CHECK = """() => { const bad = [];   // cada data-on… que haya en la página se puede leer y todos sus nombres existen
+      for (const el of document.querySelectorAll('*')) for (const a of el.attributes) if (a.name.startsWith('data-on')) {
+        try { const walk = x => { if (x.t === 'ref') { if (!['this', 'event'].includes(x.root) && !(x.root in ON_VARS) && window[x.root] === undefined) bad.push(x.root + ' ← ' + a.value); x.ops.forEach(o => o.a && o.a.forEach(walk)); } else if (x.e) walk(x.e); else if (x.a) x.a.forEach(walk); };
+          onParse(a.value).forEach(walk); } catch (e) { bad.push(String(e)); } }
+      for (const el of document.querySelectorAll('*')) for (const a of el.attributes) if (/^on[a-z]+$/.test(a.name)) bad.push('en línea: ' + a.name + '=' + a.value);
+      return bad; }"""
+    views = ["render()", "setView('table')", "setView('cards'); F.group = true; render()", "F.group = false; render()",
+      "openPaper('p0'); tab = 'data'; drawD()", "DATA_ALL = true; drawD()", "tab = 'notes'; drawD()", "tab = 'cite'; drawD()", "tab = 'rel'; drawD()", "tab = 'hist'; drawD()", "$('#dlg').close()",
+      "openCfg()", "$('#cfg').close()", "openEx()", "$('#ex').close()", "openHelp()", "$('#help').close()", "openMg('tags')", "$('#mg').close()", "openMg('sections')", "$('#mg').close()",
+      "openImport('text')", "$('#imp').close()", "trOpen()", "$('#tr').close()", "grOpen()", "$('#gr').close()", "svOpen('')", "$('#sv').close()", "openCred()", "$('#cr').close()", "openPriv()", "$('#pv').close()"]
+    bad = []
+    for v in views:
+        pg.evaluate(v); pg.wait_for_timeout(50); bad += pg.evaluate(CHECK)
+    eq('todos los data-on de las vistas se leen y sus nombres existen', sorted(set(bad)), [])
+    pg.evaluate("document.body.insertAdjacentHTML('beforeend', '<button id=\"inl\" onclick=\"window.__inl = 1\">x</button>')"); pg.click('#inl')
+    eq('la CSP bloquea un onclick en línea', pg.evaluate("window.__inl === undefined"), True)
+    pg.evaluate("$('#inl').remove()")
+    pg.click('#tbView')
+    eq('los data-onclick funcionan (cambiar a tabla)', pg.evaluate("db.settings.view"), 'table'); pg.click('#tbView')
+    pg.fill('#q', 'paper 0002'); pg.press('#q', 'Enter')
+    eq('y los de teclado (Enter en la búsqueda)', pg.evaluate("document.querySelectorAll('#list .card').length"), 1); pg.fill('#q', ''); pg.press('#q', 'Enter')
+    pg.click('#pjBtn')
+    eq('currentTarget es el botón, como en línea (menú de proyectos)', pg.evaluate("!$('#ctx').hidden && $('#ctx').querySelectorAll('button').length > 2"), True)
+    pg.mouse.click(5, 790)
+    eq('y un clic fuera lo cierra', pg.evaluate("$('#ctx').hidden"), True)
+    errs[:] = [e for e in errs if 'Content Security Policy' not in e and 'Content-Security-Policy' not in e]   # el aviso de la CSP al bloquear el onclick de prueba
     eq('sin errores en la consola', errs, [])
     b.close()
 print(f'{n - fail}/{n} pruebas correctas'); sys.exit(1 if fail else 0)

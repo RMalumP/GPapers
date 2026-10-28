@@ -70,24 +70,24 @@ function openCfg(tab) { if (tab) CFG_TAB = tab; drawCfg(); $('#cfg').showModal()
 function drawCfg() {
   const c = db.settings, on = syOn(), p = syP();
   const T = {
-    ap: `<label>Nombre de la aplicación<input value="${esc(c.appName)}" maxlength="30" oninput="setCfg('appName', this.value)"></label>
-    ${cfgSec('pal', 'Paleta de colores', `<div style="margin:6px 0 10px">${Object.entries(PAL).map(([k, p]) => chip({name: p.n, color: p.c}, c.palette === k, `setCfg('palette','${k}');drawCfg()`)).join('')}${chip({name: 'Personalizada', color: c.custom?.pri || '#888888'}, c.palette === 'custom', 'pickCustom()')}</div>${c.palette === 'custom' && c.custom ? `<div class="cpick">${LAB.map(([k, t]) => `<label class="row"><input type="color" value="${c.custom[k]}" oninput="setCustom('${k}', this.value)"> ${t}</label>`).join('')}<button onclick="resetPal()">Restablecer a Azul</button></div>` : ''}`)}
-    <label class="row"><input type="checkbox" ${c.showImg !== false ? 'checked' : ''} onchange="setCfg('showImg', this.checked);render()"> Mostrar la imagen del paper en las tarjetas y la tabla</label>
-    <label class="row"><input type="checkbox" ${c.showFile ? 'checked' : ''} onchange="setCfg('showFile', this.checked)"> Mostrar el archivo abierto en la cabecera</label>
-    <label class="row"><input type="checkbox" ${c.showProgress ? 'checked' : ''} onchange="setCfg('showProgress', this.checked)"> Mostrar el progreso de lectura (papers leídos) junto al nombre del proyecto</label>`,
-    no: `<label>Estilo de cita principal<select onchange="setMainStyle(this.value)">${styOpts(mainSty())}</select></label>
-    <label class="row" style="flex-wrap:nowrap"><input type="checkbox" ${c.citeOnlyMain ? 'checked' : ''} onchange="setCfg('citeOnlyMain', this.checked)"> En la pestaña «Cita» de cada paper, mostrar solo el estilo principal (si no, salen todos con el principal primero)</label>
+    ap: `<label>Nombre de la aplicación<input value="${esc(c.appName)}" maxlength="30" data-oninput="setCfg('appName', this.value)"></label>
+    ${cfgSec('pal', 'Paleta de colores', `<div style="margin:6px 0 10px">${Object.entries(PAL).map(([k, p]) => chip({name: p.n, color: p.c}, c.palette === k, `setCfg('palette','${k}');drawCfg()`)).join('')}${chip({name: 'Personalizada', color: c.custom?.pri || '#888888'}, c.palette === 'custom', 'pickCustom()')}</div>${c.palette === 'custom' && c.custom ? `<div class="cpick">${LAB.map(([k, t]) => `<label class="row"><input type="color" value="${c.custom[k]}" data-oninput="setCustom('${k}', this.value)"> ${t}</label>`).join('')}<button data-onclick="resetPal()">Restablecer a Azul</button></div>` : ''}`)}
+    <label class="row"><input type="checkbox" ${c.showImg !== false ? 'checked' : ''} data-onchange="setCfg('showImg', this.checked);render()"> Mostrar la imagen del paper en las tarjetas y la tabla</label>
+    <label class="row"><input type="checkbox" ${c.showFile ? 'checked' : ''} data-onchange="setCfg('showFile', this.checked)"> Mostrar el archivo abierto en la cabecera</label>
+    <label class="row"><input type="checkbox" ${c.showProgress ? 'checked' : ''} data-onchange="setCfg('showProgress', this.checked)"> Mostrar el progreso de lectura (papers leídos) junto al nombre del proyecto</label>`,
+    no: `<label>Estilo de cita principal<select data-onchange="setMainStyle(this.value)">${styOpts(mainSty())}</select></label>
+    <label class="row" style="flex-wrap:nowrap"><input type="checkbox" ${c.citeOnlyMain ? 'checked' : ''} data-onchange="setCfg('citeOnlyMain', this.checked)"> En la pestaña «Cita» de cada paper, mostrar solo el estilo principal (si no, salen todos con el principal primero)</label>
     <p class="cfgnote2"><small>El estilo principal pasa a ser también el de «Exportar» al elegirlo aquí, y decide qué campos salen en la vista simplificada de «Datos».</small></p>
-    <label class="row"><input type="checkbox" ${c.fmtOpen ? 'checked' : ''} onchange="setFmtDefault(this.checked)"> Barra de formato de las notas desplegada por defecto</label>
-    <label class="row"><input type="checkbox" ${c.export.inText ? 'checked' : ''} onchange="setInText(this.checked)"> Mostrar la cita en el texto y las notas (Chicago) en la pestaña «Cita» de cada paper</label>
+    <label class="row"><input type="checkbox" ${c.fmtOpen ? 'checked' : ''} data-onchange="setFmtDefault(this.checked)"> Barra de formato de las notas desplegada por defecto</label>
+    <label class="row"><input type="checkbox" ${c.export.inText ? 'checked' : ''} data-onchange="setInText(this.checked)"> Mostrar la cita en el texto y las notas (Chicago) en la pestaña «Cita» de cada paper</label>
     ${cfgSec('ct', 'Tipos de documento propios', ctUI())}${cfgSec('cu', 'Estilos de cita personalizados', cuUI())}${cfgSec('tpl', 'Plantillas de nota', tplUI())}`,
-    sc: `${cfgSec('sc', 'Atajos de teclado', `<div class="sct"><small>(clic en una combinación para cambiarla; Retroceso la quita)</small>${Object.keys(SC_NAMES).map(a => `<div class="scr"><span>${SC_NAMES[a]}</span><span class="scb"><button class="${recAct === a ? 'rec' : ''}" onclick="recAct='${a}';drawCfg()">${recAct === a ? 'Pulsa una tecla… (Esc cancela)' : esc(c.shortcuts[a]) || 'Sin asignar'}</button>${c.shortcuts[a] ? `<button title="Quitar" onclick="setSC('${a}','')">✕</button>` : ''}</span></div>`).join('')}<button onclick="resetSC()">Restablecer atajos</button></div>`)}`,
+    sc: `${cfgSec('sc', 'Atajos de teclado', `<div class="sct"><small>(clic en una combinación para cambiarla; Retroceso la quita)</small>${Object.keys(SC_NAMES).map(a => `<div class="scr"><span>${SC_NAMES[a]}</span><span class="scb"><button class="${recAct === a ? 'rec' : ''}" data-onclick="recActSet('${a}')">${recAct === a ? 'Pulsa una tecla… (Esc cancela)' : esc(c.shortcuts[a]) || 'Sin asignar'}</button>${c.shortcuts[a] ? `<button title="Quitar" data-onclick="setSC('${a}','')">✕</button>` : ''}</span></div>`).join('')}<button data-onclick="resetSC()">Restablecer atajos</button></div>`)}`,
     da: `<p class="cfgnote2">${on ? `Google Drive: <b>sesión iniciada</b>${p.who ? ' como ' + esc(p.who) : ''}. El resto de opciones de Drive (sincronizar ahora, autoguardado, cerrar sesión, borrar mis datos) están en el botón 🔄 de la cabecera.` : 'Google Drive: <b>sin conectar</b>. Pulsa el botón 🔄 de la cabecera para sincronizar tus proyectos con tu Google Drive.'}</p>
-    <label class="row"><input type="checkbox" ${c.pdfDrive ? 'checked' : ''} onchange="setPdfDrive(this.checked)"> Subir a mi Google Drive los PDF enlazados</label>
+    <label class="row"><input type="checkbox" ${c.pdfDrive ? 'checked' : ''} data-onchange="setPdfDrive(this.checked)"> Subir a mi Google Drive los PDF enlazados</label>
     <small class="cfgnote">${syOn() ? 'Cada PDF enlazado se copia solo a la carpeta privada y oculta de tu Google Drive (la misma de la sincronización) y se puede abrir desde otros dispositivos. Nadie más lo ve. Máx. 100 MB por PDF.' : 'Necesita la sesión de Google Drive iniciada (botón 🔄 de la cabecera).'}</small>
     <small>Estos ajustes son comunes a todos los proyectos y se guardan también en el JSON de cada uno.</small>`};
-  $('#cfg').innerHTML = `<div class="dh"><h2>Configuración</h2><div class="dbtn"><button onclick="$('#cfg').close()">Cerrar ✕</button></div></div>
-    <div class="ctabs" role="tablist">${CFG_TABS.map(([k, t]) => `<button role="tab" aria-selected="${CFG_TAB === k}" class="${CFG_TAB === k ? 'on' : ''}" onclick="cfgTab('${k}')">${t}</button>`).join('')}</div>
+  $('#cfg').innerHTML = `<div class="dh"><h2>Configuración</h2><div class="dbtn"><button data-onclick="$('#cfg').close()">Cerrar ✕</button></div></div>
+    <div class="ctabs" role="tablist">${CFG_TABS.map(([k, t]) => `<button role="tab" aria-selected="${CFG_TAB === k}" class="${CFG_TAB === k ? 'on' : ''}" data-onclick="cfgTab('${k}')">${t}</button>`).join('')}</div>
     ${T[CFG_TAB]}`;
 }
 /* ---- Editor de estilos personalizados (Configuración) ---- */
@@ -170,10 +170,10 @@ function cuCtxChip(e, k) {   // botón derecho en la lista de campos: lo inserta
 function cufShow(e) {
   const t = $('#cuT'), n = cuParse(t.value.slice(CUF.s, CUF.e))[0][0]; if (!n || n.t !== 'f') return;
   const [mods, op] = cuSplit(n.m), k = n.k, lab = CU_F.find(f => f[0] === k)?.[1] || k, has = m => mods.includes(m);
-  const chk = (m, l) => `<label class="row"><input type="checkbox" data-m="${m}" ${has(m) ? 'checked' : ''} onchange="cufApply()"> ${l}</label>`;
-  const sel = (key, o, v, attr = 'data-o') => `<select ${attr}="${key}" onchange="cufApply()">${Object.entries(o).map(([a, b]) => `<option value="${esc(a)}" ${String(v ?? '') === a ? 'selected' : ''}>${esc(b)}</option>`).join('')}</select>`;
-  const txt = (key, v, ph = '') => `<input data-o="${key}" value="${esc(v ?? '')}" placeholder="${esc(ph)}" oninput="cufApply()">`;
-  const num = (key, v) => `<input data-o="${key}" type="number" min="0" max="99" value="${esc(v ?? '')}" placeholder="—" oninput="cufApply()">`;
+  const chk = (m, l) => `<label class="row"><input type="checkbox" data-m="${m}" ${has(m) ? 'checked' : ''} data-onchange="cufApply()"> ${l}</label>`;
+  const sel = (key, o, v, attr = 'data-o') => `<select ${attr}="${key}" data-onchange="cufApply()">${Object.entries(o).map(([a, b]) => `<option value="${esc(a)}" ${String(v ?? '') === a ? 'selected' : ''}>${esc(b)}</option>`).join('')}</select>`;
+  const txt = (key, v, ph = '') => `<input data-o="${key}" value="${esc(v ?? '')}" placeholder="${esc(ph)}" data-oninput="cufApply()">`;
+  const num = (key, v) => `<input data-o="${key}" type="number" min="0" max="99" value="${esc(v ?? '')}" placeholder="—" data-oninput="cufApply()">`;
   const fld = (l, c) => `<label>${l}${c}</label>`, TRI = {'': 'Como el estilo', 1: 'Sí', 0: 'No'}, ST = o => ({'': 'Como el estilo', ...o});
   const pick = (list, v) => Object.fromEntries([['', '—'], ...list.map(x => [x, CU_M[x]])]);
   let h = `<div class="cuf2"><div class="ctxh">Campo «${esc(lab)}»</div>`;
@@ -191,8 +191,8 @@ function cufShow(e) {
     ${fld('Mayúsculas', sel('case', pick(['up', 'low', 'cap', 'sent', 'title']), mods.find(m => ['up', 'low', 'cap', 'sent', 'title'].includes(m)), 'data-case'))}
     ${fld('Rodear con', sel('wrap', pick(['q', 'qq', 'par', 'br']), mods.find(m => ['q', 'qq', 'par', 'br'].includes(m)), 'data-wrap'))}
     ${fld('Punto final', sel('dot', pick(['nodot', 'dot']), mods.find(m => ['nodot', 'dot'].includes(m)), 'data-dot'))}
-    <div class="cuh2">Solo si el campo tiene valor</div>${fld('Texto antes', txt('pre', op.pre))}${fld('Texto después', txt('suf', op.suf))}${fld('Si está vacío, poner', `<input data-fb value="${esc(n.fb)}" oninput="cufApply()">`)}
-    <div class="row" style="margin-top:6px"><button onclick="cufReset()">Quitar todo el formato</button><button onclick="ctxClose()">Cerrar</button></div></div>`;
+    <div class="cuh2">Solo si el campo tiene valor</div>${fld('Texto antes', txt('pre', op.pre))}${fld('Texto después', txt('suf', op.suf))}${fld('Si está vacío, poner', `<input data-fb value="${esc(n.fb)}" data-oninput="cufApply()">`)}
+    <div class="row" style="margin-top:6px"><button data-onclick="cufReset()">Quitar todo el formato</button><button data-onclick="ctxClose()">Cerrar</button></div></div>`;
   ctxShow(e, h);
 }
 const CUF_PERSON = ['authors', 'author1', 'editors'], CUF_DATE = ['date', 'datey', 'accessed'];
@@ -228,36 +228,36 @@ function cuPrev() {
 }
 function cuUI() {
   const L = db.settings.customStyles, c = cuCur(); if (c) CU.id = c.id;
-  let h = `<small>Crea tu propio estilo: una plantilla por tipo de documento con los campos de los papers. Sale en Exportar y en la pestaña Cita, y se guarda en el JSON. <a onclick="openHelp('estilos')">Ver la ayuda</a></small>
-    <div class="row" style="margin:8px 0">${L.length ? `<select onchange="CU.id=this.value;CU.type='*';drawCfg()">${L.map(x => `<option value="${x.id}" ${c.id === x.id ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select>` : ''}
-      <button onclick="cuAdd()">+ Nuevo estilo</button><select onchange="cuFromBase(this.value);this.value=''" title="Empieza con las plantillas de uno de los estilos de serie y modifícalas"><option value="">+ Nuevo a partir de…</option>${STY_G.slice(0, 2).map(([g, t]) => `<optgroup label="${t}">${Object.entries(CU_BASE).filter(([, b]) => (b.group || '') === g).map(([k, b]) => `<option value="${k}">${esc(b.name)}</option>`).join('')}</optgroup>`).join('')}</select>${c ? '<button onclick="cuDup()">Duplicar</button><button class="danger" onclick="cuDel()">Eliminar</button>' : ''}</div>`;
+  let h = `<small>Crea tu propio estilo: una plantilla por tipo de documento con los campos de los papers. Sale en Exportar y en la pestaña Cita, y se guarda en el JSON. <a data-onclick="openHelp('estilos')">Ver la ayuda</a></small>
+    <div class="row" style="margin:8px 0">${L.length ? `<select data-onchange="cuPick(this.value)">${L.map(x => `<option value="${x.id}" ${c.id === x.id ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select>` : ''}
+      <button data-onclick="cuAdd()">+ Nuevo estilo</button><select data-onchange="cuFromBase(this.value);put(this,'value','')" title="Empieza con las plantillas de uno de los estilos de serie y modifícalas"><option value="">+ Nuevo a partir de…</option>${STY_G.slice(0, 2).map(([g, t]) => `<optgroup label="${t}">${Object.entries(CU_BASE).filter(([, b]) => (b.group || '') === g).map(([k, b]) => `<option value="${k}">${esc(b.name)}</option>`).join('')}</optgroup>`).join('')}</select>${c ? '<button data-onclick="cuDup()">Duplicar</button><button class="danger" data-onclick="cuDel()">Eliminar</button>' : ''}</div>`;
   if (!c) return h + '<p class="empty">Aún no hay estilos personalizados.</p>';
-  const sel = (k, o, v, f) => `<select onchange="${f}('${k}',this.value)">${Object.entries(o).map(([a, b]) => `<option value="${esc(a)}" ${String(v) === a ? 'selected' : ''}>${esc(b)}</option>`).join('')}</select>`;
+  const sel = (k, o, v, f) => `<select data-onchange="${f}('${k}',this.value)">${Object.entries(o).map(([a, b]) => `<option value="${esc(a)}" ${String(v) === a ? 'selected' : ''}>${esc(b)}</option>`).join('')}</select>`;
   const au = c.au, tpl = c.tpl[CU.type] ?? c.tpl['*'] ?? '', over = CU.type !== '*' && c.tpl[CU.type] != null;
   h += `<div class="cugrid">
-    <label>Nombre<input value="${esc(c.name)}" maxlength="60" oninput="cuSet('name',this.value)"></label>
+    <label>Nombre<input value="${esc(c.name)}" maxlength="60" data-oninput="cuSet('name',this.value)"></label>
     <label>Orden de la bibliografía${sel('order', {alpha: 'Alfabético por autor', list: 'Orden de la lista'}, c.order, 'cuSet')}</label>
-    <label class="row"><input type="checkbox" ${c.numbered ? 'checked' : ''} onchange="cuSet('numbered',this.checked)"> Numerada</label>
+    <label class="row"><input type="checkbox" ${c.numbered ? 'checked' : ''} data-onchange="cuSet('numbered',this.checked)"> Numerada</label>
     <label>Formato del número${sel('numFmt', {dot: '1.', br: '[1]', par: '(1)'}, c.numFmt, 'cuSet')}</label>
-    <label class="row"><input type="checkbox" ${c.dis ? 'checked' : ''} onchange="cuSet('dis',this.checked)"> Distinguir 2020a / 2020b</label>
+    <label class="row"><input type="checkbox" ${c.dis ? 'checked' : ''} data-onchange="cuSet('dis',this.checked)"> Distinguir 2020a / 2020b</label>
     <label>Formato de fechas${sel('dateFmt', CU_DATE, c.dateFmt, 'cuSet')}</label>
     <label>Idioma de conectores y fechas${sel('lang', {export: 'El de Exportar', es: 'Español', en: 'English'}, c.lang, 'cuSet')}</label></div>
     <div class="cuh">Autores y editores</div><div class="cugrid">
-    <label>Cada autor${sel('fmt', CU_AU, au.fmt, 'cuAu')}</label><label>Entre autores<input value="${esc(au.sep)}" maxlength="10" oninput="cuAu('sep',this.value)"></label>
-    <label>Antes del último${sel('last', CU_LAST, au.last, 'cuAu')}</label><label>Más de N autores (0 = todos)<input type="number" min="0" max="99" value="${au.max}" oninput="cuAu('max',+this.value)"></label>
-    <label>Autores que se muestran<input type="number" min="1" max="99" value="${au.show}" oninput="cuAu('show',+this.value)"></label><label>Texto de «y otros»<input value="${esc(au.etAl)}" maxlength="20" oninput="cuAu('etAl',this.value)"></label>
-    <label class="row"><input type="checkbox" ${au.upper ? 'checked' : ''} onchange="cuAu('upper',this.checked)"> Apellidos en mayúsculas</label><label class="row"><input type="checkbox" ${au.firstOnly ? 'checked' : ''} onchange="cuAu('firstOnly',this.checked)"> Solo el primero va «Apellido, …»</label></div>
+    <label>Cada autor${sel('fmt', CU_AU, au.fmt, 'cuAu')}</label><label>Entre autores<input value="${esc(au.sep)}" maxlength="10" data-oninput="cuAu('sep',this.value)"></label>
+    <label>Antes del último${sel('last', CU_LAST, au.last, 'cuAu')}</label><label>Más de N autores (0 = todos)<input type="number" min="0" max="99" value="${au.max}" data-oninput="cuAu('max',+this.value)"></label>
+    <label>Autores que se muestran<input type="number" min="1" max="99" value="${au.show}" data-oninput="cuAu('show',+this.value)"></label><label>Texto de «y otros»<input value="${esc(au.etAl)}" maxlength="20" data-oninput="cuAu('etAl',this.value)"></label>
+    <label class="row"><input type="checkbox" ${au.upper ? 'checked' : ''} data-onchange="cuAu('upper',this.checked)"> Apellidos en mayúsculas</label><label class="row"><input type="checkbox" ${au.firstOnly ? 'checked' : ''} data-onchange="cuAu('firstOnly',this.checked)"> Solo el primero va «Apellido, …»</label></div>
     <div class="cuh">Plantilla</div>
-    <label>Tipo de documento<select onchange="CU.type=this.value;drawCfg()"><option value="*" ${CU.type === '*' ? 'selected' : ''}>Por defecto (todos los tipos)</option>${Object.entries(TYPES).map(([k, v]) => `<option value="${k}" ${CU.type === k ? 'selected' : ''}>${esc(v)}${c.tpl[k] != null ? ' ✎' : ''}</option>`).join('')}</select></label>
-    <textarea id="cuT" rows="4" spellcheck="false" oninput="cuTpl(this.value)" oncontextmenu="cuCtx(event)" placeholder="p. ej. [{authors}. ]({year|s.f.}). {title:i}.">${esc(tpl)}</textarea>
-    ${CU.type !== '*' ? `<small>${over ? 'Plantilla propia de este tipo.' : 'Este tipo usa la plantilla por defecto; si la editas aquí, se crea una propia.'}</small>${over ? '<button onclick="cuTplClear()">Quitar la de este tipo</button>' : ''}` : ''}
-    <div class="cuh">Campos <small>(clic para insertar; clic derecho sobre un campo, aquí o dentro de la plantilla, para darle formato propio)</small></div><div class="cuf">${CU_F.map(([k, l]) => `<button title="{${k}} · clic derecho: insertar con opciones" onclick="cuIns('{${k}}')" oncontextmenu="cuCtxChip(event,'${k}')">${esc(l)}</button>`).join('')}</div>
-    <div class="row" style="margin:6px 0"><button onclick="cuGroup()" title="Lo de dentro solo sale si todos sus campos tienen valor">[ ] Grupo opcional</button>
-      <select onchange="cuModIns(this.value);this.value=''" title="Se aplica al campo bajo el cursor"><option value="">Formato del campo…</option>${Object.entries(CU_M).map(([k, v]) => `<option value="${k}">${esc(v)}</option>`).join('')}</select></div>
+    <label>Tipo de documento<select data-onchange="put(CU,'type',this.value,drawCfg)"><option value="*" ${CU.type === '*' ? 'selected' : ''}>Por defecto (todos los tipos)</option>${Object.entries(TYPES).map(([k, v]) => `<option value="${k}" ${CU.type === k ? 'selected' : ''}>${esc(v)}${c.tpl[k] != null ? ' ✎' : ''}</option>`).join('')}</select></label>
+    <textarea id="cuT" rows="4" spellcheck="false" data-oninput="cuTpl(this.value)" data-oncontextmenu="cuCtx(event)" placeholder="p. ej. [{authors}. ]({year|s.f.}). {title:i}.">${esc(tpl)}</textarea>
+    ${CU.type !== '*' ? `<small>${over ? 'Plantilla propia de este tipo.' : 'Este tipo usa la plantilla por defecto; si la editas aquí, se crea una propia.'}</small>${over ? '<button data-onclick="cuTplClear()">Quitar la de este tipo</button>' : ''}` : ''}
+    <div class="cuh">Campos <small>(clic para insertar; clic derecho sobre un campo, aquí o dentro de la plantilla, para darle formato propio)</small></div><div class="cuf">${CU_F.map(([k, l]) => `<button title="{${k}} · clic derecho: insertar con opciones" data-onclick="cuIns('{${k}}')" data-oncontextmenu="cuCtxChip(event,'${k}')">${esc(l)}</button>`).join('')}</div>
+    <div class="row" style="margin:6px 0"><button data-onclick="cuGroup()" title="Lo de dentro solo sale si todos sus campos tienen valor">[ ] Grupo opcional</button>
+      <select data-onchange="cuModIns(this.value);put(this,'value','')" title="Se aplica al campo bajo el cursor"><option value="">Formato del campo…</option>${Object.entries(CU_M).map(([k, v]) => `<option value="${k}">${esc(v)}</option>`).join('')}</select></div>
     <details class="cuhelp"><summary>Cómo se escribe</summary><small>El texto va tal cual. <code>{campo}</code> inserta un dato; <code>{campo:i}</code> lo pone en cursiva (se pueden encadenar: <code>{title:i:q}</code>); <code>{year|s.f.}</code> usa «s.f.» si está vacío.
       <code>[ … ]</code> es un grupo opcional: solo sale si todos los campos de dentro tienen valor. <code>\\</code> escapa el siguiente carácter (<code>\\[</code>). Los puntos y espacios repetidos se limpian solos. Con el <b>botón derecho sobre un campo</b> de la plantilla eliges su formato (autores, fechas, páginas, cursiva, texto antes y después…) y se escribe solo. Los corchetes literales, como en <code>\\[Internet\\]</code>, se escapan con barra.</small></details>
-    <label>Cita en el texto (opcional)<input value="${esc(c.inText)}" maxlength="500" oninput="cuSet('inText',this.value)" placeholder="({authorsShort}, {year})"></label>
-    <div class="cuh">Vista previa</div><label>Con<select onchange="CU.prev=this.value;cuPrev()"><option value="ej" ${CU.prev === 'ej' ? 'selected' : ''}>Un ejemplo</option>${db.papers.map(p => `<option value="${p.id}" ${CU.prev === p.id ? 'selected' : ''}>${esc(shortTxt(p.alias || p.title))}</option>`).join('')}</select></label>
+    <label>Cita en el texto (opcional)<input value="${esc(c.inText)}" maxlength="500" data-oninput="cuSet('inText',this.value)" placeholder="({authorsShort}, {year})"></label>
+    <div class="cuh">Vista previa</div><label>Con<select data-onchange="put(CU,'prev',this.value,cuPrev)"><option value="ej" ${CU.prev === 'ej' ? 'selected' : ''}>Un ejemplo</option>${db.papers.map(p => `<option value="${p.id}" ${CU.prev === p.id ? 'selected' : ''}>${esc(shortTxt(p.alias || p.title))}</option>`).join('')}</select></label>
     <div id="cuPrev" class="cuprev"></div>`;
   setTimeout(cuPrev); return h;
 }
@@ -285,7 +285,7 @@ function cuModIns(m) {
 /* ===== Ayuda: botón ❓ de la cabecera (o F1) ===== */
 const HELP_OPEN = new Set(['inicio']);
 let HP_ALL = false;   // ayuda completa desplegada (por defecto solo «Empezar aquí»)
-const helpSec = (id, title, body, rest) => `<details class="cs${rest ? ' hprest' : ''}" id="hp_${id}" ${rest && !HP_ALL ? 'hidden' : ''} ${HELP_OPEN.has(id) ? 'open' : ''} ontoggle="this.open ? HELP_OPEN.add('${id}') : HELP_OPEN.delete('${id}');uiSoon()"><summary>${title}</summary><div class="csb hp">${body}</div></details>`;
+const helpSec = (id, title, body, rest) => `<details class="cs${rest ? ' hprest' : ''}" id="hp_${id}" ${rest && !HP_ALL ? 'hidden' : ''} ${HELP_OPEN.has(id) ? 'open' : ''} data-ontoggle="setHas(HELP_OPEN,'${id}',this.open)"><summary>${title}</summary><div class="csb hp">${body}</div></details>`;
 const helpTbl = rows => `<table class="hpt">${rows.map(r => `<tr>${r.map((c, i) => i ? `<td>${c}</td>` : `<th>${c}</th>`).join('')}</tr>`).join('')}</table>`;
 function helpHTML() {
   const sc = db.settings.shortcuts, kb = a => `<kbd>${esc(sc[a] || 'sin asignar')}</kbd>`;
@@ -393,7 +393,7 @@ function helpHTML() {
       <li><b>Tu archivo JSON sigue siendo el original</b>: la copia de sesión no lo sustituye. Guarda (${kb('save')}) para escribir en el archivo; si la aplicación recuerda el archivo, te pedirá permiso para escribir en él.</li>
       <li><b>Instalar</b>: en «Información», bajo Configuración, el botón <b>Añadir app</b> la instala en este dispositivo (en los navegadores que no lo permiten, explica cómo). Solo aparece si la aplicación aún no está instalada.</li>
       <li><b>Actualizaciones</b>: la aplicación busca versiones nuevas sola (al abrirla, al volver a ella y cada media hora). Cuando hay una, aparece un aviso «Hay una versión nueva» con el botón <b>Recargar ahora</b>; antes de recargar guarda la copia de sesión. <b>No hace falta borrar los datos de la aplicación</b>: se guardan aparte de lo que se actualiza.</li>
-      <li>Versión instalada: <b>v${APP_V}</b>. <button onclick="checkUpdate()">Buscar actualizaciones</button> <button class="danger" onclick="forgetAppData()" title="Borra de este navegador las copias de trabajo de los proyectos; no toca tus archivos JSON ni Google Drive">Olvidar la copia de sesión</button></li>
+      <li>Versión instalada: <b>v${APP_V}</b>. <button data-onclick="checkUpdate()">Buscar actualizaciones</button> <button class="danger" data-onclick="forgetAppData()" title="Borra de este navegador las copias de trabajo de los proyectos; no toca tus archivos JSON ni Google Drive">Olvidar la copia de sesión</button></li>
       <li>El navegador puede borrar los datos de los sitios si se queda sin espacio; la aplicación pide almacenamiento persistente para evitarlo, pero tu <b>JSON</b> sigue siendo la copia que debes conservar.</li></ul>`],
     sync: ['Sincronización con Google Drive', `<p>El icono <b>🔄</b> de la barra de arriba, a la izquierda de 💾 (sin conectar pone «Conectar con Google Drive»), guarda <b>todos tus proyectos</b> (papers, notas, secciones, etiquetas, papelera y ajustes) en una <b>carpeta oculta de tu propio Google Drive</b>, para tenerlos igual en el ordenador, la tablet y el móvil.</p>
       <ul><li><b>Conectar</b>: pulsa 🔄 → «Continuar», elige tu cuenta de Google y da permiso. Si en Drive ya había una biblioteca de otro dispositivo, eliges si combinarlas o quedarte con una.</li>
@@ -407,15 +407,15 @@ function helpHTML() {
       <li><b>Proyectos</b>: se sincroniza el proyecto abierto, la lista de proyectos (con sus nombres) y los ajustes comunes. Los proyectos creados en otro dispositivo salen en ▾ con ☁ y se descargan al abrirlos; renombrar o borrar un proyecto llega a los demás dispositivos.</li>
       <li>La vista (tarjetas o tabla) es de cada dispositivo y no se sincroniza. Tus archivos JSON siguen funcionando igual.</li></ul>`],
     atajos: ['Atajos de teclado', helpTbl(Object.keys(SC_NAMES).map(a => [esc(SC_NAMES[a]), kb(a)]).concat([['Esta ayuda', '<kbd>F1</kbd>'], ['Cerrar menús y ventanas', '<kbd>Esc</kbd>']])) + '<p>Se cambian en Configuración → Atajos de teclado. Dentro de campos de texto solo funciona «Guardar»; negrita y cursiva actúan dentro de una nota.</p>'],
-    datos: ['Datos, privacidad y consejos', `<ul><li>Todo se queda en tu navegador y en tu archivo JSON. La aplicación solo sale a internet para <b>buscar un DOI en CrossRef</b>, para mostrar <b>imágenes por URL</b> y, si la activas, para la <b>sincronización con Google Drive</b>. Detalles en la <a href="privacidad.html" onclick="event.preventDefault();openPriv()">Política de privacidad</a> (enlace al final de la barra lateral).</li>
+    datos: ['Datos, privacidad y consejos', `<ul><li>Todo se queda en tu navegador y en tu archivo JSON. La aplicación solo sale a internet para <b>buscar un DOI en CrossRef</b>, para mostrar <b>imágenes por URL</b> y, si la activas, para la <b>sincronización con Google Drive</b>. Detalles en la <a href="privacidad.html" data-onclick="event.preventDefault();openPriv()">Política de privacidad</a> (enlace al final de la barra lateral).</li>
       <li>Funciona sin conexión una vez cargada (se puede instalar como aplicación). Las imágenes por URL y la búsqueda de DOI necesitan internet.</li>
       <li>Haz copias del JSON de vez en cuando: es tu única base de datos. La papelera guarda 5 días; el historial no se guarda.</li>
       <li>Las imágenes <b>enlazadas</b> solo se ven en el navegador donde las elegiste; si vas a llevar el JSON a otro equipo, usa la <b>copia incrustada</b> o una URL.</li>
       <li>Los estilos y tipos propios viajan dentro del JSON, así que se ven igual en cualquier navegador que lo abra.</li></ul>`]
   };
-  return `<div class="dh"><h2>Ayuda</h2><div class="dbtn"><button onclick="$('#help').close()">Cerrar ✕</button></div></div>
-    <input id="hpq" type="search" placeholder="Buscar en la ayuda…" oninput="helpFilter(this.value)" aria-label="Buscar en la ayuda">
-    <div id="hpb">${Object.entries(S).map(([id, [t, b]]) => helpSec(id, t, b, id !== 'inicio')).join('')}<button id="hpMore" class="hpmore" onclick="hpMore()">${HP_ALL ? 'Ocultar el resto de la ayuda ▴' : `Ver toda la ayuda (${Object.keys(S).length - 1} temas) ▾`}</button></div>`;
+  return `<div class="dh"><h2>Ayuda</h2><div class="dbtn"><button data-onclick="$('#help').close()">Cerrar ✕</button></div></div>
+    <input id="hpq" type="search" placeholder="Buscar en la ayuda…" data-oninput="helpFilter(this.value)" aria-label="Buscar en la ayuda">
+    <div id="hpb">${Object.entries(S).map(([id, [t, b]]) => helpSec(id, t, b, id !== 'inicio')).join('')}<button id="hpMore" class="hpmore" data-onclick="hpMore()">${HP_ALL ? 'Ocultar el resto de la ayuda ▴' : `Ver toda la ayuda (${Object.keys(S).length - 1} temas) ▾`}</button></div>`;
 }
 function helpFilter(q) {
   q = norm(q).trim(); let n = 0; $('#hpMore').hidden = !!q;   // al buscar se busca en toda la ayuda
@@ -437,17 +437,17 @@ function ctNew(name = 'Tipo propio') {
 }
 function ctUI() {
   const L = db.settings.customTypes, c = ctCur(); if (c) CTS.id = c.id;
-  let h = `<small>Crea tipos de documento para lo que los predefinidos no contemplan. Eliges qué campos muestra el formulario y cómo se llaman, y aparecen en el desplegable «Tipo» de cada paper. <a onclick="openHelp('tipos')">Ver la ayuda</a></small>
-    <div class="row" style="margin:8px 0">${L.length ? `<select onchange="CTS.id=this.value;drawCfg()">${L.map(x => `<option value="${x.id}" ${c.id === x.id ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select>` : ''}
-    <button onclick="ctNew();drawCfg()">+ Nuevo tipo</button>${c ? '<button onclick="ctDup()">Duplicar</button><button class="danger" onclick="ctDel()">Eliminar</button>' : ''}</div>`;
+  let h = `<small>Crea tipos de documento para lo que los predefinidos no contemplan. Eliges qué campos muestra el formulario y cómo se llaman, y aparecen en el desplegable «Tipo» de cada paper. <a data-onclick="openHelp('tipos')">Ver la ayuda</a></small>
+    <div class="row" style="margin:8px 0">${L.length ? `<select data-onchange="put(CTS,'id',this.value,drawCfg)">${L.map(x => `<option value="${x.id}" ${c.id === x.id ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select>` : ''}
+    <button data-onclick="ctNew();drawCfg()">+ Nuevo tipo</button>${c ? '<button data-onclick="ctDup()">Duplicar</button><button class="danger" data-onclick="ctDel()">Eliminar</button>' : ''}</div>`;
   if (!c) return h + '<p class="empty">Aún no hay tipos propios.</p>';
   const inUse = db.papers.filter(p => p.type === 'ct_' + c.id).length;
-  h += `<div class="cugrid"><label>Nombre<input value="${esc(c.name)}" maxlength="60" oninput="ctSet('name',this.value)"></label>
-    <label>Se cita como (para los estilos de serie)<select onchange="ctSet('like',this.value);drawCfg()">${Object.entries(TYPES).filter(([k]) => !CTYPES.has(k)).map(([k, v]) => `<option value="${k}" ${c.like === k ? 'selected' : ''}>${esc(v)}</option>`).join('')}</select></label></div>
-    <div class="row" style="margin:6px 0"><small>${inUse ? `${inUse} paper${inUse > 1 ? 's usan' : ' usa'} este tipo.` : 'Ningún paper usa este tipo todavía.'}</small><button onclick="ctReset()" title="Marca los campos que muestra el tipo «${esc(TYPES[c.like])}»">Usar los campos de «${esc(TYPES[c.like])}»</button></div>
+  h += `<div class="cugrid"><label>Nombre<input value="${esc(c.name)}" maxlength="60" data-oninput="ctSet('name',this.value)"></label>
+    <label>Se cita como (para los estilos de serie)<select data-onchange="ctSet('like',this.value);drawCfg()">${Object.entries(TYPES).filter(([k]) => !CTYPES.has(k)).map(([k, v]) => `<option value="${k}" ${c.like === k ? 'selected' : ''}>${esc(v)}</option>`).join('')}</select></label></div>
+    <div class="row" style="margin:6px 0"><small>${inUse ? `${inUse} paper${inUse > 1 ? 's usan' : ' usa'} este tipo.` : 'Ningún paper usa este tipo todavía.'}</small><button data-onclick="ctReset()" title="Marca los campos que muestra el tipo «${esc(TYPES[c.like])}»">Usar los campos de «${esc(TYPES[c.like])}»</button></div>
     <div class="cuh">Campos del formulario <small>(siempre están título, autores, año, URL, DOI y fecha de consulta)</small></div>
-    <div class="ctf"><div class="ctr"><span>Revista / editorial / sitio</span><input value="${esc(c.labels.venue || '')}" placeholder="Etiqueta propia (p. ej. Medio, Canal, Emisora)" oninput="ctLabel('venue',this.value)"></div>
-    ${Object.entries(CT_NAMES).map(([k, n]) => `<div class="ctr"><label class="row"><input type="checkbox" ${c.fields.includes(k) ? 'checked' : ''} onchange="ctField('${k}',this.checked)"> ${esc(n)}</label><input value="${esc(c.labels[k] || '')}" placeholder="Etiqueta propia" ${c.fields.includes(k) ? '' : 'disabled'} oninput="ctLabel('${k}',this.value)"></div>`).join('')}</div>
+    <div class="ctf"><div class="ctr"><span>Revista / editorial / sitio</span><input value="${esc(c.labels.venue || '')}" placeholder="Etiqueta propia (p. ej. Medio, Canal, Emisora)" data-oninput="ctLabel('venue',this.value)"></div>
+    ${Object.entries(CT_NAMES).map(([k, n]) => `<div class="ctr"><label class="row"><input type="checkbox" ${c.fields.includes(k) ? 'checked' : ''} data-onchange="ctField('${k}',this.checked)"> ${esc(n)}</label><input value="${esc(c.labels[k] || '')}" placeholder="Etiqueta propia" ${c.fields.includes(k) ? '' : 'disabled'} data-oninput="ctLabel('${k}',this.value)"></div>`).join('')}</div>
     <small>En un estilo propio puedes usar todos los campos con <code>{campo}</code> y darle a este tipo su plantilla (Configuración → Estilos de cita personalizados → «Tipo de documento»).</small>`;
   return h;
 }
@@ -469,4 +469,4 @@ function typeChange(v) {   // desplegable «Tipo» del paper; la última opción
 }
 $('#cfg').addEventListener('close', () => { if ($('#dlg').open) drawD(); });   // al volver del editor de tipos, el formulario se pone al día
 const CFG_OPEN = new Set();   // apartados de Configuración desplegados (se conservan al redibujar)
-const cfgSec = (id, title, body) => `<details class="cs" ${CFG_OPEN.has(id) ? 'open' : ''} ontoggle="this.open ? CFG_OPEN.add('${id}') : CFG_OPEN.delete('${id}');uiSoon()"><summary>${title}</summary><div class="csb">${body}</div></details>`;
+const cfgSec = (id, title, body) => `<details class="cs" ${CFG_OPEN.has(id) ? 'open' : ''} data-ontoggle="setHas(CFG_OPEN,'${id}',this.open)"><summary>${title}</summary><div class="csb">${body}</div></details>`;
