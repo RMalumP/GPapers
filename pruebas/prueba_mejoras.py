@@ -93,7 +93,7 @@ with sync_playwright() as pw:
     eq('abrir lo abre en otra pestaña en esa página, sin volver a pedirlo', A.evaluate("[window.__open.length, window.__open[0].startsWith('blob:'), window.__open[0].endsWith('#page=7'), window.__pickN]"), [1, True, True, 1])
     A.evaluate("commit()"); A.wait_for_timeout(300)
     eq('el JSON lleva el nombre y la página, sin datos del archivo', A.evaluate("JSON.parse(dbJSON()).papers.find(p => p.id === 'd1').pdf"), {'name': 'articulo.pdf', 'page': 7})
-    eq('la tarjeta muestra el botón del PDF', A.evaluate("!!document.querySelector('.card[data-id=d1] button[onclick*=pdfOpen]')"), True)
+    eq('la tarjeta muestra el botón del PDF', A.evaluate("!!document.querySelector('.card[data-id=d1] button[data-onclick*=pdfOpen]')"), True)
     A.evaluate("PEND_PDF.clear(); window.__open = []; pdfOpen('d1')"); A.wait_for_timeout(400)
     eq('sin enlace en este navegador (otro dispositivo) pide elegir el archivo', A.evaluate("[window.__pickN, window.__open.length]"), [2, 1])
     eq('un JSON con datos raros en pdf se sanea', A.evaluate("[validate({papers: [{id: 'q', title: 't', authors: [], pdf: {name: 5}}, {id: 'r', title: 't', authors: [], pdf: {name: 'a.pdf', page: -3}}], tags: [], sections: []}).papers.map(p => p.pdf)]"), [[None, {'name': 'a.pdf'}]])

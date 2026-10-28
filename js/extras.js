@@ -23,7 +23,7 @@ async function appInstall() {
 /* ===== Privacidad ===== */
 function privHTML() {
   const on = syOn(), p = syP();
-  return `<div class="dh"><h2>Privacidad</h2><div class="dbtn"><button onclick="$('#pv').close()">Cerrar ✕</button></div></div><div class="sytx">
+  return `<div class="dh"><h2>Privacidad</h2><div class="dbtn"><button data-onclick="$('#pv').close()">Cerrar ✕</button></div></div><div class="sytx">
     <h4>Qué datos se tratan y dónde</h4><p>Tus proyectos (papers, notas, secciones, etiquetas y papelera) y tus ajustes se guardan <b>en tu navegador</b> (copia de trabajo de cada proyecto en el almacenamiento de la aplicación) y en los <b>archivos JSON</b> que tú eliges. No se envían a ningún servidor de quien mantiene la aplicación: no hay cuentas, ni analíticas, ni publicidad, ni cookies de seguimiento.</p>
     <h4>Cuándo sale algo a internet</h4><ul><li><b>Buscar por DOI</b>: se envía el DOI a CrossRef (api.crossref.org) para traer los datos del paper.</li>
     <li><b>Imágenes por URL</b>: tu navegador las descarga de la web donde están.</li>
@@ -37,14 +37,14 @@ function privHTML() {
     <li><b>Quitar el permiso a la aplicación</b> en todos tus dispositivos: <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener">myaccount.google.com/permissions</a>.</li>
     <li><b>Datos de este navegador</b>: Ayuda → «Aplicación instalada» → «Olvidar la copia de sesión», o borra los datos del sitio desde el navegador. Tus archivos JSON solo los borras tú.</li>
     <li><b>Copias de seguridad y filtros guardados</b> se guardan solo en este navegador (nunca en Google Drive). Los <b>PDF enlazados</b> no se leen ni se envían a ningún sitio, salvo que actives en Configuración «Subir a mi Google Drive los PDF enlazados»: entonces cada PDF se copia a la carpeta privada y oculta de tu Google Drive (mismo permiso <code>drive.appdata</code>), solo para que puedas abrirlo desde tus otros dispositivos. Se borra de allí si quitas el enlace, y con «Borrar mis datos de Google Drive».</li></ul>
-    ${syAvail() ? `<p class="sypv">${on ? `Google Drive: <b>sesión iniciada</b>${p.who ? ' como ' + esc(p.who) : ''}${p.last ? ' · última sincronización ' + syAgo(p.last) : ''}.</p><p class="row"><button onclick="syLogout()">🚪 Cerrar sesión</button><button class="danger" onclick="syWipe()">🗑 Borrar mi copia de Google Drive</button>` : 'Google Drive: <b>sin conectar</b>. <button onclick="$(\'#pv\').close();syIntro()">🔄 Sincronizar…</button>'}</p>` : ''}
+    ${syAvail() ? `<p class="sypv">${on ? `Google Drive: <b>sesión iniciada</b>${p.who ? ' como ' + esc(p.who) : ''}${p.last ? ' · última sincronización ' + syAgo(p.last) : ''}.</p><p class="row"><button data-onclick="syLogout()">🚪 Cerrar sesión</button><button class="danger" data-onclick="syWipe()">🗑 Borrar mi copia de Google Drive</button>` : 'Google Drive: <b>sin conectar</b>. <button data-onclick="$(\'#pv\').close();syIntro()">🔄 Sincronizar…</button>'}</p>` : ''}
     <h4>Contacto</h4><p>Dudas sobre esta política: <a href="mailto:r.malumbresp@gmail.com">r.malumbresp@gmail.com</a> o <a href="mailto:rmalum01@ucm.es">rmalum01@ucm.es</a>. Versión para enlazar: <a href="privacidad.html" target="_blank" rel="noopener">privacidad.html</a>.</p></div>`;
 }
 function openPriv() { $('#pv').innerHTML = privHTML(); if (!$('#pv').open) $('#pv').showModal(); }
 
 /* ===== Créditos ===== */
 function openCred() {
-  $('#cr').innerHTML = `<div class="dh"><h2>Créditos</h2><div class="dbtn"><button onclick="$('#cr').close()">Cerrar ✕</button></div></div>
+  $('#cr').innerHTML = `<div class="dh"><h2>Créditos</h2><div class="dbtn"><button data-onclick="$('#cr').close()">Cerrar ✕</button></div></div>
     <dl class="cred"><dt>Dirección:</dt><dd>R.M.P.</dd><dt>Desarrollo:</dt><dd>Vibe Coding con Claude</dd>
     <dt>Derechos:</dt><dd><a href="https://creativecommons.org/licenses/by-sa/4.0/deed.es" target="_blank" rel="noopener">Licencia CC BY-SA</a></dd><dt>Versión:</dt><dd>v${APP_V}</dd></dl>`;
   if (!$('#cr').open) $('#cr').showModal();
@@ -87,11 +87,11 @@ function dpMerge(keepId, ids) {
 function dpOpen() { dpDraw(); if (!$('#dp').open) $('#dp').showModal(); }
 function dpDraw() {
   const G = dpGroups();
-  $('#dp').innerHTML = `<div class="dh"><h2>Posibles duplicados</h2><div class="dbtn"><button onclick="$('#dp').close()">Cerrar ✕</button></div></div>
+  $('#dp').innerHTML = `<div class="dh"><h2>Posibles duplicados</h2><div class="dbtn"><button data-onclick="$('#dp').close()">Cerrar ✕</button></div></div>
     <p class="empty">Papers con el mismo DOI o el mismo título. «Quedarme con este» lo conserva, le añade lo que falte de los otros (campos vacíos, etiquetas, secciones, notas, relaciones) y manda los demás a la papelera.</p>
     ${G.length ? G.map((g, gi) => `<div class="dpg"><div class="dpt">${g.length} papers · ${g.some((p, i) => g.some((q, j) => i < j && normDoi(p.doi) && normDoi(p.doi) === normDoi(q.doi))) ? 'mismo DOI' : 'mismo título'}</div>
-      ${g.map(p => `<div class="irow"><span><b>${esc(p.alias || p.title)}</b><br><small>${esc(svAuth(p))}${p.venue ? ' · ' + esc(p.venue) : ''}${p.doi ? ' · ' + esc(p.doi) : ''}<br>${p.notes.length} notas · ${p.tagIds.length} etiquetas · ${p.related.length} relaciones</small></span><button class="sm" style="margin-left:auto" onclick="dpMerge('${p.id}', ${esc(JSON.stringify(g.map(x => x.id)).replace(/"/g, '&quot;'))});dpDraw()">Quedarme con este</button></div>`).join('')}
-      <div class="row"><button class="sm" onclick="DP_IGN.add('${g.map(p => p.id).sort().join()}');dpDraw()">No son duplicados</button></div></div>`).join('') : '<p class="empty">No hay papers duplicados.</p>'}`;
+      ${g.map(p => `<div class="irow"><span><b>${esc(p.alias || p.title)}</b><br><small>${esc(svAuth(p))}${p.venue ? ' · ' + esc(p.venue) : ''}${p.doi ? ' · ' + esc(p.doi) : ''}<br>${p.notes.length} notas · ${p.tagIds.length} etiquetas · ${p.related.length} relaciones</small></span><button class="sm" style="margin-left:auto" data-onclick="dpMerge('${p.id}', ${esc(JSON.stringify(g.map(x => x.id)).replace(/"/g, '&quot;'))});dpDraw()">Quedarme con este</button></div>`).join('')}
+      <div class="row"><button class="sm" data-onclick="DP_IGN.add('${g.map(p => p.id).sort().join()}');dpDraw()">No son duplicados</button></div></div>`).join('') : '<p class="empty">No hay papers duplicados.</p>'}`;
 }
 
 /* ===== Extras: copiar cita, filtros guardados y progreso del proyecto ===== */
@@ -169,10 +169,10 @@ function psOpen() {
   const ids = [...SEL].filter(id => db.papers.some(p => p.id === id)), T = PJ.list.filter(p => p.id !== PJ.cur && !p.remote);
   if (!ids.length) return toast('Selecciona antes los papers que quieres mover o copiar (casilla «Seleccionar» de cada uno).', [], 4000);
   if (!T.length) return toast('Necesitas otro proyecto en este dispositivo: crea uno con ▾ junto al nombre del proyecto.', [], 4500);
-  $('#ps').innerHTML = `<div class="dh"><h2>Mover o copiar ${ids.length} ${ids.length === 1 ? 'paper' : 'papers'}</h2><div class="dbtn"><button onclick="$('#ps').close()">Cerrar ✕</button></div></div>
+  $('#ps').innerHTML = `<div class="dh"><h2>Mover o copiar ${ids.length} ${ids.length === 1 ? 'paper' : 'papers'}</h2><div class="dbtn"><button data-onclick="$('#ps').close()">Cerrar ✕</button></div></div>
     <p class="empty">Desde «${esc(pjCur().name)}» a otro proyecto. Se llevan las notas, etiquetas y secciones (se crean en el destino si no existen) y las relaciones entre los papers elegidos.</p>
     <label class="row"><input type="radio" name="psm" value="copy" checked> Copiar (se quedan también aquí)</label><label class="row"><input type="radio" name="psm" value="move"> Mover (dejan de estar aquí)</label>
-    <h4>Proyecto de destino</h4>${T.map(p => `<button class="pji2" onclick="psGo('${p.id}')">${esc(p.name)} <small>${p.n || 0} papers</small></button>`).join('')}`;
+    <h4>Proyecto de destino</h4>${T.map(p => `<button class="pji2" data-onclick="psGo('${p.id}')">${esc(p.name)} <small>${p.n || 0} papers</small></button>`).join('')}`;
   $('#ps').showModal();
 }
 async function psGo(tid) {
@@ -216,10 +216,10 @@ const bkDaily = async () => { const L = await bkList(); if (!L.length || Date.no
 const bkFmt = c => new Date(c.at).toLocaleString('es', {dateStyle: 'medium', timeStyle: 'short'});
 async function bkOpen() {
   ctxClose(); const L = await bkList(), kb = x => x < 1024 ? x + ' B' : x < 1048576 ? Math.round(x / 1024) + ' KB' : (x / 1048576).toFixed(1) + ' MB';
-  $('#bk').innerHTML = `<div class="dh"><h2>Copias de seguridad · ${esc(pjCur().name)}</h2><div class="dbtn"><button onclick="$('#bk').close()">Cerrar ✕</button></div></div>
+  $('#bk').innerHTML = `<div class="dh"><h2>Copias de seguridad · ${esc(pjCur().name)}</h2><div class="dbtn"><button data-onclick="$('#bk').close()">Cerrar ✕</button></div></div>
     <p class="empty">Se guarda una copia al abrir la aplicación cada día (las últimas ${BK_MAX}) y antes de restaurar o de sustituirlo todo por lo de Drive. Solo están en este navegador y se borran con el proyecto. Restaurar sustituye papers, notas, secciones, etiquetas y papelera de este proyecto (los ajustes no cambian) y se puede deshacer.</p>
-    ${L.length ? L.map((c, i) => `<div class="irow"><span><b>${esc(bkFmt(c))}</b><br><small>${esc(c.why)} · ${c.n} papers · ${kb(c.size)}</small></span><span class="row" style="margin-left:auto;flex-wrap:nowrap"><button class="sm" onclick="bkRestore(${i})">Restaurar</button><button class="sm" onclick="bkDownload(${i})" title="Descargar esta copia como JSON">⬇</button><button class="sm x" onclick="bkDelete(${i})" title="Borrar esta copia">✕</button></span></div>`).join('') : '<p class="empty">Todavía no hay copias.</p>'}
-    <div class="row" style="margin-top:12px"><button class="pri" onclick="bkNow()">Crear copia ahora</button></div>`;
+    ${L.length ? L.map((c, i) => `<div class="irow"><span><b>${esc(bkFmt(c))}</b><br><small>${esc(c.why)} · ${c.n} papers · ${kb(c.size)}</small></span><span class="row" style="margin-left:auto;flex-wrap:nowrap"><button class="sm" data-onclick="bkRestore(${i})">Restaurar</button><button class="sm" data-onclick="bkDownload(${i})" title="Descargar esta copia como JSON">⬇</button><button class="sm x" data-onclick="bkDelete(${i})" title="Borrar esta copia">✕</button></span></div>`).join('') : '<p class="empty">Todavía no hay copias.</p>'}
+    <div class="row" style="margin-top:12px"><button class="pri" data-onclick="bkNow()">Crear copia ahora</button></div>`;
   if (!$('#bk').open) $('#bk').showModal();
 }
 async function bkNow() { await bkTake('Manual', true); bkOpen(); }
@@ -334,6 +334,6 @@ async function pjGone(id) {   // otro dispositivo borró el proyecto abierto
 function pjMenu(e) {
   e.stopPropagation(); const r = e.currentTarget.getBoundingClientRect(), L = [...PJ.list].sort((a, b) => a.name.localeCompare(b.name, 'es'));
   ctxShow({preventDefault() {}, stopPropagation() {}, clientX: r.left, clientY: r.bottom + 4}, '<div class="ctxh">Proyectos</div>'
-    + L.map(p => `<button class="pji" onclick="pjOpen('${p.id}')">${tick(p.id === PJ.cur)}${esc(p.name)} <small>${p.remote ? '☁ en Google Drive' : (p.id === PJ.cur ? db.papers.length : p.n || 0) + ' papers'}</small></button>`).join('')
-    + '<hr><button onclick="pjNew()">＋ Nuevo proyecto</button><button onclick="ctxClose();doOpen()">📂 Abrir un JSON como proyecto…</button><button onclick="ctxClose();pjEdit()">✏️ Cambiar el nombre</button>' + (handle ? `<button onclick="pjReload()" title="Vuelve a leer «${esc(path || '')}» del disco (descarta lo que no hayas guardado)">↻ Volver a leer «${esc(path || '')}»</button>` : '') + '<button onclick="ctxClose();dpOpen()">🔍 Buscar duplicados…</button><button onclick="bkOpen()">🕘 Copias de seguridad…</button><button class="danger" onclick="pjDel()">🗑 Borrar este proyecto…</button>');
+    + L.map(p => `<button class="pji" data-onclick="pjOpen('${p.id}')">${tick(p.id === PJ.cur)}${esc(p.name)} <small>${p.remote ? '☁ en Google Drive' : (p.id === PJ.cur ? db.papers.length : p.n || 0) + ' papers'}</small></button>`).join('')
+    + '<hr><button data-onclick="pjNew()">＋ Nuevo proyecto</button><button data-onclick="ctxClose();doOpen()">📂 Abrir un JSON como proyecto…</button><button data-onclick="ctxClose();pjEdit()">✏️ Cambiar el nombre</button>' + (handle ? `<button data-onclick="pjReload()" title="Vuelve a leer «${esc(path || '')}» del disco (descarta lo que no hayas guardado)">↻ Volver a leer «${esc(path || '')}»</button>` : '') + '<button data-onclick="ctxClose();dpOpen()">🔍 Buscar duplicados…</button><button data-onclick="bkOpen()">🕘 Copias de seguridad…</button><button class="danger" data-onclick="pjDel()">🗑 Borrar este proyecto…</button>');
 }

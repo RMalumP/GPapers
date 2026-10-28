@@ -198,21 +198,21 @@ async function impDoi() {
   try { IMP = {mode: 'prev', refs: impPrepare([await fetchDoi($('#iDoi').value)])}; impDraw(); } catch (e) { $('#iMsg').textContent = e.message; }
 }
 function impDraw() {
-  const m = IMP.mode, close = `<button onclick="$('#imp').close()">Cancelar</button>`;
+  const m = IMP.mode, close = `<button data-onclick="$('#imp').close()">Cancelar</button>`;
   let h = `<h2>${m === 'fill' ? 'Datos de CrossRef' : 'Importar referencias'}</h2>`;
-  if (m === 'text') h += `<textarea id="iTxt" style="min-height:220px" placeholder="Pega aquí BibTeX, RIS, el texto de ScienceDirect o citas de Google Scholar (una por línea, en APA, MLA, Chicago, Harvard o Vancouver)"></textarea><div class="row" style="margin-top:10px"><button class="pri" onclick="impText($('#iTxt').value)">Analizar</button>${close}</div>`;
-  else if (m === 'doi') h += `<div class="row"><input id="iDoi" style="flex:1" placeholder="10.1000/xyz123 o https://doi.org/…" onkeydown="if(event.key==='Enter')impDoi()"><button class="pri" onclick="impDoi()">Buscar</button></div><p id="iMsg" class="empty"></p>${close}`;
+  if (m === 'text') h += `<textarea id="iTxt" style="min-height:220px" placeholder="Pega aquí BibTeX, RIS, el texto de ScienceDirect o citas de Google Scholar (una por línea, en APA, MLA, Chicago, Harvard o Vancouver)"></textarea><div class="row" style="margin-top:10px"><button class="pri" data-onclick="impText($('#iTxt').value)">Analizar</button>${close}</div>`;
+  else if (m === 'doi') h += `<div class="row"><input id="iDoi" style="flex:1" placeholder="10.1000/xyz123 o https://doi.org/…" data-onkeydown="onEnter(event,impDoi)"><button class="pri" data-onclick="impDoi()">Buscar</button></div><p id="iMsg" class="empty"></p>${close}`;
   else if (m === 'fill') {
     const j = v => Array.isArray(v) ? v.join('; ') : String(v ?? ''), r = IMP.ref, cur = k => j(D[k]), nw = k => j(r[k]), L = FLD.filter(([k]) => nw(k) && nw(k) !== cur(k) && (!FLD_T[k] || shows(k, r.type)));
     h += (L.length ? '<p>Marca los datos que quieras aplicar (por defecto, solo los campos vacíos):</p>' + L.map(([k, t]) => `<label class="irow"><input type="checkbox" id="f_${k}" ${cur(k) ? '' : 'checked'}><span><b>${t}</b><br><small>Ahora: ${esc(cur(k)) || '—'}</small><br><small>CrossRef: ${esc(nw(k))}</small></span></label>`).join('') : '<p>CrossRef no aporta datos nuevos.</p>')
-      + `<div class="row" style="margin-top:12px"><button class="pri" onclick="fillGo()">Aplicar</button>${close}</div>`;
+      + `<div class="row" style="margin-top:12px"><button class="pri" data-onclick="fillGo()">Aplicar</button>${close}</div>`;
   } else {
     const R = IMP.refs, nd = R.filter(r => r.dup).length;
-    h += `<p>${R.length} encontrados${nd ? ` · ${nd} posibles duplicados (desmarcados)` : ''}</p><div class="ilist">${R.map((r, i) => `<label class="irow"><input type="checkbox" ${r.on ? 'checked' : ''} ${r.bad ? 'disabled' : ''} onchange="IMP.refs[${i}].on=this.checked;impCount()"><span><b>${esc(r.title || '(sin título)')}</b>${r.dup ? ' <span class="tag-dup">Duplicado</span>' : ''}${r.bad ? ' <span class="tag-dup">No legible</span>' : ''}<br><small>${esc(r.authors.join('; '))}${r.year ? ' · ' + esc(r.year) : ''}${r.venue ? ' · ' + esc(r.venue) : ''}</small></span></label>`).join('')}</div>
+    h += `<p>${R.length} encontrados${nd ? ` · ${nd} posibles duplicados (desmarcados)` : ''}</p><div class="ilist">${R.map((r, i) => `<label class="irow"><input type="checkbox" ${r.on ? 'checked' : ''} ${r.bad ? 'disabled' : ''} data-onchange="impOn(${i},this.checked)"><span><b>${esc(r.title || '(sin título)')}</b>${r.dup ? ' <span class="tag-dup">Duplicado</span>' : ''}${r.bad ? ' <span class="tag-dup">No legible</span>' : ''}<br><small>${esc(r.authors.join('; '))}${r.year ? ' · ' + esc(r.year) : ''}${r.venue ? ' · ' + esc(r.venue) : ''}</small></span></label>`).join('')}</div>
       <div class="grid" style="margin-top:10px"><label>Sección<select id="iSec"><option value="">(ninguna)</option>${db.sections.map(s => `<option value="${s.id}" ${F.sec === s.id ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}</select></label>
       <label>Etiqueta<select id="iTag"><option value="">(ninguna)</option>${db.tags.map(t => `<option value="${t.id}">${esc(t.name)}</option>`).join('')}</select></label>
       <label>Estado de lectura<select id="iRd">${Object.entries(READ).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select></label></div>
-      <div class="row" style="margin-top:12px"><button class="pri" id="iGo" onclick="impGo()"></button>${close}</div>`;
+      <div class="row" style="margin-top:12px"><button class="pri" id="iGo" data-onclick="impGo()"></button>${close}</div>`;
   }
   $('#imp').innerHTML = h;
   if (m === 'doi') $('#iDoi').focus(); if (m === 'prev') impCount();
@@ -234,4 +234,4 @@ function fillGo() {
   if ($('#f_authors')?.checked && r.authorType === 'entidad' && D.authorType === 'auto') D.authorType = 'entidad';
   D.doi = r.doi; $('#imp').close(); drawD();
 }
-function openMenu(e) { ctxShow(e, `<div class="ctxh">Importar referencias</div><button onclick="openImport('file')">📄 Desde archivo (.bib, .ris o .txt)</button><button onclick="openImport('text')">📋 Pegar BibTeX, RIS o citas de Google Scholar</button><button onclick="openImport('doi')">🔎 Buscar por DOI</button>`); }
+function openMenu(e) { ctxShow(e, `<div class="ctxh">Importar referencias</div><button data-onclick="openImport('file')">📄 Desde archivo (.bib, .ris o .txt)</button><button data-onclick="openImport('text')">📋 Pegar BibTeX, RIS o citas de Google Scholar</button><button data-onclick="openImport('doi')">🔎 Buscar por DOI</button>`); }

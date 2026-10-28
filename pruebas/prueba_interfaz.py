@@ -52,8 +52,8 @@ with sync_playwright() as pw:
     # Configuración por pestañas
     A.evaluate("openCfg()")
     eq('cuatro pestañas, la primera abierta', A.evaluate("[[...document.querySelectorAll('#cfg .ctabs button')].map(b => b.textContent), document.querySelector('#cfg .ctabs button.on').textContent]"), [['Apariencia', 'Notas y citas', 'Atajos', 'Datos y Drive'], 'Apariencia'])
-    eq('Apariencia: nombre, paleta, imagen, archivo y progreso (desactivado)', A.evaluate("[!!$('#cfg input[oninput*=appName]'), !![...document.querySelectorAll('#cfg summary')].find(s => s.textContent.includes('Paleta')), document.querySelector('#cfg label:has(input[onchange*=showProgress]) input').checked]"), [True, True, False])
-    A.evaluate("document.querySelector('#cfg input[onchange*=showProgress]').click()")
+    eq('Apariencia: nombre, paleta, imagen, archivo y progreso (desactivado)', A.evaluate("[!!$('#cfg input[data-oninput*=appName]'), !![...document.querySelectorAll('#cfg summary')].find(s => s.textContent.includes('Paleta')), document.querySelector('#cfg label:has(input[data-onchange*=showProgress]) input').checked]"), [True, True, False])
+    A.evaluate("document.querySelector('#cfg input[data-onchange*=showProgress]').click()")
     eq('la casilla activa el progreso', A.evaluate("[db.settings.showProgress, !$('#pjProg').hidden]"), [True, True])
     A.click('#cfg .ctabs button:has-text("Notas y citas")')
     eq('Notas y citas: tipos, estilos y plantillas', A.evaluate("[...document.querySelectorAll('#cfg summary')].map(s => s.textContent)"), ['Tipos de documento propios', 'Estilos de cita personalizados', 'Plantillas de nota'])

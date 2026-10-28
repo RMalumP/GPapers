@@ -1,9 +1,45 @@
 'use strict';
+/* ===== Eventos: lo que usan los data-on… del HTML (ver «Eventos de la interfaz» en js/modelo.js) =====
+   ON_VARS da acceso a las variables y funciones flecha (const/let no están en window); las funciones normales se encuentran solas. */
+const ON_VARS = {
+  get $() { return $; }, get F() { return F; }, get D() { return D; }, get DATA_ALL() { return DATA_ALL; }, get GR() { return GR; }, get LK() { return LK; }, get SV() { return SV; },
+  get CU() { return CU; }, get CTS() { return CTS; }, get DP_IGN() { return DP_IGN; }, get ALL_FOLD() { return ALL_FOLD; }, get CITE_OPEN() { return CITE_OPEN; },
+  get HELP_OPEN() { return HELP_OPEN; }, get CFG_OPEN() { return CFG_OPEN; }, get ctxClose() { return ctxClose; }, get fmClose() { return fmClose; }, get svSave() { return svSave; }, get syAuto() { return syAuto; },
+};
+function put(o, k, v, then) { o[k] = v; if (then) then(); }   // asigna y, si se pide, redibuja: put(F,'mode',this.value,render)
+function setHas(S, id, on) { on ? S.add(id) : S.delete(id); uiSoon(); }   // bloques plegables que se recuerdan
+function onEnter(e, fn, ...a) { if (e.key === 'Enter') fn(...a); }
+function lines(v) { return v.split('\n').map(s => s.trim()).filter(Boolean); }
+function noBtnFocus(e) { if (e.target.tagName === 'BUTTON') e.preventDefault(); }   // los botones de la barra de formato no quitan el foco al texto
+function imgErr(el) { el.outerHTML = '<span class="imgx" title="No se pudo cargar la imagen">⚠</span>'; }
+function viewToggle() { setView(db.settings.view === 'table' ? 'cards' : 'table'); }
+function pjSize(el) { el.size = Math.max(6, el.value.length + 1); }
+function pjKey(e, el) { if (e.key === 'Enter') el.blur(); else if (e.key === 'Escape') { el.value = pjCur().name; el.blur(); } }
+function sortSet(i, k) { F.sorts[i].k = k; render(); }
+function sortFlip(i) { F.sorts[i].d *= -1; render(); }
+function sortDel(i) { F.sorts.splice(i, 1); render(); }
+function sortAdd(k) { F.sorts.push({k, d: 1}); render(); }
+function exsSet(v) { EXS = v; drawEx(); }
+function tabSet(k) { tab = k; drawD(); }
+function dataAllSet(v) { DATA_ALL = v; uiSoon(); drawD(); }
+function dRate(n) { D.rating = D.rating === n ? 0 : n; drawD(); }
+function noteSec(i, v) { D.notes[i].sectionId = v; drawD(); }
+function noteDel(i) { D.notes.splice(i, 1); drawD(); }
+function citeDel(k) { delete D.cites[k]; drawD(); }
+function clocSet(v) { CLOC = v; drawIT(); }
+function citeSelSet(v) { CITE_SEL = v; drawD(); }
+function citeAllOn() { CITE_ALL = true; drawD(); }
+function reltSet(v) { RELT = v; relSearch(); }
+function recActSet(a) { recAct = a; drawCfg(); }
+function cuPick(id) { CU.id = id; CU.type = '*'; drawCfg(); }
+function impOn(i, on) { IMP.refs[i].on = on; impCount(); }
+function mgAdd(id) { db[MG].push({id, name: 'Nueva', color: '#2457c5', tagIds: []}); markDirty(); drawMg(); }
+
 /* ===== Datos de la aplicación (PWA): copia de la sesión y estado de la interfaz, en IndexedDB =====
    Aparte del JSON, la app guarda (1) una copia de trabajo, para reabrir justo donde lo dejaste aunque no hayas guardado, y
    (2) el estado de la interfaz (filtros, orden, barra lateral, bloques plegados). Viven fuera de la caché de la aplicación,
    así que las actualizaciones no los tocan y no hace falta borrar datos para recibir una versión nueva. */
-const APP_V = '35.5';   // debe coincidir con la versión de sw.js
+const APP_V = '35.6';   // debe coincidir con la versión de sw.js
 let BOOTED = false, RELOADING = false, SWREG = null, tSes = 0, tUi = 0, lastUi = '';
 const sessionNow = () => { clearTimeout(tSes); if (!BOOTED) return Promise.resolve();   // copia de trabajo del proyecto abierto (y la lista de proyectos)
   const p = pjCur(); if (p) { Object.assign(p, {n: db.papers.length, file: path, dirty}); delete p.remote; }

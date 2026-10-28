@@ -1,53 +1,54 @@
 <!DOCTYPE html>
 <html lang="es"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://accounts.google.com; style-src 'self' 'unsafe-inline' https://accounts.google.com; img-src * data: blob:; connect-src 'self' data: blob: https://www.googleapis.com https://oauth2.googleapis.com https://accounts.google.com https://api.crossref.org; frame-src https://accounts.google.com; object-src 'none'; base-uri 'self'; form-action 'none'">
 <title>Gestor de papers</title><meta name="description" content="Gestor de papers académicos: notas, secciones, etiquetas, citas en varios estilos y sincronización opcional con tu propio Google Drive."><link rel="stylesheet" href="style.css"><link rel="manifest" href="manifest.json"><meta name="theme-color" content="#2457c5"><link rel="icon" href="icon-192.png"></head>
 <body>
 <header>
-  <h1 id="appName">Papers</h1><span class="pj"><span class="pjs" aria-hidden="true">/</span><input id="pjName" maxlength="60" spellcheck="false" autocomplete="off" aria-label="Nombre del proyecto" title="Nombre del proyecto (su archivo JSON se llama igual). Escribe para cambiarlo." placeholder="Proyecto" oninput="this.size=Math.max(6,this.value.length+1)" onchange="pjRename(this.value)" onkeydown="if(event.key==='Enter')this.blur();else if(event.key==='Escape'){this.value=pjCur().name;this.blur()}"><button id="pjBtn" onclick="pjMenu(event)" title="Proyectos: cambiar, crear o borrar" aria-label="Proyectos">▾</button></span><span id="pjProg" hidden><span class="pjb"></span><small></small></span><span id="fname"></span>
+  <h1 id="appName">Papers</h1><span class="pj"><span class="pjs" aria-hidden="true">/</span><input id="pjName" maxlength="60" spellcheck="false" autocomplete="off" aria-label="Nombre del proyecto" title="Nombre del proyecto (su archivo JSON se llama igual). Escribe para cambiarlo." placeholder="Proyecto" data-oninput="pjSize(this)" data-onchange="pjRename(this.value)" data-onkeydown="pjKey(event,this)"><button id="pjBtn" data-onclick="pjMenu(event)" title="Proyectos: cambiar, crear o borrar" aria-label="Proyectos">▾</button></span><span id="pjProg" hidden><span class="pjb"></span><small></small></span><span id="fname"></span>
   <div class="row">
-    <button id="syncBtn" onclick="syClick(event)" title="Conectar con Google Drive" aria-label="Conectar con Google Drive" data-st="off" hidden><span class="syi">🔄</span><span class="syl">Conectar con Google Drive</span><span class="syb"></span></button>
-    <button onclick="save(false)" title="Guardar (Ctrl+S)" aria-label="Guardar">💾</button>
-    <button onclick="openMenu(event)" title="Importar referencias: archivo (.bib, .ris, .txt de ScienceDirect), texto pegado (BibTeX, RIS o citas de Google Scholar) o DOI">📥 Importar</button>
-    <button class="pri" onclick="openEx()">Exportar citas</button>
-    <span class="fm"><button id="fmBtn" onclick="fmToggle(event)" aria-haspopup="true" aria-expanded="false" title="Abrir, guardar como, importar y autoguardado">Archivo ▾</button>
+    <button id="syncBtn" data-onclick="syClick(event)" title="Conectar con Google Drive" aria-label="Conectar con Google Drive" data-st="off" hidden><span class="syi">🔄</span><span class="syl">Conectar con Google Drive</span><span class="syb"></span></button>
+    <button data-onclick="save(false)" title="Guardar (Ctrl+S)" aria-label="Guardar">💾</button>
+    <button data-onclick="openMenu(event)" title="Importar referencias: archivo (.bib, .ris, .txt de ScienceDirect), texto pegado (BibTeX, RIS o citas de Google Scholar) o DOI">📥 Importar</button>
+    <button class="pri" data-onclick="openEx()">Exportar citas</button>
+    <span class="fm"><button id="fmBtn" data-onclick="fmToggle(event)" aria-haspopup="true" aria-expanded="false" title="Abrir, guardar como, importar y autoguardado">Archivo ▾</button>
       <div id="fmenu" hidden>
-        <button onclick="fmClose();doOpen()">📂 Abrir un archivo JSON…</button>
-        <button onclick="fmClose();save(true)">💾 Guardar como…</button>
+        <button data-onclick="fmClose();doOpen()">📂 Abrir un archivo JSON…</button>
+        <button data-onclick="fmClose();save(true)">💾 Guardar como…</button>
         <hr><div class="fmh">Importar referencias</div>
-        <button onclick="fmClose();openImport('file')">📄 Desde archivo (.bib, .ris o .txt)…</button>
-        <button onclick="fmClose();openImport('text')">📋 Pegar BibTeX, RIS o citas de Google Scholar…</button>
-        <button onclick="fmClose();openImport('doi')">🔎 Buscar por DOI…</button>
-        <hr><label><input type="checkbox" id="auto" onchange="setAuto(this)"> Autoguardado</label>
+        <button data-onclick="fmClose();openImport('file')">📄 Desde archivo (.bib, .ris o .txt)…</button>
+        <button data-onclick="fmClose();openImport('text')">📋 Pegar BibTeX, RIS o citas de Google Scholar…</button>
+        <button data-onclick="fmClose();openImport('doi')">🔎 Buscar por DOI…</button>
+        <hr><label><input type="checkbox" id="auto" data-onchange="setAuto(this)"> Autoguardado</label>
       </div></span>
   </div>
 </header>
 <div id="app">
   <aside id="side">
-    <button class="sh" onclick="sbToggle()" title="Plegar / desplegar menú"><span class="ic">☰</span><span class="lbl">Menú</span></button>
-    <div class="sg" id="sg-search"><div class="sgh"><button class="sh" onclick="sbGroup('search')" title="Buscar" aria-label="Buscar"><span class="ic">🔍</span><span class="dot" id="d-search" hidden></span></button><input id="q" type="search" placeholder="Título, autor o año" aria-label="Buscar" oninput="qSet(this.value)" onkeydown="if(event.key==='Enter')qSet(this.value,1)"></div>
-      <div class="sb"><label><input type="checkbox" onchange="F.inNotes=this.checked;render()"> Incluir notas y citas editadas</label>
-        <div class="row"><select id="favSel" onchange="favApply(this.value)" aria-label="Filtros guardados"><option value="">⭐ Filtros guardados…</option></select><button onclick="favSave()" title="Guardar los filtros actuales con un nombre">＋</button><button id="favDel" onclick="favDel()" title="Borrar los filtros elegidos" hidden>✕</button></div></div></div>
-    <div class="sg" id="sg-sort"><button class="sh" onclick="sbGroup('sort')" title="Ordenar"><span class="ic">⇅</span><span class="lbl">Ordenar</span><span class="dot" id="d-sort" hidden></span></button>
-      <div class="sb"><div id="sortUI"></div><label><input type="checkbox" id="grpChk" onchange="F.group=this.checked;render()"> Agrupar por sección</label><label>Valoración mínima <select id="minR" onchange="F.minRating=+this.value;render()"><option value="0">Cualquiera</option><option value="1">Al menos ★1</option><option value="2">Al menos ★2</option><option value="3">Al menos ★3</option><option value="4">Al menos ★4</option><option value="5">Al menos ★5</option></select></label></div></div>
-    <div class="sg" id="sg-filt"><button class="sh" onclick="sbGroup('filt')" title="Filtros: secciones, etiquetas y lectura"><span class="ic">🎚️</span><span class="lbl">Filtros</span><span class="dot" id="d-filt" hidden></span></button>
-      <div class="sb"><div class="fh2"><b>📁 Secciones</b><button class="mgb" onclick="openMg('sections')" title="Gestionar secciones">✎ Gestionar</button></div><div id="secF"></div><button onclick="svOpen(F.sec)">📄 Ver notas de la sección</button>
-        <div class="fh2"><b>🏷️ Etiquetas</b><button class="mgb" onclick="openMg('tags')" title="Gestionar etiquetas">✎ Gestionar</button></div><div id="tagF"></div>
+    <button class="sh" data-onclick="sbToggle()" title="Plegar / desplegar menú"><span class="ic">☰</span><span class="lbl">Menú</span></button>
+    <div class="sg" id="sg-search"><div class="sgh"><button class="sh" data-onclick="sbGroup('search')" title="Buscar" aria-label="Buscar"><span class="ic">🔍</span><span class="dot" id="d-search" hidden></span></button><input id="q" type="search" placeholder="Título, autor o año" aria-label="Buscar" data-oninput="qSet(this.value)" data-onkeydown="onEnter(event,qSet,this.value,1)"></div>
+      <div class="sb"><label><input type="checkbox" data-onchange="put(F,'inNotes',this.checked,render)"> Incluir notas y citas editadas</label>
+        <div class="row"><select id="favSel" data-onchange="favApply(this.value)" aria-label="Filtros guardados"><option value="">⭐ Filtros guardados…</option></select><button data-onclick="favSave()" title="Guardar los filtros actuales con un nombre">＋</button><button id="favDel" data-onclick="favDel()" title="Borrar los filtros elegidos" hidden>✕</button></div></div></div>
+    <div class="sg" id="sg-sort"><button class="sh" data-onclick="sbGroup('sort')" title="Ordenar"><span class="ic">⇅</span><span class="lbl">Ordenar</span><span class="dot" id="d-sort" hidden></span></button>
+      <div class="sb"><div id="sortUI"></div><label><input type="checkbox" id="grpChk" data-onchange="put(F,'group',this.checked,render)"> Agrupar por sección</label><label>Valoración mínima <select id="minR" data-onchange="put(F,'minRating',+this.value,render)"><option value="0">Cualquiera</option><option value="1">Al menos ★1</option><option value="2">Al menos ★2</option><option value="3">Al menos ★3</option><option value="4">Al menos ★4</option><option value="5">Al menos ★5</option></select></label></div></div>
+    <div class="sg" id="sg-filt"><button class="sh" data-onclick="sbGroup('filt')" title="Filtros: secciones, etiquetas y lectura"><span class="ic">🎚️</span><span class="lbl">Filtros</span><span class="dot" id="d-filt" hidden></span></button>
+      <div class="sb"><div class="fh2"><b>📁 Secciones</b><button class="mgb" data-onclick="openMg('sections')" title="Gestionar secciones">✎ Gestionar</button></div><div id="secF"></div><button data-onclick="svOpen(F.sec)">📄 Ver notas de la sección</button>
+        <div class="fh2"><b>🏷️ Etiquetas</b><button class="mgb" data-onclick="openMg('tags')" title="Gestionar etiquetas">✎ Gestionar</button></div><div id="tagF"></div>
         <div class="fh2"><b>📖 Lectura</b></div><div id="readF"></div></div></div>
-    <div class="sg" id="sg-sel" hidden><button class="sh" onclick="sbGroup('sel')" title="Papers seleccionados"><span class="ic">☑️</span><span class="lbl" id="selT">Selección</span></button>
-      <div class="sb"><button class="pri" onclick="openEx()">Exportar citas…</button><button onclick="psOpen()">Mover o copiar a otro proyecto…</button><button onclick="selNone()">Quitar selección</button></div></div>
-  <button class="sh" onclick="grOpen()" title="Gráfico de relaciones entre papers"><span class="ic">🕸️</span><span class="lbl">Relaciones</span></button>
-  <button class="sh trb" onclick="trOpen()" title="Papelera"><span class="ic">🗑️</span><span class="lbl" id="trLbl">Papelera</span><span class="dot" id="d-tr" hidden></span></button>
-  <button class="sh cfgb" onclick="openCfg()" title="Configuración"><span class="ic">⚙️</span><span class="lbl">Configuración</span></button>
+    <div class="sg" id="sg-sel" hidden><button class="sh" data-onclick="sbGroup('sel')" title="Papers seleccionados"><span class="ic">☑️</span><span class="lbl" id="selT">Selección</span></button>
+      <div class="sb"><button class="pri" data-onclick="openEx()">Exportar citas…</button><button data-onclick="psOpen()">Mover o copiar a otro proyecto…</button><button data-onclick="selNone()">Quitar selección</button></div></div>
+  <button class="sh" data-onclick="grOpen()" title="Gráfico de relaciones entre papers"><span class="ic">🕸️</span><span class="lbl">Relaciones</span></button>
+  <button class="sh trb" data-onclick="trOpen()" title="Papelera"><span class="ic">🗑️</span><span class="lbl" id="trLbl">Papelera</span><span class="dot" id="d-tr" hidden></span></button>
+  <button class="sh cfgb" data-onclick="openCfg()" title="Configuración"><span class="ic">⚙️</span><span class="lbl">Configuración</span></button>
   <hr class="sbsep">
-  <div class="sgm fold" id="sg-more"><button class="sh shs shm" onclick="sbMore()" title="Ayuda y créditos" aria-expanded="false"><span class="ic">ℹ️</span><span class="lbl">Información</span><span class="car">▸</span></button>
-    <div class="smb"><button class="sh shs" onclick="openHelp()" title="Ayuda (F1)"><span class="ic">❓</span><span class="lbl">Ayuda</span></button>
-    <button class="sh shs" id="instBtn" onclick="appInstall()" title="Instalar la aplicación en este dispositivo" hidden><span class="ic">⬇️</span><span class="lbl">Añadir app</span></button>
-    <button class="sh shs" onclick="openCred()" title="Créditos"><span class="ic">©️</span><span class="lbl">Créditos</span></button></div></div>
-  <p class="sbinfo">Gestor papers: organiza tus papers y sincronízalos con tu Google Drive. · <a href="privacidad.html" onclick="event.preventDefault();openPriv()">Política de privacidad</a></p>
+  <div class="sgm fold" id="sg-more"><button class="sh shs shm" data-onclick="sbMore()" title="Ayuda y créditos" aria-expanded="false"><span class="ic">ℹ️</span><span class="lbl">Información</span><span class="car">▸</span></button>
+    <div class="smb"><button class="sh shs" data-onclick="openHelp()" title="Ayuda (F1)"><span class="ic">❓</span><span class="lbl">Ayuda</span></button>
+    <button class="sh shs" id="instBtn" data-onclick="appInstall()" title="Instalar la aplicación en este dispositivo" hidden><span class="ic">⬇️</span><span class="lbl">Añadir app</span></button>
+    <button class="sh shs" data-onclick="openCred()" title="Créditos"><span class="ic">©️</span><span class="lbl">Créditos</span></button></div></div>
+  <p class="sbinfo">Gestor papers: organiza tus papers y sincronízalos con tu Google Drive. · <a href="privacidad.html" data-onclick="event.preventDefault();openPriv()">Política de privacidad</a></p>
   </aside>
   <main>
-    <div class="row"><button class="pri" onclick="openPaper()">+ Nuevo paper</button><button id="tbView" class="tg" onclick="setView(db.settings.view==='table'?'cards':'table')" title="Cambiar entre tarjetas y tabla compacta"></button><div class="bar"><button id="tbSec" class="tg" onclick="F.tbSec=!F.tbSec;render()" oncontextmenu="groupMenu(event)" title="Clic: mostrar u ocultar las secciones · Clic derecho: agrupar por sección"></button><div id="secF2" class="chips" hidden></div></div><div class="bar"><button id="tbTag" class="tg" onclick="F.tbTag=!F.tbTag;render()" oncontextmenu="modeMenu(event)" title="Clic: mostrar u ocultar las etiquetas · Clic derecho: cómo combinarlas"></button><div id="tagF2" class="chips"></div></div><button id="selAll" class="tg" onclick="selVisible()" title="Seleccionar todos los papers que se ven">☑ Seleccionar visibles</button><span id="count"></span></div>
+    <div class="row"><button class="pri" data-onclick="openPaper()">+ Nuevo paper</button><button id="tbView" class="tg" data-onclick="viewToggle()" title="Cambiar entre tarjetas y tabla compacta"></button><div class="bar"><button id="tbSec" class="tg" data-onclick="put(F,'tbSec',!F.tbSec,render)" data-oncontextmenu="groupMenu(event)" title="Clic: mostrar u ocultar las secciones · Clic derecho: agrupar por sección"></button><div id="secF2" class="chips" hidden></div></div><div class="bar"><button id="tbTag" class="tg" data-onclick="put(F,'tbTag',!F.tbTag,render)" data-oncontextmenu="modeMenu(event)" title="Clic: mostrar u ocultar las etiquetas · Clic derecho: cómo combinarlas"></button><div id="tagF2" class="chips"></div></div><button id="selAll" class="tg" data-onclick="selVisible()" title="Seleccionar todos los papers que se ven">☑ Seleccionar visibles</button><span id="count"></span></div>
     <div id="list"></div>
   </main>
 </div>

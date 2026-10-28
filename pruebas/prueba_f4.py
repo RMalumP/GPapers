@@ -18,7 +18,7 @@ with sync_playwright() as pw:
     eq('JSON antiguo: el ajuste se rellena a false', pg.evaluate("(d => { validate(d); return d.settings.export.inText })({papers: [], tags: [], sections: []})"), False)
     pg.evaluate("$('#dlg').close(); openCfg('no')")
     eq('Configuración ofrece el ajuste', 'Mostrar la cita en el texto' in pg.inner_text('#cfg'), True)
-    pg.locator('#cfg input[onchange^="setInText"]').check()
+    pg.locator('#cfg input[data-onchange^="setInText"]').check()
     eq('activar guarda el ajuste', (pg.evaluate("ex().inText"), pg.evaluate("JSON.parse(JSON.stringify(db)).settings.export.inText")), (True, True))
     pg.evaluate("$('#cfg').close(); openPaper('p1'); tab = 'cite'; drawD()")
     eq('activado: una zona por estilo y el campo de página', (pg.locator('.itx').count(), pg.locator('#locIn').count()), (11, 1))   # 10 generales + Derecho y jurisprudencia
