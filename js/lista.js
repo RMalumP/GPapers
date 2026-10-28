@@ -83,7 +83,7 @@ function filtDraw() {   // chips de Secciones, Etiquetas y Lectura, con cuántos
   db.papers.forEach(p => { let s = 0, t = 0; p.sectionIds.forEach(i => { if (secById(i)) { s = 1; cS.set(i, (cS.get(i) || 0) + 1); } }); p.tagIds.forEach(i => { if (tagById(i)) { t = 1; cT.set(i, (cT.get(i) || 0) + 1); } });
     nS += !s; nT += !t; cR[p.reading in cR ? p.reading : 'por_leer']++; });
   const N = db.papers.length;
-  const secC = side => [{name: 'Todas', color: '#888888'}, ...db.sections].map(x => chip(x, x.id ? F.sec === x.id : !F.sec && !F.noSec, `setSecF('${x.id || ''}')`, 0, `svOpen('${x.id || ''}',event)`, side ? x.id ? cS.get(x.id) || 0 : N : null)).join('')
+  const secC = side => [{name: 'Todas', color: '#888888'}, ...db.sections].map(x => (x.id ? `<span class="cw" data-sec="${x.id}">` : '') + chip(x, x.id ? F.sec === x.id : !F.sec && !F.noSec, `setSecF('${x.id || ''}')`, 0, `svOpen('${x.id || ''}',event)`, side ? x.id ? cS.get(x.id) || 0 : N : null) + (x.id ? '</span>' : '')).join('')   // data-sec: soltar un paper aquí le pone la sección
     + (side && db.sections.length ? chip({name: 'Sin sección', color: '#888888'}, F.noSec, 'noSecF()', 0, '', nS) : '');
   const tagC = side => db.tags.length ? chip({name: 'Todas', color: '#888888'}, !F.tags.size && !F.exTags.size && !F.noTag, 'tagsAll()', 0, '', side ? N : null)
     + db.tags.map(t => chip(t, F.exTags.has(t.id) ? 'ex' : F.tags.has(t.id), `toggleF('${t.id}')`, 1, `tagFMenu(event,'${t.id}')`, side ? cT.get(t.id) || 0 : null)).join('')
@@ -167,7 +167,7 @@ const starsHTML = p => `<span class="stv${p.rating ? '' : ' none'}" data-onconte
 const rdHTML = p => `<span class="rd"><button class="rst" style="--c:${READ_C[p.reading]}" title="Clic: cambiar el estado de lectura" data-onclick="cycleRead('${p.id}')">${READ[p.reading]}</button>${starsHTML(p)}</span>`;
 function starMenu(e, id) { ctxShow(e, '<div class="ctxh">Valoración</div>' + [5, 4, 3, 2, 1, 0].map(n => `<button data-onclick="setRating('${id}',${n})">${n ? '★'.repeat(n) + '☆'.repeat(5 - n) : 'Sin valorar'}</button>`).join('')); }
 function setRating(id, n) { const p = db.papers.find(x => x.id === id); ctxClose(); if (!p || p.rating === n) return; logChange(p, `Valoración: ${p.rating || '—'} → ${n || '—'}`); p.rating = n; markDirty(); renderPaper(id); }
-const card = (p, from) => `<article class="card" data-id="${p.id}" ${F.group ? `draggable="true" data-from="${from || ''}"` : ''}><div class="ct"><label class="sel"><input type="checkbox" ${SEL.has(p.id) ? 'checked' : ''} data-onchange="toggleSel('${p.id}')"> Seleccionar</label><button class="sm" data-onclick="openPaper('${p.id}')">Editar</button><button class="sm cpb" data-onclick="copyCardCite('${p.id}',this)" title="Copiar la cita (estilo elegido en Exportar), con cursiva al pegar en Word">📋</button>${p.pdf ? `<button class="sm" data-onclick="pdfOpen('${p.id}')" title="Abrir el PDF enlazado: ${esc(p.pdf.name)}">📄 PDF</button>` : ''}${p.tagIds.length ? `<span class="tl">${tagsOf(p)}</span>` : ''}${rdHTML(p)}<button class="x" title="Eliminar" data-onclick="delPaper('${p.id}')">✕</button></div><div class="th">${thumbHTML(p, 'sm')}<h3>${esc(p.alias || p.title)}</h3></div>${p.alias ? `<div class="sub">${esc(p.title)}</div>` : ''}
+const card = (p, from) => `<article class="card" data-id="${p.id}" draggable="true" ${F.group ? `data-from="${from || ''}"` : ''}><div class="ct"><label class="sel"><input type="checkbox" ${SEL.has(p.id) ? 'checked' : ''} data-onchange="toggleSel('${p.id}')"> Seleccionar</label><button class="sm" data-onclick="openPaper('${p.id}')">Editar</button><button class="sm cpb" data-onclick="copyCardCite('${p.id}',this)" title="Copiar la cita (estilo elegido en Exportar), con cursiva al pegar en Word">📋</button>${p.pdf ? `<button class="sm" data-onclick="pdfOpen('${p.id}')" title="Abrir el PDF enlazado: ${esc(p.pdf.name)}">📄 PDF</button>` : ''}${p.tagIds.length ? `<span class="tl">${tagsOf(p)}</span>` : ''}${rdHTML(p)}<button class="x" title="Eliminar" data-onclick="delPaper('${p.id}')">✕</button></div><div class="th">${thumbHTML(p, 'sm')}<h3>${esc(p.alias || p.title)}</h3></div>${p.alias ? `<div class="sub">${esc(p.title)}</div>` : ''}
     <div class="au"><span>${esc(p.authors.join('; '))} ${p.year ? '(' + esc(p.year) + ')' : ''}</span></div>
     ${/^https?:/i.test(p.url) ? `<a href="${esc(p.url)}" target="_blank" rel="noopener noreferrer">${esc(p.url)}</a>` : ''}
     
@@ -176,7 +176,7 @@ const TH = [[null, ''], ['title', 'Título'], ['author', 'Autores'], ['year', 'A
 function thSort(k) {   // clic en una cabecera: ese criterio pasa a ser el principal; otro clic invierte el sentido
   F.sorts = F.sorts[0]?.k === k ? [{k, d: -F.sorts[0].d}, ...F.sorts.slice(1)] : [{k, d: 1}, ...F.sorts.filter(x => x.k !== k).slice(0, 2)]; render();
 }
-const rowHTML = (p, from) => `<tr class="rw" data-id="${p.id}" ${F.group ? `draggable="true" data-from="${from || ''}"` : ''}>
+const rowHTML = (p, from) => `<tr class="rw" data-id="${p.id}" draggable="true" ${F.group ? `data-from="${from || ''}"` : ''}>
   <td><input type="checkbox" aria-label="Seleccionar" ${SEL.has(p.id) ? 'checked' : ''} data-onchange="toggleSel('${p.id}')"></td>
   <td class="timg">${thumbHTML(p, 'xs')}</td>
   <td class="tt"><a class="tl2" data-onclick="openPaper('${p.id}')" title="Editar">${esc(p.alias || p.title)}</a></td><td>${esc(p.authors.join('; '))}</td><td>${esc(p.year)}</td><td>${esc(p.venue)}</td>
@@ -266,6 +266,15 @@ document.addEventListener('contextmenu', e => { if (!e.target.closest('[data-onc
 function setSecF(id) { F.sec = id && F.sec === id ? '' : id; F.noSec = false; render(); }   // '' = Todas; pulsar la sección activa también vuelve a «Todas»
 function sbToggle() { $('#side').classList.toggle('min'); uiSoon(); }
 function sbAllMenu(e) { ctxShow(e, '<div class="ctxh">Grupos de la barra</div><button data-onclick="ctxClose();sbAll(0)">Desplegar todos</button><button data-onclick="ctxClose();sbAll(1)">Plegar todos</button>'); }
+function sbWidth(w) { const a = $('#side'); if (w) a.style.setProperty('--sbw', Math.max(200, Math.min(480, Math.round(w))) + 'px'); else a.style.removeProperty('--sbw'); }
+function sbWidthReset() { sbWidth(0); uiSoon(); }
+const sbW = () => parseInt($('#side').style.getPropertyValue('--sbw')) || 0;   // 0 = ancho por defecto
+function sbGripDown(e) {   // arrastrar el borde derecho de la barra cambia su ancho; doble clic lo devuelve al de siempre
+  if (e.button !== 0 || $('#side').classList.contains('min')) return; e.preventDefault();
+  const a = $('#side'), x0 = e.clientX, w0 = a.getBoundingClientRect().width; a.classList.add('rs');
+  const mv = ev => sbWidth(w0 + ev.clientX - x0), up = () => { a.classList.remove('rs'); removeEventListener('pointermove', mv); removeEventListener('pointerup', up); uiSoon(); };
+  addEventListener('pointermove', mv); addEventListener('pointerup', up);
+}
 function sbAll(fold) { $('#side').classList.remove('min'); document.querySelectorAll('#side .sg').forEach(e => e.classList.toggle('fold', !!fold)); uiSoon(); }
 function sbSearchDock() {   // con la barra plegada, la búsqueda pasa a la fila de «Nuevo paper» (el resto se pliega); al desplegarla, vuelve a su sitio
   const q = $('#q'), min = $('#side').classList.contains('min'), had = document.activeElement === q;
