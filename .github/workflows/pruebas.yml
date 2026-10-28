@@ -14,7 +14,7 @@ jobs:
         with:
           node-version: 22
       - run: node pruebas/prueba_version.js .
-      - run: node pruebas/pruebas_citas.js app.js
+      - run: node pruebas/pruebas_citas.js .
   navegador:
     runs-on: ubuntu-latest
     strategy:

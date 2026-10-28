@@ -10,5 +10,6 @@ eq('APP_V coincide con la versión de sw.js', appV, swV);
 const files = JSON.parse((sw.match(/FILES = (\[[^\]]*\])/) || [, '[]'])[1].replace(/'/g, '"'));
 const used = [...html.matchAll(/<(?:script|link)[^>]+(?:src|href)="([^"#:]+)"/g)].map(m => m[1]);
 eq('sw.js guarda en caché todo lo que carga index.html', used.filter(f => !files.includes(f)), []);
+eq('sw.js lista los scripts en el orden de index.html', files.filter(f => used.includes(f) && f.endsWith('.js')), used.filter(f => f.endsWith('.js')));
 eq('los archivos de sw.js existen', files.filter(f => f !== './' && !fs.existsSync(path.join(dir, f))), []);
 console.log(`${n - fail}/${n} pruebas correctas`); process.exit(fail ? 1 : 0);
