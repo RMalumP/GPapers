@@ -101,25 +101,36 @@ async function copyCardCite(id, b) {   // la cita del paper en el estilo elegido
   if (b) { const t = b.textContent; b.textContent = '✓'; setTimeout(() => b.textContent = t, 1200); }
 }
 let FAV = [];   // filtros guardados de este proyecto (solo en este navegador): [{name, q, sorts, group, sec, tags, read, minRating, inNotes, mode, exTags, noTag, noSec, yFrom, yTo}]
-const favLoad = async () => { FAV = await idb('readonly', st => st.get('fav:' + PJ.cur)).then(a => Array.isArray(a) ? a : []).catch(() => []); favDraw(); };
+const favLoad = async () => { const arr = k => idb('readonly', st => st.get(k + PJ.cur)).then(a => Array.isArray(a) ? a : []).catch(() => []);   // también los recientes del proyecto
+  FAV = await arr('fav:'); REC = (await arr('rec:')).filter(x => typeof x === 'string'); favDraw(); recDraw(); };
 const favPut = () => idb('readwrite', st => st.put(FAV, 'fav:' + PJ.cur)).catch(() => {});
-function favDraw() {
-  const s = $('#favSel'); if (!s) return; s.innerHTML = `<option value="">⭐ Filtros guardados${FAV.length ? ` (${FAV.length})` : ''}…</option>` + FAV.map((f, i) => `<option value="${i}">${esc(f.name)}</option>`).join('');
-  $('#favDel').hidden = true;
+const favNow = () => ({q: F.q, sorts: F.sorts.map(s => ({...s})), group: F.group, sec: F.sec, tags: [...F.tags], read: F.read, minRating: F.minRating, inNotes: F.inNotes, mode: F.mode, ...fExtra()});
+const favKey = f => JSON.stringify(['q', 'sorts', 'group', 'sec', 'tags', 'read', 'minRating', 'inNotes', 'mode', 'exTags', 'noTag', 'noSec', 'yFrom', 'yTo'].map(k => f[k] ?? null));
+function favDraw() {   // «Vistas»: un clic aplica la vista; la que coincide con los filtros actuales sale marcada
+  const el = $('#favL'); if (!el) return; const now = favKey(favNow());
+  el.innerHTML = FAV.map((f, i) => `<div class="fav${favKey(f) === now ? ' on' : ''}"><button class="fva" data-onclick="favApply(${i})" title="Aplicar esta vista">${esc(f.name)}</button><button class="x" data-onclick="favDel(${i})" title="Borrar esta vista" aria-label="Borrar la vista ${esc(f.name)}">✕</button></div>`).join('')
+    || '<small>Guarda aquí combinaciones de búsqueda, orden y filtros que uses a menudo.</small>';
 }
 function favSave() {
   const name = (prompt('Nombre para estos filtros (búsqueda, orden, sección, etiquetas, lectura y valoración):') || '').trim().slice(0, 40); if (!name) return;
-  const f = {name, q: F.q, sorts: F.sorts.map(s => ({...s})), group: F.group, sec: F.sec, tags: [...F.tags], read: F.read, minRating: F.minRating, inNotes: F.inNotes, mode: F.mode, ...fExtra()}, i = FAV.findIndex(x => x.name.toLowerCase() === name.toLowerCase());
-  if (i >= 0) FAV[i] = f; else FAV.push(f); favPut(); favDraw(); $('#favSel').value = String(i >= 0 ? i : FAV.length - 1); $('#favDel').hidden = false;
+  const f = {name, ...favNow()}, i = FAV.findIndex(x => x.name.toLowerCase() === name.toLowerCase());
+  if (i >= 0) FAV[i] = f; else FAV.push(f); favPut(); favDraw();
 }
 function favApply(v) {
-  const f = FAV[+v]; $('#favDel').hidden = !f; if (!f) return;
+  const f = FAV[+v]; if (!f) return;
   F.q = typeof f.q === 'string' ? f.q : ''; $('#q').value = F.q; F.group = !!f.group; F.sec = db.sections.some(s => s.id === f.sec) ? f.sec : '';   // lo que ya no existe se ignora
   F.tags = new Set((f.tags || []).filter(id => db.tags.some(t => t.id === id))); F.read = Object.hasOwn(READ, f.read) ? f.read : ''; F.minRating = Number.isInteger(f.minRating) && f.minRating >= 0 && f.minRating <= 5 ? f.minRating : 0;
   F.inNotes = !!f.inNotes; F.mode = f.mode === 'all' ? 'all' : 'any'; fExtraLoad(f); const so = (f.sorts || []).filter(x => x && Object.hasOwn(SORTS, x.k) && (x.d === 1 || x.d === -1)).slice(0, 3); if (so.length) F.sorts = so.map(x => ({k: x.k, d: x.d}));
-  document.querySelector('#sg-search .sb input[type=checkbox]').checked = F.inNotes; render(); $('#favSel').value = v; $('#favDel').hidden = false;
+  document.querySelector('#sg-search .sb input[type=checkbox]').checked = F.inNotes; render();
 }
-function favDel() { const i = +$('#favSel').value; if (!FAV[i] || !confirm(`¿Borrar los filtros «${FAV[i].name}»?`)) return; FAV.splice(i, 1); favPut(); favDraw(); }
+function favDel(i) { if (!FAV[i] || !confirm(`¿Borrar la vista «${FAV[i].name}»?`)) return; FAV.splice(i, 1); favPut(); favDraw(); }
+let REC = [];   // papers abiertos hace poco en este proyecto (solo en este navegador), el último primero
+const recPut = () => idb('readwrite', st => st.put(REC, 'rec:' + PJ.cur)).catch(() => {});
+function recPush(id) { REC = [id, ...REC.filter(x => x !== id)].slice(0, 20); recPut(); recDraw(); }
+function recDraw() {
+  const L = REC.map(id => db.papers.find(p => p.id === id)).filter(Boolean).slice(0, 5), g = $('#sg-rec'); if (!g) return; g.hidden = !L.length;
+  $('#recL').innerHTML = L.map(p => `<button class="rec" data-onclick="openPaper('${p.id}')" title="${esc(p.title)}">${esc(shortTxt(p.alias || p.title) || '(sin título)')}</button>`).join('');
+}
 function progDraw() {   // barra de progreso de lectura del proyecto, en la cabecera
   const el = $('#pjProg'), n = db.papers.length; el.hidden = !n || !db.settings.showProgress; if (el.hidden) return;
   const c = {leido: 0, leyendo: 0, por_leer: 0}; db.papers.forEach(p => c[p.reading in c ? p.reading : 'por_leer']++);
@@ -247,7 +258,7 @@ const pjFile = n => (String(n).replace(/[\\/:*?"<>|\u0000-\u001f]/g, '-').trim()
 const pjNameFor = f => { const b = String(f || '').split(/[\\/]/).pop().replace(/\.json$/i, '').trim(); return !b ? 'Mi biblioteca' : b === 'ejemplo_papers' ? 'Ejemplo' : b.slice(0, 60); };
 const pjUnique = (n, skip) => { let o = n, i = 2; while (PJ.list.some(p => p.id !== skip && p.name.toLowerCase() === o.toLowerCase())) o = `${n} (${i++})`; return o; };
 const pjSave = () => BOOTED ? idb('readwrite', st => st.put({v: 1, cur: PJ.cur, list: PJ.list, gone: PJ.gone}, 'projects')).catch(() => {}) : Promise.resolve();
-const pjDrop = id => { const N = syNames(id); return idb('readwrite', st => { ['proj:' + id, 'h:' + id, 'bk:' + id, 'fav:' + id, 'syncBase' + N.key, 'syncCache' + N.key].forEach(k => st.delete(k)); return st.count(); }).catch(() => {}); };
+const pjDrop = id => { const N = syNames(id); return idb('readwrite', st => { ['proj:' + id, 'h:' + id, 'bk:' + id, 'fav:' + id, 'rec:' + id, 'syncBase' + N.key, 'syncCache' + N.key].forEach(k => st.delete(k)); return st.count(); }).catch(() => {}); };
 function pjShow() {
   const p = pjCur(), i = $('#pjName'); if (!p || !i) return;
   if (document.activeElement !== i) i.value = p.name; i.size = Math.max(6, i.value.length + 1); document.title = p.name + ' · Gestor de papers';
