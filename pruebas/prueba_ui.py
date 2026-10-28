@@ -152,6 +152,8 @@ with sync_playwright() as pw:
     eq('plegada, la búsqueda sigue visible junto a «Nuevo paper»', pg.evaluate("[$('#q').offsetParent !== null, $('#q').closest('main') !== null, $('#q').previousElementSibling.textContent]"), [True, True, '+ Nuevo paper'])
     eq('plegada, el resto de la barra se oculta', pg.evaluate("[...document.querySelectorAll('#side .sb, #side .lbl')].every(e => e.offsetParent === null)"), True)
     eq('plegada, la búsqueda filtra', (pg.fill('#q', 'zzz'), pg.press('#q', 'Enter'), pg.evaluate("document.querySelectorAll('#list article.card').length"))[2], 0)
+    pg.evaluate("$('#q').blur(); SC_ACT.find()")
+    eq('plegada, el atajo de buscar enfoca la búsqueda sin desplegar la barra', pg.evaluate("[$('#side').classList.contains('min'), document.activeElement === $('#q')]"), [True, True])
     pg.evaluate("sbToggle()")
     eq('desplegada, la búsqueda vuelve a la barra con su texto', pg.evaluate("[$('#q').closest('#sg-search') !== null, $('#q').value, $('#q').offsetParent !== null]"), [True, 'zzz', True])
     pg.fill('#q', ''); pg.press('#q', 'Enter')

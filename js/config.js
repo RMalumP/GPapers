@@ -10,7 +10,7 @@ function comboOf(e) {   // p. ej. «Ctrl+Shift+Z»; null si solo se ha pulsado u
 }
 const SC_ACT = {
   open: () => doOpen(), save: () => save(false), newPaper: () => openPaper(), undo, redo, exportCites: () => openEx(), import: () => openImport('file'),
-  find: () => { $('#side').classList.remove('min'); $('#sg-search').classList.remove('fold'); $('#q').focus(); }
+  find: () => { if (!$('#side').classList.contains('min')) $('#sg-search').classList.remove('fold'); $('#q').focus(); }   // con la barra plegada, la búsqueda ya está en la fila de «Nuevo paper»
 };
 document.addEventListener('keydown', e => {
   if (recAct) return;
