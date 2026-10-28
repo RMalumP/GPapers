@@ -1,6 +1,6 @@
 'use strict';
 /* ===== Lista principal ===== */
-const chip = (t, on, click, drag, ctx) => `<span class="chip ${on ? 'on' : ''}" style="--c:${esc(t.color || '#888888')}" ${click ? `data-onclick="${click}"` : ''} ${drag ? `draggable="true" data-tag="${t.id}"` : ''} ${ctx ? `data-oncontextmenu="${ctx}"` : ''}>${esc(t.name)}</span>`;
+const chip = (t, on, click, drag, ctx, n) => `<span class="chip ${on === 'ex' ? 'ex' : on ? 'on' : ''}" style="--c:${esc(t.color || '#888888')}" ${click ? `data-onclick="${click}"` : ''} ${drag ? `draggable="true" data-tag="${t.id}"` : ''} ${ctx ? `data-oncontextmenu="${ctx}"` : ''}>${esc(t.name)}${n != null ? ` <small class="cn">${n}</small>` : ''}</span>`;   // on = 'ex': etiqueta excluida · n: cuántos papers
 const BYID = new WeakMap();   // índice por id de una lista (etiquetas, secciones); dura hasta acabar la tarea en curso, así nunca queda desfasado
 const byId = arr => { let m = BYID.get(arr); if (!m || m.n !== arr.length) { m = new Map(arr.map(x => [x.id, x])); m.n = arr.length; BYID.set(arr, m); queueMicrotask(() => BYID.delete(arr)); } return m; };
 const tagById = i => byId(db.tags).get(i), secById = i => byId(db.sections).get(i);
@@ -29,7 +29,73 @@ function searchTxt(p) {
 function visible() {
   const q = norm(F.q);
   return sortList(db.papers.filter(p => (!q || searchTxt(p).includes(q))
-    && (!F.sec || p.sectionIds.includes(F.sec)) && (!F.read || p.reading === F.read) && p.rating >= F.minRating && (!F.tags.size || [...F.tags][F.mode === 'all' ? 'every' : 'some'](t => has(p, t)))));
+    && (!F.sec || p.sectionIds.includes(F.sec)) && (!F.read || p.reading === F.read) && p.rating >= F.minRating && (!F.tags.size || [...F.tags][F.mode === 'all' ? 'every' : 'some'](t => has(p, t)))
+    && (!F.noSec || !p.sectionIds.some(secById)) && (!F.noTag || !p.tagIds.some(tagById)) && (!F.exTags.size || ![...F.exTags].some(t => has(p, t)))
+    && (!F.yFrom || +p.year >= F.yFrom) && (!F.yTo || (+p.year > 0 && +p.year <= F.yTo))));
+}
+/* ---- Filtros: resumen de lo aplicado, contadores y estado ---- */
+const fYears = () => F.yFrom && F.yTo ? `${F.yFrom}–${F.yTo}` : F.yFrom ? `desde ${F.yFrom}` : `hasta ${F.yTo}`;
+function actList() {   // filtros aplicados, cada uno con su forma de quitarlo
+  const A = [];
+  if (F.q) A.push(['🔍 «' + F.q + '»', "fClr('q')"]);
+  if (F.sec && secById(F.sec)) A.push(['📁 ' + secById(F.sec).name, "fClr('sec')"]);
+  if (F.noSec) A.push(['📁 Sin sección', "fClr('noSec')"]);
+  F.tags.forEach(t => tagById(t) && A.push(['🏷️ ' + tagById(t).name, `fClr('tag','${t}')`]));
+  F.exTags.forEach(t => tagById(t) && A.push(['🚫 ' + tagById(t).name, `fClr('ex','${t}')`]));
+  if (F.noTag) A.push(['🏷️ Sin etiquetas', "fClr('noTag')"]);
+  if (F.read) A.push(['📖 ' + READ[F.read], "fClr('read')"]);
+  if (F.minRating) A.push(['★ ≥ ' + F.minRating, "fClr('min')"]);
+  if (F.yFrom || F.yTo) A.push(['📅 ' + fYears(), "fClr('years')"]);
+  return A;
+}
+function fClr(k, id) {
+  if (k === 'q') { F.q = ''; $('#q').value = ''; } else if (k === 'sec') F.sec = ''; else if (k === 'tag') F.tags.delete(id); else if (k === 'ex') F.exTags.delete(id);
+  else if (k === 'read') F.read = ''; else if (k === 'min') F.minRating = 0; else if (k === 'years') F.yFrom = F.yTo = 0; else F[k] = false;
+  render();
+}
+function fClrAll() { F.q = ''; $('#q').value = ''; F.sec = ''; F.tags.clear(); F.exTags.clear(); F.noSec = F.noTag = false; F.read = ''; F.minRating = 0; F.yFrom = F.yTo = 0; render(); }
+function actDraw() {
+  const A = actList(), el = $('#actF'); el.hidden = !A.length;
+  el.innerHTML = A.length ? `<small>Filtros:</small>${A.map(([t, c]) => `<button class="af" data-onclick="${c}" title="Quitar este filtro">${esc(t)} <b>✕</b></button>`).join('')}<button class="afx" data-onclick="fClrAll()">Limpiar todo</button>` : '';
+  $('#d-filt').hidden = !A.some(([, c]) => c !== "fClr('q')");
+}
+const fExtra = () => ({exTags: [...F.exTags], noTag: F.noTag, noSec: F.noSec, yFrom: F.yFrom, yTo: F.yTo});   // lo que guardan el estado de la interfaz y los filtros guardados
+function fExtraLoad(f) {   // lo guardado se valida: una etiqueta borrada o un año raro se ignoran
+  const yr = v => Number.isInteger(v) && v > 0 && v < 10000 ? v : 0;
+  F.exTags = new Set((Array.isArray(f.exTags) ? f.exTags : []).filter(id => typeof id === 'string' && db.tags.some(t => t.id === id)));
+  F.noTag = !!f.noTag; F.noSec = !!f.noSec; F.yFrom = yr(f.yFrom); F.yTo = yr(f.yTo);
+}
+function setYears() { const v = id => { const n = Math.trunc(+$(id).value); return n > 0 && n < 10000 ? n : 0; }; const a = v('#yFrom'), b = v('#yTo'); if (a === F.yFrom && b === F.yTo) return; F.yFrom = a; F.yTo = b; render(); }   // sin cambios no repinta (el clic que quitó el foco sigue funcionando)
+let TQ = '';   // texto para buscar entre las etiquetas de la barra
+function tagQSet(v) { TQ = v; tagQDraw(); }
+function tagQDraw() {
+  const q = norm(TQ), inp = $('#tagQ'); inp.hidden = db.tags.length < 6; if (inp.hidden) TQ = '';
+  document.querySelectorAll('#tagF .chip[data-tag]').forEach(c => { c.hidden = !!TQ && !norm(tagById(c.dataset.tag)?.name || '').includes(q); });
+}
+function tagFMenu(e, id) {   // clic derecho en una etiqueta de los filtros: incluirla, excluirla o quitarla
+  const st = F.tags.has(id) ? 'in' : F.exTags.has(id) ? 'ex' : '';
+  ctxShow(e, `<div class="ctxh">Etiqueta «${esc(tagById(id)?.name)}»</div>` + [['in', 'Solo papers con esta etiqueta'], ['ex', 'Ocultar papers con esta etiqueta'], ['', 'Sin filtrar por ella']]
+    .map(([k, v]) => `<button data-onclick="ctxClose();tagFSet('${id}','${k}')">${tick(st === k)}${v}</button>`).join(''));
+}
+function tagFSet(id, k) { F.tags.delete(id); F.exTags.delete(id); if (k === 'in') { F.tags.add(id); F.noTag = false; } else if (k === 'ex') F.exTags.add(id); render(); }
+function filtDraw() {   // chips de Secciones, Etiquetas y Lectura, con cuántos papers tiene cada uno
+  const cS = new Map(), cT = new Map(), cR = {por_leer: 0, leyendo: 0, leido: 0}; let nS = 0, nT = 0;
+  db.papers.forEach(p => { let s = 0, t = 0; p.sectionIds.forEach(i => { if (secById(i)) { s = 1; cS.set(i, (cS.get(i) || 0) + 1); } }); p.tagIds.forEach(i => { if (tagById(i)) { t = 1; cT.set(i, (cT.get(i) || 0) + 1); } });
+    nS += !s; nT += !t; cR[p.reading in cR ? p.reading : 'por_leer']++; });
+  const N = db.papers.length;
+  const secC = side => [{name: 'Todas', color: '#888888'}, ...db.sections].map(x => chip(x, x.id ? F.sec === x.id : !F.sec && !F.noSec, `setSecF('${x.id || ''}')`, 0, `svOpen('${x.id || ''}',event)`, side ? x.id ? cS.get(x.id) || 0 : N : null)).join('')
+    + (side && db.sections.length ? chip({name: 'Sin sección', color: '#888888'}, F.noSec, 'noSecF()', 0, '', nS) : '');
+  const tagC = side => db.tags.length ? chip({name: 'Todas', color: '#888888'}, !F.tags.size && !F.exTags.size && !F.noTag, 'tagsAll()', 0, '', side ? N : null)
+    + db.tags.map(t => chip(t, F.exTags.has(t.id) ? 'ex' : F.tags.has(t.id), `toggleF('${t.id}')`, 1, `tagFMenu(event,'${t.id}')`, side ? cT.get(t.id) || 0 : null)).join('')
+    + (side ? chip({name: 'Sin etiquetas', color: '#888888'}, F.noTag, 'noTagF()', 0, '', nT) : '') : '<small>Aún no hay etiquetas.</small>';   // en la fila de arriba, sin contadores ni «Sin …», para que quepa
+  const modeSel = `<select class="mode" title="Cómo combinar varias etiquetas" data-onchange="put(F,'mode',this.value,render)"><option value="any" ${F.mode === 'any' ? 'selected' : ''}>Al menos una etiqueta</option><option value="all" ${F.mode === 'all' ? 'selected' : ''}>Todas las etiquetas</option></select>`;
+  $('#secF').innerHTML = secC(1); $('#secF2').innerHTML = secC(0);
+  $('#tagF').innerHTML = tagC(1) + modeSel; $('#tagF2').innerHTML = tagC(0); tagQDraw();
+  $('#readF').innerHTML = [['', 'Todos'], ...Object.entries(READ)].map(([k, v]) => chip({name: v, color: k ? READ_C[k] : '#888888'}, F.read === k, `setRead('${k}')`, 0, '', k ? cR[k] : N)).join('');
+  const rp = $('#readP'); rp.hidden = !N; rp.innerHTML = N ? ['leido', 'leyendo'].map(k => `<i style="width:${cR[k] / N * 100}%;background:${READ_C[k]}"></i>`).join('') : '';
+  rp.title = `Progreso de lectura: ${cR.leido} leídos, ${cR.leyendo} leyendo y ${cR.por_leer} por leer, de ${N}`;
+  $('#minR').value = F.minRating; $('#yFrom').value = F.yFrom || ''; $('#yTo').value = F.yTo || '';
+  actDraw();
 }
 const tagsOf = p => p.tagIds.map(tagById).filter(Boolean).map(t => chip(t, 1, '', 0, `tagMenu(event,'${p.id}','${t.id}')`)).join('');
 const EXP = new Set();   // papers con las notas desplegadas en la lista
@@ -122,7 +188,7 @@ const tableHTML = (L, from) => `<div class="twrap"><table class="tbl"><thead><tr
 const items = (l, from) => db.settings.view === 'table' ? (l.length ? tableHTML(l, from) : '') : l.map(p => card(p, from)).join('');
 function listHTML(L) {
   if (!F.group) return items(L, '');
-  const G = db.sections.filter(s => !F.sec || s.id === F.sec).map(s => [s, L.filter(p => p.sectionIds.includes(s.id))]);
+  const G = F.noSec ? [] : db.sections.filter(s => !F.sec || s.id === F.sec).map(s => [s, L.filter(p => p.sectionIds.includes(s.id))]);
   if (!F.sec) G.push([{id: '', name: 'Sin sección', color: '#888888'}, L.filter(p => !p.sectionIds.some(secById))]);
   return G.map(([s, l]) => `<section class="gbox" data-sec="${s.id || ''}"><h2 class="grp" style="border-color:${esc(s.color || '#888888')}" ${s.id ? `data-oncontextmenu="svOpen('${s.id}',event)"` : ''}>${esc(s.name)} <small>(${l.length})</small></h2>${items(l, s.id || '') || '<p class="empty drop">Arrastra papers aquí</p>'}</section>`).join('');
 }
@@ -134,17 +200,12 @@ function fitTags(only) {   // las etiquetas van en la barra superior de la tarje
 let listW = 0; new ResizeObserver(([e]) => { if (Math.abs(e.contentRect.width - listW) > 1) { listW = e.contentRect.width; fitTags(); } }).observe($('#list'));   // también al plegar la barra o cambiar el tamaño
 function render() {
   hdr();
-  const secH = [{name: 'Todas', color: '#888888'}, ...db.sections].map(x => chip(x, x.id ? F.sec === x.id : !F.sec, `setSecF('${x.id || ''}')`, 0, `svOpen('${x.id || ''}',event)`)).join('');
-  const tagC = db.tags.length ? chip({name: 'Todas', color: '#888888'}, !F.tags.size, 'tagsAll()') + db.tags.map(t => chip(t, F.tags.has(t.id), `toggleF('${t.id}')`, 1)).join('') : '<small>Aún no hay etiquetas.</small>';   // «Todas» quita el filtro, como en Secciones
-  const modeSel = `<select class="mode" title="Cómo combinar varias etiquetas" data-onchange="put(F,'mode',this.value,render)"><option value="any" ${F.mode === 'any' ? 'selected' : ''}>Al menos una etiqueta</option><option value="all" ${F.mode === 'all' ? 'selected' : ''}>Todas las etiquetas</option></select>`;
-  $('#secF').innerHTML = $('#secF2').innerHTML = secH;
-  $('#tagF').innerHTML = tagC + modeSel; $('#tagF2').innerHTML = tagC;
+  filtDraw();
   const tg = (id, open, label, active) => { const b = $(id); b.textContent = `${label} ${open ? '▾' : '▸'}${!open && active ? ' •' : ''}`; b.classList.toggle('on', open); };   // «•» = hay filtro activo con la lista plegada
-  tg('#tbSec', F.tbSec, 'Sección', F.sec); tg('#tbTag', F.tbTag, 'Etiquetas', F.tags.size);
+  tg('#tbSec', F.tbSec, 'Sección', F.sec || F.noSec); tg('#tbTag', F.tbTag, 'Etiquetas', F.tags.size || F.exTags.size || F.noTag);
   $('#secF2').hidden = !F.tbSec; $('#tagF2').hidden = !F.tbTag; $('#grpChk').checked = F.group;
   selDraw(0);
-  $('#d-search').hidden = !F.q; $('#d-filt').hidden = !(F.sec || F.tags.size || F.read); $('#d-sort').hidden = !F.minRating; $('#d-tr').hidden = !db.trash.length; $('#trLbl').textContent = 'Papelera' + (db.trash.length ? ` (${db.trash.length})` : ''); $('#tbView').textContent = db.settings.view === 'table' ? '▦ Tarjetas' : '☰ Tabla';
-  $('#readF').innerHTML = [['', 'Todos'], ...Object.entries(READ)].map(([k, v]) => chip({name: v, color: k ? READ_C[k] : '#888888'}, F.read === k, `setRead('${k}')`)).join(''); $('#minR').value = F.minRating;   // puntos de filtro activo
+  $('#d-search').hidden = !F.q; $('#d-tr').hidden = !db.trash.length; $('#trLbl').textContent = 'Papelera' + (db.trash.length ? ` (${db.trash.length})` : ''); $('#tbView').textContent = db.settings.view === 'table' ? '▦ Tarjetas' : '☰ Tabla';
   const nextKey = Object.keys(SORTS).find(k => !F.sorts.some(s => s.k === k)) || 'title';
   $('#sortUI').innerHTML = F.sorts.map((s, i) => `<div class="row"><select data-onchange="sortSet(${i},this.value)">${Object.entries(SORTS).map(([k, v]) => `<option value="${k}" ${s.k === k ? 'selected' : ''}>${v}</option>`).join('')}</select>
     <button title="${s.d > 0 ? 'Ascendente (A→Z, antiguo→reciente)' : 'Descendente (Z→A, reciente→antiguo)'}" data-onclick="sortFlip(${i})">${s.d > 0 ? '▲' : '▼'}</button>
@@ -173,16 +234,17 @@ function selDraw(count = 1) {   // barra de selección (solo sale con papers mar
 }
 function renderPaper(id) {   // repinta solo la tarjeta o fila de un paper; si el cambio puede moverlo o sacarlo de la lista, todo
   const p = db.papers.find(x => x.id === id), el = $(`#list [data-id="${id}"]`);
-  if (!p || !el || F.minRating || F.read || F.sorts.some(s => ['rating', 'reading', 'modified'].includes(s.k))) return render();
+  if (!p || !el || F.minRating || F.read || F.exTags.size || F.noTag || F.noSec || F.yFrom || F.yTo || F.sorts.some(s => ['rating', 'reading', 'modified'].includes(s.k))) return render();
   const tr = el.tagName === 'TR', t = document.createElement(tr ? 'tbody' : 'div'); t.innerHTML = (tr ? rowHTML : card)(p, el.dataset.from);
   if (tr && el.nextElementSibling?.classList.contains('rn')) el.nextElementSibling.remove();   // la fila de notas desplegadas va justo detrás
-  const nodes = [...t.children]; el.replaceWith(...nodes); hdr();
+  const nodes = [...t.children]; el.replaceWith(...nodes); hdr(); filtDraw();   // los contadores de los filtros pueden cambiar
   if (!tr) fitTags(nodes[0]); nodes.forEach(n => n.querySelectorAll('.pimg[data-fpid]').forEach(e => hydrateImgs(false, e)));
 }
 let tQ = 0;   // la búsqueda espera a que dejes de escribir (Enter la aplica al momento)
 function qSet(v, now) { F.q = v; clearTimeout(tQ); if (now) render(); else tQ = setTimeout(render, 150); }
-function toggleF(id) { F.tags.has(id) ? F.tags.delete(id) : F.tags.add(id); render(); }
-function tagsAll() { F.tags.clear(); render(); }
+function toggleF(id) { if (F.exTags.delete(id)) return render(); F.tags.has(id) ? F.tags.delete(id) : F.tags.add(id); F.noTag = false; render(); }   // pulsar una excluida solo quita la exclusión
+function tagsAll() { F.tags.clear(); F.exTags.clear(); F.noTag = false; render(); }
+function noTagF() { F.noTag = !F.noTag; if (F.noTag) F.tags.clear(); render(); }
 function ctxShow(e, html) {   // menú contextual genérico
   e.preventDefault(); e.stopPropagation(); let m = $('#ctx'); if (!m) { m = document.createElement('div'); m.id = 'ctx'; }
   (document.querySelector('dialog[open]') || document.body).appendChild(m);   // dentro de una ventana abierta, para que se vea por encima
@@ -201,7 +263,7 @@ const fmClose = () => { $('#fmenu').hidden = true; $('#fmBtn').setAttribute('ari
 function fmToggle(e) { e.stopPropagation(); const m = $('#fmenu'), open = m.hidden; ctxClose(); m.hidden = !open; $('#fmBtn').setAttribute('aria-expanded', String(open)); }
 document.addEventListener('click', e => { if (!e.target.closest('.fm')) fmClose(); });
 document.addEventListener('contextmenu', e => { if (!e.target.closest('[data-oncontextmenu]')) ctxClose(); });   // clic derecho en otro sitio también cierra
-function setSecF(id) { F.sec = id && F.sec === id ? '' : id; render(); }   // '' = Todas; pulsar la sección activa también vuelve a «Todas»
+function setSecF(id) { F.sec = id && F.sec === id ? '' : id; F.noSec = false; render(); }   // '' = Todas; pulsar la sección activa también vuelve a «Todas»
 function sbToggle() { $('#side').classList.toggle('min'); uiSoon(); }
 function sbSearchDock() {   // con la barra plegada, la búsqueda pasa a la fila de «Nuevo paper» (el resto se pliega); al desplegarla, vuelve a su sitio
   const q = $('#q'), min = $('#side').classList.contains('min'), had = document.activeElement === q;
@@ -221,6 +283,7 @@ function sbGroup(g) {   // con la barra plegada, pulsar un icono la despliega en
 }
 function cycleRead(id) { const p = db.papers.find(x => x.id === id); if (!p) return; const k = Object.keys(READ); const was = p.reading; p.reading = k[(k.indexOf(p.reading) + 1) % k.length]; logChange(p, `Lectura: ${READ[was]} → ${READ[p.reading]}`); markDirty(); renderPaper(id); }
 function setRead(k) { F.read = k; render(); }
+function noSecF() { F.noSec = !F.noSec; F.sec = ''; render(); }
 function toggleSel(id) { SEL.has(id) ? SEL.delete(id) : SEL.add(id);   // solo cambian la casilla, la barra de selección y el contador
   const c = $(`#list [data-id="${id}"] input[type=checkbox]`); if (c) c.checked = SEL.has(id); selDraw(); }
 function selVisible() { visible().forEach(p => SEL.add(p.id)); render(); }

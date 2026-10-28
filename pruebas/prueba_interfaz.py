@@ -40,7 +40,7 @@ with sync_playwright() as pw:
     A.keyboard.press('Escape')
     # barra lateral
     eq('barra lateral: Buscar, Ordenar, Filtros, y Selección oculta', A.evaluate("[...document.querySelectorAll('#side > .sg')].map(g => [g.id, g.hidden])"), [['sg-search', False], ['sg-sort', False], ['sg-filt', False], ['sg-sel', True]])
-    eq('Filtros reúne Secciones, Etiquetas y Lectura', A.evaluate("[...document.querySelectorAll('#sg-filt .fh2 b')].map(b => b.textContent)"), ['📁 Secciones', '🏷️ Etiquetas', '📖 Lectura'])
+    eq('Filtros reúne Secciones, Etiquetas, Lectura, Valoración y Años', A.evaluate("[...document.querySelectorAll('#sg-filt .fh2 b')].map(b => b.textContent)"), ['📁 Secciones', '🏷️ Etiquetas', '📖 Lectura', '⭐ Valoración', '📅 Años'])
     eq('el botón «Visibles» (seleccionar los que se ven) está sobre la lista, con texto corto', A.evaluate("[!!$('#selAll').offsetParent, $('#selAll').closest('main') !== null, $('#selAll').textContent]"), [True, True, '☑ Visibles'])
     A.click('#selAll')
     eq('seleccionar visibles muestra la barra de Selección con su contador', A.evaluate("[$('#sg-sel').hidden, $('#selT').textContent, [...document.querySelectorAll('#sg-sel .sb button')].map(b => b.textContent)]"), [False, 'Selección (2)', ['Exportar citas…', 'Mover o copiar a otro proyecto…', 'Quitar selección']])
