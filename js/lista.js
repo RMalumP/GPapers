@@ -335,7 +335,8 @@ function minRMenu(e) { ctxShow(e, '<div class="ctxh">Valoración mínima</div>' 
 function sbGroup(g) {   // con la barra plegada, pulsar un icono la despliega en ese grupo
   const a = $('#side'), el = $('#sg-' + g), wasMin = a.classList.contains('min');
   a.classList.remove('min'); wasMin ? el.classList.remove('fold') : el.classList.toggle('fold');
-  if (g === 'search' && !el.classList.contains('fold')) $('#q').focus(); uiSoon();
+  if (g === 'search' && !el.classList.contains('fold')) { fsToggle('sort', false); $('#q').focus(); }   // al abrir Buscar, Ordenar sale desplegado
+  uiSoon();
 }
 function cycleRead(id) { const p = db.papers.find(x => x.id === id); if (!p) return; const k = Object.keys(READ); const was = p.reading; p.reading = k[(k.indexOf(p.reading) + 1) % k.length]; logChange(p, `Lectura: ${READ[was]} → ${READ[p.reading]}`); markDirty(); renderPaper(id); }
 function setRead(k) { F.read = k; render(); }

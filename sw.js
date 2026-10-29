@@ -1,6 +1,6 @@
 // Service worker: red primero (revalida siempre, para ver la última versión sin vaciar nada) y caché como respaldo sin conexión.
 // Solo toca sus cachés: los datos de la aplicación (copia de sesión, estado de la interfaz) viven en IndexedDB y sobreviven a las actualizaciones.
-const V = 'papers-v36.4', FILES = ['./', 'index.html', 'style.css', 'js/modelo.js', 'js/citas.js', 'js/persistencia.js', 'js/importar.js', 'js/config.js', 'js/lista.js', 'js/edicion.js', 'js/drive.js', 'js/extras.js', 'app.js', 'manifest.json', 'icon-192.png', 'icon-512.png', 'ejemplo_papers.json', 'privacidad.html'];
+const V = 'papers-v36.5', FILES = ['./', 'index.html', 'style.css', 'js/modelo.js', 'js/citas.js', 'js/persistencia.js', 'js/importar.js', 'js/config.js', 'js/lista.js', 'js/edicion.js', 'js/drive.js', 'js/extras.js', 'app.js', 'manifest.json', 'icon-192.png', 'icon-512.png', 'ejemplo_papers.json', 'privacidad.html'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(V).then(c => c.addAll(FILES.map(f => new Request(f, {cache: 'reload'}))))); self.skipWaiting(); });
 self.addEventListener('activate', e => e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== V).map(k => caches.delete(k)))).then(() => clients.claim())));
 self.addEventListener('fetch', e => {
