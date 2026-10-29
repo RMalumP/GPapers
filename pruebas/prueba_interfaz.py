@@ -39,8 +39,8 @@ with sync_playwright() as pw:
     eq('«Buscar duplicados» está en el menú del proyecto', A.evaluate("[...document.querySelectorAll('#ctx button')].some(b => b.textContent.includes('Buscar duplicados'))"), True)
     A.keyboard.press('Escape')
     # barra lateral
-    eq('barra lateral: Buscar, Filtros, Ordenar | Vistas, Recientes y Selección (ocultas sin contenido)', A.evaluate("[...document.querySelectorAll('#side > .sg, #side > hr')].map(g => g.tagName === 'HR' ? '——' : [g.id, g.hidden])"), [['sg-search', False], ['sg-filt', False], ['sg-sort', False], '——', ['sg-fav', False], ['sg-rec', True], ['sg-sel', True], '——'])
-    eq('Ordenar empieza plegado', A.evaluate("$('#sg-sort').classList.contains('fold')"), True)
+    eq('barra lateral: Buscar, Filtros | Vistas, Recientes y Selección (ocultas sin contenido)', A.evaluate("[...document.querySelectorAll('#side > .sg, #side > hr')].map(g => g.tagName === 'HR' ? '——' : [g.id, g.hidden])"), [['sg-search', False], ['sg-filt', False], '——', ['sg-fav', False], ['sg-rec', True], ['sg-sel', True], '——'])
+    eq('Buscar contiene Ordenar y, debajo, Búsqueda avanzada (plegada al empezar)', A.evaluate("[[...document.querySelectorAll('#sg-search .fs')].map(e => [e.id, e.classList.contains('fold')]), !!document.querySelector('#fs-sort #sortUI')]"), [[['fs-sort', False], ['fs-adv', True]], True])
     A.click('#side > button.sh', button='right')
     eq('clic derecho en «Menú»: plegar o desplegar todo', A.evaluate("[...document.querySelectorAll('#ctx button')].map(b => b.textContent)"), ['Desplegar todos', 'Plegar todos'])
     A.click('#ctx button >> nth=0')

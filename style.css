@@ -117,7 +117,7 @@ details.cs[open]>summary{border-bottom:1px solid var(--bd)}.csb{padding:6px 12px
 body{min-height:100vh;display:flex;flex-direction:column}#app{flex:1;padding-left:0}
 aside{border-left:0;border-radius:0 10px 10px 0;padding-left:6px}
 #sg-search .sgh input{flex:1;min-width:0;margin:0 6px 0 2px}#sg-search .sgh .sh{padding:8px 6px 8px 10px}
-#sg-search.fold .sgh input,aside.min #sg-search .sgh input{display:none}
+aside.min #sg-search .sgh input{display:none}
 .ct .tl{display:flex;flex-wrap:nowrap;align-items:center;margin:0 6px;flex:0 0 auto}.ct .tl .chip{white-space:nowrap}
 #app{padding:0}main{padding:16px 16px 16px 0}aside{border-radius:0;border-top:0;border-bottom:0}
 
@@ -205,3 +205,6 @@ main > .row > #q{width:220px;min-width:0;flex:0 1 220px}
 .fhb b,.fh2 .fht{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.fh2{gap:4px}.fh2 .fhx,.fs .fh2 .mgb{padding:2px 6px;margin-right:0}
 #fs-read .fhb{flex:0 0 auto}#fs-read .fh2 #readP{flex:1;width:auto;margin:0 4px 0 6px}
 .mgb .mgl[hidden]{display:none}
+#sg-search .sb .fs{margin-top:4px}#advUI{display:flex;flex-direction:column;gap:6px}.advm{font-size:13px}.advm select{font-size:13px}
+.advr{display:grid;grid-template-columns:1fr 1fr;gap:4px;padding:6px;border:1px solid var(--bd);border-radius:8px;background:var(--card)}.advr select,.advr input{min-width:0;font-size:13px}
+.advr input,.advr > span{grid-column:1}.advr .x{grid-column:2;justify-self:end;border:0;background:none;color:var(--red);padding:2px 6px}#fs-adv .fh2 .dot{margin-left:0}

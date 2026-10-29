@@ -31,8 +31,38 @@ function visible() {
   return sortList(db.papers.filter(p => (!q || searchTxt(p).includes(q))
     && (!F.sec || p.sectionIds.includes(F.sec)) && (!F.read || p.reading === F.read) && p.rating >= F.minRating && (!F.tags.size || [...F.tags][F.mode === 'all' ? 'every' : 'some'](t => has(p, t)))
     && (!F.noSec || !p.sectionIds.some(secById)) && (!F.noTag || !p.tagIds.some(tagById)) && (!F.exTags.size || ![...F.exTags].some(t => has(p, t)))
-    && (!F.yFrom || +p.year >= F.yFrom) && (!F.yTo || (+p.year > 0 && +p.year <= F.yTo))));
+    && (!F.yFrom || +p.year >= F.yFrom) && (!F.yTo || (+p.year > 0 && +p.year <= F.yTo)) && advTest(p)));
 }
+/* ---- Búsqueda avanzada: condiciones campo · condición · valor, que se cumplan todas o alguna ---- */
+const ADV_F = {any: 'Cualquier campo', title: 'Título', authors: 'Autores', year: 'Año', venue: 'Revista/editorial', doi: 'DOI', notes: 'Notas'};
+const ADV_OP = {has: 'contiene', not: 'no contiene', eq: 'es', starts: 'empieza por', ge: 'desde (≥)', le: 'hasta (≤)', empty: 'está vacío', full: 'no está vacío'};
+const advOps = f => f === 'year' ? ['eq', 'ge', 'le', 'empty', 'full'] : ['has', 'not', 'eq', 'starts', 'empty', 'full'];
+const advVal = (p, f) => f === 'title' ? [p.title, p.alias].join(' ') : f === 'authors' ? p.authors.join('; ') : f === 'year' ? String(p.year ?? '') : f === 'venue' ? p.venue || '' : f === 'doi' ? p.doi || ''
+  : f === 'notes' ? [p.general, ...p.notes.map(n => n.content)].join(' ') : ['title', 'authors', 'year', 'venue', 'doi', 'notes'].map(k => advVal(p, k)).join(' ');
+const advRules = () => F.adv.rules.filter(r => r.op === 'empty' || r.op === 'full' || String(r.v).trim());   // una condición sin valor no cuenta
+function advTest(p) {
+  const R = advRules(); if (!R.length) return true;
+  const ok = r => { const raw = advVal(p, r.f).trim(), x = norm(raw), v = norm(String(r.v).trim());
+    if (r.op === 'empty') return !raw; if (r.op === 'full') return !!raw;
+    if (r.f === 'year') { const y = +p.year, n = +r.v; return !!y && (r.op === 'ge' ? y >= n : r.op === 'le' ? y <= n : y === n); }
+    return r.op === 'has' ? x.includes(v) : r.op === 'not' ? !x.includes(v) : r.op === 'eq' ? x === v : x.startsWith(v); };
+  return F.adv.mode === 'any' ? R.some(ok) : R.every(ok);
+}
+function advDraw() {
+  const el = $('#advUI'); if (el.contains(document.activeElement) && document.activeElement.tagName === 'INPUT') return;   // no se rehace mientras escribes
+  const opt = (o, sel) => Object.entries(o).map(([k, v]) => `<option value="${k}" ${k === sel ? 'selected' : ''}>${v}</option>`).join('');
+  el.innerHTML = `<div class="advm">Que se cumplan <select aria-label="Combinar condiciones" data-onchange="advMode(this.value)">${opt({all: 'todas', any: 'alguna'}, F.adv.mode)}</select> las condiciones</div>`
+    + F.adv.rules.map((r, i) => `<div class="advr"><select aria-label="Campo" data-onchange="advSet(${i},'f',this.value)">${opt(ADV_F, r.f)}</select><select aria-label="Condición" data-onchange="advSet(${i},'op',this.value)">${opt(Object.fromEntries(advOps(r.f).map(k => [k, ADV_OP[k]])), r.op)}</select>`
+      + (r.op === 'empty' || r.op === 'full' ? '<span></span>' : `<input aria-label="Valor" ${r.f === 'year' ? 'type="number"' : ''} value="${esc(r.v)}" placeholder="Valor" data-onchange="advSet(${i},'v',this.value)" data-onkeydown="onEnter(event,advEnter,this)">`)
+      + `<button class="x" data-onclick="advDel(${i})" title="Quitar esta condición" aria-label="Quitar esta condición">✕</button></div>`).join('')
+    + `<div class="row"><button data-onclick="advAdd()">＋ Añadir condición</button>${F.adv.rules.length ? '<button data-onclick="fClr(\'adv\')">Quitar todas</button>' : ''}</div>`;
+  $('#d-adv').hidden = !advRules().length;
+}
+function advAdd() { F.adv.rules.push({f: 'any', op: 'has', v: ''}); advDraw(); const i = [...document.querySelectorAll('#advUI .advr input')].pop(); if (i) i.focus(); }
+function advSet(i, k, v) { const r = F.adv.rules[i]; if (!r) return; r[k] = v; if (k === 'f' && !advOps(v).includes(r.op)) r.op = advOps(v)[0]; document.activeElement?.blur?.(); render(); }
+function advEnter(inp) { inp.blur(); }   // Enter aplica la condición (el cambio llega por onchange)
+function advDel(i) { F.adv.rules.splice(i, 1); render(); }
+function advMode(v) { F.adv.mode = v === 'any' ? 'any' : 'all'; render(); }
 /* ---- Filtros: resumen de lo aplicado, contadores y estado ---- */
 const fYears = () => F.yFrom && F.yTo ? `${F.yFrom}–${F.yTo}` : F.yFrom ? `desde ${F.yFrom}` : `hasta ${F.yTo}`;
 function actList() {   // filtros aplicados, cada uno con su forma de quitarlo
@@ -46,24 +76,27 @@ function actList() {   // filtros aplicados, cada uno con su forma de quitarlo
   if (F.read) A.push(['📖 ' + READ[F.read], "fClr('read')"]);
   if (F.minRating) A.push(['★ ≥ ' + F.minRating, "fClr('min')"]);
   if (F.yFrom || F.yTo) A.push(['📅 ' + fYears(), "fClr('years')"]);
+  const nA = advRules().length; if (nA) A.push(['🔎 Búsqueda avanzada (' + nA + (nA === 1 ? ' condición)' : ' condiciones)'), "fClr('adv')"]);
   return A;
 }
 function fClr(k, id) {
   if (k === 'q') { F.q = ''; $('#q').value = ''; } else if (k === 'sec') F.sec = ''; else if (k === 'tag') F.tags.delete(id); else if (k === 'ex') F.exTags.delete(id);
-  else if (k === 'read') F.read = ''; else if (k === 'min') F.minRating = 0; else if (k === 'years') F.yFrom = F.yTo = 0; else F[k] = false;
+  else if (k === 'read') F.read = ''; else if (k === 'min') F.minRating = 0; else if (k === 'years') F.yFrom = F.yTo = 0; else if (k === 'adv') F.adv.rules = []; else F[k] = false;
   render();
 }
-function fClrAll() { F.q = ''; $('#q').value = ''; F.sec = ''; F.tags.clear(); F.exTags.clear(); F.noSec = F.noTag = false; F.read = ''; F.minRating = 0; F.yFrom = F.yTo = 0; render(); }
+function fClrAll() { F.q = ''; $('#q').value = ''; F.sec = ''; F.tags.clear(); F.exTags.clear(); F.noSec = F.noTag = false; F.read = ''; F.minRating = 0; F.yFrom = F.yTo = 0; F.adv.rules = []; render(); }
 function actDraw() {
   const A = actList(), el = $('#actF'); el.hidden = !A.length;
   el.innerHTML = A.length ? `<small>Filtros:</small>${A.map(([t, c]) => `<button class="af" data-onclick="${c}" title="Quitar este filtro">${esc(t)} <b>✕</b></button>`).join('')}<button class="afx" data-onclick="fClrAll()">Limpiar todo</button>` : '';
-  $('#d-filt').hidden = !A.some(([, c]) => c !== "fClr('q')");
+  $('#d-filt').hidden = !A.some(([, c]) => c !== "fClr('q')" && c !== "fClr('adv')");
 }
-const fExtra = () => ({exTags: [...F.exTags], noTag: F.noTag, noSec: F.noSec, yFrom: F.yFrom, yTo: F.yTo});   // lo que guardan el estado de la interfaz y los filtros guardados
+const fExtra = () => ({exTags: [...F.exTags], noTag: F.noTag, noSec: F.noSec, yFrom: F.yFrom, yTo: F.yTo, adv: {mode: F.adv.mode, rules: F.adv.rules.map(r => ({...r}))}});   // lo que guardan el estado de la interfaz y los filtros guardados
 function fExtraLoad(f) {   // lo guardado se valida: una etiqueta borrada o un año raro se ignoran
   const yr = v => Number.isInteger(v) && v > 0 && v < 10000 ? v : 0;
   F.exTags = new Set((Array.isArray(f.exTags) ? f.exTags : []).filter(id => typeof id === 'string' && db.tags.some(t => t.id === id)));
   F.noTag = !!f.noTag; F.noSec = !!f.noSec; F.yFrom = yr(f.yFrom); F.yTo = yr(f.yTo);
+  const a = f.adv && typeof f.adv === 'object' ? f.adv : {};
+  F.adv = {mode: a.mode === 'any' ? 'any' : 'all', rules: (Array.isArray(a.rules) ? a.rules : []).filter(r => r && Object.hasOwn(ADV_F, r.f) && advOps(r.f).includes(r.op)).slice(0, 20).map(r => ({f: r.f, op: r.op, v: String(r.v ?? '').slice(0, 200)}))};
 }
 function setYears() { const v = id => { const n = Math.trunc(+$(id).value); return n > 0 && n < 10000 ? n : 0; }; const a = v('#yFrom'), b = v('#yTo'); if (a === F.yFrom && b === F.yTo) return; F.yFrom = a; F.yTo = b; render(); }   // sin cambios no repinta (el clic que quitó el foco sigue funcionando)
 let TQ = '';   // texto para buscar entre las etiquetas de la barra
@@ -204,7 +237,7 @@ function render() {
   tg('#tbSec', F.tbSec, 'Sección', F.sec || F.noSec); tg('#tbTag', F.tbTag, 'Etiquetas', F.tags.size || F.exTags.size || F.noTag);
   $('#secF2').hidden = !F.tbSec; $('#tagF2').hidden = !F.tbTag; $('#grpChk').checked = F.group;
   selDraw(0);
-  $('#d-search').hidden = !F.q; $('#d-tr').hidden = !db.trash.length; $('#trLbl').textContent = 'Papelera' + (db.trash.length ? ` (${db.trash.length})` : ''); $('#tbView').textContent = db.settings.view === 'table' ? '▦ Tarjetas' : '☰ Tabla';
+  $('#d-search').hidden = !F.q && !advRules().length; advDraw(); $('#d-tr').hidden = !db.trash.length; $('#trLbl').textContent = 'Papelera' + (db.trash.length ? ` (${db.trash.length})` : ''); $('#tbView').textContent = db.settings.view === 'table' ? '▦ Tarjetas' : '☰ Tabla';
   const nextKey = Object.keys(SORTS).find(k => !F.sorts.some(s => s.k === k)) || 'title';
   $('#sortUI').innerHTML = F.sorts.map((s, i) => `<div class="row"><select data-onchange="sortSet(${i},this.value)">${Object.entries(SORTS).map(([k, v]) => `<option value="${k}" ${s.k === k ? 'selected' : ''}>${v}</option>`).join('')}</select>
     <button title="${s.d > 0 ? 'Ascendente (A→Z, antiguo→reciente)' : 'Descendente (Z→A, reciente→antiguo)'}" data-onclick="sortFlip(${i})">${s.d > 0 ? '▲' : '▼'}</button>
@@ -233,7 +266,7 @@ function selDraw(count = 1) {   // barra de selección (solo sale con papers mar
 }
 function renderPaper(id) {   // repinta solo la tarjeta o fila de un paper; si el cambio puede moverlo o sacarlo de la lista, todo
   const p = db.papers.find(x => x.id === id), el = $(`#list [data-id="${id}"]`);
-  if (!p || !el || F.minRating || F.read || F.exTags.size || F.noTag || F.noSec || F.yFrom || F.yTo || F.sorts.some(s => ['rating', 'reading', 'modified'].includes(s.k))) return render();
+  if (!p || !el || F.minRating || F.read || advRules().length || F.exTags.size || F.noTag || F.noSec || F.yFrom || F.yTo || F.sorts.some(s => ['rating', 'reading', 'modified'].includes(s.k))) return render();
   const tr = el.tagName === 'TR', t = document.createElement(tr ? 'tbody' : 'div'); t.innerHTML = (tr ? rowHTML : card)(p, el.dataset.from);
   if (tr && el.nextElementSibling?.classList.contains('rn')) el.nextElementSibling.remove();   // la fila de notas desplegadas va justo detrás
   const nodes = [...t.children]; el.replaceWith(...nodes); hdr(); filtDraw();   // los contadores de los filtros pueden cambiar
