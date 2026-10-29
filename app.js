@@ -39,14 +39,14 @@ function mgAdd(id) { db[MG].push({id, name: 'Nueva', color: '#2457c5', tagIds: [
    Aparte del JSON, la app guarda (1) una copia de trabajo, para reabrir justo donde lo dejaste aunque no hayas guardado, y
    (2) el estado de la interfaz (filtros, orden, barra lateral, bloques plegados). Viven fuera de la caché de la aplicación,
    así que las actualizaciones no los tocan y no hace falta borrar datos para recibir una versión nueva. */
-const APP_V = '36.0';   // debe coincidir con la versión de sw.js
+const APP_V = '36.1';   // debe coincidir con la versión de sw.js
 let BOOTED = false, RELOADING = false, SWREG = null, tSes = 0, tUi = 0, lastUi = '';
 const sessionNow = () => { clearTimeout(tSes); if (!BOOTED) return Promise.resolve();   // copia de trabajo del proyecto abierto (y la lista de proyectos)
   const p = pjCur(); if (p) { Object.assign(p, {n: db.papers.length, file: path, dirty}); delete p.remote; }
   return idb('readwrite', st => { st.put({v: 1, cur: PJ.cur, list: PJ.list, gone: PJ.gone}, 'projects'); return st.put({v: 1, path, dirty, at: new Date().toISOString(), json: dbJSON()}, 'proj:' + PJ.cur); }).catch(() => {}); };
 const sessionSoon = () => { clearTimeout(tSes); tSes = setTimeout(sessionNow, 700); };
 const uiState = () => ({v: 1, F: {sorts: F.sorts, group: F.group, sec: F.sec, tags: [...F.tags], read: F.read, minRating: F.minRating, inNotes: F.inNotes, mode: F.mode, tbSec: F.tbSec, tbTag: F.tbTag, ...fExtra()},
-  side: {min: $('#side').classList.contains('min'), w: sbW(), fold: [...document.querySelectorAll('#side .sg.fold')].map(e => e.id), more: !$('#sg-more').classList.contains('fold')}, cite: CITE_SEL, dataAll: DATA_ALL, citeOpen: [...CITE_OPEN], allFold: [...ALL_FOLD], cfg: [...CFG_OPEN], help: [...HELP_OPEN]});
+  side: {min: $('#side').classList.contains('min'), w: sbW(), fold: [...document.querySelectorAll('#side .sg.fold')].map(e => e.id), more: !$('#sg-more').classList.contains('fold'), ff: [...document.querySelectorAll('#sg-filt .fs.fold')].map(e => e.id)}, cite: CITE_SEL, dataAll: DATA_ALL, citeOpen: [...CITE_OPEN], allFold: [...ALL_FOLD], cfg: [...CFG_OPEN], help: [...HELP_OPEN]});
 const uiNow = () => { clearTimeout(tUi); if (!BOOTED) return Promise.resolve(); const s = JSON.stringify(uiState()); if (s === lastUi) return Promise.resolve(); lastUi = s; return idb('readwrite', st => st.put(JSON.parse(s), 'ui')).catch(() => {}); };
 const uiSoon = () => { clearTimeout(tUi); tUi = setTimeout(uiNow, 500); };
 function applyUI(u) {   // lo guardado nunca se fía: cada dato se valida contra el estado actual (un paper o etiqueta borrados no rompen nada)
@@ -55,7 +55,7 @@ function applyUI(u) {   // lo guardado nunca se fía: cada dato se valida contra
   F.group = !!f.group; F.sec = db.sections.some(s => s.id === f.sec) ? f.sec : ''; F.tags = new Set(strs(f.tags).filter(id => db.tags.some(t => t.id === id)));
   F.read = Object.hasOwn(READ, f.read) ? f.read : ''; F.minRating = Number.isInteger(f.minRating) && f.minRating >= 0 && f.minRating <= 5 ? f.minRating : 0; F.inNotes = !!f.inNotes; F.mode = f.mode === 'all' ? 'all' : 'any'; F.tbSec = !!f.tbSec; F.tbTag = f.tbTag !== false; fExtraLoad(f);
   const sd = u.side || {}; $('#side').classList.toggle('min', !!sd.min); sbWidth(Number.isFinite(sd.w) ? sd.w : 0); document.querySelectorAll('#side .sg').forEach(e => e.classList.toggle('fold', strs(sd.fold).includes(e.id)));
-  $('#sg-more').classList.toggle('fold', sd.more !== true); $('#sg-more .shm').setAttribute('aria-expanded', sd.more === true);
+  $('#sg-more').classList.toggle('fold', sd.more !== true); ['sec', 'tag', 'read'].forEach(k => fsToggle(k, strs(sd.ff).includes('fs-' + k))); $('#sg-more .shm').setAttribute('aria-expanded', sd.more === true);
   CITE_SEL = typeof u.cite === 'string' && STYLES[u.cite] ? u.cite : ''; DATA_ALL = u.dataAll === true; strs(u.citeOpen).filter(g => STY_G.some(([x]) => (x || 'gen') === g)).forEach(g => CITE_OPEN.add(g)); strs(u.allFold).forEach(x => ALL_FOLD.add(x)); strs(u.cfg).forEach(x => CFG_OPEN.add(x)); strs(u.help).forEach(x => HELP_OPEN.add(x));
   $('#grpChk').checked = F.group; render();
 }

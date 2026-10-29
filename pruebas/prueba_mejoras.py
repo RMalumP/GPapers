@@ -118,8 +118,9 @@ with sync_playwright() as pw:
     # filtros guardados
     A.evaluate("F.read = 'leido'; F.tags.add('tg1'); F.sorts = [{k: 'year', d: -1}]; F.q = 'prim'; $('#q').value = 'prim'; render()")
     A.on('dialog', lambda d: None)   # (el manejador de la página ya acepta; el nombre llega con page.once más abajo)
-    A.evaluate("window.prompt = () => 'Leídos de la clave'")
-    A.evaluate("$('#side').classList.remove('min'); $('#sg-fav').classList.remove('fold')"); A.click('#sg-fav .sb > button'); A.wait_for_timeout(200)
+    A.evaluate("$('#side').classList.remove('min'); $('#sg-fav').classList.remove('fold')"); A.click('#sg-fav .fvadd')
+    eq('«＋ Guardar vista» va en la fila del título y pide el nombre con una explicación', A.evaluate("[$('.fvadd').parentElement.classList.contains('sgh'), $('#favN').hidden, document.activeElement === $('#favName'), $('#favN small').textContent]"), [True, False, True, 'Guarda aquí combinaciones de búsqueda, orden y filtros que uses a menudo.'])
+    A.fill('#favName', 'Leídos de la clave'); A.press('#favName', 'Enter'); A.wait_for_timeout(200)
     eq('guardar la vista actual con un nombre; sale marcada', A.evaluate("[FAV.map(f => f.name), [...document.querySelectorAll('#favL .fav')].map(d => [d.querySelector('.fva').textContent, d.classList.contains('on')])]"), [['Leídos de la clave'], [['Leídos de la clave', True]]])
     A.evaluate("F.read = ''; F.tags.clear(); F.q = ''; $('#q').value = ''; F.sorts = [{k: 'title', d: 1}]; render()")
     eq('al cambiar los filtros deja de estar marcada', A.evaluate("$('#favL .fav').classList.contains('on')"), False)
@@ -130,6 +131,8 @@ with sync_playwright() as pw:
     eq('si una etiqueta ya no existe se ignora sin romper', A.evaluate("[F.tags.size, F.read]"), [0, 'leido'])
     A.evaluate("window.confirm = () => true"); A.click('#favL .x'); A.wait_for_timeout(200)
     eq('borrar una vista', A.evaluate("[FAV.length, document.querySelectorAll('#favL .fav').length]"), [0, 0])
+    A.click('#sg-fav .fvadd'); A.press('#favName', 'Escape')
+    eq('Escape cancela sin guardar', A.evaluate("[$('#favN').hidden, FAV.length]"), [True, 0])
     # recientes
     eq('sin papers abiertos no hay «Recientes»', A.evaluate("$('#sg-rec').hidden"), True)
     A.evaluate("['c1', 'c2', 'c3', 'c1'].forEach(id => { openPaper(id); $('#dlg').close(); })"); A.wait_for_timeout(200)

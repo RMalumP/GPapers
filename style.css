@@ -196,3 +196,10 @@ main > .row > #q{width:220px;min-width:0;flex:0 1 220px}
 #recL .rec{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px}
 #sbGrip{position:absolute;top:0;right:-3px;width:6px;height:100%;cursor:col-resize;z-index:2}#sbGrip:hover,aside.rs #sbGrip{background:color-mix(in srgb,var(--pri) 35%,transparent)}aside.min #sbGrip{display:none}
 #secF .cw{display:inline-block}#secF .cw.over .chip,#tagF .chip.over{outline:2px dashed var(--pri);outline-offset:1px}
+.fhb{flex:1;min-width:0;display:flex;align-items:center;gap:4px;border:0;background:none;padding:2px 0;text-align:left;font-size:13px;color:inherit}.fhb b{font-weight:600}.fhb .car{width:10px;font-size:11px;opacity:.6}.fs.fold .fhb .car{transform:rotate(-90deg)}
+.fs.fold .fsb{display:none}.fh2 .fht{flex:1;font-weight:600;padding-left:14px}.fh2 .fhx{flex:0 0 auto;font-size:12px;padding:2px 8px}.fh2 .fhx.on{border-color:var(--pri);color:var(--pri)}
+.fh2.yrs input{width:0;flex:0 1 64px;min-width:0;font-size:12px;padding:2px 6px}.fh2.yrs .fht{flex:0 0 auto}
+#sg-fav .sgh .sh{flex:1}.fvadd{flex:0 0 auto;font-size:12px;padding:2px 8px;margin-right:6px}aside.min .fvadd{display:none}
+#favN{display:flex;flex-direction:column;gap:4px;margin-bottom:6px}#favN[hidden]{display:none}#favN small{opacity:.7;font-size:12px}
+.fs .fh2{margin:8px 0 4px}.fs:first-child .fh2{margin-top:2px}
+.fhb b,.fh2 .fht{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.fh2{gap:4px}.fh2 .fhx,.fs .fh2 .mgb{padding:2px 6px;margin-right:0}
