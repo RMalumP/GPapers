@@ -203,3 +203,5 @@ main > .row > #q{width:220px;min-width:0;flex:0 1 220px}
 #favN{display:flex;flex-direction:column;gap:4px;margin-bottom:6px}#favN[hidden]{display:none}#favN small{opacity:.7;font-size:12px}
 .fs .fh2{margin:8px 0 4px}.fs:first-child .fh2{margin-top:2px}
 .fhb b,.fh2 .fht{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.fh2{gap:4px}.fh2 .fhx,.fs .fh2 .mgb{padding:2px 6px;margin-right:0}
+#fs-read .fhb{flex:0 0 auto}#fs-read .fh2 #readP{flex:1;width:auto;margin:0 4px 0 6px}
+.mgb .mgl[hidden]{display:none}

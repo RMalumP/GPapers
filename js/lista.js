@@ -89,7 +89,7 @@ function filtDraw() {   // chips de Secciones, Etiquetas y Lectura, con cuántos
     + db.tags.map(t => chip(t, F.exTags.has(t.id) ? 'ex' : F.tags.has(t.id), `toggleF('${t.id}')`, 1, `tagFMenu(event,'${t.id}')`, side ? cT.get(t.id) || 0 : null)).join('')
     + (side ? chip({name: 'Sin etiquetas', color: '#888888'}, F.noTag, 'noTagF()', 0, '', nT) : '') : '<small>Aún no hay etiquetas.</small>';   // en la fila de arriba, sin contadores ni «Sin …», para que quepa
   $('#secF').innerHTML = secC(1); $('#secF2').innerHTML = secC(0);
-  $('#tagF').innerHTML = tagC(1); $('#modeB').textContent = (F.mode === 'all' ? 'Todas' : 'Alguna') + ' ▾'; $('#tagF2').innerHTML = tagC(0); tagQDraw();
+  $('#tagF').innerHTML = tagC(1); $('#modeB').textContent = (F.mode === 'all' ? 'Todas' : 'Alguna') + ' ▾'; mgFit(); $('#tagF2').innerHTML = tagC(0); tagQDraw();
   $('#readF').innerHTML = [['', 'Todos'], ...Object.entries(READ)].map(([k, v]) => chip({name: v, color: k ? READ_C[k] : '#888888'}, F.read === k, `setRead('${k}')`, 0, '', k ? cR[k] : N)).join('');
   const rp = $('#readP'); rp.hidden = !N; rp.innerHTML = N ? ['leido', 'leyendo'].map(k => `<i style="width:${cR[k] / N * 100}%;background:${READ_C[k]}"></i>`).join('') : '';
   rp.title = `Progreso de lectura: ${cR.leido} leídos, ${cR.leyendo} leyendo y ${cR.por_leer} por leer, de ${N}`;
@@ -286,6 +286,11 @@ function sbMore() {   // «Información» (Ayuda, Privacidad y Créditos): plega
   a.classList.remove('min'); wasMin ? el.classList.remove('fold') : el.classList.toggle('fold');
   el.querySelector('.shm').setAttribute('aria-expanded', !el.classList.contains('fold')); uiSoon();
 }
+function mgFit() {   // «✎ Gestionar» entero si cabe junto al título; si no, solo «✎»
+  document.querySelectorAll('#sg-filt .fh2 .mgb').forEach(b => { const l = b.querySelector('.mgl'), t = b.parentElement.querySelector('.fhb b'); if (!l || !t) return;
+    l.hidden = false; if (t.scrollWidth > t.clientWidth + 1) l.hidden = true; });
+}
+new ResizeObserver(() => mgFit()).observe($('#side'));   // al cambiar el ancho de la barra o abrir Filtros
 function fsToggle(k, fold) {   // plegar un apartado de Filtros (Secciones, Etiquetas, Lectura)
   const el = $('#fs-' + k); if (!el) return; el.classList.toggle('fold', fold ?? !el.classList.contains('fold'));
   el.querySelector('.fhb').setAttribute('aria-expanded', !el.classList.contains('fold')); uiSoon();
