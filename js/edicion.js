@@ -332,10 +332,10 @@ function orderBy(L, ord) {
   const key = p => sortKeyOf(p, ex().particles), cmp = (a, b) => COLL.compare(key(a), key(b)), yr = p => +p.year || 0;
   return ord === 'alpha' ? [...L].sort((a, b) => cmp(a, b) || yr(a) - yr(b)) : ord === 'year' ? [...L].sort((a, b) => yr(a) - yr(b) || cmp(a, b)) : sortList(L);
 }
-function svData() {   // papers con notas (de la sección elegida, o de todas) que cumplen el filtro
+function svData() {   // papers con notas (de la sección elegida, o de todas más la general) que cumplen el filtro
   const q = norm(SV.q), rows = [];
   for (const p of orderBy(db.papers, SV.order)) {
-    const ns = p.notes.filter(n => n.content.trim() && (!SV.sec || n.sectionId === SV.sec) && (!q || norm([n.content, p.title, p.alias, ...p.authors].join(' ')).includes(q)));
+    const ns = pNotes(p).filter(n => (SV.sec ? n.sectionId === SV.sec : true) && (!q || norm([n.content, p.title, p.alias, ...p.authors].join(' ')).includes(q)));
     if (ns.length) rows.push({p, ns});
   }
   return rows;
@@ -354,11 +354,11 @@ function svDraw() {
 }
 function svBody() {
   const rows = svData();
-  $('#svB').innerHTML = rows.map(({p, ns}) => `<div class="svp"><h3><a class="nl" data-t="p" data-id="${p.id}">${esc(p.alias || p.title)}</a> <small>${esc(svAuth(p))}</small></h3>${ns.map(n => `<div class="nt">${SV.sec ? '' : chip(db.sections.find(s => s.id === n.sectionId) || {name: 'Sin sección', color: '#888888'}, 1)}<div class="ntx md">${md(n.content)}</div></div>`).join('')}</div>`).join('') || '<p class="empty">No hay notas que coincidan.</p>';
+  $('#svB').innerHTML = rows.map(({p, ns}) => `<div class="svp"><h3><a class="nl" data-t="p" data-id="${p.id}">${esc(p.alias || p.title)}</a> <small>${esc(svAuth(p))}</small></h3>${ns.map(n => `<div class="nt">${SV.sec ? '' : chip(n.gen ? GEN_N : db.sections.find(s => s.id === n.sectionId) || {name: 'Sin sección', color: '#888888'}, 1)}<div class="ntx md">${md(n.content)}</div></div>`).join('')}</div>`).join('') || '<p class="empty">No hay notas que coincidan.</p>';
   $('#svMsg').textContent = `${rows.length} papers · ${rows.reduce((a, r) => a + r.ns.length, 0)} notas`;
 }
-const svMarkdown = () => `# ${svTitle()}\n\n` + svData().map(({p, ns}) => `## ${p.alias || p.title}\n*${svAuth(p)}*\n\n` + ns.map(n => (SV.sec ? '' : `**[${secName(n.sectionId)}]** `) + plainLinks(n.content.trim())).join('\n\n')).join('\n\n');
-const svHtml = () => `<div style="font-family:'Times New Roman',serif;font-size:12pt"><h1 style="font-size:16pt">${esc(svTitle())}</h1>${svData().map(({p, ns}) => `<h2 style="font-size:13pt;margin-bottom:0">${esc(p.alias || p.title)}</h2><p style="margin-top:0"><i>${esc(svAuth(p))}</i></p>${ns.map(n => `<div>${SV.sec ? '' : `<b>[${esc(secName(n.sectionId))}]</b>`}${md(n.content)}</div>`).join('')}`).join('')}</div>`;
+const svMarkdown = () => `# ${svTitle()}\n\n` + svData().map(({p, ns}) => `## ${p.alias || p.title}\n*${svAuth(p)}*\n\n` + ns.map(n => (SV.sec ? '' : `**[${noteLabel(n)}]** `) + plainLinks(n.content.trim())).join('\n\n')).join('\n\n');
+const svHtml = () => `<div style="font-family:'Times New Roman',serif;font-size:12pt"><h1 style="font-size:16pt">${esc(svTitle())}</h1>${svData().map(({p, ns}) => `<h2 style="font-size:13pt;margin-bottom:0">${esc(p.alias || p.title)}</h2><p style="margin-top:0"><i>${esc(svAuth(p))}</i></p>${ns.map(n => `<div>${SV.sec ? '' : `<b>[${esc(noteLabel(n))}]</b>`}${md(n.content)}</div>`).join('')}`).join('')}</div>`;
 async function copyText(text, host) {
   try { await navigator.clipboard.writeText(text); return true; } catch {}
   const t = document.createElement('textarea'); t.value = text; t.style.cssText = 'position:fixed;left:-9999px'; (host || document.body).appendChild(t); t.select(); const ok = document.execCommand('copy'); t.remove(); return ok;

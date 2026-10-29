@@ -131,7 +131,10 @@ function filtDraw() {   // chips de Secciones, Etiquetas y Lectura, con cuántos
 }
 const tagsOf = p => p.tagIds.map(tagById).filter(Boolean).map(t => chip(t, 1, '', 0, `tagMenu(event,'${p.id}','${t.id}')`)).join('');
 const EXP = new Set();   // papers con las notas desplegadas en la lista
-const notesHTML = (p, hl) => `<div class="nts">${p.notes.filter(n => n.content.trim()).map(n => { const s = secById(n.sectionId);
+const GEN_N = {name: 'Nota general', color: '#555555'};
+const pNotes = p => [...(p.general?.trim() ? [{id: 'gen', gen: 1, content: p.general}] : []), ...p.notes.filter(n => n.content.trim())];   // la nota general va primero
+const noteLabel = n => n.gen ? GEN_N.name : secName(n.sectionId);
+const notesHTML = (p, hl) => `<div class="nts">${pNotes(p).map(n => { const s = n.gen ? GEN_N : secById(n.sectionId);
   return `<div class="nt${n.id === hl ? ' hl' : ''}">${s ? chip(s, 1) : '<span class="chip on" style="--c:#888888">Sin sección</span>'}<div class="ntx md">${md(n.content)}</div></div>`; }).join('') || '<small>Este paper no tiene notas.</small>'}</div>`;
 function toggleNotes(id) { EXP.has(id) ? EXP.delete(id) : EXP.add(id); renderPaper(id); }
 /* ---- Imagen del paper ---- */
@@ -203,7 +206,7 @@ const card = (p, from) => `<article class="card" data-id="${p.id}" draggable="tr
     <div class="au"><span>${esc(p.authors.join('; '))} ${p.year ? '(' + esc(p.year) + ')' : ''}</span></div>
     ${/^https?:/i.test(p.url) ? `<a href="${esc(p.url)}" target="_blank" rel="noopener noreferrer">${esc(p.url)}</a>` : ''}
     
-    <div class="row"><button class="sm" data-onclick="toggleNotes('${p.id}')" data-oncontextmenu="viewNotes(event,'${p.id}')" title="Clic: desplegar notas · Clic derecho: abrir el visor de notas">Notas (${p.notes.filter(n => n.content.trim()).length}) ${EXP.has(p.id) ? '▾' : '▸'}</button>${relCount(p) ? `<button class="sm" data-onclick="viewRel('${p.id}')" title="Relaciones: relacionados, cita a y citado por">🔗 ${relCount(p)}</button>` : ''}</div>${EXP.has(p.id) ? notesHTML(p) : ''}</article>`;
+    <div class="row"><button class="sm" data-onclick="toggleNotes('${p.id}')" data-oncontextmenu="viewNotes(event,'${p.id}')" title="Clic: desplegar notas · Clic derecho: abrir el visor de notas">Notas (${pNotes(p).length}) ${EXP.has(p.id) ? '▾' : '▸'}</button>${relCount(p) ? `<button class="sm" data-onclick="viewRel('${p.id}')" title="Relaciones: relacionados, cita a y citado por">🔗 ${relCount(p)}</button>` : ''}</div>${EXP.has(p.id) ? notesHTML(p) : ''}</article>`;
 const TH = [[null, ''], ['title', 'Título'], ['author', 'Autores'], ['year', 'Año'], ['venue', 'Revista / editorial'], ['reading', 'Lectura'], ['rating', '★'], [null, 'Secciones'], [null, 'Etiquetas'], [null, 'Notas'], [null, '']];
 function thSort(k) {   // clic en una cabecera: ese criterio pasa a ser el principal; otro clic invierte el sentido
   F.sorts = F.sorts[0]?.k === k ? [{k, d: -F.sorts[0].d}, ...F.sorts.slice(1)] : [{k, d: 1}, ...F.sorts.filter(x => x.k !== k).slice(0, 2)]; render();
@@ -214,7 +217,7 @@ const rowHTML = (p, from) => `<tr class="rw" data-id="${p.id}" draggable="true" 
   <td class="tt"><a class="tl2" data-onclick="openPaper('${p.id}')" title="Editar">${esc(p.alias || p.title)}</a></td><td>${esc(p.authors.join('; '))}</td><td>${esc(p.year)}</td><td>${esc(p.venue)}</td>
   <td><button class="rst" style="--c:${READ_C[p.reading]}" title="Clic: cambiar el estado de lectura" data-onclick="cycleRead('${p.id}')">${READ[p.reading]}</button></td><td>${starsHTML(p)}</td>
   <td>${p.sectionIds.map(secById).filter(Boolean).map(s => chip(s, 1)).join('')}</td><td>${tagsOf(p)}</td>
-  <td class="nw"><button class="sm cpb" data-onclick="copyCardCite('${p.id}',this)" title="Copiar la cita (estilo elegido en Exportar), con cursiva al pegar en Word">📋</button>${p.pdf ? `<button class="sm" data-onclick="pdfOpen('${p.id}')" title="Abrir el PDF enlazado: ${esc(p.pdf.name)}">📄</button>` : ''}<button class="sm" data-onclick="toggleNotes('${p.id}')" data-oncontextmenu="viewNotes(event,'${p.id}')" title="Clic: desplegar · Clic derecho: visor de notas">${p.notes.filter(n => n.content.trim()).length} ${EXP.has(p.id) ? '▾' : '▸'}</button>${relCount(p) ? `<button class="sm" data-onclick="viewRel('${p.id}')" title="Relaciones">🔗 ${relCount(p)}</button>` : ''}</td>
+  <td class="nw"><button class="sm cpb" data-onclick="copyCardCite('${p.id}',this)" title="Copiar la cita (estilo elegido en Exportar), con cursiva al pegar en Word">📋</button>${p.pdf ? `<button class="sm" data-onclick="pdfOpen('${p.id}')" title="Abrir el PDF enlazado: ${esc(p.pdf.name)}">📄</button>` : ''}<button class="sm" data-onclick="toggleNotes('${p.id}')" data-oncontextmenu="viewNotes(event,'${p.id}')" title="Clic: desplegar · Clic derecho: visor de notas">${pNotes(p).length} ${EXP.has(p.id) ? '▾' : '▸'}</button>${relCount(p) ? `<button class="sm" data-onclick="viewRel('${p.id}')" title="Relaciones">🔗 ${relCount(p)}</button>` : ''}</td>
   <td><button class="x" title="Eliminar" data-onclick="delPaper('${p.id}')">✕</button></td></tr>${EXP.has(p.id) ? `<tr class="rn"><td></td><td colspan="11">${notesHTML(p)}</td></tr>` : ''}`;
 const tableHTML = (L, from) => `<div class="twrap"><table class="tbl"><thead><tr><th></th>${TH.map(([k, t]) => k ? `<th class="sortable" data-onclick="thSort('${k}')">${t}${F.sorts[0]?.k === k ? (F.sorts[0].d > 0 ? ' ▲' : ' ▼') : ''}</th>` : `<th>${t}</th>`).join('')}</tr></thead><tbody>${L.map(p => rowHTML(p, from)).join('')}</tbody></table></div>`;
 const items = (l, from) => db.settings.view === 'table' ? (l.length ? tableHTML(l, from) : '') : l.map(p => card(p, from)).join('');
