@@ -27,6 +27,7 @@ with sync_playwright() as pw:
     eq('nota general: en «📄 Notas» con todas las secciones', ('Idea general' in pg.inner_text('#svB'), pg.evaluate("svMarkdown().includes('**[Nota general]** Idea *general*')")), (True, True))
     pg.evaluate("svOpen('s1')")
     eq('…pero no al elegir una sección', 'Idea general' in pg.inner_text('#svB'), False); pg.evaluate("$('#sv').close()")
+    eq('nota general: al exportar con «Incluir notas» (texto, HTML y Word)', pg.evaluate("(o => [exText(db.papers, o).includes('[Nota general] Idea general'), exHtml(db.papers, o).includes('<i>[Nota general]</i>'), new TextDecoder().decode(exDocx(db.papers, o)).includes('[Nota general]')])({...ex(), fmt: 'apa', style: 'apa', notes: true})"), [True, True, True])
     pg.evaluate(SEED)
     # ---- Fase 1
     eq('papelera: 5 días', pg.evaluate("TRASH_DAYS"), 5)

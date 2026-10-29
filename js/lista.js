@@ -376,7 +376,7 @@ function exText(L, o) {
   return exSecs(L, o).map(S => { if (S.lines) return S.h + '\n\n' + S.lines.join('\n');
     const sx = yearSuffixes(S.L, o);
     const items = S.L.map((p, i) => { let t = (isNum(o) ? numLbl(i + 1, o) : '') + citeTxt(cite(p, o, sx.get(p.id)));
-      if (o.notes) p.notes.filter(n => n.content.trim()).forEach(n => t += `\n   [${secName(n.sectionId)}] ${mdPlain(n.content.trim())}`);
+      if (o.notes) pNotes(p).forEach(n => t += `\n   [${noteLabel(n)}] ${mdPlain(n.content.trim())}`);
       return t; });
     return (S.h ? S.h + '\n\n' : '') + items.join('\n\n'); }).join('\n\n\n');
 }
@@ -385,7 +385,7 @@ function exHtml(L, o) {   // sangría francesa de 1,27 cm (36 pt); las notas se 
     if (S.lines) return h + S.lines.map(l => `<p style="margin:0 0 4pt">${citeHtml(l)}</p>`).join('');
     const sx = yearSuffixes(S.L, o);
     return h + S.L.map((p, i) => {
-      const notes = o.notes ? p.notes.filter(n => n.content.trim()).map(n => `<div style="margin:0 0 6pt 36pt;font-size:10pt"><i>[${esc(secName(n.sectionId))}]</i>${md(n.content)}</div>`).join('') : '';
+      const notes = o.notes ? pNotes(p).map(n => `<div style="margin:0 0 6pt 36pt;font-size:10pt"><i>[${esc(noteLabel(n))}]</i>${md(n.content)}</div>`).join('') : '';
       return `<p style="margin:0 0 ${notes ? 2 : 8}pt 36pt;text-indent:-36pt">${citeHtml((isNum(o) ? numLbl(i + 1, o) : '') + cite(p, o, sx.get(p.id)))}</p>${notes}`;
     }).join(''); });
   return `<div style="font-family:'Times New Roman',serif;font-size:12pt;line-height:1.15">${body.join('')}</div>`;
@@ -417,7 +417,7 @@ function exDocx(L, o) {
     const sx = yearSuffixes(S.L, o);
     S.L.forEach((p, i) => {
       body.push(P(docxRuns((isNum(o) ? numLbl(i + 1, o) : '') + cite(p, o, sx.get(p.id))), '<w:ind w:left="720" w:hanging="720"/>'));   // sangría francesa
-      if (o.notes) p.notes.filter(n => n.content.trim()).forEach(n => n.content.trim().split('\n').forEach((ln, j) => body.push(P(docxRuns(j ? '' : `*[${secName(n.sectionId)}]* `, 20) + noteRuns(ln, 20), '<w:spacing w:after="40"/><w:ind w:left="720"/>')))); }); }
+      if (o.notes) pNotes(p).forEach(n => n.content.trim().split('\n').forEach((ln, j) => body.push(P(docxRuns(j ? '' : `*[${noteLabel(n)}]* `, 20) + noteRuns(ln, 20), '<w:spacing w:after="40"/><w:ind w:left="720"/>')))); }); }
   const R = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
   return zipStore([
     ['[Content_Types].xml', `${H}<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/></Types>`],
