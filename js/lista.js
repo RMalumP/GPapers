@@ -88,13 +88,12 @@ function filtDraw() {   // chips de Secciones, Etiquetas y Lectura, con cuántos
   const tagC = side => db.tags.length ? chip({name: 'Todas', color: '#888888'}, !F.tags.size && !F.exTags.size && !F.noTag, 'tagsAll()', 0, '', side ? N : null)
     + db.tags.map(t => chip(t, F.exTags.has(t.id) ? 'ex' : F.tags.has(t.id), `toggleF('${t.id}')`, 1, `tagFMenu(event,'${t.id}')`, side ? cT.get(t.id) || 0 : null)).join('')
     + (side ? chip({name: 'Sin etiquetas', color: '#888888'}, F.noTag, 'noTagF()', 0, '', nT) : '') : '<small>Aún no hay etiquetas.</small>';   // en la fila de arriba, sin contadores ni «Sin …», para que quepa
-  const modeSel = `<select class="mode" title="Cómo combinar varias etiquetas" data-onchange="put(F,'mode',this.value,render)"><option value="any" ${F.mode === 'any' ? 'selected' : ''}>Al menos una etiqueta</option><option value="all" ${F.mode === 'all' ? 'selected' : ''}>Todas las etiquetas</option></select>`;
   $('#secF').innerHTML = secC(1); $('#secF2').innerHTML = secC(0);
-  $('#tagF').innerHTML = tagC(1) + modeSel; $('#tagF2').innerHTML = tagC(0); tagQDraw();
+  $('#tagF').innerHTML = tagC(1); $('#modeB').textContent = (F.mode === 'all' ? 'Todas' : 'Alguna') + ' ▾'; $('#tagF2').innerHTML = tagC(0); tagQDraw();
   $('#readF').innerHTML = [['', 'Todos'], ...Object.entries(READ)].map(([k, v]) => chip({name: v, color: k ? READ_C[k] : '#888888'}, F.read === k, `setRead('${k}')`, 0, '', k ? cR[k] : N)).join('');
   const rp = $('#readP'); rp.hidden = !N; rp.innerHTML = N ? ['leido', 'leyendo'].map(k => `<i style="width:${cR[k] / N * 100}%;background:${READ_C[k]}"></i>`).join('') : '';
   rp.title = `Progreso de lectura: ${cR.leido} leídos, ${cR.leyendo} leyendo y ${cR.por_leer} por leer, de ${N}`;
-  $('#minR').value = F.minRating; $('#yFrom').value = F.yFrom || ''; $('#yTo').value = F.yTo || '';
+  $('#minR').textContent = (F.minRating ? '★ ≥ ' + F.minRating : 'Cualquiera') + ' ▾'; $('#minR').classList.toggle('on', !!F.minRating); $('#yFrom').value = F.yFrom || ''; $('#yTo').value = F.yTo || '';
   actDraw(); favDraw(); recDraw();
 }
 const tagsOf = p => p.tagIds.map(tagById).filter(Boolean).map(t => chip(t, 1, '', 0, `tagMenu(event,'${p.id}','${t.id}')`)).join('');
@@ -287,6 +286,11 @@ function sbMore() {   // «Información» (Ayuda, Privacidad y Créditos): plega
   a.classList.remove('min'); wasMin ? el.classList.remove('fold') : el.classList.toggle('fold');
   el.querySelector('.shm').setAttribute('aria-expanded', !el.classList.contains('fold')); uiSoon();
 }
+function fsToggle(k, fold) {   // plegar un apartado de Filtros (Secciones, Etiquetas, Lectura)
+  const el = $('#fs-' + k); if (!el) return; el.classList.toggle('fold', fold ?? !el.classList.contains('fold'));
+  el.querySelector('.fhb').setAttribute('aria-expanded', !el.classList.contains('fold')); uiSoon();
+}
+function minRMenu(e) { ctxShow(e, '<div class="ctxh">Valoración mínima</div>' + [0, 1, 2, 3, 4, 5].map(n => `<button data-onclick="ctxClose();put(F,'minRating',${n},render)">${tick(F.minRating === n)}${n ? 'Al menos ' + '★'.repeat(n) : 'Cualquiera'}</button>`).join('')); }
 function sbGroup(g) {   // con la barra plegada, pulsar un icono la despliega en ese grupo
   const a = $('#side'), el = $('#sg-' + g), wasMin = a.classList.contains('min');
   a.classList.remove('min'); wasMin ? el.classList.remove('fold') : el.classList.toggle('fold');

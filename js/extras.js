@@ -109,10 +109,16 @@ const favKey = f => JSON.stringify(['q', 'sorts', 'group', 'sec', 'tags', 'read'
 function favDraw() {   // «Vistas»: un clic aplica la vista; la que coincide con los filtros actuales sale marcada
   const el = $('#favL'); if (!el) return; const now = favKey(favNow());
   el.innerHTML = FAV.map((f, i) => `<div class="fav${favKey(f) === now ? ' on' : ''}"><button class="fva" data-onclick="favApply(${i})" title="Aplicar esta vista">${esc(f.name)}</button><button class="x" data-onclick="favDel(${i})" title="Borrar esta vista" aria-label="Borrar la vista ${esc(f.name)}">✕</button></div>`).join('')
-    || '<small>Guarda aquí combinaciones de búsqueda, orden y filtros que uses a menudo.</small>';
+    || ($('#favN').hidden ? '<small>Aún no hay vistas.</small>' : '');
 }
-function favSave() {
-  const name = (prompt('Nombre para estos filtros (búsqueda, orden, sección, etiquetas, lectura y valoración):') || '').trim().slice(0, 40); if (!name) return;
+function favNew() {   // «＋ Guardar vista»: pide el nombre en la propia barra, con una explicación
+  $('#side').classList.remove('min'); $('#sg-fav').classList.remove('fold'); $('#favN').hidden = false; favDraw(); const i = $('#favName'); i.value = ''; i.focus(); uiSoon();
+}
+function favCancel() { $('#favN').hidden = true; favDraw(); }
+function favSaveForm() { const n = $('#favName').value.trim(); if (!n) return $('#favName').focus(); favSave(n); favCancel(); }
+function favKeyDown(e) { if (e.key === 'Enter') { e.preventDefault(); favSaveForm(); } else if (e.key === 'Escape') { e.stopPropagation(); favCancel(); } }
+function favSave(nm) {
+  const name = String(nm || '').trim().slice(0, 40); if (!name) return;
   const f = {name, ...favNow()}, i = FAV.findIndex(x => x.name.toLowerCase() === name.toLowerCase());
   if (i >= 0) FAV[i] = f; else FAV.push(f); favPut(); favDraw();
 }
