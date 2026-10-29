@@ -18,6 +18,16 @@ with sync_playwright() as pw:
     pg.on('pageerror', lambda e: errs.append(str(e))); pg.on('console', lambda m: errs.append(m.text) if m.type == 'error' else None); pg.on('dialog', lambda d: d.accept())
     pg.goto('file://' + str(folder / 'index.html')); pg.wait_for_timeout(300); pg.evaluate('DATA_ALL = true')   # formulario completo (la vista simplificada se prueba en prueba_principal.py)
     pg.evaluate(SEED)
+    # ---- Nota general: en el desplegable, el visor y «📄 Notas»
+    pg.evaluate("db.papers[0].general = 'Idea *general*'; render(); toggleNotes('p1')")
+    eq('nota general: cuenta en el botón y sale primero al desplegar', (pg.locator('button:has-text("Notas (2)")').count(), pg.evaluate("[...document.querySelectorAll('.nts .nt')].map(n => n.querySelector('.chip').textContent)")), (1, ['Nota general', 'Intro']))
+    pg.evaluate("toggleNotes('p1'); showNotes('p1')")
+    eq('nota general: en el visor de notas', 'Idea general' in pg.inner_text('#nv'), True); pg.evaluate("$('#nv').close()")
+    pg.evaluate("svOpen('')")
+    eq('nota general: en «📄 Notas» con todas las secciones', ('Idea general' in pg.inner_text('#svB'), pg.evaluate("svMarkdown().includes('**[Nota general]** Idea *general*')")), (True, True))
+    pg.evaluate("svOpen('s1')")
+    eq('…pero no al elegir una sección', 'Idea general' in pg.inner_text('#svB'), False); pg.evaluate("$('#sv').close()")
+    pg.evaluate(SEED)
     # ---- Fase 1
     eq('papelera: 5 días', pg.evaluate("TRASH_DAYS"), 5)
     eq('papelera caduca a los 5 días', pg.evaluate("validate({papers:[], tags:[], sections:[], trash:[{at:new Date(Date.now()-6*864e5).toISOString(), paper:{id:'a', title:'x', authors:[]}}, {at:new Date(Date.now()-4*864e5).toISOString(), paper:{id:'b', title:'y', authors:[]}}]}).trash.map(t => t.paper.id)"), ['b'])
