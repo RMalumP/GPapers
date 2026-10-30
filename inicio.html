@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="es"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Gestor de papers · Organiza tus lecturas académicas</title>
+<meta name="description" content="Gestor de papers: aplicación web gratuita para organizar artículos académicos, tomar notas y exportar citas, con sincronización opcional en tu propio Google Drive.">
+<link rel="stylesheet" href="style.css"><link rel="icon" href="icon-192.png">
+<style>
+main.ld{max-width:860px;margin:0 auto;padding:28px 16px 48px}
+.ld .hero{display:flex;gap:18px;align-items:center;flex-wrap:wrap}.ld .hero img{width:84px;height:84px;border-radius:18px}
+.ld h1{font-size:30px;margin:0}.ld h2{font-size:20px;margin:30px 0 8px}.ld h3{font-size:16px;margin:16px 0 4px}
+.ld .lead{font-size:17px;margin:14px 0}.ld li{margin:5px 0}.ld a{color:var(--pri)}
+.ld .cta{display:flex;gap:10px;flex-wrap:wrap;margin:18px 0}.ld .cta a{padding:9px 16px;border-radius:8px;border:1px solid var(--pri);text-decoration:none;font-weight:600}
+.ld .cta a.pri{background:var(--pri);color:#fff}
+.ld .box{background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:4px 18px 12px;margin-top:12px}
+.ld .lang{float:right;font-size:13px}.ld hr{border:0;border-top:1px solid var(--bd);margin:40px 0}
+.ld code{overflow-wrap:anywhere}
+.ld footer{font-size:13px;opacity:.8;margin-top:36px}
+</style></head>
+<body><main class="ld">
+<p class="lang"><a href="#en">English</a></p>
+<div class="hero"><img src="icon-192.png" alt="Icono de Gestor de papers"><div><h1>Gestor de papers</h1><p class="sub">Aplicación web gratuita para investigadores y estudiantes</p></div></div>
+
+<p class="lead"><b>Gestor de papers</b> sirve para organizar los artículos académicos (papers), libros, capítulos y sentencias que lees: guardar sus datos bibliográficos, tomar notas, clasificarlos por secciones y etiquetas, y exportar las citas en APA, MLA, Chicago, Harvard, Vancouver y otros estilos.</p>
+<div class="cta"><a class="pri" href="./">Abrir la aplicación</a><a href="privacidad.html">Política de privacidad</a></div>
+
+<h2>Qué puedes hacer</h2>
+<ul>
+<li><b>Tu biblioteca de lecturas</b>: autores, año, título, revista, DOI, páginas, valoración y estado de lectura de cada paper.</li>
+<li><b>Notas y citas textuales</b> por paper, organizadas por secciones (por ejemplo, los capítulos de una tesis) y etiquetas.</li>
+<li><b>Importar referencias</b> desde BibTeX, RIS, ScienceDirect, citas copiadas de Google Scholar o un DOI (consulta en CrossRef).</li>
+<li><b>Exportar la bibliografía</b> en varios estilos de cita, también estilos propios y citas de jurisprudencia.</li>
+<li><b>Varios proyectos</b>, cada uno con su archivo JSON, búsqueda avanzada, filtros, copias de seguridad y papelera.</li>
+<li>Funciona en el navegador y se puede <b>instalar como aplicación</b> (también sin conexión). Sin anuncios, sin registro y sin servidor propio.</li>
+</ul>
+
+<h2>Uso de Google Drive y de tus datos de Google</h2>
+<div class="box">
+<p>La sincronización con Google Drive es <b>opcional</b>: la aplicación funciona igual sin ella, guardando los datos en tu navegador y en los archivos JSON que tú eliges. Si la activas con «Conectar con Google Drive», la aplicación:</p>
+<ul>
+<li>Pide un único permiso: <code>https://www.googleapis.com/auth/drive.appdata</code>, que solo da acceso a una <b>carpeta privada y oculta de tu propio Google Drive</b> reservada para esta aplicación. <b>No puede ver, leer ni modificar ningún otro archivo de tu Drive.</b></li>
+<li>Usa esa carpeta solo para <b>guardar y sincronizar entre tus dispositivos</b> tus proyectos (papers, notas, ajustes, imágenes incrustadas y, si lo activas, los PDF que enlaces).</li>
+<li>Lee el correo de tu cuenta solo para mostrarte con qué cuenta has iniciado sesión.</li>
+<li>Se conecta <b>directamente desde tu navegador a Google</b>: los datos no pasan por ningún servidor de quien mantiene la aplicación, que no tiene acceso a ellos. No se venden, no se comparten con terceros, no se usan para publicidad ni para entrenar modelos de inteligencia artificial.</li>
+<li>Puedes cerrar sesión, borrar la copia de Drive desde la propia aplicación o retirar el permiso en <a href="https://myaccount.google.com/permissions">myaccount.google.com/permissions</a>.</li>
+</ul>
+<p>El uso y la transferencia a cualquier otra aplicación de la información recibida de las API de Google se ajustan a la <a href="https://developers.google.com/terms/api-services-user-data-policy">Política de datos de usuario de los servicios de API de Google</a>, incluidos los requisitos de uso limitado. Detalles en la <a href="privacidad.html">política de privacidad</a>.</p>
+</div>
+
+<h2>Quién la mantiene</h2>
+<p>Gestor de papers es un proyecto personal de código abierto mantenido por <a href="https://github.com/RMalumP">RMalumP</a> (<a href="https://github.com/RMalumP/GPapers">código en GitHub</a>). Contacto: <a href="mailto:r.malumbresp@gmail.com">r.malumbresp@gmail.com</a>.</p>
+
+<hr id="en">
+<div lang="en">
+<h2 style="margin-top:0">Gestor de papers (Paper manager) — English</h2>
+<p class="lead"><b>Gestor de papers</b> is a free web app that helps researchers and students organise the academic papers, books, chapters and court decisions they read: store bibliographic data, take notes and quotes, classify items into sections and tags, and export citations in APA, MLA, Chicago, Harvard, Vancouver and other styles.</p>
+<div class="cta"><a class="pri" href="./">Open the app</a><a href="privacidad.html#en">Privacy policy</a></div>
+<h3>Features</h3>
+<ul>
+<li>Reading library with authors, year, title, journal, DOI, pages, rating and reading status.</li>
+<li>Notes and quotes per paper, organised by sections and tags.</li>
+<li>Import references from BibTeX, RIS, ScienceDirect, Google Scholar citations or a DOI (CrossRef lookup).</li>
+<li>Export bibliographies in several citation styles, including custom styles.</li>
+<li>Several projects, advanced search, filters, backups and trash. Installable as an app (works offline). No ads, no sign-up, no backend server.</li>
+</ul>
+<h3>How the app uses Google user data</h3>
+<div class="box">
+<p>Google Drive sync is <b>optional</b>; the app works fully without it. When the user clicks “Connect to Google Drive”, the app:</p>
+<ul>
+<li>Requests a single scope, <code>https://www.googleapis.com/auth/drive.appdata</code>, which only grants access to a <b>private, hidden application data folder in the user’s own Google Drive</b>. <b>The app cannot see, read or modify any other file in the user’s Drive.</b></li>
+<li>Uses that folder only to <b>store the user’s own library and sync it across the user’s devices</b> (papers, notes, settings, embedded images and, if enabled, linked PDFs).</li>
+<li>Reads the account e-mail address only to show the user which account is signed in.</li>
+<li>Talks <b>directly from the browser to Google</b>. No data goes through any server run by the developer, who has no access to it. Data is never sold, shared with third parties, used for advertising, or used to train AI/ML models.</li>
+<li>Users can sign out, delete the Drive copy from inside the app, or revoke access at <a href="https://myaccount.google.com/permissions">myaccount.google.com/permissions</a>.</li>
+</ul>
+<p>Gestor de papers’ use and transfer to any other app of information received from Google APIs will adhere to the <a href="https://developers.google.com/terms/api-services-user-data-policy">Google API Services User Data Policy</a>, including the Limited Use requirements. See the <a href="privacidad.html#en">privacy policy</a>.</p>
+</div>
+<h3>Developer</h3>
+<p>Gestor de papers is an open-source personal project maintained by <a href="https://github.com/RMalumP">RMalumP</a> (<a href="https://github.com/RMalumP/GPapers">source code on GitHub</a>). Contact: <a href="mailto:r.malumbresp@gmail.com">r.malumbresp@gmail.com</a>.</p>
+</div>
+
+<footer><a href="./">Abrir la aplicación / Open the app</a> · <a href="privacidad.html">Política de privacidad / Privacy policy</a></footer>
+</main></body></html>
