@@ -2,10 +2,11 @@
 <html lang="es"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Política de privacidad · Gestor de papers</title><link rel="stylesheet" href="style.css"><link rel="icon" href="icon-192.png">
-<style>main.pv{max-width:760px;margin:0 auto;padding:24px 16px 48px}main.pv h1{font-size:26px;margin:0 0 4px}main.pv h2{font-size:18px;margin:24px 0 6px}main.pv li{margin:4px 0}main.pv a{color:var(--pri)}</style></head>
+<style>main.pv{max-width:760px;margin:0 auto;padding:24px 16px 48px}main.pv h1{font-size:26px;margin:0 0 4px}main.pv h2{font-size:18px;margin:24px 0 6px}main.pv li{margin:4px 0}main.pv a{color:var(--pri)}main.pv code{overflow-wrap:anywhere}</style></head>
 <body><main class="pv">
 <h1>Política de privacidad</h1>
-<p class="sub">Gestor de papers · Última actualización: octubre de 2026 · <a href="./">Volver a la aplicación</a></p>
+<p class="sub">Gestor de papers · Última actualización: 30 de octubre de 2026 · <a href="inicio.html">Qué es Gestor de papers</a> · <a href="./">Abrir la aplicación</a> · <a href="#en">English</a></p>
+<p>Esta política explica qué datos trata <b>Gestor de papers</b>, una aplicación web gratuita para organizar artículos académicos, notas y citas, y en particular cómo usa los datos de tu cuenta de Google si activas la sincronización con Google Drive.</p>
 
 <h2>Qué datos se tratan y dónde</h2>
 <p>Tus proyectos (papers, notas, secciones, etiquetas y papelera) y tus ajustes se guardan <b>en tu navegador</b> (copia de trabajo de cada proyecto en el almacenamiento de la aplicación) y en los <b>archivos JSON</b> que tú eliges. No se envían a ningún servidor de quien mantiene la aplicación: no hay cuentas, ni analíticas, ni publicidad, ni cookies de seguimiento.</p>
@@ -18,8 +19,13 @@
 <h2>Sincronización con Google Drive (opcional)</h2>
 <p>Si pulsas «Sincronizar» (🔄) y das permiso, la aplicación guarda una copia de tus proyectos (archivos <code>gpapers-…</code>: la lista de proyectos con los ajustes, cada proyecto, los cambios de cada autoguardado y las imágenes incrustadas) en una <b>carpeta privada y oculta de tu propio Google Drive</b>. Usa el permiso <code>drive.appdata</code>, que solo deja ver, crear y borrar esa carpeta concreta: la aplicación <b>no puede leer ni modificar ningún otro archivo de tu Drive</b>.</p>
 <ul><li>La conexión va directamente de tu navegador a Google. Quien mantiene la aplicación no tiene acceso a tu cuenta ni a tus datos; no se usan para publicidad, ni se venden ni se comparten con terceros.</li>
+<li>Además de esa carpeta, la aplicación solo lee el <b>correo de tu cuenta</b>, para mostrarte con qué cuenta has iniciado sesión.</li>
+<li>Los datos de Google <b>no se usan para entrenar modelos de inteligencia artificial</b> ni de aprendizaje automático, ni para ningún fin distinto de guardar y sincronizar tus propios proyectos.</li>
 <li>El acceso que da Google (token) se guarda en tu navegador, caduca en una hora y se borra al cerrar sesión.</li>
 <li>En tu dispositivo se recuerda que la sesión está iniciada, el correo de la cuenta (para mostrarlo), la fecha de la última sincronización, la última versión sincronizada (para combinar bien los cambios) y lo ya descargado de Drive (para no volver a descargarlo).</li></ul>
+
+<p><b>Uso limitado.</b> El uso y la transferencia a cualquier otra aplicación de la información recibida de las API de Google se ajustan a la <a href="https://developers.google.com/terms/api-services-user-data-policy">Política de datos de usuario de los servicios de API de Google</a>, incluidos los requisitos de uso limitado.</p>
+<p><b>Conservación.</b> La copia de Drive se conserva mientras tú la mantengas: no caduca ni la borra nadie más que tú (o Google si eliminas la aplicación de tu cuenta y vacías sus datos).</p>
 
 <h2>Cómo retirar el permiso o borrar los datos</h2>
 <ul><li><b>Cerrar sesión</b> (menú del icono 🔄): deja de sincronizar en ese dispositivo. Tus datos siguen en él y en tu Drive.</li>
@@ -28,6 +34,32 @@
 <li><b>Datos del navegador</b>: Ayuda → «Aplicación instalada» → «Olvidar la copia de sesión», o borra los datos del sitio desde el navegador. Tus archivos JSON solo los borras tú.</li>
 <li><b>Copias de seguridad y filtros guardados</b> se guardan solo en este navegador (nunca en Google Drive). Los <b>PDF enlazados</b> no se leen ni se envían a ningún sitio, salvo que actives en Configuración «Subir a mi Google Drive los PDF enlazados»: entonces cada PDF se copia a la carpeta privada y oculta de tu Google Drive (mismo permiso <code>drive.appdata</code>), solo para que puedas abrirlo desde tus otros dispositivos. Se borra de allí si quitas el enlace, y con «Borrar mis datos de Google Drive».</li></ul>
 
+<h2>Cambios en esta política</h2>
+<p>Si cambia algo de lo anterior, se actualizará esta página con su fecha. Si alguna vez se pidiera un permiso de Google distinto, la aplicación volvería a pedirte consentimiento.</p>
+
 <h2>Contacto</h2>
 <p>Dudas sobre esta política: <a href="mailto:r.malumbresp@gmail.com">r.malumbresp@gmail.com</a> o <a href="mailto:rmalum01@ucm.es">rmalum01@ucm.es</a>.</p>
+
+<hr id="en" style="border:0;border-top:1px solid var(--bd);margin:40px 0">
+<div lang="en">
+<h1>Privacy policy (English)</h1>
+<p class="sub">Gestor de papers · Last updated: 30 October 2026 · <a href="inicio.html#en">About Gestor de papers</a> · <a href="./">Open the app</a></p>
+<p>This policy explains what data <b>Gestor de papers</b>, a free web app to organise academic papers, notes and citations, processes, and in particular how it uses Google user data when the user turns on Google Drive sync.</p>
+<h2>What data is processed and where</h2>
+<p>Projects (papers, notes, sections, tags and trash) and settings are stored <b>in the user’s browser</b> and in the <b>JSON files</b> the user chooses. They are never sent to any server run by the developer: there are no accounts, analytics, ads or tracking cookies.</p>
+<h2>When anything goes online</h2>
+<ul><li><b>DOI lookup</b>: the DOI is sent to CrossRef (api.crossref.org) to fetch the paper’s metadata.</li>
+<li><b>Images by URL</b>: the browser downloads them from their website.</li>
+<li><b>Google Drive sync</b>, only if the user turns it on.</li></ul>
+<h2>Google Drive sync (optional) and Google user data</h2>
+<ul><li><b>Scope requested</b>: only <code>https://www.googleapis.com/auth/drive.appdata</code>. It gives access exclusively to a private, hidden application data folder in the user’s own Google Drive. The app <b>cannot see, read or modify any other file</b> in the user’s Drive.</li>
+<li><b>Data accessed</b>: the files the app itself creates in that folder (named <code>gpapers-…</code>: the project list and settings, each project, incremental changes, embedded images and, if the user enables it, linked PDFs), and the account e-mail address, only to display which account is signed in.</li>
+<li><b>How it is used</b>: solely to store the user’s own library and keep it in sync across the user’s devices.</li>
+<li><b>Sharing</b>: the browser talks directly to Google. No Google user data is sent to, stored on or seen by the developer or any third party. It is never sold, used for advertising, or used to develop, improve or train generalised AI/ML models.</li>
+<li><b>Storage and retention</b>: the access token is kept in the browser, expires after one hour and is deleted on sign-out. The Drive copy stays in the user’s Drive until the user deletes it.</li>
+<li><b>Deletion and revocation</b>: sign out from the 🔄 menu; delete the Drive copy with “Borrar mis datos de Google Drive” (Delete my Google Drive data); revoke access at <a href="https://myaccount.google.com/permissions">myaccount.google.com/permissions</a>; clear site data in the browser to remove local data.</li></ul>
+<p><b>Limited Use.</b> Gestor de papers’ use and transfer to any other app of information received from Google APIs will adhere to the <a href="https://developers.google.com/terms/api-services-user-data-policy">Google API Services User Data Policy</a>, including the Limited Use requirements.</p>
+<h2>Changes and contact</h2>
+<p>Any change will be published on this page with its date. Questions: <a href="mailto:r.malumbresp@gmail.com">r.malumbresp@gmail.com</a>.</p>
+</div>
 </main></body></html>
