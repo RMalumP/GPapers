@@ -205,6 +205,6 @@ main > .row > #q{width:220px;min-width:0;flex:0 1 220px}
 .fhb b,.fh2 .fht{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.fh2{gap:4px}.fh2 .fhx,.fs .fh2 .mgb{padding:2px 6px;margin-right:0}
 #fs-read .fhb{flex:0 0 auto}#fs-read .fh2 #readP{flex:1;width:auto;margin:0 4px 0 6px}
 .mgb .mgl[hidden]{display:none}
-#sg-search .sb .fs{margin-top:4px}#advUI{display:flex;flex-direction:column;gap:6px}.advm{font-size:13px}.advm select{font-size:13px}
+#sg-search .sb .fs{margin-top:4px}#advUI{display:flex;flex-direction:column;gap:6px}#fs-adv.fold #advUI{display:none}.advm{font-size:13px}.advm select{font-size:13px}
 .advr{display:grid;grid-template-columns:1fr 1fr;gap:4px;padding:6px;border:1px solid var(--bd);border-radius:8px;background:var(--card)}.advr select,.advr input{min-width:0;font-size:13px}
 .advr input,.advr > span{grid-column:1}.advr .x{grid-column:2;justify-self:end;border:0;background:none;color:var(--red);padding:2px 6px}#fs-adv .fh2 .dot{margin-left:0}

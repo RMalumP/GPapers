@@ -264,7 +264,7 @@ with sync_playwright() as pw:
     pg.select_option('#advUI .advr >> nth=1 >> select >> nth=1', 'empty')
     eq('«está vacío» no pide valor', pg.evaluate("[$('#advUI .advr:nth-of-type(3) input'), F.adv.rules[1].op]") if False else pg.evaluate("[document.querySelectorAll('#advUI .advr')[1].querySelector('input'), F.adv.rules[1].op]"), [None, 'empty'])
     eq('las condiciones se guardan con la interfaz y en las vistas', pg.evaluate("[uiState().F.adv.rules.length, favNow().adv.mode]"), [2, 'any'])
-    pg.evaluate("applyUI({v: 1, F: {adv: {mode: 'raro', rules: [{f: 'title', op: 'has', v: 'x'}, {f: 'nada', op: 'has', v: 'y'}, {f: 'year', op: 'has', v: '1'}]}}})")
+    pg.evaluate("applyUI({v: 1, F: {adv: {mode: 'raro', rules: [{f: 'title', op: 'has', v: 'x'}, {f: 'nada', op: 'has', v: 'y'}, {f: 'year', op: 'has', v: '1'}]}}}); fsToggle('adv', false)")
     eq('al recuperar, lo que no es válido se ignora', pg.evaluate("[F.adv.mode, F.adv.rules.map(r => r.f)]"), ['all', ['title']])
     pg.click('#advUI button:has-text("Quitar todas")')
     eq('«Quitar todas» vacía la búsqueda avanzada', pg.evaluate("[F.adv.rules.length, document.querySelectorAll('#list article.card').length, $('#d-adv').hidden]"), [0, 2, True])
