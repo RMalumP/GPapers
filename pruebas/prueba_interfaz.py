@@ -41,6 +41,7 @@ with sync_playwright() as pw:
     # barra lateral
     eq('barra lateral: Buscar, Filtros | Vistas, Recientes y Selección (ocultas sin contenido)', A.evaluate("[...document.querySelectorAll('#side > .sg, #side > hr')].map(g => g.tagName === 'HR' ? '——' : [g.id, g.hidden])"), [['sg-search', False], ['sg-filt', False], '——', ['sg-fav', False], ['sg-rec', True], ['sg-sel', True], '——'])
     eq('Buscar contiene Búsqueda avanzada (plegada al empezar) y, debajo, Ordenar', A.evaluate("[[...document.querySelectorAll('#sg-search .fs')].map(e => [e.id, e.classList.contains('fold')]), !!document.querySelector('#fs-sort #sortUI')]"), [[['fs-adv', True], ['fs-sort', False]], True])
+    eq('Búsqueda avanzada plegada oculta su contenido; al desplegarla se ve', A.evaluate("[$('#advUI').offsetParent === null, (fsToggle('adv'), $('#advUI').offsetParent !== null), (fsToggle('adv'), $('#advUI').offsetParent === null)]"), [True, True, True])
     A.click('#fs-sort .fhb'); A.click('#sg-search .sh'); A.click('#sg-search .sh')
     eq('al desplegar Buscar, Ordenar sale desplegado', A.evaluate("[document.querySelector('#sg-search').classList.contains('fold'), document.querySelector('#fs-sort').classList.contains('fold')]"), [False, False])
     A.click('#side > button.sh', button='right')
