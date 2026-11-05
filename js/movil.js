@@ -1,0 +1,95 @@
+'use strict';
+/* ===== Interfaz para móviles =====
+   Solo se activa en pantallas táctiles estrechas (o un móvil en horizontal): pone la clase «mv» en <html> y todo lo de movil.css va detrás de ella.
+   En el ordenador (ratón o ventana ancha) no cambia nada: no se crea ningún elemento y no se toca ninguna función.
+   No duplica lógica: reutiliza los botones y funciones de siempre y solo los coloca de otra forma (panel lateral, barra inferior, menú ⋯). */
+const MV_Q = matchMedia('(pointer: coarse) and (max-width: 760px), (pointer: coarse) and (max-height: 500px)');
+const mvOn = () => MV_Q.matches;
+document.documentElement.classList.toggle('mv', mvOn());   // antes de pintar: sin parpadeo del diseño de escritorio
+
+let MV_BUILT = false;
+const mv$ = s => document.querySelector(s);
+function mvDrawer(open) {   // la barra lateral, como panel que entra desde la izquierda
+  const on = open ?? !document.documentElement.classList.contains('mv-dr');
+  if (on) mvMore(false);
+  document.documentElement.classList.toggle('mv-dr', on);
+  mv$('#side')?.setAttribute('aria-hidden', String(!on)); mv$('#mvMenuBtn')?.setAttribute('aria-expanded', String(on));
+  if (on) mvCount();
+}
+function mvMore(open) {   // menú ⋯ de la cabecera (Google Drive, Guardar, Importar, Exportar y Archivo)
+  const on = open ?? !document.documentElement.classList.contains('mv-mo');
+  if (on) mvDrawer(false);
+  document.documentElement.classList.toggle('mv-mo', on); mv$('#mvMoreBtn')?.setAttribute('aria-expanded', String(on));
+}
+function mvClose() { mvDrawer(false); mvMore(false); }
+function mvFilters() {   // botón «Filtros»: abre el panel con el grupo de filtros desplegado
+  mvDrawer(true); const g = mv$('#sg-filt'); if (g) g.classList.remove('fold'); mv$('#side').classList.remove('min');
+  g?.scrollIntoView({block: 'start'});
+}
+function mvCount() { const c = mv$('#count'), b = mv$('#mvSeeBtn'); if (!c || !b) return; const t = 'Ver resultados · ' + c.textContent.split('·')[0].trim(); if (b.textContent !== t) b.textContent = t; }
+function mvDots() {   // punto en «Filtros» si hay algún filtro activo (el mismo aviso que ya da la barra)
+  const on = !!mv$('#d-filt:not([hidden])') || !!mv$('#d-adv:not([hidden])') || !mv$('#actF')?.hidden;
+  document.querySelectorAll('.mvfd').forEach(d => { if (d.hidden === on) d.hidden = !on; });   // solo si cambia: si no, los observadores se llamarían sin fin
+}
+function mvSearchDock() { const q = mv$('#q'), box = mv$('#mvSearch'); if (mvOn() && q && box && q.parentElement !== box) box.prepend(q); }
+
+function mvBuild() {
+  if (MV_BUILT) return; MV_BUILT = true;
+  const hdr = mv$('header'), side = mv$('#side'), main = mv$('main');
+  // Cabecera: ☰ al principio y ⋯ al final; los botones de la cabecera pasan al menú ⋯
+  hdr.insertAdjacentHTML('afterbegin', '<button id="mvMenuBtn" class="mvib" aria-label="Menú" aria-expanded="false" aria-controls="side">☰</button>');
+  hdr.insertAdjacentHTML('beforeend', '<button id="mvMoreBtn" class="mvib" aria-label="Más acciones" aria-expanded="false">⋯</button>');
+  hdr.querySelector('.row').id = 'mvHdrRow';
+  // Panel lateral: cabecera con cerrar y botón fijo para volver a la lista
+  side.insertAdjacentHTML('afterbegin', '<div class="mvdh"><b>Menú</b><button class="mvib" data-mv="close" aria-label="Cerrar menú">✕</button></div>');
+  side.insertAdjacentHTML('beforeend', '<div class="mvdf"><button class="pri" id="mvSeeBtn" data-mv="close">Ver resultados</button></div>');
+  document.body.insertAdjacentHTML('beforeend', '<div id="mvShade" data-mv="close" hidden></div>');
+  // Buscador fijo encima de la lista, con acceso a los filtros
+  main.insertAdjacentHTML('afterbegin', '<div id="mvTop"><div id="mvSearch"><button class="mvib" data-mv="filt" aria-label="Filtros">🎚️<span class="dot mvfd" hidden></span></button></div></div>');
+  // Barra inferior
+  document.body.insertAdjacentHTML('beforeend', `<nav id="mvNav" aria-label="Navegación principal">
+    <button data-mv="top"><span class="ic">📚</span><span>Papers</span></button>
+    <button data-mv="filt"><span class="ic">🎚️<span class="dot mvfd" hidden></span></span><span>Filtros</span></button>
+    <button class="mvnew" data-mv="new" aria-label="Nuevo paper"><span class="ic">＋</span><span>Nuevo</span></button>
+    <button data-mv="exp"><span class="ic">📤</span><span>Exportar</span></button>
+    <button data-mv="more"><span class="ic">⋯</span><span>Más</span></button></nav>`);
+  mvSearchDock();
+
+  const act = {dx: () => { const d = [...document.querySelectorAll('dialog[open]')].pop(); if (d && d.dispatchEvent(new Event('cancel', {cancelable: true}))) d.close(); }, close: mvClose, filt: mvFilters, more: () => mvMore(), new: () => { mvClose(); openPaper(); }, exp: () => { mvClose(); openEx(); }, top: () => { mvClose(); scrollTo({top: 0, behavior: 'smooth'}); }};
+  document.addEventListener('click', e => {
+    if (!mvOn()) return;
+    const b = e.target.closest('[data-mv]'); if (b) { act[b.dataset.mv]?.(); return; }
+    if (e.target.closest('#mvMenuBtn')) return mvDrawer();
+    if (e.target.closest('#mvMoreBtn')) { e.stopPropagation(); return mvMore(); }
+    // en el menú ⋯, cualquier acción lo cierra (salvo la casilla de autoguardado)
+    if (e.target.closest('#mvHdrRow button') && !e.target.closest('#fmBtn')) setTimeout(() => mvMore(false));
+    // en el panel lateral, lo que abre una ventana cierra el panel
+    if (e.target.closest('#side')) setTimeout(() => { if (mv$('dialog[open]')) mvDrawer(false); mvCount(); });
+  });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && mvOn()) mvClose(); });
+  // la búsqueda se queda arriba aunque la barra se pliegue o despliegue (este observador va después del de lista.js)
+  new MutationObserver(mvSearchDock).observe(side, {attributes: true, attributeFilter: ['class']});
+  new MutationObserver(() => { mvDots(); mvCount(); }).observe(main, {subtree: true, childList: true, attributes: true, attributeFilter: ['hidden']});
+  new MutationObserver(mvDots).observe(side, {subtree: true, attributes: true, attributeFilter: ['hidden']});
+  mvDots();
+  // ventanas sin cabecera propia (Exportar, Importar…): un ✕ arriba, porque a pantalla completa no hay «fuera» donde pulsar
+  const dx = d => { if (!mvOn() || !d.open || d.querySelector(':scope > .dh, :scope > .mvdx')) return;
+    d.insertAdjacentHTML('afterbegin', '<button class="mvdx" data-mv="dx" aria-label="Cerrar">✕</button>'); };
+  document.querySelectorAll('dialog').forEach(d => new MutationObserver(() => dx(d)).observe(d, {childList: true, attributes: true, attributeFilter: ['open']}));
+  // pulsación larga = clic derecho (en iPhone no existe; en Android ya lo hace el navegador y no se repite)
+  let lp = 0, lpEv = null, lpDone = false;
+  document.addEventListener('touchstart', e => {
+    lpDone = false; if (!mvOn() || e.touches.length !== 1) return; const t = e.target.closest('[data-oncontextmenu]'); if (!t) return;
+    const {clientX, clientY} = e.touches[0]; clearTimeout(lp);
+    lp = setTimeout(() => { lpDone = true; lpEv = t.dispatchEvent(new MouseEvent('contextmenu', {bubbles: true, cancelable: true, clientX, clientY})); navigator.vibrate?.(15); }, 550);
+  }, {passive: true});
+  ['touchmove', 'touchend', 'touchcancel'].forEach(k => document.addEventListener(k, () => clearTimeout(lp), {passive: true}));
+  document.addEventListener('contextmenu', e => { if (e.isTrusted) clearTimeout(lp); if (e.isTrusted && lpDone && mvOn()) e.preventDefault(); }, true);
+  document.addEventListener('click', e => { if (lpDone && mvOn()) { lpDone = false; e.preventDefault(); e.stopPropagation(); } }, true);   // el toque que abrió el menú no hace además clic
+}
+function mvApply() {
+  const on = mvOn(); document.documentElement.classList.toggle('mv', on);
+  if (on) mvBuild(); else { mvClose(); if (MV_BUILT && typeof sbSearchDock === 'function') sbSearchDock(); }   // al salir, la búsqueda vuelve a su sitio de siempre
+}
+MV_Q.addEventListener('change', mvApply);
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', mvApply); else mvApply();
