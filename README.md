@@ -42,6 +42,16 @@ Los ajustes son comunes a todos: nombre de la aplicación, colores, atajos, tipo
 - **PDF enlazado** (Datos): solo el nombre y la página van al JSON; el enlace al archivo vive en el navegador. Opcional (Configuración → «Subir a mi Google Drive los PDF enlazados»): cada PDF se copia a la carpeta oculta de Drive (`gpapers-pdf-<id>`, subida reanudable, máx. 100 MB) y se abre desde otros dispositivos; se borra al quitar el enlace.
 - **Copiar cita 📋** en tarjetas y tabla; **vistas ⭐** (filtros guardados) por proyecto (IndexedDB `fav:<id>`; los recientes, en `rec:<id>`); **barra de progreso** de lectura junto al nombre del proyecto.
 
+## Interfaz para móviles
+En pantallas táctiles estrechas (móvil en vertical, o en horizontal con poca altura) la aplicación cambia sola a una interfaz adaptada; en el ordenador no cambia nada, aunque la ventana sea pequeña.
+- **Cabecera de una fila**: ☰ (menú), nombre del proyecto con su estado y ⋯ (Google Drive, Guardar, Importar, Exportar y todo lo de Archivo).
+- **Buscador fijo** encima de la lista, con acceso directo a los filtros; la fila de Tabla, Sección, Etiquetas y Visibles se desliza en horizontal.
+- **Barra lateral como panel** que entra desde la izquierda, con «Ver resultados» para volver a la lista.
+- **Barra inferior**: Papers, Filtros, ＋ Nuevo, Exportar y Más.
+- **Ventanas a pantalla completa**, con pestañas deslizables y ✕ arriba; la vista Tabla se muestra como fichas.
+- **Pulsación larga** = clic derecho (también en iPhone). Los campos usan texto de 16 px para que el iPhone no amplíe la página.
+Todo vive en `movil.css` y `js/movil.js`, detrás de la clase `mv` de `<html>`, y reutiliza las funciones de siempre. Pruebas: `python3 pruebas/prueba_movil.py`.
+
 ## Añadir app
 En la barra lateral, dentro de «Información» (plegada, bajo Configuración), el botón **Añadir app** (mismo estilo que Ayuda) instala la aplicación en el dispositivo. Solo se ve si se abre desde la web y aún no está instalada
 (se oculta al abrirla como app y al instalarse). En Chrome y Edge la instalación la ofrece el navegador; en los demás se explica cómo hacerlo.

@@ -1,0 +1,120 @@
+/* ===== Interfaz para móviles =====
+   Todo va detrás de html.mv, que solo pone js/movil.js en pantallas táctiles estrechas: en el ordenador estas reglas no se aplican. */
+#mvMenuBtn,#mvMoreBtn,#mvTop,#mvNav,#mvShade,.mvdh,.mvdf{display:none}
+
+html.mv{--mvnav:60px;--mvsafe:env(safe-area-inset-bottom,0px);-webkit-text-size-adjust:100%}
+html.mv body{padding-bottom:calc(var(--mvnav) + var(--mvsafe) + 8px);overscroll-behavior-y:contain}
+html.mv input,html.mv select,html.mv textarea{font-size:16px}   /* menos de 16 px hace que el iPhone amplíe la página al escribir */
+html.mv button{min-height:40px;touch-action:manipulation}
+html.mv .mvib{display:inline-flex;align-items:center;justify-content:center;min-width:44px;min-height:44px;padding:0;border:0;background:none;font-size:22px;line-height:1;position:relative}
+
+/* --- Cabecera: una sola fila (☰ · proyecto · estado · ⋯) --- */
+html.mv header{position:sticky;top:0;z-index:40;background:var(--bg);flex-wrap:nowrap;gap:4px;padding:4px 4px 4px 2px;padding-top:max(4px,env(safe-area-inset-top))}
+html.mv #mvMenuBtn,html.mv #mvMoreBtn{display:inline-flex;flex-shrink:0}
+html.mv h1{display:none}
+html.mv .pj{margin-left:0;min-width:0}html.mv .pjs{display:none}
+html.mv #pjName{font-size:17px;max-width:42vw}html.mv #pjBtn{min-height:36px;min-width:36px;padding:0}
+html.mv #fname{font-size:12px;min-width:0;flex:1}
+html.mv #pjProg{display:none}
+/* el resto de la cabecera, como menú ⋯ que baja desde arriba */
+html.mv #mvHdrRow{display:none;position:fixed;z-index:70;top:calc(52px + env(safe-area-inset-top,0px));right:8px;left:auto;width:min(320px,calc(100vw - 16px));max-height:calc(100dvh - 140px);overflow:auto;flex-direction:column;align-items:stretch;gap:2px;padding:6px;background:var(--card);border:1px solid var(--bd);border-radius:12px;box-shadow:0 8px 28px #0005}
+html.mv.mv-mo #mvHdrRow{display:flex}
+html.mv #mvHdrRow>button,html.mv #mvHdrRow #fmenu button{justify-content:flex-start;text-align:left;border:0;background:none;color:inherit;padding:10px 12px;min-height:44px;display:flex;align-items:center;gap:8px;white-space:normal}
+html.mv #mvHdrRow>button.pri{background:var(--pri);color:#fff;border-radius:8px}
+html.mv #mvHdrRow>button[title^="Guardar"]::after{content:"Guardar"}
+html.mv #mvHdrRow #syncBtn[hidden]{display:none}html.mv #syncBtn .syl{display:inline}
+html.mv #mvHdrRow .fm{display:contents}html.mv #fmBtn{display:none}
+html.mv #fmenu,html.mv #fmenu[hidden]{display:flex;position:static;box-shadow:none;border:0;border-top:1px solid var(--bd);border-radius:0;padding:4px 0 0;margin-top:4px;min-width:0;background:none}
+html.mv #fmenu label{padding:10px 12px;display:flex;gap:8px;align-items:center}
+
+/* --- Panel lateral deslizante --- */
+html.mv #app{display:block;padding:0 10px}
+html.mv aside{position:fixed;z-index:80;top:0;bottom:0;left:0;width:min(86vw,360px)!important;max-width:none;padding:0 0 0 env(safe-area-inset-left,0px);background:var(--bg);overflow-y:auto;overscroll-behavior:contain;transform:translateX(-102%);transition:transform .22s ease;box-shadow:0 0 32px #0006;visibility:hidden}
+html.mv.mv-dr aside{transform:none;visibility:visible}
+html.mv #mvShade{display:block;position:fixed;inset:0;z-index:75;background:#0006;opacity:0;pointer-events:none;transition:opacity .22s}
+html.mv.mv-dr #mvShade,html.mv.mv-mo #mvShade{opacity:1;pointer-events:auto}html.mv.mv-mo #mvShade{z-index:65;background:#0003}
+html.mv #mvShade[hidden]{display:block}
+html.mv .mvdh{display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:3;background:var(--bg);padding:max(6px,env(safe-area-inset-top)) 6px 6px 16px;border-bottom:1px solid var(--bd);font-size:17px}
+html.mv .mvdf{display:block;position:sticky;bottom:0;z-index:3;margin-top:auto;padding:10px 12px calc(10px + var(--mvsafe));background:var(--bg);border-top:1px solid var(--bd)}
+html.mv .mvdf button{width:100%;min-height:46px;font-weight:600}
+html.mv #sbGrip,html.mv aside>.sh:first-of-type{display:none}
+html.mv aside.min .sb,html.mv aside.min .lbl,html.mv aside.min .sbinfo{display:revert}html.mv aside.min .sb{display:flex}   /* en el móvil la barra nunca está «plegada en iconos» */
+html.mv aside.min .dot{position:static}
+html.mv aside .sh{min-height:48px;padding:10px 16px}
+html.mv aside .sb{padding:2px 16px 14px}
+html.mv aside .chip{padding:6px 12px;margin:3px 6px 3px 0}
+
+
+html.mv .trb{margin-top:0}
+
+/* --- Buscador fijo y barra de herramientas de la lista --- */
+html.mv #mvTop{display:block;position:sticky;top:calc(52px + env(safe-area-inset-top,0px));z-index:30;background:var(--bg);margin:0 -10px;padding:6px 10px}
+html.mv #mvSearch{display:flex;gap:6px;align-items:center}
+html.mv #mvSearch #q{flex:1;min-width:0;min-height:44px;border-radius:22px;padding:8px 16px}
+html.mv #mvSearch .mvib{border:1px solid var(--bd);border-radius:50%;background:var(--card);font-size:19px}
+html.mv .mvfd{position:absolute;top:6px;right:6px;margin:0}
+html.mv main>.row{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;margin:0 -10px;padding:2px 10px 6px;gap:6px;-webkit-overflow-scrolling:touch}
+html.mv main>.row::-webkit-scrollbar{display:none}
+html.mv main>.row>*{flex-shrink:0}
+html.mv main>.row>.pri:first-child{display:none}   /* «Nuevo paper» está en la barra inferior */
+html.mv main>.row .bar,html.mv main>.row .chips{flex-wrap:nowrap}
+html.mv main>.row .chip{white-space:nowrap;padding:6px 12px}
+html.mv main>.row button{border-radius:20px;padding:6px 14px}
+html.mv #count{font-size:13px;opacity:.75;white-space:nowrap;padding-right:10px}
+html.mv #actF{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}html.mv #actF .af,html.mv #actF .afx{white-space:nowrap;flex-shrink:0;min-height:34px}
+
+/* --- Tarjetas --- */
+html.mv .card{padding:12px 14px;border-radius:12px;margin-top:10px}
+html.mv .card[draggable],html.mv .tbl tr[draggable]{-webkit-user-drag:none}
+html.mv .card .ct{flex-wrap:wrap;gap:6px}
+html.mv .card .ct .sel{font-size:0;gap:0}html.mv .card .ct .sel input{width:22px;height:22px;margin:0 4px 0 0}
+html.mv .card .sm{min-height:36px;padding:4px 12px;font-size:14px}
+html.mv .card{position:relative}html.mv .card .ct{padding-right:44px}html.mv .card .ct .x{position:absolute;top:10px;right:10px;min-height:36px;min-width:36px}
+html.mv .card .rd{margin-left:0}html.mv .rst{min-height:30px;padding:2px 10px;font-size:13px}
+html.mv .card h3{font-size:17px;line-height:1.3}
+html.mv .card a{word-break:break-word;overflow-wrap:anywhere;display:inline-block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px}
+html.mv .stv{font-size:18px}
+
+/* --- Vista tabla: cada fila, una ficha compacta --- */
+html.mv .twrap{overflow:visible;border:0;background:none}
+html.mv .tbl,html.mv .tbl tbody{display:block;background:none}html.mv .tbl thead{display:none}
+html.mv .tbl tr.rw{display:flex;flex-wrap:wrap;align-items:center;gap:2px 8px;background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:8px 10px;margin-top:8px;font-size:14px}
+html.mv .tbl tr.rw td{display:block;border:0;padding:0}
+html.mv .tbl tr.rw td:empty,html.mv .tbl tr.rw td.timg:not(:has(img)){display:none}
+html.mv .tbl tr.rw td.tt{flex:1 1 calc(100% - 90px);min-width:0;font-size:15px}
+html.mv .tbl tr.rw td:nth-child(4),html.mv .tbl tr.rw td:nth-child(6){flex-basis:100%;opacity:.8;font-size:13px}
+html.mv .tbl tr.rw td:nth-child(5){opacity:.8;font-size:13px}
+html.mv .tbl tr.rw td.nw{margin-left:auto}html.mv .tbl tr.rw .sm{min-height:34px}
+html.mv .tbl tr.rw td input[type=checkbox]{width:22px;height:22px}
+html.mv .tbl tr.rn{display:block}html.mv .tbl tr.rn td{display:block;padding:6px 10px}html.mv .tbl tr.rn td:first-child{display:none}
+
+/* --- Barra inferior --- */
+html.mv #mvNav{display:grid;grid-template-columns:repeat(5,1fr);position:fixed;z-index:60;left:0;right:0;bottom:0;height:calc(var(--mvnav) + var(--mvsafe));padding:0 4px var(--mvsafe);background:var(--card);border-top:1px solid var(--bd);box-shadow:0 -2px 10px #0002}
+html.mv #mvNav button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;border:0;background:none;padding:4px 0;font-size:11px;min-height:0}
+html.mv #mvNav .ic{font-size:20px;width:auto;position:relative}html.mv #mvNav .mvfd{top:-2px;right:-8px}
+html.mv #mvNav .mvnew .ic{background:var(--pri);color:#fff;width:46px;height:34px;border-radius:17px;display:flex;align-items:center;justify-content:center;font-size:22px}
+html.mv.mv-dr #mvNav{z-index:50}
+html.mv #toast{bottom:calc(var(--mvnav) + var(--mvsafe) + 10px);max-width:calc(100vw - 20px);flex-wrap:wrap}
+
+/* --- Ventanas a pantalla completa --- */
+html.mv dialog{width:100vw;max-width:100vw;height:100dvh;max-height:100dvh;margin:0;border:0;border-radius:0;padding:0 14px calc(16px + var(--mvsafe))}
+html.mv dialog>.dh{margin:0 -14px 8px;padding:max(10px,env(safe-area-inset-top)) 14px 8px;flex-wrap:wrap;gap:8px}
+html.mv dialog>.dh h2{font-size:18px}
+html.mv dialog .dbtn{flex-wrap:wrap;gap:6px}
+html.mv dialog .tabs{overflow-x:auto;flex-wrap:nowrap;scrollbar-width:none;gap:14px}html.mv dialog .tabs::-webkit-scrollbar{display:none}
+html.mv dialog .tabs button{white-space:nowrap;flex-shrink:0}
+html.mv dialog .grid,html.mv .cugrid,html.mv .cpick,html.mv .ctr{grid-template-columns:minmax(0,1fr)}
+html.mv dialog .row button{min-height:42px}
+html.mv .scr{flex-wrap:wrap}html.mv .scb button{min-width:0}
+html.mv #ctx{min-width:220px;max-width:calc(100vw - 16px);border-radius:12px}html.mv #ctx button{min-height:44px;padding:8px 14px}
+html.mv dialog{overflow-x:hidden}
+html.mv dialog :is(input:not([type=checkbox]):not([type=radio]):not([type=color]),select,textarea){max-width:100%;min-width:0}
+html.mv dialog .grid label>*{max-width:100%}
+html.mv label.row{flex-wrap:nowrap;align-items:flex-start}html.mv label.row>input[type=checkbox]{flex-shrink:0;margin-top:3px}
+html.mv dialog .ctabs{display:flex;overflow-x:auto;flex-wrap:nowrap;scrollbar-width:none}html.mv dialog .ctabs::-webkit-scrollbar{display:none}html.mv dialog .ctabs button{white-space:nowrap;flex-shrink:0}
+/* ventanas sin cabecera propia: botón ✕ fijo arriba a la derecha */
+.mvdx{display:none}
+html.mv dialog>.mvdx{display:flex;position:sticky;top:0;float:right;z-index:5;margin:6px -6px 0 8px;font-size:20px;background:var(--bg);border:1px solid var(--bd);border-radius:50%;width:44px;height:44px}
+html.mv dialog>.dh+.mvdx,html.mv dialog>.dh~.mvdx{display:none}
+html.mv .sgh{display:flex}html.mv #sg-search .sgh{display:flex}html.mv #sg-search .sgh .sh::after{content:"Buscar y ordenar"}
+html.mv #sg-search .sgh .sh{width:100%}
