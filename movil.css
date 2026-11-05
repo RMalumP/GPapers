@@ -28,7 +28,7 @@ html.mv #fmenu,html.mv #fmenu[hidden]{display:flex;position:static;box-shadow:no
 html.mv #fmenu label{padding:10px 12px;display:flex;gap:8px;align-items:center}
 
 /* --- Panel lateral deslizante --- */
-html.mv #app{display:block;padding:0 10px}
+html.mv #app{display:block;padding:0 10px}html.mv main{padding:0 0 8px;margin:0}
 html.mv aside{position:fixed;z-index:80;top:0;bottom:0;left:0;width:min(86vw,360px)!important;max-width:none;padding:0 0 0 env(safe-area-inset-left,0px);background:var(--bg);overflow-y:auto;overscroll-behavior:contain;transform:translateX(-102%);transition:transform .22s ease;box-shadow:0 0 32px #0006;visibility:hidden}
 html.mv.mv-dr aside{transform:none;visibility:visible}
 html.mv #mvShade{display:block;position:fixed;inset:0;z-index:75;background:#0006;opacity:0;pointer-events:none;transition:opacity .22s}
@@ -48,9 +48,9 @@ html.mv aside .chip{padding:6px 12px;margin:3px 6px 3px 0}
 html.mv .trb{margin-top:0}
 
 /* --- Buscador fijo y barra de herramientas de la lista --- */
-html.mv #mvTop{display:block;position:sticky;top:calc(52px + env(safe-area-inset-top,0px));z-index:30;background:var(--bg);margin:0 -10px;padding:6px 10px}
+html.mv #mvTop{display:block;position:sticky;top:calc(52px + env(safe-area-inset-top,0px));z-index:30;background:var(--bg);margin:0 -10px;padding:6px 10px 4px}
 html.mv #mvSearch{display:flex;gap:6px;align-items:center}
-html.mv #mvSearch #q{flex:1;min-width:0;min-height:44px;border-radius:22px;padding:8px 16px}
+html.mv #mvSearch #q{flex:1;min-width:0;min-height:40px;border-radius:22px;padding:8px 16px}
 html.mv #mvSearch .mvib{border:1px solid var(--bd);border-radius:50%;background:var(--card);font-size:19px}
 html.mv .mvfd{position:absolute;top:6px;right:6px;margin:0}
 html.mv main>.row{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;margin:0 -10px;padding:2px 10px 6px;gap:6px;-webkit-overflow-scrolling:touch}
@@ -58,34 +58,48 @@ html.mv main>.row::-webkit-scrollbar{display:none}
 html.mv main>.row>*{flex-shrink:0}
 html.mv main>.row>.pri:first-child{display:none}   /* «Nuevo paper» está en la barra inferior */
 html.mv main>.row .bar,html.mv main>.row .chips{flex-wrap:nowrap}
-html.mv main>.row .chip{white-space:nowrap;padding:6px 12px}
-html.mv main>.row button{border-radius:20px;padding:6px 14px}
+html.mv main>.row .chip{white-space:nowrap;padding:4px 12px}
+html.mv main>.row button{border-radius:18px;padding:4px 12px;min-height:34px;font-size:14px}
 html.mv #count{font-size:13px;opacity:.75;white-space:nowrap;padding-right:10px}
 html.mv #actF{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}html.mv #actF .af,html.mv #actF .afx{white-space:nowrap;flex-shrink:0;min-height:34px}
 
 /* --- Tarjetas --- */
-html.mv .card{padding:12px 14px;border-radius:12px;margin-top:10px}
+html.mv .card .ct{margin-bottom:2px}html.mv .card .ct .sm,html.mv .card>.row .sm{min-height:32px;padding:2px 10px;font-size:13px}
+html.mv .card .ct .cpb,html.mv .card>.row .sm{border-color:transparent;background:none}
+html.mv .card .th{margin-top:2px}html.mv .card>.row{margin-top:2px;gap:4px}
+html.mv .card .au{font-size:14px;opacity:.85}
+html.mv .card{padding:8px 10px 6px;border-radius:12px;margin-top:6px}
 html.mv .card[draggable],html.mv .tbl tr[draggable]{-webkit-user-drag:none}
 html.mv .card .ct{flex-wrap:wrap;gap:6px}
 html.mv .card .ct .sel{font-size:0;gap:0}html.mv .card .ct .sel input{width:22px;height:22px;margin:0 4px 0 0}
 html.mv .card .sm{min-height:36px;padding:4px 12px;font-size:14px}
-html.mv .card{position:relative}html.mv .card .ct{padding-right:44px}html.mv .card .ct .x{position:absolute;top:10px;right:10px;min-height:36px;min-width:36px}
+html.mv .card{position:relative}html.mv .card .ct{padding-right:44px}html.mv .card .ct .x{position:absolute;top:8px;right:6px;min-height:32px;min-width:32px;border-color:transparent;opacity:.7}
 html.mv .card .rd{margin-left:0}html.mv .rst{min-height:30px;padding:2px 10px;font-size:13px}
-html.mv .card h3{font-size:17px;line-height:1.3}
+html.mv .card h3{font-size:16px;line-height:1.3}
 html.mv .card a{word-break:break-word;overflow-wrap:anywhere;display:inline-block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px}
 html.mv .stv{font-size:18px}
 
 /* --- Vista tabla: cada fila, una ficha compacta --- */
 html.mv .twrap{overflow:visible;border:0;background:none}
 html.mv .tbl,html.mv .tbl tbody{display:block;background:none}html.mv .tbl thead{display:none}
-html.mv .tbl tr.rw{display:flex;flex-wrap:wrap;align-items:center;gap:2px 8px;background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:8px 10px;margin-top:8px;font-size:14px}
-html.mv .tbl tr.rw td{display:block;border:0;padding:0}
+/* ficha compacta: 1.ª línea casilla + título + ✕ · 2.ª autores · año · revista (recortados) · 3.ª lectura, estrellas, secciones, etiquetas y botones */
+html.mv .twrap{margin-top:4px;background:var(--card);border:1px solid var(--bd);border-radius:10px;overflow:hidden}
+html.mv .tbl tr.rw{display:flex;flex-wrap:wrap;align-items:center;gap:2px 6px;border-bottom:1px solid var(--bd);padding:5px 4px 4px 8px;font-size:13px}html.mv .tbl tr.rw:last-child{border-bottom:0}
+html.mv .tbl tr.rw td{display:block;border:0;padding:0;order:3}
 html.mv .tbl tr.rw td:empty,html.mv .tbl tr.rw td.timg:not(:has(img)){display:none}
-html.mv .tbl tr.rw td.tt{flex:1 1 calc(100% - 90px);min-width:0;font-size:15px}
-html.mv .tbl tr.rw td:nth-child(4),html.mv .tbl tr.rw td:nth-child(6){flex-basis:100%;opacity:.8;font-size:13px}
-html.mv .tbl tr.rw td:nth-child(5){opacity:.8;font-size:13px}
-html.mv .tbl tr.rw td.nw{margin-left:auto}html.mv .tbl tr.rw .sm{min-height:34px}
-html.mv .tbl tr.rw td input[type=checkbox]{width:22px;height:22px}
+html.mv .tbl tr.rw td:nth-child(-n+3){order:0}html.mv .tbl tr.rw td:last-child{order:1}
+html.mv .tbl tr.rw td.tt{flex:1 1 calc(100% - 70px);min-width:0;font-size:14px;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+html.mv .tbl tr.rw td:last-child .x{min-height:26px;min-width:28px;padding:0;border-color:transparent;opacity:.7}
+html.mv .tbl tr.rw td:nth-child(4),html.mv .tbl tr.rw td:nth-child(5),html.mv .tbl tr.rw td:nth-child(6){order:2;font-size:13px;opacity:.75;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+html.mv .tbl tr.rw td:nth-child(4){flex:0 1 auto;max-width:60%}html.mv .tbl tr.rw td:nth-child(5){flex:none}html.mv .tbl tr.rw td:nth-child(6){flex:1 1 0}
+html.mv .tbl tr.rw td:nth-child(5):not(:empty)::before,html.mv .tbl tr.rw td:nth-child(6):not(:empty)::before{content:"· ";opacity:.6}
+html.mv .tbl tr.rw td:nth-child(4){padding-left:24px}   /* alineado con el título */
+html.mv .tbl tr.rw::after{content:"";order:2;flex-basis:100%;height:0}   /* salto de línea tras autores · año · revista */
+html.mv .tbl tr.rw td:nth-child(9){display:none}   /* las secciones, como en las tarjetas, solo en los filtros */
+html.mv .tbl tr.rw td.nw{margin-left:auto;display:flex;gap:0}html.mv .tbl tr.rw .sm{min-height:28px;padding:0 7px;border:0;background:none;font-size:13px}
+html.mv .tbl tr.rw .rst{min-height:22px;padding:0 8px;font-size:11px}html.mv .tbl tr.rw td:nth-child(7){padding-left:24px}html.mv .tbl .stv{font-size:13px;letter-spacing:0}
+html.mv .tbl tr.rw .chip{font-size:11px;padding:0 7px;margin:0 3px 0 0;border-width:1px}
+html.mv .tbl tr.rw td input[type=checkbox]{width:18px;height:18px;margin:0}
 html.mv .tbl tr.rn{display:block}html.mv .tbl tr.rn td{display:block;padding:6px 10px}html.mv .tbl tr.rn td:first-child{display:none}
 
 /* --- Barra inferior --- */
