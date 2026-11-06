@@ -77,7 +77,7 @@ function NEWF(p) {   // rellena los campos nuevos de un paper (JSON antiguo, imp
   p.editors = Array.isArray(p.editors) ? p.editors.filter(x => typeof x === 'string' && x.trim()) : [];
   p.authorType = Object.hasOwn(AUTH_T, p.authorType) ? p.authorType : 'auto';
   p.linkMode = Object.hasOwn(LINK_MODES, p.linkMode) ? p.linkMode : 'auto'; p.hideAccessed = !!p.hideAccessed; p.image = imgOk(p.image);
-  p.pdf = p.pdf && typeof p.pdf === 'object' && typeof p.pdf.name === 'string' && p.pdf.name ? {name: p.pdf.name.slice(0, 260), ...(pdfPage(p.pdf.page) ? {page: pdfPage(p.pdf.page)} : {})} : null;
+  for (const k of ['pdf', 'pdf2']) { const v = p[k]; p[k] = v && typeof v === 'object' && typeof v.name === 'string' && v.name ? {name: v.name.slice(0, 260), ...(pdfPage(v.page) ? {page: pdfPage(v.page)} : {})} : null; }   // hasta dos PDF enlazados
   return p;
 }
 /* ===== Eventos de la interfaz =====
