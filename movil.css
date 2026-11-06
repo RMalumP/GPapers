@@ -19,6 +19,7 @@ html.mv #pjProg{display:none}
 /* el resto de la cabecera, como menú ⋯ que baja desde arriba */
 html.mv #mvHdrRow{display:none;position:fixed;z-index:70;top:calc(52px + env(safe-area-inset-top,0px));right:8px;left:auto;width:min(320px,calc(100vw - 16px));max-height:calc(100dvh - 140px);overflow:auto;flex-direction:column;align-items:stretch;gap:2px;padding:6px;background:var(--card);border:1px solid var(--bd);border-radius:12px;box-shadow:0 8px 28px #0005}
 html.mv.mv-mo #mvHdrRow{display:flex}
+html.mv.mv-mo header{z-index:70}   /* el menú ⋯ vive dentro de la cabecera (su contexto de apilamiento): la cabecera tiene que quedar por encima de la sombra (#mvShade, 65) o la sombra se come los toques */
 html.mv #mvHdrRow>button,html.mv #mvHdrRow #fmenu button{justify-content:flex-start;text-align:left;border:0;background:none;color:inherit;padding:10px 12px;min-height:44px;display:flex;align-items:center;gap:8px;white-space:normal}
 html.mv #mvHdrRow>button.pri{background:var(--pri);color:#fff;border-radius:8px}
 html.mv #mvHdrRow>button[title^="Guardar"]::after{content:"Guardar"}
