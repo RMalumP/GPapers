@@ -62,7 +62,10 @@ with sync_playwright() as pw:
     eq('el ✕ cierra la ventana', pg.evaluate("$('#ex').open"), False)
     pg.evaluate("setView('table')"); pg.wait_for_timeout(200)
     eq('tabla: cada fila es una ficha (sin cabecera)', pg.evaluate("[getComputedStyle($('.tbl thead')).display, getComputedStyle($('.tbl tr.rw')).display, document.documentElement.scrollWidth <= innerWidth]"), ['none', 'flex', True])
-    pg.evaluate("setView('cards')")
+    alto = "Math.round($('.tbl tr.rw').getBoundingClientRect().height)"; h0 = pg.evaluate(alto)
+    pg.evaluate("db.tags.push(...Array.from({length: 6}, (_, i) => ({id: 'm' + i, name: 'Etiqueta larga ' + i, color: '#888888'}))); db.papers[0].tagIds = db.tags.map(t => t.id); render()"); pg.wait_for_timeout(100)
+    eq('tabla: muchas etiquetas no añaden líneas a la ficha', pg.evaluate(alto), h0)
+    pg.evaluate("db.papers[0].tagIds = []; setView('cards')")
     eq('pulsación larga = clic derecho (valoración)', pg.evaluate("""() => new Promise(r => { const s = $('#list .stv'), o = s.getBoundingClientRect(), t = new Touch({identifier: 1, target: s, clientX: o.x + 5, clientY: o.y + 5});
         s.dispatchEvent(new TouchEvent('touchstart', {bubbles: true, touches: [t]})); setTimeout(() => r(!$('#ctx').hidden && $('#ctx').textContent.includes('Valoración')), 700); })"""), True)
     eq('móvil: sin errores', errs, [])

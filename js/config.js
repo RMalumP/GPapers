@@ -318,7 +318,7 @@ function helpHTML() {
       <li><b>Copiar cita 📋</b>: en cada tarjeta y fila copia la cita en el estilo elegido en Exportar, con cursiva al pegar en Word o Docs.</li>
       <li><b>Vistas ⭐</b> (filtros guardados): en la barra lateral, «＋ Guardar vista» (junto al título) guarda la búsqueda, el orden y los filtros con un nombre; un clic la aplica. Son de cada proyecto y de este navegador.</li>
       <li><b>Progreso</b> (opcional: Configuración → Apariencia): junto al nombre del proyecto, una barra con los papers leídos y leyendo (el detalle, al pasar el ratón).</li></ul>`],
-    lista: ['Lista principal', `<ul><li><b>Tarjetas o tabla</b>: el botón «Tabla / Tarjetas» cambia la vista. La tabla muestra imagen, título, autores, año, revista, lectura, valoración, secciones, etiquetas y notas.</li>
+    lista: ['Lista principal', `<ul><li><b>Tarjetas o tabla</b>: el botón «Tabla / Tarjetas» cambia la vista. La tabla muestra imagen, título, autores, año, revista, lectura, valoración, secciones, etiquetas y notas. Cada fila ocupa siempre una línea: si la ventana es estrecha, el texto largo se corta con «…» (pasa el ratón por encima para verlo entero) y, si aun así no cabe, la tabla se desplaza hacia los lados.</li>
       <li><b>En cada tarjeta</b>: casilla para seleccionar, <i>Editar</i>, las etiquetas del paper, el estado de lectura, las estrellas y la ✕ (a la papelera). Si las etiquetas no caben en la barra, pasan a su propia línea.</li>
       <li><b>Estado de lectura</b>: un clic lo cambia (por leer → leyendo → leído). <b>Estrellas</b>: clic derecho para elegir la valoración.</li>
       <li><b>Etiquetas</b>: clic derecho sobre una etiqueta del paper para quitársela.</li>

@@ -283,6 +283,16 @@ with sync_playwright() as pw:
     pg.evaluate("db.papers[0].sectionIds = ['s1', 's2']; db.papers[0].tagIds = []; setView('table')")
     eq('tabla: columna Secciones con las secciones del paper', pg.evaluate("[[...document.querySelectorAll('.tbl th')].map(t => t.textContent.replace(/[ ▲▼]/g, '')).includes('Secciones'), [...document.querySelectorAll('.tbl tbody tr.rw')][0].querySelectorAll('.chip').length]"), [True, 2])
     pg.evaluate("toggleNotes('p1')"); eq('la fila de notas cubre todas las columnas', pg.evaluate("document.querySelector('tr.rn td:last-child').colSpan === document.querySelectorAll('.tbl thead th').length - 1"), True)
+    pg.evaluate("db.papers[0].title = 'Un título de paper muy largo que antes partía la fila en varias líneas al estrechar la ventana'; db.papers[0].authors = ['Pérez, Juan Carlos', 'Gómez, Lucía', 'Martínez, Ana', 'López, Pedro']; db.papers[0].venue = 'Revista Internacional de Estudios de Ejemplo'; render()")
+    alturas = "[...document.querySelectorAll('.tbl tr.rw')].map(r => Math.round(r.getBoundingClientRect().height))"
+    h0 = pg.evaluate(alturas)
+    for w in (900, 600):
+        pg.set_viewport_size({'width': w, 'height': 800}); pg.wait_for_timeout(100)
+        eq(f'tabla a {w} px: las filas conservan la altura', pg.evaluate(alturas), h0)
+    eq('tabla: el texto largo se recorta con puntos suspensivos en una línea', pg.evaluate("(td => [getComputedStyle(td).whiteSpace, getComputedStyle(td).textOverflow, td.scrollWidth > td.clientWidth])(document.querySelector('.tbl tr.rw td.tt'))"), ['nowrap', 'ellipsis', True])
+    eq('tabla: el texto entero sale al pasar el ratón', pg.evaluate("(r => [r.querySelector('td.tt a').title.startsWith(db.papers[0].title), r.children[3].title, r.children[8].title])(document.querySelector('.tbl tr.rw'))"), [True, 'Pérez, Juan Carlos; Gómez, Lucía; Martínez, Ana; López, Pedro', 'Intro, Método'])
+    eq('tabla: si no cabe, se desplaza en horizontal (no se desborda la página)', pg.evaluate("[$('.twrap').scrollWidth > $('.twrap').clientWidth, document.documentElement.scrollWidth <= innerWidth]"), [True, True])
+    pg.set_viewport_size({'width': 1200, 'height': 800}); pg.evaluate("db.papers[0].title = 'Paper uno'; render()")
     pg.evaluate("F.group = true; render()"); eq('agrupar por sección sigue funcionando en tabla', pg.locator('.gbox').count() > 0, True); pg.evaluate("F.group = false; setView('cards')")
     eq('valoración mínima está en Filtros', pg.evaluate("!!document.querySelector('#sg-filt #minR') && !document.querySelector('#sg-search #minR')"), True)
     eq('valoración: un botón en la fila del título', pg.evaluate("[$('#minR').tagName, $('#minR').parentElement.classList.contains('fh2'), $('#minR').textContent]"), ['BUTTON', True, 'Cualquiera ▾'])
