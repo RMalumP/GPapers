@@ -25,7 +25,7 @@ function validate(d) {
   d.settings = {...defSettings(), ...sIn, shortcuts: {...SC_DEF}};
   d.settings.export = {...defSettings().export, ...(sIn.export && typeof sIn.export === 'object' ? sIn.export : {})};
   const xo = d.settings.export; if (!['es', 'en'].includes(xo.lang)) xo.lang = 'es'; if (!['long', 'dmy', 'iso'].includes(xo.dateFmt)) xo.dateFmt = 'long'; xo.vanAll = !!xo.vanAll; xo.ppChap = !!xo.ppChap; xo.disamb = !!xo.disamb; xo.abbrList = xo.abbrList !== false; if (!['auto', 'dot', 'br', 'par'].includes(xo.numFmt)) xo.numFmt = 'auto';
-  d.settings.showProgress = !!d.settings.showProgress; d.settings.citeOnlyMain = !!d.settings.citeOnlyMain; if (typeof d.settings.mainStyle !== 'string') d.settings.mainStyle = 'apa'; d.settings.pdfDrive = !!d.settings.pdfDrive; d.settings.fmtOpen = !!d.settings.fmtOpen; d.settings.view = d.settings.view === 'table' ? 'table' : 'cards';
+  d.settings.showProgress = !!d.settings.showProgress; d.settings.citeOnlyMain = !!d.settings.citeOnlyMain; d.settings.aliasInMore = !!d.settings.aliasInMore; if (typeof d.settings.mainStyle !== 'string') d.settings.mainStyle = 'apa'; d.settings.pdfDrive = !!d.settings.pdfDrive; d.settings.fmtOpen = !!d.settings.fmtOpen; d.settings.view = d.settings.view === 'table' ? 'table' : 'cards';
   if (!Array.isArray(d.settings.templates)) d.settings.templates = defSettings().templates;
   d.settings.templates = d.settings.templates.filter(t => t && typeof t.name === 'string' && typeof t.text === 'string').map(t => ({id: t.id || uid(), name: t.name, text: t.text}));
   d.settings.customTypes = [...new Map((Array.isArray(sIn.customTypes) ? sIn.customTypes : []).map(ctClean).filter(Boolean).map(c => [c.id, c])).values()];
