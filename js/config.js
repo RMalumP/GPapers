@@ -77,6 +77,7 @@ function drawCfg() {
     <label class="row"><input type="checkbox" ${c.showProgress ? 'checked' : ''} data-onchange="setCfg('showProgress', this.checked)"> Mostrar el progreso de lectura (papers leídos) junto al nombre del proyecto</label>`,
     no: `<label>Estilo de cita principal<select data-onchange="setMainStyle(this.value)">${styOpts(mainSty())}</select></label>
     <label class="row" style="flex-wrap:nowrap"><input type="checkbox" ${c.citeOnlyMain ? 'checked' : ''} data-onchange="setCfg('citeOnlyMain', this.checked)"> En la pestaña «Cita» de cada paper, mostrar solo el estilo principal (si no, salen todos con el principal primero)</label>
+    <label class="row" style="flex-wrap:nowrap"><input type="checkbox" ${c.aliasInMore ? 'checked' : ''} data-onchange="setCfg('aliasInMore', this.checked)"> En la pestaña «Datos», llevar el «Título personalizado» a «Mostrar todos los campos» (si no, sale siempre bajo el título; si tiene texto, se ve igualmente)</label>
     <p class="cfgnote2"><small>El estilo principal pasa a ser también el de «Exportar» al elegirlo aquí, y decide qué campos salen en la vista simplificada de «Datos».</small></p>
     <label class="row"><input type="checkbox" ${c.fmtOpen ? 'checked' : ''} data-onchange="setFmtDefault(this.checked)"> Barra de formato de las notas desplegada por defecto</label>
     <label class="row"><input type="checkbox" ${c.export.inText ? 'checked' : ''} data-onchange="setInText(this.checked)"> Mostrar la cita en el texto y las notas (Chicago) en la pestaña «Cita» de cada paper</label>
