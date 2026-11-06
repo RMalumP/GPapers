@@ -90,7 +90,7 @@ a.nl{color:var(--pri);cursor:pointer;text-decoration:underline dotted}a.nl:hover
 .tbl thead th{overflow:hidden;text-overflow:ellipsis}
 .tbl thead th:nth-child(1){width:32px}.tbl thead th:nth-child(2){width:48px}.tbl.noimg thead th:nth-child(2){width:0;padding:0}.tbl.noimg td.timg{padding:0}
 .tbl thead th:nth-child(4){width:13%}.tbl thead th:nth-child(5){width:50px}.tbl thead th:nth-child(6){width:10%}.tbl thead th:nth-child(7){width:86px}.tbl thead th:nth-child(8){width:100px}
-.tbl thead th:nth-child(9){width:8%}.tbl thead th:nth-child(10){width:9%}.tbl thead th:nth-child(11){width:112px}.tbl thead th:nth-child(12){width:48px}
+.tbl thead th:nth-child(9){width:8%}.tbl thead th:nth-child(10){width:9%}.tbl thead th:nth-child(11){width:132px}.tbl thead th:nth-child(12){width:48px}
 .tbl tr.rn td{background:var(--bg)}.tbl .chip{font-size:11px;padding:0 7px;margin:1px 3px 1px 0}.tbl .x{border:1px solid var(--red);color:var(--red);border-radius:6px;background:none;padding:0 7px}
 .rw.over{background:color-mix(in srgb,var(--pri) 10%,transparent)}.rw.drag{opacity:.45}.rw[draggable=true]{cursor:grab}
 #gr{width:min(920px,96vw)}.grhelp.on{opacity:.95}.grhelp{margin-top:8px;padding:14px 18px;border:1px dashed var(--bd);border-radius:8px;font-size:14px;opacity:.6}.grhelp h3{font-size:15px;margin:12px 0 4px}.grhelp h3:first-child{margin-top:0}.grhelp p{margin:4px 0}.grhelp ul,.grhelp ol{margin:4px 0;padding-left:22px}.grhelp li{margin:2px 0}.grtmp{margin-top:10px!important;font-style:italic;font-size:13px}   /* explicación provisional (sin relaciones) */
