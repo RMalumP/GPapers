@@ -144,40 +144,46 @@ function progDraw() {   // barra de progreso de lectura del proyecto, en la cabe
   el.querySelector('small').textContent = `${c.leido}/${n} leídos`; el.title = `${READ.leido}: ${c.leido} · ${READ.leyendo}: ${c.leyendo} · ${READ.por_leer}: ${c.por_leer} (de ${n} papers)`;
 }
 
-/* ===== PDF enlazado =====
+/* ===== PDF enlazados (hasta dos por paper: «pdf» y «pdf2», p. ej. el artículo y su material suplementario) =====
    Como la imagen enlazada: en el JSON solo va el nombre (y la página donde abrir, si se indica) y el enlace al archivo vive en este
-   navegador (IndexedDB). Nada se sube a Google Drive. En otro dispositivo, o si el archivo se movió, al abrirlo se pide elegirlo de nuevo.
-   En navegadores sin acceso a archivos hay que elegir el PDF cada vez que se abre. */
-const PDF_T = [{description: 'PDF', accept: {'application/pdf': ['.pdf']}}], PEND_PDF = new Map(), PDF_FILES = new Map();   // PEND_PDF: elegidos en el borrador · PDF_FILES: archivos de esta sesión (sin acceso a archivos)
+   navegador (IndexedDB). En otro dispositivo, o si el archivo se movió, al abrirlo se pide elegirlo de nuevo.
+   En navegadores sin acceso a archivos hay que elegir el PDF cada vez que se abre.
+   Cada hueco tiene su clave (pdfKey): la del primero es el id del paper, como siempre; la del segundo, <id>~2. Con ella se nombran el enlace
+   en IndexedDB («pdf:<clave>») y la copia en Google Drive («gpapers-pdf-<clave>»). */
+const PDF_T = [{description: 'PDF', accept: {'application/pdf': ['.pdf']}}], PEND_PDF = new Map(), PDF_FILES = new Map();   // PEND_PDF: elegidos en el borrador · PDF_FILES: archivos de esta sesión (sin acceso a archivos); ambos por clave
+const PDF_N = [1, 2], pdfF = n => n === 2 ? 'pdf2' : 'pdf', pdfKey = (id, n) => n === 2 ? id + '~2' : id;
 const pdfPage = v => { v = parseInt(v, 10); return Number.isInteger(v) && v > 0 && v < 100000 ? v : 0; };
-async function pdfChoose(id) {   // elige el archivo de un paper (guardándolo en el borrador o en el paper); devuelve el File
-  if (FSA) { const [h] = await showOpenFilePicker({types: PDF_T}); PEND_PDF.set(id, h); return {file: await h.getFile(), h}; }
+const pdfsOf = p => PDF_N.filter(n => p[pdfF(n)]);   // huecos con PDF de un paper
+async function pdfChoose(key) {   // elige el archivo de un hueco (guardándolo en el borrador o en el paper); devuelve el File
+  if (FSA) { const [h] = await showOpenFilePicker({types: PDF_T}); PEND_PDF.set(key, h); return {file: await h.getFile(), h}; }
   const file = await new Promise(res => { const i = document.createElement('input'); i.type = 'file'; i.accept = '.pdf,application/pdf'; i.onchange = () => res(i.files[0] || null); i.oncancel = () => res(null); i.click(); });
-  if (!file) throw Object.assign(Error('cancelado'), {name: 'AbortError'}); PDF_FILES.set(id, file); return {file};
+  if (!file) throw Object.assign(Error('cancelado'), {name: 'AbortError'}); PDF_FILES.set(key, file); return {file};
 }
-async function pdfPick() {
-  try { const {file} = await pdfChoose(D.id); D.pdf = {name: file.name, ...(pdfPage(D.pdf?.page) ? {page: D.pdf.page} : {})}; drawD(); }
+async function pdfPick(n = 1) {
+  const f = pdfF(n);
+  try { const {file} = await pdfChoose(pdfKey(D.id, n)); D[f] = {name: file.name, ...(pdfPage(D[f]?.page) ? {page: D[f].page} : {})}; drawD(); }
   catch (e) { if (e.name !== 'AbortError') alert('No se pudo elegir el archivo: ' + e.message); }
 }
-function pdfClear() { PEND_PDF.delete(D.id); PDF_FILES.delete(D.id); D.pdf = null; drawD(); }
-function pdfSetPage(v) { if (D.pdf) { const n = pdfPage(v); n ? D.pdf.page = n : delete D.pdf.page; } }
-async function pdfOpen(id) {
-  const p = D && D.id === id && $('#dlg').open ? D : db.papers.find(x => x.id === id); if (!p || !p.pdf) return;   // con el editor abierto, el borrador
+function pdfClear(n = 1) { const k = pdfKey(D.id, n); PEND_PDF.delete(k); PDF_FILES.delete(k); D[pdfF(n)] = null; drawD(); }
+function pdfSetPage(v, n = 1) { const p = D[pdfF(n)]; if (p) { const x = pdfPage(v); x ? p.page = x : delete p.page; } }
+async function pdfOpen(id, n = 1) {
+  const p = D && D.id === id && $('#dlg').open ? D : db.papers.find(x => x.id === id), pf = p && p[pdfF(n)], key = pdfKey(id, n); if (!pf) return;   // con el editor abierto, el borrador
   try {
-    let file = PDF_FILES.get(id);
+    let file = PDF_FILES.get(key);
     if (!file && FSA) {
-      const h = PEND_PDF.get(id) || await idb('readonly', st => st.get('pdf:' + id)).catch(() => null);
-      if (h) try { if (await h.queryPermission({mode: 'read'}) === 'granted' || await h.requestPermission({mode: 'read'}) === 'granted') file = await h.getFile(); else return toast('Sin permiso para leer el PDF.'); } catch (e) { toast(`No se encuentra «${p.pdf.name}»: elígelo de nuevo.`, [], 4000); }
+      const h = PEND_PDF.get(key) || await idb('readonly', st => st.get('pdf:' + key)).catch(() => null);
+      if (h) try { if (await h.queryPermission({mode: 'read'}) === 'granted' || await h.requestPermission({mode: 'read'}) === 'granted') file = await h.getFile(); else return toast('Sin permiso para leer el PDF.'); } catch (e) { toast(`No se encuentra «${pf.name}»: elígelo de nuevo.`, [], 4000); }
     }
-    if (!file) file = await pdfFromDrive(id, p.pdf.name);   // subido por otro dispositivo
+    if (!file) file = await pdfFromDrive(key, pf.name);   // subido por otro dispositivo
     if (!file) {   // archivo movido o sin copia en Drive: se vuelve a enlazar
-      const r = await pdfChoose(id); file = r.file; if (r.h) idb('readwrite', st => st.put(r.h, 'pdf:' + id)).catch(() => {});
-      if (file.name !== p.pdf.name) toast(`Has elegido «${file.name}», distinto de «${p.pdf.name}».`, [], 4000);
+      const r = await pdfChoose(key); file = r.file; if (r.h) idb('readwrite', st => st.put(r.h, 'pdf:' + key)).catch(() => {});
+      if (file.name !== pf.name) toast(`Has elegido «${file.name}», distinto de «${pf.name}».`, [], 4000);
     }
-    const url = URL.createObjectURL(file.type === 'application/pdf' ? file : new Blob([file], {type: 'application/pdf'})) + (pdfPage(p.pdf.page) ? '#page=' + pdfPage(p.pdf.page) : '');
+    const url = URL.createObjectURL(file.type === 'application/pdf' ? file : new Blob([file], {type: 'application/pdf'})) + (pdfPage(pf.page) ? '#page=' + pdfPage(pf.page) : '');
     window.open(url, '_blank'); setTimeout(() => URL.revokeObjectURL(url.split('#')[0]), 120000);
   } catch (e) { if (e.name !== 'AbortError') alert('No se pudo abrir el PDF: ' + e.message); }
 }
+const pdfBtns = (p, full) => pdfsOf(p).map(n => `<button class="sm" data-onclick="pdfOpen('${p.id}',${n})" title="Abrir el PDF enlazado: ${esc(p[pdfF(n)].name)}">📄${full ? ' PDF' : ''}${n === 2 ? ' 2' : ''}</button>`).join('');   // botones de la tarjeta (full) y de la tabla
 
 /* ===== Mover o copiar papers a otro proyecto =====
    Los papers seleccionados (con sus notas, etiquetas, secciones y las relaciones entre ellos) pasan a la copia de trabajo del otro

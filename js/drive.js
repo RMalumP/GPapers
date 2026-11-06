@@ -104,8 +104,8 @@ function syPatch(a, p, f) {   // aplica un parche sin tocar a
   return a;
 }
 /* ---- PDF enlazados: copia opcional en la carpeta oculta (Configuración → «Subir a mi Google Drive los PDF enlazados») ----
-   Un archivo por paper (gpapers-pdf-<id>), subido tal cual (subida reanudable). Solo se sube lo que este dispositivo puede leer sin
-   preguntar; cualquier dispositivo con la sesión iniciada puede abrir el PDF desde Drive. Los de papers que ya no tienen PDF se borran pasado un día. */
+   Un archivo por PDF enlazado (gpapers-pdf-<id>, y gpapers-pdf-<id>~2 para el segundo), subido tal cual (subida reanudable). Solo se sube lo que este dispositivo puede leer sin
+   preguntar; cualquier dispositivo con la sesión iniciada puede abrir el PDF desde Drive. Los de PDF que ya no están enlazados se borran pasado un día. */
 async function syUploadFile(tok, id, name, file) {   // siempre reanudable: el archivo va tal cual, sin pasarlo a texto
   const F = '&fields=id,md5Checksum,modifiedTime,size', r = await syDrive(tok, `/upload/drive/v3/files${id ? '/' + id : ''}?uploadType=resumable${F}`, {method: id ? 'PATCH' : 'POST',
     headers: {'Content-Type': 'application/json; charset=UTF-8', 'X-Upload-Content-Type': 'application/pdf'}, body: JSON.stringify(id ? {} : {name, parents: ['appDataFolder']})});
@@ -114,7 +114,7 @@ async function syUploadFile(tok, id, name, file) {   // siempre reanudable: el a
   if (!u.ok) { const e = Error('drive ' + u.status); e.estado = u.status; throw e; }
   return u.json();
 }
-async function pdfLocal(id) {   // el PDF de este paper si este dispositivo puede leerlo ahora sin preguntar
+async function pdfLocal(id) {   // id: clave del hueco (pdfKey). El PDF si este dispositivo puede leerlo ahora sin preguntar
   try {
     if (!FSA) return PDF_FILES.get(id) || null;
     const h = PEND_PDF.get(id) || await idb('readonly', st => st.get('pdf:' + id)).catch(() => null);
@@ -124,17 +124,17 @@ async function pdfLocal(id) {   // el PDF de este paper si este dispositivo pued
 async function syPdfs(tok, files, m, N) {
   try {
     const have = new Map(files.filter(f => f.name.startsWith(N.pdf)).map(f => [f.name.slice(N.pdf.length), f])), old = Date.now() - 864e5;
-    if (m.settings.pdfDrive) for (const p of m.papers) {
-      if (!p.pdf) continue; const file = await pdfLocal(p.id); if (!file || file.size > SY_CFG.pdfMax) continue;
-      const f = have.get(p.id), k = `pdfUp:${PJ.cur}:${p.id}`, sig = `${file.size}:${file.lastModified}`, rec = await idb('readonly', st => st.get(k)).catch(() => null);
+    if (m.settings.pdfDrive) for (const p of m.papers) for (const n of pdfsOf(p)) {
+      const key = pdfKey(p.id, n), file = await pdfLocal(key); if (!file || file.size > SY_CFG.pdfMax) continue;
+      const f = have.get(key), k = `pdfUp:${PJ.cur}:${key}`, sig = `${file.size}:${file.lastModified}`, rec = await idb('readonly', st => st.get(k)).catch(() => null);
       if (f && (rec === sig || !rec && +f.size === file.size)) { if (rec !== sig) idb('readwrite', st => st.put(sig, k)).catch(() => {}); continue; }   // ya está en Drive
-      await syUploadFile(tok, f && f.id, N.pdf + p.id, file); await idb('readwrite', st => st.put(sig, k)).catch(() => {});
+      await syUploadFile(tok, f && f.id, N.pdf + key, file); await idb('readwrite', st => st.put(sig, k)).catch(() => {});
     }
-    const used = new Set(syPapersOf(m).filter(p => p.pdf).map(p => p.id));
+    const used = new Set(syPapersOf(m).flatMap(p => pdfsOf(p).map(n => pdfKey(p.id, n))));
     for (const [id, f] of have) if (!used.has(id) && Date.parse(f.modifiedTime) < old) await syDel(tok, f.id);   // el paper ya no tiene PDF
   } catch (e) { if (e.estado === 401) throw e; if (!SY.pdfWarned) { SY.pdfWarned = true; toast(e.estado === 403 ? 'No se pudo subir un PDF: puede que tu Google Drive esté lleno.' : 'No se pudo subir un PDF a Google Drive; se reintentará.', [], 6000); } }
 }
-async function pdfFromDrive(id, name) {   // el PDF subido por otro dispositivo (solo con acceso vigente: no se abre ninguna ventana de Google)
+async function pdfFromDrive(id, name) {   // id: clave del hueco (pdfKey). El PDF subido por otro dispositivo (solo con acceso vigente: no se abre ninguna ventana de Google)
   const tok = syOn() && syTokGet(); if (!tok) return null;
   try { const f = (await syLs(tok)).find(x => x.name === syNames(PJ.cur).pdf + id); if (!f) return null; toast('Descargando el PDF de tu Google Drive…', [], 3000);
     return new File([await (await syDrive(tok, `/drive/v3/files/${f.id}?alt=media`)).blob()], name, {type: 'application/pdf'}); } catch (e) { return null; }

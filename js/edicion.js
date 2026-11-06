@@ -31,7 +31,10 @@ function drawD() {
       ...Object.fromEntries([['isbn', 'ISBN'], ['issn', 'ISSN'], ['institution', 'Institución (facultad, departamento…)'], ['docNumber', 'Número de documento'], ['series', 'Serie o colección'], ['seriesNumber', 'Número en la serie'], ['conferenceName', 'Nombre del congreso'], ['conferencePlace', 'Lugar del congreso'], ['conferenceDates', 'Fechas del congreso'], ['abbr', 'Abreviatura'], ['ecli', 'ECLI (p. ej. ECLI:ES:TS:2017:1229 o EU:C:2005:446)']].map(([k, l]) => [k, inp(k, lbl(k, l))]))})[k];
     put(has('sortKey'), inp('sortKey', 'Clave de orden en la bibliografía (opcional): p. ej. «Torre» para «de la Torre, Ana»', 'text', 'w'));
     rel('url');
-    put(!!D.pdf, `<div class="w pdfrow"><span>📄 PDF: ${D.pdf ? `<b>${esc(D.pdf.name)}</b>` : '<i>ninguno</i>'}</span><button data-onclick="pdfPick()">${D.pdf ? 'Cambiar…' : 'Enlazar un PDF…'}</button>${D.pdf ? `<button data-onclick="pdfOpen('${D.id}')">Abrir</button><label>Página <input type="number" min="1" style="width:5em" value="${D.pdf.page || ''}" data-oninput="pdfSetPage(this.value)" placeholder="1"></label><button class="x" data-onclick="pdfClear()" title="Quitar el enlace al PDF">✕</button>` : ''}<small>${db.settings.pdfDrive ? 'El PDF se copia a tu Google Drive privado (Configuración).' : 'El archivo no se sube a ningún sitio: solo se recuerda su nombre.'}</small></div>`);
+    for (const n of PDF_N) {   // el segundo hueco aparece cuando ya hay un PDF enlazado
+      const P = D[pdfF(n)], L = n === 2 ? 'PDF 2' : 'PDF'; if (n === 2 && !D.pdf && !P) continue;
+      put(!!P, `<div class="w pdfrow" data-pdf="${n}"><span>📄 ${L}: ${P ? `<b>${esc(P.name)}</b>` : '<i>ninguno</i>'}</span><button data-onclick="pdfPick(${n})">${P ? 'Cambiar…' : n === 2 ? 'Enlazar un segundo PDF…' : 'Enlazar un PDF…'}</button>${P ? `<button data-onclick="pdfOpen('${D.id}',${n})">Abrir</button><label>Página <input type="number" min="1" style="width:5em" value="${P.page || ''}" data-oninput="pdfSetPage(this.value,${n})" placeholder="1"></label><button class="x" data-onclick="pdfClear(${n})" title="Quitar el enlace al ${L}">✕</button>` : ''}${n === 1 ? `<small>${db.settings.pdfDrive ? 'El PDF se copia a tu Google Drive privado (Configuración).' : 'El archivo no se sube a ningún sitio: solo se recuerda su nombre.'} Puedes enlazar hasta dos PDF por paper.</small>` : ''}</div>`);
+    }
     ['venue', 'doi', 'accessed'].forEach(rel);
     put((D.linkMode || 'auto') !== 'auto', `<label>Enlace en la cita (si hay DOI y URL)<select data-onchange="put(D,'linkMode',this.value)">${Object.entries(LINK_MODES).map(([k, v]) => `<option value="${k}" ${D.linkMode === k ? 'selected' : ''}>${v}</option>`).join('')}</select></label>`);
     put(!!D.hideAccessed, `<label class="chk"><input type="checkbox" ${D.hideAccessed ? 'checked' : ''} data-onchange="put(D,'hideAccessed',this.checked)"> Omitir «[consultado …]» en la cita (aunque la fecha esté rellena)</label>`);
@@ -571,8 +574,9 @@ function commit() {
   const i = db.papers.findIndex(p => p.id === D.id), old = i < 0 ? null : db.papers[i];
   logChange(D, ...(old ? diffPaper(old, D) : ['Creado']));
   if (PEND.has(D.id)) idb('readwrite', st => st.put(PEND.get(D.id), 'img:' + D.id)).catch(() => {});
-  if (PEND_PDF.has(D.id)) idb('readwrite', st => st.put(PEND_PDF.get(D.id), 'pdf:' + D.id)).catch(() => {});
-  if (!D.pdf) idb('readwrite', st => st.delete('pdf:' + D.id)).catch(() => {});
+  for (const n of PDF_N) { const k = pdfKey(D.id, n);   // enlaces de los PDF en este navegador
+    if (PEND_PDF.has(k)) idb('readwrite', st => st.put(PEND_PDF.get(k), 'pdf:' + k)).catch(() => {});
+    if (!D[pdfF(n)]) idb('readwrite', st => st.delete('pdf:' + k)).catch(() => {}); }
   syncRelated(old ? old.related : [], D);
   i < 0 ? db.papers.push(D) : db.papers[i] = D;
   markDirty(); $('#dlg').close(); render();
