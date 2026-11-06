@@ -99,6 +99,7 @@ html.mv .tbl tr.rw::after{content:"";order:2;flex-basis:100%;height:0}   /* salt
 html.mv .tbl tr.rw td:nth-child(9){display:none}   /* las secciones, como en las tarjetas, solo en los filtros */
 html.mv .tbl tr.rw td.nw{margin-left:auto;display:flex;gap:0}html.mv .tbl tr.rw .sm{min-height:28px;padding:0 7px;border:0;background:none;font-size:13px}
 html.mv .tbl tr.rw .rst{min-height:22px;padding:0 8px;font-size:11px}html.mv .tbl tr.rw td:nth-child(7){padding-left:24px}html.mv .tbl .stv{font-size:13px;letter-spacing:0}
+html.mv .tbl{table-layout:auto;min-width:0}html.mv .tbl tr.rw td:nth-child(10){flex:1 1 0;min-width:0;white-space:nowrap;overflow:hidden}   /* etiquetas en una sola línea: si no caben se recortan en vez de añadir otra línea a la ficha */
 html.mv .tbl tr.rw .chip{font-size:11px;padding:0 7px;margin:0 3px 0 0;border-width:1px}
 html.mv .tbl tr.rw td input[type=checkbox]{width:18px;height:18px;margin:0}
 html.mv .tbl tr.rn{display:block}html.mv .tbl tr.rn td{display:block;padding:6px 10px}html.mv .tbl tr.rn td:first-child{display:none}
