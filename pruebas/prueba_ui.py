@@ -334,7 +334,7 @@ with sync_playwright() as pw:
     with pg.expect_file_chooser() as fc: pg.click('#img button:has-text("Incrustar")')
     fc.value.set_files(PNG); pg.wait_for_timeout(400)
     eq('copia incrustada reducida (máx. 480 px, JPEG)', pg.evaluate("[D.image.kind, D.image.data.startsWith('data:image/jpeg;base64,'), D.image.data.length < 60000]"), ['data', True, True])
-    eq('y se ve en el recuadro', pg.evaluate("document.querySelector('#dlg .pimgbox img').src.startsWith('data:image/jpeg')"), True)
+    eq('y se ve en el recuadro (desde una URL blob:, sin copiar el base64 en el HTML)', pg.evaluate("(async () => { const im = document.querySelector('#dlg .pimgbox img'); await im.decode().catch(() => {}); return [im.src.startsWith('blob:'), im.naturalWidth > 0, (await (await fetch(im.src)).blob()).type]; })()"), [True, True, 'image/jpeg'])
     # archivo local enlazado (se simula el selector con un archivo del almacenamiento privado del navegador)
     pg.evaluate("""async () => { const d = await navigator.storage.getDirectory(), h = await d.getFileHandle('foto.png', {create: true}), w = await h.createWritable(); await w.write(await (await fetch('/pruebas/img_prueba.png')).blob()); await w.close(); window.showOpenFilePicker = async () => [h]; }""")
     pg.click('#img button:has-text("Archivo local")'); pg.wait_for_timeout(500)
@@ -491,7 +491,7 @@ with sync_playwright() as pw:
     import re
     swsrc = (folder / 'sw.js').read_text(); appsrc = (folder / 'app.js').read_text()
     eq('la versión de app.js coincide con la del service worker', re.search(r"APP_V = '([\d.]+)'", appsrc).group(1), re.search(r"papers-v([\d.]+)'", swsrc).group(1))
-    eq('el service worker revalida y no toca IndexedDB', ("cache: 'no-cache'" in swsrc, 'indexedDB' in swsrc), (True, False))
+    eq('el service worker sirve primero de la caché de su versión y no toca IndexedDB', ("caches.open(V).then(c => c.match(key" in swsrc, 'indexedDB' in swsrc), (True, False))
     ctx2 = b.new_context(viewport={'width': 1200, 'height': 800}, service_workers='allow'); p2 = ctx2.new_page(); e2 = []; p2.on('pageerror', lambda e: e2.append(str(e))); p2.on('dialog', lambda d: d.accept())
     URL = 'http://localhost:8791/index.html'
     p2.goto(URL); p2.wait_for_timeout(1200)
@@ -514,6 +514,28 @@ with sync_playwright() as pw:
     # actualizaciones: aviso y recarga sin borrar datos
     p2.evaluate("db.papers[0].title = 'Antes de actualizar'; markDirty()"); p2.wait_for_timeout(1000); p2.reload(); p2.wait_for_timeout(1500)
     eq('con el service worker activo hay controlador', p2.evaluate("!!navigator.serviceWorker.controller"), True)
+    # arranque: un solo pintado de la lista y sin reescribir la copia de trabajo recuperada
+    at0 = p2.evaluate("(async () => (await idb('readonly', st => st.get('proj:' + PJ.cur))).at)()")
+    p2.add_init_script("window.__pint = 0; new MutationObserver(ms => ms.forEach(m => { if (m.target.id === 'list' && m.addedNodes.length) __pint++; })).observe(document, {childList: true, subtree: true})")
+    p2.reload(); p2.wait_for_timeout(1500)
+    eq('al abrir, la lista se pinta una sola vez', p2.evaluate("[window.__pint, db.papers[0].title]"), [1, 'Antes de actualizar'])
+    eq('la copia de trabajo recuperada no se vuelve a escribir', p2.evaluate("(async () => (await idb('readonly', st => st.get('proj:' + PJ.cur))).at)()"), at0)
+    # copia de trabajo: imágenes incrustadas aparte, JSON compacto, una sola conexión a IndexedDB
+    IMGD = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='
+    p2.evaluate("img => { db.papers[0].image = {kind: 'data', data: img}; markDirty(); render(); return sessionNow(); }", IMGD)
+    rec = p2.evaluate("(async () => { const r = await idb('readonly', st => st.get('proj:' + PJ.cur)), ks = await idb('readonly', st => st.getAllKeys()); return [r.img, r.json.includes('base64'), r.json.includes('\\n  '), ks.filter(k => String(k).startsWith('imgd:')).length]; })()")
+    eq('la copia de trabajo guarda la imagen aparte y el JSON compacto', rec, [1, False, False, 1])
+    eq('la miniatura de la lista sale de una URL blob:', p2.evaluate("document.querySelector('#list .pimg img')?.src.startsWith('blob:')"), True)
+    eq('una sola conexión a IndexedDB', p2.evaluate("idbOpen() === idbOpen()"), True)
+    p2.reload(); p2.wait_for_timeout(1500)
+    eq('al reabrir la imagen vuelve entera', p2.evaluate("db.papers[0].image?.data"), IMGD)
+    p2.evaluate("(db.papers[0].image = null, markDirty(), render(), sessionNow().then(imgGc))")
+    eq('una imagen que ya no se usa se borra', p2.evaluate("(async () => (await idb('readonly', st => st.getAllKeys())).filter(k => String(k).startsWith('imgd:')).length)()"), 0)
+    # caché primero: al abrir, los archivos de la aplicación salen de la caché sin esperar a la red
+    pedidos = []; spy = lambda r: (pedidos.append(r.request.url.split('8791/')[-1]), r.continue_())
+    ctx2.route('**/*', spy); p2.reload(); p2.wait_for_timeout(1000); ctx2.unroute('**/*', spy)
+    eq('al abrir con el service worker no se pide a la red ningún archivo de la aplicación', [u for u in pedidos if u.split('?')[0] in ('', 'index.html', 'style.css', 'movil.css', 'app.js') or u.startswith('js/')], [])
+    p2.wait_for_timeout(500)
     p2.evaluate("document.querySelector('#toast') && (document.querySelector('#toast').hidden = true); navigator.serviceWorker.dispatchEvent(new Event('controllerchange'))")
     eq('al llegar una versión nueva sale el aviso para recargar', ('Recargar ahora' in p2.inner_text('#toast'), 'versión nueva' in p2.inner_text('#toast')), (True, True))
     p2.click('#toast button:has-text("Recargar ahora")'); p2.wait_for_timeout(1800)

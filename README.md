@@ -123,8 +123,15 @@ El HTML no lleva `onclick` ni otros manejadores en línea: `index.html` tiene un
 
 ## Datos de la aplicación (PWA) y actualizaciones (F13)
 - Además del JSON, la app guarda en IndexedDB una **copia de la sesión** (tus datos tal como están, aunque no hayas guardado) y el **estado de la interfaz** (filtros, orden, barra lateral, bloques plegados). Al reabrirla sigues donde lo dejaste y, si había cambios sin guardar, te lo avisa. El JSON sigue siendo el archivo original: guarda para escribir en él (si recuerda el archivo, pide permiso).
-- Estos datos viven **fuera de la caché del service worker**, así que las actualizaciones no los tocan: **no hace falta borrar los datos de la aplicación** para recibir una versión nueva. El service worker revalida siempre (`cache: 'no-cache'`), busca versiones nuevas al abrir, al volver a la app y cada 30 min, y avisa con «Recargar ahora» (guarda la copia de sesión antes de recargar).
-- La versión está en `APP_V` (app.js) y en `papers-vNN` (sw.js): **súbelas juntas** en cada publicación. En Ayuda → «Aplicación instalada» hay botones para buscar actualizaciones y olvidar la copia de sesión.
+- Estos datos viven **fuera de la caché del service worker**, así que las actualizaciones no los tocan: **no hace falta borrar los datos de la aplicación** para recibir una versión nueva. El service worker sirve la app **desde la caché de su versión** (v37.6: abre al instante aunque la red sea lenta o no haya), busca versiones nuevas al abrir, al volver a la app y cada 30 min, las descarga enteras por detrás y avisa con «Recargar ahora» (guarda la copia de sesión antes de recargar).
+- La versión está en `APP_V` (app.js) y en `papers-vNN` (sw.js): **súbelas juntas** en cada publicación (si no cambian, los dispositivos instalados no ven la versión nueva). En Ayuda → «Aplicación instalada» hay botones para buscar actualizaciones y olvidar la copia de sesión.
+
+## Rendimiento (v37.6–v37.7)
+- Al abrir, la lista se pinta **una sola vez**, cuando ya se han leído la copia de trabajo y el estado de la interfaz (`RENDER_HOLD` en js/lista.js), y la copia recuperada no se vuelve a escribir.
+- En el móvil la lista se pinta **de 40 en 40** (150 en el escritorio); el resto se añade al bajar.
+- La sincronización con Google Drive al abrir espera a que la lista ya se vea (`afterPaint` en app.js).
+- (v37.7) La **copia de trabajo** en IndexedDB es JSON compacto y guarda cada imagen incrustada **aparte**, una sola vez («imgd:<huella>»; el JSON lleva `{kind: 'data', ref}` y `img: 1`); guardar tras un cambio ya no reescribe todas las imágenes. Las que ya no usa ningún proyecto se borran al abrir (`imgGc`). El archivo JSON que guardas o exportas sigue llevando las imágenes dentro, como siempre.
+- (v37.7) Las miniaturas incrustadas se muestran con URLs `blob:` en vez de copiar el base64 en el HTML de cada tarjeta, y la app usa una sola conexión a IndexedDB (`idbOpen`).
 
 ## Sincronización con Google Drive, Privacidad y Créditos (F14)
 - **Final de la barra lateral**: Papelera, Configuración, una línea, «ℹ️ Información» (Ayuda y Créditos, discretos y plegada por defecto; se recuerda si la abres) y, siempre visible y con la misma letra, una línea que explica qué es la app con el enlace **Política de privacidad** (v31.1: sustituye al botón Privacidad; Google lo pide en la página principal para verificar la marca).

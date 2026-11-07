@@ -140,7 +140,15 @@ function toggleNotes(id) { EXP.has(id) ? EXP.delete(id) : EXP.add(id); renderPap
 /* ---- Imagen del paper ---- */
 const PEND = new Map(), IMG_URL = new Map();   // PEND: archivos elegidos en el borrador aún sin guardar · IMG_URL: URLs de objeto de los archivos enlazados
 const imgInner = i => !i ? '🖼️' : i.kind === 'url' ? `<img src="${esc(i.url)}" alt="" loading="lazy" referrerpolicy="no-referrer" data-onerror="imgErr(this)">`
-  : i.kind === 'data' ? `<img src="${i.data}" alt="">` : '🖼️';
+  : i.kind === 'data' ? `<img src="${imgBlob(i.data)}" alt="">` : '🖼️';
+const IMG_BLOB = new Map();   // imagen incrustada → URL blob: (la lista no copia cientos de KB de base64 en su HTML a cada pintado)
+function imgBlob(d) {
+  let u = IMG_BLOB.get(d); if (u) return u;
+  try { const c = d.indexOf(','), bin = atob(d.slice(c + 1)), a = new Uint8Array(bin.length); for (let k = 0; k < bin.length; k++) a[k] = bin.charCodeAt(k);
+    u = URL.createObjectURL(new Blob([a], {type: d.slice(5, d.indexOf(';'))})); } catch (e) { return d; }
+  if (IMG_BLOB.size >= 400) { const [k, v] = IMG_BLOB.entries().next().value; URL.revokeObjectURL(v); IMG_BLOB.delete(k); }   // las más antiguas se sueltan
+  IMG_BLOB.set(d, u); return u;
+}
 const pimgHTML = (p, cls, attrs = '') => `<div class="pimg ${cls}" ${p.image?.kind === 'file' ? `data-fpid="${p.id}" title="Imagen enlazada: ${esc(p.image.name)}"` : ''} ${attrs}>${imgInner(p.image)}</div>`;
 const thumbHTML = (p, cls) => p.image && db.settings.showImg !== false ? pimgHTML(p, cls) : '';
 async function fileImgUrl(pid, ask) {   // archivo local enlazado: el navegador puede pedir permiso de lectura en cada sesión
@@ -233,7 +241,9 @@ function fitTags(only) {   // las etiquetas van en la barra superior de la tarje
     if (ct.scrollWidth > ct.clientWidth + 1) ct.after(tl); });
 }
 let listW = 0; new ResizeObserver(([e]) => { if (Math.abs(e.contentRect.width - listW) > 1) { listW = e.contentRect.width; fitTags(); } }).observe($('#list'));   // también al plegar la barra o cambiar el tamaño
+let RENDER_HOLD = false, RENDER_HELD = false;   // al arrancar se pinta una sola vez, al final (ver bootApp en app.js)
 function render() {
+  if (RENDER_HOLD) { RENDER_HELD = true; return; }
   hdr();
   filtDraw();
   const tg = (id, open, label, active) => { const b = $(id); b.textContent = `${label} ${open ? '▾' : '▸'}${!open && active ? ' •' : ''}`; b.classList.toggle('on', open); };   // «•» = hay filtro activo con la lista plegada
@@ -252,7 +262,7 @@ function render() {
   fitTags(); hydrateImgs(); moreWatch(); uiSoon();
   LIST.n = L.length; countDraw(); progDraw();
 }
-const LIST = {L: [], n: 0, shown: 0, step: 150};   // lo que se ve en la lista y cuántos papers lleva pintados
+const LIST = {L: [], n: 0, shown: 0, get step() { return document.documentElement.classList.contains('mv') ? 40 : 150; }};   // lo que se ve en la lista y cuántos papers lleva pintados (en el móvil caben pocas tarjetas: se pintan de 40 en 40)
 const moreHTML = () => `<p class="more"><button data-onclick="listMore()">Mostrar ${Math.min(LIST.step, LIST.L.length - LIST.shown)} más (quedan ${LIST.L.length - LIST.shown})</button></p>`;
 function listMore() {   // añade la siguiente parte sin repintar lo que ya está
   const m = $('#list > .more'); if (!m) return; const add = LIST.L.slice(LIST.shown, LIST.shown += LIST.step);
