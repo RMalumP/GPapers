@@ -200,7 +200,7 @@ function psOpen() {
 }
 async function psGo(tid) {
   const mode = document.querySelector('#ps input[name=psm]:checked')?.value || 'copy', ids = [...SEL].filter(id => db.papers.some(p => p.id === id)), tp = PJ.list.find(p => p.id === tid);
-  const rec = await idb('readonly', st => st.get('proj:' + tid)).catch(() => null); let d; try { d = JSON.parse(rec.json); } catch (e) { return alert('No se pudo leer el proyecto de destino.'); }
+  const rec = await idb('readonly', st => st.get('proj:' + tid)).catch(() => null); let d; try { d = await projData(rec); if (!d) throw 0; } catch (e) { return alert('No se pudo leer el proyecto de destino.'); }
   const src = ids.map(id => structuredClone(db.papers.find(p => p.id === id))), srcTags = new Map(db.tags.map(t => [t.id, t])), srcSecs = new Map(db.sections.map(s => [s.id, s]));
   const low = s => String(s).trim().toLowerCase(), tagMap = new Map(), secMap = new Map(), have = new Set(d.papers.map(p => p.id).concat(d.trash.map(t => t.paper.id)));
   const mapTag = id => { const t = srcTags.get(id); if (!t) return null; if (!tagMap.has(id)) { let x = d.tags.find(y => low(y.name) === low(t.name)); if (!x) { x = {...t, id: have.has(t.id) || d.tags.some(y => y.id === t.id) ? uid() : t.id}; d.tags.push(x); } tagMap.set(id, x.id); } return tagMap.get(id); };
@@ -215,8 +215,8 @@ async function psGo(tid) {
     d.papers.push(p);
   }
   await bkTake('Antes de ' + (mode === 'move' ? 'mover' : 'copiar') + ' papers a «' + tp.name + '»', true);
-  const json = JSON.stringify(d, null, 2);
-  await idb('readwrite', st => st.put({...rec, dirty: true, at: new Date().toISOString(), json}, 'proj:' + tid)).catch(() => {});
+  const [json, add] = projWire(d);
+  await idb('readwrite', st => projPut(st, 'proj:' + tid, {...rec, dirty: true, at: new Date().toISOString(), json}, add)).then(() => projSaved(add)).catch(() => {});
   Object.assign(tp, {n: d.papers.length, dirty: true});
   if (mode === 'move') { const S = new Set(ids); db.papers = db.papers.filter(p => !S.has(p.id)); db.papers.forEach(q => { q.related = q.related.filter(x => !S.has(x)); q.refTo = (q.refTo || []).filter(x => !S.has(x)); }); SEL.clear(); markDirty(); render(); } else { SEL.clear(); render(); }
   pjSave(); $('#ps').close();
@@ -262,7 +262,7 @@ async function bkRestore(i) {
    Cada proyecto es una biblioteca aparte (papers, notas, secciones, etiquetas y papelera) con su propio archivo JSON, que se llama
    como el proyecto. Los ajustes (nombre de la aplicación, colores, atajos, tipos y estilos propios, plantillas, exportación) son
    comunes: viajan en db.settings y se quedan al cambiar de proyecto (también se guardan en cada JSON, para que el archivo sirva
-   solo). En IndexedDB: «projects» (lista y proyecto abierto), «proj:<id>» (copia de trabajo de cada uno) y «h:<id>» (su archivo).
+   solo). En IndexedDB: «projects» (lista y proyecto abierto), «proj:<id>» (copia de trabajo de cada uno, con las imágenes incrustadas aparte en «imgd:<huella>») y «h:<id>» (su archivo).
    El primero es «main»: en Google Drive conserva los nombres de archivo de antes. */
 const PJ = {cur: 'main', list: [{id: 'main', name: 'Mi biblioteca', created: ''}], gone: []};   // gone: borrados aquí cuyos archivos de Drive aún hay que borrar
 const pjCur = () => PJ.list.find(p => p.id === PJ.cur);
@@ -283,7 +283,7 @@ async function pjLeave() {   // antes de cambiar de proyecto: lo pendiente se gu
 }
 async function pjLoad(id, text, file, h) {   // abre un proyecto: su copia de trabajo (o el texto de un archivo) con los ajustes comunes
   const r = text == null ? await idb('readonly', st => st.get('proj:' + id)).catch(() => null) : null;
-  let d = null; try { d = JSON.parse(text ?? (r && r.v === 1 ? r.json : 'null')); } catch (e) {}
+  let d = null; try { d = text != null ? JSON.parse(text) : await projData(r); } catch (e) {}
   if (!d || typeof d !== 'object') d = {version: 1, sections: [], tags: [], papers: [], trash: []};
   if (text == null || !d.settings) d.settings = structuredClone(db.settings);
   PJ.cur = id; pjShow();

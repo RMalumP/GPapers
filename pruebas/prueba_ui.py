@@ -334,7 +334,7 @@ with sync_playwright() as pw:
     with pg.expect_file_chooser() as fc: pg.click('#img button:has-text("Incrustar")')
     fc.value.set_files(PNG); pg.wait_for_timeout(400)
     eq('copia incrustada reducida (máx. 480 px, JPEG)', pg.evaluate("[D.image.kind, D.image.data.startsWith('data:image/jpeg;base64,'), D.image.data.length < 60000]"), ['data', True, True])
-    eq('y se ve en el recuadro', pg.evaluate("document.querySelector('#dlg .pimgbox img').src.startsWith('data:image/jpeg')"), True)
+    eq('y se ve en el recuadro (desde una URL blob:, sin copiar el base64 en el HTML)', pg.evaluate("(async () => { const im = document.querySelector('#dlg .pimgbox img'); await im.decode().catch(() => {}); return [im.src.startsWith('blob:'), im.naturalWidth > 0, (await (await fetch(im.src)).blob()).type]; })()"), [True, True, 'image/jpeg'])
     # archivo local enlazado (se simula el selector con un archivo del almacenamiento privado del navegador)
     pg.evaluate("""async () => { const d = await navigator.storage.getDirectory(), h = await d.getFileHandle('foto.png', {create: true}), w = await h.createWritable(); await w.write(await (await fetch('/pruebas/img_prueba.png')).blob()); await w.close(); window.showOpenFilePicker = async () => [h]; }""")
     pg.click('#img button:has-text("Archivo local")'); pg.wait_for_timeout(500)
@@ -520,6 +520,17 @@ with sync_playwright() as pw:
     p2.reload(); p2.wait_for_timeout(1500)
     eq('al abrir, la lista se pinta una sola vez', p2.evaluate("[window.__pint, db.papers[0].title]"), [1, 'Antes de actualizar'])
     eq('la copia de trabajo recuperada no se vuelve a escribir', p2.evaluate("(async () => (await idb('readonly', st => st.get('proj:' + PJ.cur))).at)()"), at0)
+    # copia de trabajo: imágenes incrustadas aparte, JSON compacto, una sola conexión a IndexedDB
+    IMGD = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='
+    p2.evaluate("img => { db.papers[0].image = {kind: 'data', data: img}; markDirty(); render(); return sessionNow(); }", IMGD)
+    rec = p2.evaluate("(async () => { const r = await idb('readonly', st => st.get('proj:' + PJ.cur)), ks = await idb('readonly', st => st.getAllKeys()); return [r.img, r.json.includes('base64'), r.json.includes('\\n  '), ks.filter(k => String(k).startsWith('imgd:')).length]; })()")
+    eq('la copia de trabajo guarda la imagen aparte y el JSON compacto', rec, [1, False, False, 1])
+    eq('la miniatura de la lista sale de una URL blob:', p2.evaluate("document.querySelector('#list .pimg img')?.src.startsWith('blob:')"), True)
+    eq('una sola conexión a IndexedDB', p2.evaluate("idbOpen() === idbOpen()"), True)
+    p2.reload(); p2.wait_for_timeout(1500)
+    eq('al reabrir la imagen vuelve entera', p2.evaluate("db.papers[0].image?.data"), IMGD)
+    p2.evaluate("(db.papers[0].image = null, markDirty(), render(), sessionNow().then(imgGc))")
+    eq('una imagen que ya no se usa se borra', p2.evaluate("(async () => (await idb('readonly', st => st.getAllKeys())).filter(k => String(k).startsWith('imgd:')).length)()"), 0)
     # caché primero: al abrir, los archivos de la aplicación salen de la caché sin esperar a la red
     pedidos = []; spy = lambda r: (pedidos.append(r.request.url.split('8791/')[-1]), r.continue_())
     ctx2.route('**/*', spy); p2.reload(); p2.wait_for_timeout(1000); ctx2.unroute('**/*', spy)

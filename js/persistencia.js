@@ -5,9 +5,45 @@
 const FSA = 'showSaveFilePicker' in window;
 let handle = null;   // archivo elegido por el usuario
 const JSON_T = [{description: 'Datos de papers (JSON)', accept: {'application/json': ['.json']}}];
-const idb = (mode, fn) => new Promise((res, rej) => {   // IndexedDB: recuerda el último archivo entre sesiones
-  const r = indexedDB.open('gestor-papers', 1); r.onupgradeneeded = () => r.result.createObjectStore('k'); r.onerror = () => rej(r.error);
-  r.onsuccess = () => { const t = r.result.transaction('k', mode), q = fn(t.objectStore('k')); t.oncomplete = () => res(q.result); t.onerror = () => rej(t.error); }; });
+let IDB_CONN = null;   // una sola conexión a IndexedDB para toda la sesión (abrirla en cada lectura cuesta, sobre todo en el móvil)
+const idbOpen = () => IDB_CONN ??= new Promise((res, rej) => {
+  const r = indexedDB.open('gestor-papers', 1); r.onupgradeneeded = () => r.result.createObjectStore('k');
+  r.onerror = () => { IDB_CONN = null; rej(r.error); };
+  r.onsuccess = () => { const c = r.result; c.onversionchange = c.onclose = () => { c.close(); IDB_CONN = null; }; res(c); }; });
+const idb = (mode, fn) => idbOpen().then(c => new Promise((res, rej) => {   // IndexedDB: recuerda el último archivo entre sesiones
+  let t; try { t = c.transaction('k', mode); } catch (e) { IDB_CONN = null; return rej(e); }   // la conexión se cerró: la siguiente vez se abre otra
+  const q = fn(t.objectStore('k')); t.oncomplete = () => res(q && q.result); t.onerror = () => rej(t.error); t.onabort = () => rej(t.error); }));
+/* ---- Copia de trabajo con las imágenes aparte ----
+   Las imágenes incrustadas (data:) no van dentro del JSON de la copia de trabajo: cada una se guarda una sola vez en «imgd:<huella>»
+   y el JSON lleva {kind: 'data', ref: huella} (marcado con img: 1). Así guardar la sesión tras cada cambio no reescribe todas las imágenes. */
+const IMG_H = new Map(), IMG_SAVED = new Set();   // imagen → huella (se calcula una vez) · huellas ya escritas en esta sesión
+const imgHash = d => { let h = IMG_H.get(d); if (!h) { h = syHash(d); IMG_H.set(d, h); } return h; };
+function projWire(d) {   // JSON compacto de la copia de trabajo y las imágenes que aún no se han escrito
+  const add = new Map(), json = JSON.stringify(d, (k, v) => {
+    if (k === 'history') return undefined;
+    if (k === 'image' && v && v.kind === 'data' && typeof v.data === 'string') { const h = imgHash(v.data); if (!IMG_SAVED.has(h)) add.set(h, v.data); return {kind: 'data', ref: h}; }
+    return v; });
+  return [json, add];
+}
+const projPut = (st, key, rec, add) => { add.forEach((v, h) => st.put(v, 'imgd:' + h)); return st.put({...rec, img: 1}, key); };
+const projSaved = add => add.forEach((v, h) => IMG_SAVED.add(h));
+async function projData(rec) {   // lee una copia de trabajo (con o sin imágenes aparte) y devuelve el objeto, con sus imágenes
+  if (!rec || rec.v !== 1 || typeof rec.json !== 'string') return null;
+  if (!rec.img) return JSON.parse(rec.json);
+  const refs = [...new Set([...rec.json.matchAll(/"ref":"([0-9a-f]+)"/g)].map(m => m[1]))], imgs = new Map();
+  if (refs.length) await idb('readonly', st => { refs.forEach(h => { const q = st.get('imgd:' + h); q.onsuccess = () => { if (typeof q.result === 'string') { imgs.set(h, q.result); IMG_H.set(q.result, h); IMG_SAVED.add(h); } }; }); return null; });
+  return JSON.parse(rec.json, (k, v) => k === 'image' && v && v.kind === 'data' && typeof v.ref === 'string' ? (imgs.has(v.ref) ? {kind: 'data', data: imgs.get(v.ref)} : null) : v);
+}
+async function imgGc() {   // borra las imágenes que ya no usa ninguna copia de trabajo
+  const keys = await idb('readonly', st => st.getAllKeys()).catch(() => []), used = new Set();
+  const projs = keys.filter(k => typeof k === 'string' && k.startsWith('proj:')), imgs = keys.filter(k => typeof k === 'string' && k.startsWith('imgd:'));
+  if (!imgs.length) return;
+  for (const k of projs) { const r = await idb('readonly', st => st.get(k)).catch(() => null); if (r && typeof r.json === 'string') for (const m of r.json.matchAll(/"ref":"([0-9a-f]+)"/g)) used.add(m[1]); }
+  syPapersOf(db).forEach(p => { if (p.image?.kind === 'data' && p.image.data) used.add(imgHash(p.image.data)); });   // y las del proyecto abierto, aunque aún no se hayan guardado
+  const gone = imgs.filter(k => !used.has(k.slice(5))); if (!gone.length) return;
+  gone.forEach(k => IMG_SAVED.delete(k.slice(5)));
+  await idb('readwrite', st => { gone.forEach(k => st.delete(k)); return null; }).catch(() => {});
+}
 const rememberHandle = () => idb('readwrite', st => { st.put(handle, 'h:' + PJ.cur); return st.put(handle, 'last'); }).catch(() => {});   // el archivo de cada proyecto
 function validate(d) {
   if (!d || typeof d !== 'object' || !['papers', 'tags', 'sections'].every(k => Array.isArray(d[k])))
@@ -37,8 +73,8 @@ function validate(d) {
 }
 const pickFile = (acc = '.json') => new Promise(res => { const i = document.createElement('input'); i.type = 'file'; i.accept = acc;
   i.onchange = () => i.files[0] ? i.files[0].text().then(text => res({path: i.files[0].name, text})) : res(null); i.click(); });
-async function loadText(text, name, quiet) {
-  try { db = validate(JSON.parse(text)); path = name; dirty = false; F.tags.clear(); F.exTags.clear(); F.sec = ''; SEL.clear(); UNDO.length = 0; REDO.length = 0; lastSnap = snapDb(); fmtPinned = db.settings.fmtOpen; applySettings(); render(); sessionSoon(); return true; }
+async function loadText(text, name, quiet) {   // text: el JSON, o el objeto ya leído
+  try { db = validate(typeof text === 'string' ? JSON.parse(text) : text); path = name; dirty = false; F.tags.clear(); F.exTags.clear(); F.sec = ''; SEL.clear(); UNDO.length = 0; REDO.length = 0; lastSnap = snapDb(); fmtPinned = db.settings.fmtOpen; applySettings(); render(); sessionSoon(); return true; }
   catch (e) { if (!quiet) alert('Archivo no válido (se mantienen los datos actuales): ' + e.message); return false; }
 }
 async function doOpen() {   // cada archivo JSON se abre como proyecto (ver Proyectos)

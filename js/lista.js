@@ -140,7 +140,15 @@ function toggleNotes(id) { EXP.has(id) ? EXP.delete(id) : EXP.add(id); renderPap
 /* ---- Imagen del paper ---- */
 const PEND = new Map(), IMG_URL = new Map();   // PEND: archivos elegidos en el borrador aún sin guardar · IMG_URL: URLs de objeto de los archivos enlazados
 const imgInner = i => !i ? '🖼️' : i.kind === 'url' ? `<img src="${esc(i.url)}" alt="" loading="lazy" referrerpolicy="no-referrer" data-onerror="imgErr(this)">`
-  : i.kind === 'data' ? `<img src="${i.data}" alt="">` : '🖼️';
+  : i.kind === 'data' ? `<img src="${imgBlob(i.data)}" alt="">` : '🖼️';
+const IMG_BLOB = new Map();   // imagen incrustada → URL blob: (la lista no copia cientos de KB de base64 en su HTML a cada pintado)
+function imgBlob(d) {
+  let u = IMG_BLOB.get(d); if (u) return u;
+  try { const c = d.indexOf(','), bin = atob(d.slice(c + 1)), a = new Uint8Array(bin.length); for (let k = 0; k < bin.length; k++) a[k] = bin.charCodeAt(k);
+    u = URL.createObjectURL(new Blob([a], {type: d.slice(5, d.indexOf(';'))})); } catch (e) { return d; }
+  if (IMG_BLOB.size >= 400) { const [k, v] = IMG_BLOB.entries().next().value; URL.revokeObjectURL(v); IMG_BLOB.delete(k); }   // las más antiguas se sueltan
+  IMG_BLOB.set(d, u); return u;
+}
 const pimgHTML = (p, cls, attrs = '') => `<div class="pimg ${cls}" ${p.image?.kind === 'file' ? `data-fpid="${p.id}" title="Imagen enlazada: ${esc(p.image.name)}"` : ''} ${attrs}>${imgInner(p.image)}</div>`;
 const thumbHTML = (p, cls) => p.image && db.settings.showImg !== false ? pimgHTML(p, cls) : '';
 async function fileImgUrl(pid, ask) {   // archivo local enlazado: el navegador puede pedir permiso de lectura en cada sesión
