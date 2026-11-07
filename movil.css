@@ -102,11 +102,18 @@ html.mv .tbl tr.rw .rst{min-height:22px;padding:0 8px;font-size:11px}html.mv .tb
 html.mv .tbl{table-layout:auto;min-width:0}html.mv .tbl tr.rw td:nth-child(10){flex:1 1 0;min-width:0;white-space:nowrap;overflow:hidden}   /* etiquetas en una sola línea: si no caben se recortan en vez de añadir otra línea a la ficha */
 html.mv .tbl tr.rw .chip{font-size:11px;padding:0 7px;margin:0 3px 0 0;border-width:1px}
 html.mv .tbl tr.rw td input[type=checkbox]{width:18px;height:18px;margin:0}
-/* miniatura del paper: en la tabla cabe en la 1.ª línea (20 px, como los botones de la fila) y en las tarjetas va a la derecha del título/autores, así que ninguna crece */
-html.mv .tbl tr.rw td.timg{flex:none;width:20px;line-height:0}html.mv .tbl tr.rw td.timg .pimg.xs{display:flex;vertical-align:top;width:20px;height:20px;margin:0;font-size:13px}
-html.mv .card .th .pimg.sm{position:absolute;top:50px;right:10px;width:44px;height:44px;margin:0;font-size:18px}
-html.mv .card:has(.th .pimg.sm) :is(.th,.au,.sub){padding-right:56px}
-html.mv .tbl tr.rw:has(td.timg img) td.tt{flex-basis:calc(100% - 96px)}
+/* miniatura del paper (a la izquierda, sin cambiar el alto de la ficha): en la tabla ocupa las dos primeras líneas; en las tarjetas va junto al título y los autores */
+html.mv .tbl tr.rw{position:relative}
+html.mv .tbl tr.rw td.timg{position:absolute;left:34px;top:5px;line-height:0;width:46px}
+html.mv .tbl tr.rw td.timg .pimg.xs{display:flex;width:46px;height:46px;margin:0;font-size:20px}
+html.mv .tbl tr.rw:has(td.timg img) td.tt{padding-left:54px;flex-basis:calc(100% - 96px)}
+html.mv .tbl tr.rw:has(td.timg img) td:nth-child(4){padding-left:78px}
+html.mv .card .th .pimg.sm{position:absolute;z-index:1;top:50px;left:10px;width:56px;height:56px;margin:0;font-size:22px}
+html.mv .card:has(.th .pimg.sm) :is(.th,.au,.sub){padding-left:66px}
+html.mv .card .pimg:has(img),html.mv .tbl .pimg:has(img){cursor:zoom-in}
+#mvZoom{display:none}
+html.mv #mvZoom{display:flex;position:fixed;inset:0;z-index:200;align-items:center;justify-content:center;padding:16px;background:#000c;cursor:zoom-out}
+html.mv #mvZoom img{width:100%;height:100%;object-fit:contain;border-radius:8px;background:var(--card)}
 html.mv .tbl tr.rn{display:block}html.mv .tbl tr.rn td{display:block;padding:6px 10px}html.mv .tbl tr.rn td:first-child{display:none}
 
 /* --- Barra inferior --- */
