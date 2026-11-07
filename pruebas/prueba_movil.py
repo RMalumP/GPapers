@@ -81,6 +81,9 @@ with sync_playwright() as pw:
     eq('un toque en cualquier sitio cierra el pop-up', pg.evaluate("!$('#mvZoom')"), True)
     pg.evaluate("db.papers[0].image = null; render()")
     eq('tarjeta: la miniatura no cambia el alto', hc, pg.evaluate(altoC))
+    pg.evaluate(f"Object.assign(db.papers[0], {{pdf: {{name: 'a.pdf'}}, pdf2: {{name: 'b.pdf'}}, image: {IMG}, alias: 'Alias largo del paper para que la tarjeta tenga subtítulo', url: 'https://example.org/doi/10.1000/xyz'}}); render()")
+    eq('tarjeta: la miniatura no tapa botones ni etiquetas (con PDF, alias y enlace)', pg.evaluate("""(() => { const t = $('.card .pimg').getBoundingClientRect();
+      return [...document.querySelectorAll('.card button, .card .rst, .card .stv, .card a')].filter(e => { const r = e.getBoundingClientRect(); return r.width && r.left < t.right && r.right > t.left && r.top < t.bottom && r.bottom > t.top; }).map(e => e.textContent.trim()); })()"""), [])
     pg.evaluate("db.papers[0].tagIds = []; setView('cards')")
     eq('pulsación larga = clic derecho (valoración)', pg.evaluate("""() => new Promise(r => { const s = $('#list .stv'), o = s.getBoundingClientRect(), t = new Touch({identifier: 1, target: s, clientX: o.x + 5, clientY: o.y + 5});
         s.dispatchEvent(new TouchEvent('touchstart', {bubbles: true, touches: [t]})); setTimeout(() => r(!$('#ctx').hidden && $('#ctx').textContent.includes('Valoración')), 700); })"""), True)
