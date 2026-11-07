@@ -39,7 +39,7 @@ function mgAdd(id) { db[MG].push({id, name: 'Nueva', color: '#2457c5', tagIds: [
    Aparte del JSON, la app guarda (1) una copia de trabajo, para reabrir justo donde lo dejaste aunque no hayas guardado, y
    (2) el estado de la interfaz (filtros, orden, barra lateral, bloques plegados). Viven fuera de la caché de la aplicación,
    así que las actualizaciones no los tocan y no hace falta borrar datos para recibir una versión nueva. */
-const APP_V = '37.5';   // debe coincidir con la versión de sw.js
+const APP_V = '37.6';   // debe coincidir con la versión de sw.js
 let BOOTED = false, RELOADING = false, SWREG = null, tSes = 0, tUi = 0, lastUi = '';
 const sessionNow = () => { clearTimeout(tSes); if (!BOOTED) return Promise.resolve();   // copia de trabajo del proyecto abierto (y la lista de proyectos)
   const p = pjCur(); if (p) { Object.assign(p, {n: db.papers.length, file: path, dirty}); delete p.remote; }
@@ -78,6 +78,7 @@ function checkUpdate() {
   if (!SWREG) return toast('Las actualizaciones solo funcionan con la aplicación instalada o abierta desde la web (no desde un archivo local).');
   SWREG.update().then(() => toast('Buscando versión nueva… si la hay, aparecerá un aviso para recargar.', [], 4000)).catch(() => toast('No se pudo comprobar (¿sin conexión?).'));
 }
+const afterPaint = fn => requestAnimationFrame(() => setTimeout(() => window.requestIdleCallback ? requestIdleCallback(fn, {timeout: 1500}) : setTimeout(fn, 200)));   // tras el primer pintado y cuando el navegador quede libre
 async function bootApp() {
   navigator.storage?.persist?.().catch(() => {});   // pide que el navegador no borre estos datos por falta de espacio
   let ses = null, ui = null, pj = null, old = false; try { pj = await idb('readonly', st => st.get('projects')); ui = await idb('readonly', st => st.get('ui')); } catch (e) {}
@@ -97,7 +98,7 @@ async function bootApp() {
     if (!pj) PJ.list[0].name = pjNameFor(path);
   }
   pjShow(); instShow(); applyUI(ui); BOOTED = true; lastUi = JSON.stringify(uiState()); if (restored) uiNow();
-  if (pj && !restored) pjSave(); else await sessionNow();
+  if (pj && !restored) pjSave(); else if (!restored || old) await sessionNow(); else clearTimeout(tSes);   // recuperada tal cual: no hace falta volver a escribirla
   if (old) { if (handle) rememberHandle(); idb('readwrite', st => st.delete('session')).catch(() => {}); }
   bkDaily(); favLoad();
 }
@@ -109,10 +110,11 @@ if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {   //
     document.addEventListener('visibilitychange', () => { if (!document.hidden) reg.update().catch(() => {}); }); }).catch(() => {});
   navigator.serviceWorker.addEventListener('controllerchange', () => { if (had && !RELOADING) toast('Hay una versión nueva de la aplicación.', [{t: 'Recargar ahora', fn: reloadApp}], 0); });
 }
-bootApp().then(() => { syIcon(); try { const t = JSON.parse(localStorage.getItem(SY_TOK)); if (t && t.exp > Date.now()) syTokWatch(t.exp); } catch (e) {}
+RENDER_HOLD = true;   // mientras se lee la copia de trabajo y el estado de la interfaz no se pinta nada: un solo pintado al final
+bootApp().finally(() => { RENDER_HOLD = false; RENDER_HELD = false; render(); }).then(() => { syIcon(); try { const t = JSON.parse(localStorage.getItem(SY_TOK)); if (t && t.exp > Date.now()) syTokWatch(t.exp); } catch (e) {}
   if (syOn() && syP().cid !== SY_CFG.clientId) {   // la sesión era de otro proyecto de Google (otra carpeta oculta): hay que dar permiso al nuevo una vez
     SY.st = 'reconnect'; SY.consent = true; syIcon(); toast('La sincronización con Google Drive ha cambiado de proyecto: pulsa «Conectar» y da permiso una vez. Tus datos siguen aquí.', [{t: 'Conectar', fn: syConnect}], 0);
-  } else if (syAuto()) syRun(false); });   // con la sesión de Google Drive recordada, se trae lo último al abrir
+  } else if (syAuto()) afterPaint(() => syRun(false)); });   // con la sesión de Google Drive recordada, se trae lo último al abrir (cuando la lista ya se ve)
 render();
 lastSnap = snapDb();
 applySettings();
