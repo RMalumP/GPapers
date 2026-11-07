@@ -65,6 +65,17 @@ with sync_playwright() as pw:
     alto = "Math.round($('.tbl tr.rw').getBoundingClientRect().height)"; h0 = pg.evaluate(alto)
     pg.evaluate("db.tags.push(...Array.from({length: 6}, (_, i) => ({id: 'm' + i, name: 'Etiqueta larga ' + i, color: '#888888'}))); db.papers[0].tagIds = db.tags.map(t => t.id); render()"); pg.wait_for_timeout(100)
     eq('tabla: muchas etiquetas no añaden líneas a la ficha', pg.evaluate(alto), h0)
+    # miniatura del paper: se ve en la tabla y en las tarjetas sin cambiar el alto
+    IMG = "{kind:'data',data:'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=='}"
+    pg.evaluate("db.papers[0].tagIds = []; render()"); h0 = pg.evaluate(alto)
+    pg.evaluate(f"db.papers[0].image = {IMG}; render()"); pg.wait_for_timeout(100)
+    eq('tabla: la miniatura es visible', pg.evaluate("(() => { const r = $('.tbl tr.rw .pimg').getBoundingClientRect(); return r.width >= 18 && r.height >= 18 && r.right <= innerWidth; })()"), True)
+    eq('tabla: la miniatura no cambia el alto de la fila', pg.evaluate(alto), h0)
+    pg.evaluate("setView('cards')"); pg.wait_for_timeout(100)
+    altoC = "Math.round($('.card').getBoundingClientRect().height)"; hc = pg.evaluate(altoC)
+    eq('tarjeta: la miniatura es visible', pg.evaluate("(() => { const r = $('.card .pimg').getBoundingClientRect(); return r.width >= 40 && r.height >= 40 && r.right <= innerWidth; })()"), True)
+    pg.evaluate("db.papers[0].image = null; render()")
+    eq('tarjeta: la miniatura no cambia el alto', hc, pg.evaluate(altoC))
     pg.evaluate("db.papers[0].tagIds = []; setView('cards')")
     eq('pulsación larga = clic derecho (valoración)', pg.evaluate("""() => new Promise(r => { const s = $('#list .stv'), o = s.getBoundingClientRect(), t = new Touch({identifier: 1, target: s, clientX: o.x + 5, clientY: o.y + 5});
         s.dispatchEvent(new TouchEvent('touchstart', {bubbles: true, touches: [t]})); setTimeout(() => r(!$('#ctx').hidden && $('#ctx').textContent.includes('Valoración')), 700); })"""), True)
