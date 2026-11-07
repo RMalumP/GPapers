@@ -39,7 +39,7 @@ function mgAdd(id) { db[MG].push({id, name: 'Nueva', color: '#2457c5', tagIds: [
    Aparte del JSON, la app guarda (1) una copia de trabajo, para reabrir justo donde lo dejaste aunque no hayas guardado, y
    (2) el estado de la interfaz (filtros, orden, barra lateral, bloques plegados). Viven fuera de la caché de la aplicación,
    así que las actualizaciones no los tocan y no hace falta borrar datos para recibir una versión nueva. */
-const APP_V = '37.7';   // debe coincidir con la versión de sw.js
+const APP_V = '37.8';   // debe coincidir con la versión de sw.js
 let BOOTED = false, RELOADING = false, SWREG = null, tSes = 0, tUi = 0, lastUi = '';
 const sessionNow = () => { clearTimeout(tSes); if (!BOOTED) return Promise.resolve();   // copia de trabajo del proyecto abierto (y la lista de proyectos)
   const p = pjCur(); if (p) { Object.assign(p, {n: db.papers.length, file: path, dirty}); delete p.remote; }
@@ -60,10 +60,10 @@ function applyUI(u) {   // lo guardado nunca se fía: cada dato se valida contra
   CITE_SEL = typeof u.cite === 'string' && STYLES[u.cite] ? u.cite : ''; DATA_ALL = u.dataAll === true; strs(u.citeOpen).filter(g => STY_G.some(([x]) => (x || 'gen') === g)).forEach(g => CITE_OPEN.add(g)); strs(u.allFold).forEach(x => ALL_FOLD.add(x)); strs(u.cfg).forEach(x => CFG_OPEN.add(x)); strs(u.help).forEach(x => HELP_OPEN.add(x));
   $('#grpChk').checked = F.group; render();
 }
-function toast(msg, acts = [], ms = 8000) {
+function toast(msg, acts = [], ms = 8000, tag = '') {   // tag: 'sy' = aviso de reconectar con Google (se quita solo al reconectar)
   let t = $('#toast'); if (!t) { t = document.createElement('div'); t.id = 'toast'; t.setAttribute('role', 'status'); document.body.appendChild(t); }
   t.innerHTML = `<span>${esc(msg)}</span>${acts.map((a, i) => `<button data-i="${i}">${esc(a.t)}</button>`).join('')}<button data-x aria-label="Cerrar">✕</button>`; t.hidden = false; clearTimeout(t.tm);
-  t.onclick = e => { const b = e.target.closest('button'); if (!b) return; if (b.dataset.x != null) t.hidden = true; else acts[+b.dataset.i].fn(); };
+  t.dataset.tag = tag; t.onclick = e => { const b = e.target.closest('button'); if (!b) return; t.hidden = true; if (b.dataset.x == null) acts[+b.dataset.i].fn(); };   // un botón del aviso lo cierra
   if (ms) t.tm = setTimeout(() => t.hidden = true, ms);
 }
 async function forgetAppData() {
@@ -115,7 +115,7 @@ if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {   //
 RENDER_HOLD = true;   // mientras se lee la copia de trabajo y el estado de la interfaz no se pinta nada: un solo pintado al final
 bootApp().finally(() => { RENDER_HOLD = false; RENDER_HELD = false; render(); }).then(() => { syIcon(); try { const t = JSON.parse(localStorage.getItem(SY_TOK)); if (t && t.exp > Date.now()) syTokWatch(t.exp); } catch (e) {}
   if (syOn() && syP().cid !== SY_CFG.clientId) {   // la sesión era de otro proyecto de Google (otra carpeta oculta): hay que dar permiso al nuevo una vez
-    SY.st = 'reconnect'; SY.consent = true; syIcon(); toast('La sincronización con Google Drive ha cambiado de proyecto: pulsa «Conectar» y da permiso una vez. Tus datos siguen aquí.', [{t: 'Conectar', fn: syConnect}], 0);
+    SY.st = 'reconnect'; SY.consent = true; syIcon(); toast('La sincronización con Google Drive ha cambiado de proyecto: pulsa «Conectar» y da permiso una vez. Tus datos siguen aquí.', [{t: 'Conectar', fn: syConnect}], 0, 'sy');
   } else if (syAuto()) afterPaint(() => syRun(false)); });   // con la sesión de Google Drive recordada, se trae lo último al abrir (cuando la lista ya se ve)
 render();
 lastSnap = snapDb();

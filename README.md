@@ -133,6 +133,8 @@ El HTML no lleva `onclick` ni otros manejadores en línea: `index.html` tiene un
 - (v37.7) La **copia de trabajo** en IndexedDB es JSON compacto y guarda cada imagen incrustada **aparte**, una sola vez («imgd:<huella>»; el JSON lleva `{kind: 'data', ref}` y `img: 1`); guardar tras un cambio ya no reescribe todas las imágenes. Las que ya no usa ningún proyecto se borran al abrir (`imgGc`). El archivo JSON que guardas o exportas sigue llevando las imágenes dentro, como siempre.
 - (v37.7) Las miniaturas incrustadas se muestran con URLs `blob:` en vez de copiar el base64 en el HTML de cada tarjeta, y la app usa una sola conexión a IndexedDB (`idbOpen`).
 
+- (v37.8) Los avisos de reconectar con Google (`toast(…, 'sy')`) se quitan solos en cuanto vuelve el acceso, y pulsar un botón de un aviso lo cierra.
+
 ## Sincronización con Google Drive, Privacidad y Créditos (F14)
 - **Final de la barra lateral**: Papelera, Configuración, una línea, «ℹ️ Información» (Ayuda y Créditos, discretos y plegada por defecto; se recuerda si la abres) y, siempre visible y con la misma letra, una línea que explica qué es la app con el enlace **Política de privacidad** (v31.1: sustituye al botón Privacidad; Google lo pide en la página principal para verificar la marca).
 - **©️ Créditos** (barra lateral, en «Información»): dirección, desarrollo, derechos (licencia CC BY-SA) y la versión de la aplicación.
