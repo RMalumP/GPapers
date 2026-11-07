@@ -353,18 +353,19 @@ async function syRun(inter, gesture) {   // gesture: viene de un clic o una tecl
   clearTimeout(SY.tm); SY.tm = 0; SY.busy = true; SY.wait = false; SY.st = 'busy'; syIcon();
   try {
     let r; try { r = await syOnce(inter); } catch (e) { if (e.estado !== 401) throw e; syTokDel(); r = await syOnce(inter); }   // el acceso había caducado
-    SY.st = SY.wait ? 'wait' : 'idle'; if (r && r.gone) setTimeout(() => pjGone(r.gone)); return r;
+    SY.st = SY.wait ? 'wait' : 'idle'; syToastOff(); if (r && r.gone) setTimeout(() => pjGone(r.gone)); return r;
   } catch (e) {
     SY.st = /silencio|interaction|login|consent|popup|cerrada|denegado|access_denied|immediate/i.test(e.message) ? 'reconnect' : 'error'; SY.err = e;
     if (inter) throw e;
-    if (SY.st === 'reconnect' && gesture) { SY.consent = true; toast('Google necesita que vuelvas a dar permiso a la aplicación. Tus datos siguen aquí.', [{t: 'Conectar', fn: syConnect}], 0); }   // ni con un clic se pudo sin su ventana de permiso
+    if (SY.st === 'reconnect' && gesture) { SY.consent = true; toast('Google necesita que vuelvas a dar permiso a la aplicación. Tus datos siguen aquí.', [{t: 'Conectar', fn: syConnect}], 0, 'sy'); }   // ni con un clic se pudo sin su ventana de permiso
     else {
       if (SY.st === 'reconnect' || SY.st === 'error') syGesture();
-      if (SY.st === 'reconnect' && !SY.warned) { SY.warned = true; toast('Google corta el acceso cada hora: se reconectará con tu próximo clic. No pierdes nada.', [], 6000); }
+      if (SY.st === 'reconnect' && !SY.warned) { SY.warned = true; toast('Google corta el acceso cada hora: se reconectará con tu próximo clic. No pierdes nada.', [], 6000, 'sy'); }
     }
     return null;
   } finally { SY.busy = false; syIcon(); if (SY.again) { SY.again = false; sySoon(1500); } }
 }
+const syToastOff = () => { const t = $('#toast'); if (t && t.dataset.tag === 'sy') t.hidden = true; };   // ya hay acceso: fuera el aviso de reconectar
 const sySoon = (ms = 3000) => { clearTimeout(SY.tm); SY.tm = setTimeout(() => { SY.tm = 0; syRun(false); }, ms); };
 const syAuto = () => syOn() && syP().auto !== false;
 function syApply(m, replace) {   // pone en la app lo que llega de Drive (se puede deshacer)
@@ -402,7 +403,7 @@ function syClick(e) {
 }
 async function syNow() {
   const r = await syRun(false, true);
-  if (SY.st === 'reconnect') toast('Hay que volver a conectar con Google.', [{t: 'Conectar', fn: syConnect}]);
+  if (SY.st === 'reconnect') toast('Hay que volver a conectar con Google.', [{t: 'Conectar', fn: syConnect}], 8000, 'sy');
   else if (SY.st === 'error') toast(syErr(SY.err));
   else if (r && r.wait) toast('Cierra la ventana abierta para terminar de sincronizar.', [], 4000);
   else if (r && !r.cancel) toast(r.news ? 'Sincronizado: han llegado cambios de Google Drive.' : 'Sincronizado con Google Drive.', [], 3000);
