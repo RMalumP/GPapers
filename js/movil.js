@@ -67,6 +67,17 @@ function mvBuild() {
     if (e.target.closest('#side')) setTimeout(() => { if (mv$('dialog[open]')) mvDrawer(false); mvCount(); });
   });
   document.addEventListener('keydown', e => { if (e.key === 'Escape' && mvOn()) mvClose(); });
+  // tocar la miniatura de un paper la amplía en una ventana emergente; un toque en cualquier sitio la cierra
+  const zoomClose = () => { document.getElementById('mvZoom')?.remove(); };
+  document.addEventListener('click', e => {
+    if (!mvOn()) return;
+    if (e.target.closest('#mvZoom')) { e.stopPropagation(); return zoomClose(); }
+    const im = e.target.closest('#list .pimg')?.querySelector('img'); if (!im?.src) return;
+    e.stopPropagation(); e.preventDefault(); zoomClose();
+    const z = document.createElement('div'); z.id = 'mvZoom'; z.setAttribute('role', 'dialog'); z.setAttribute('aria-label', 'Imagen del paper (toca para cerrar)');
+    const big = document.createElement('img'); big.src = im.src; big.alt = ''; z.append(big); document.body.append(z);
+  }, true);
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') zoomClose(); });
   // la búsqueda se queda arriba aunque la barra se pliegue o despliegue (este observador va después del de lista.js)
   new MutationObserver(mvSearchDock).observe(side, {attributes: true, attributeFilter: ['class']});
   new MutationObserver(() => { mvDots(); mvCount(); }).observe(main, {subtree: true, childList: true, attributes: true, attributeFilter: ['hidden']});
