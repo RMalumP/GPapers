@@ -156,6 +156,9 @@ El HTML no lleva `onclick` ni otros manejadores en línea: `index.html` tiene un
 - **Completar con OpenAlex** (botón junto al DOI en Datos): resumen y número de citas a las notas generales y PDF en abierto como URL.
 - **Tema claro u oscuro a mano** (Configuración → Apariencia → Paleta): Automático, Claro u Oscuro, de cada dispositivo (`gp-theme`).
 
+## Barras de una línea en escritorio (v38.3)
+- En ventanas estrechas del navegador (no en móvil), la cabecera y la fila de «Nuevo paper» ya no saltan de línea: `fitBars` (js/lista.js) añade la clase `cmp` si no caben, y algunos botones quedan solo con su icono (el texto completo sigue en su título). Si aún falta sitio, el nombre del proyecto se corta con «…», la búsqueda se estrecha y las etiquetas de la fila se desplazan en horizontal (también con la rueda).
+
 ## Sincronización con Google Drive, Privacidad y Créditos (F14)
 - **Final de la barra lateral**: Papelera, Configuración, una línea, «ℹ️ Información» (Ayuda y Créditos, discretos y plegada por defecto; se recuerda si la abres) y, siempre visible y con la misma letra, una línea que explica qué es la app con el enlace **Política de privacidad** (v31.1: sustituye al botón Privacidad; Google lo pide en la página principal para verificar la marca).
 - **©️ Créditos** (barra lateral, en «Información»): dirección, desarrollo, derechos (licencia CC BY-SA) y la versión de la aplicación.

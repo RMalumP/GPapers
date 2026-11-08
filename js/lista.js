@@ -5,7 +5,22 @@ const BYID = new WeakMap();   // índice por id de una lista (etiquetas, seccion
 const byId = arr => { let m = BYID.get(arr); if (!m || m.n !== arr.length) { m = new Map(arr.map(x => [x.id, x])); m.n = arr.length; BYID.set(arr, m); queueMicrotask(() => BYID.delete(arr)); } return m; };
 const tagById = i => byId(db.tags).get(i), secById = i => byId(db.sections).get(i);
 const secChips = id => (secById(id)?.tagIds || []).map(tagById).filter(Boolean).map(t => chip(t, 1)).join('');
-const hdr = () => syIcon();   // syIcon también redibuja el estado de guardado
+const hdr = () => { syIcon(); fitBars(); };   // syIcon también redibuja el estado de guardado
+// En escritorio, la cabecera y la fila de «Nuevo paper» ocupan siempre una línea: si no caben, se acortan los textos de
+// algunos botones (clase «cmp»); lo que aún sobre se comprime (título con «…», búsqueda más corta, etiquetas con desplazamiento lateral)
+let FIT_RO = null;
+function fitBars() {
+  const h = $('header'), t = $('#appName'), r = $('main > .row'); if (!h || !r) return;
+  if (document.documentElement.classList.contains('mv')) { h.classList.remove('cmp'); r.classList.remove('cmp'); return; }
+  if (!FIT_RO && window.ResizeObserver) { FIT_RO = new ResizeObserver(() => fitBars()); FIT_RO.observe(h); FIT_RO.observe(r); }
+  const over = e => e.scrollWidth > e.clientWidth + 1;
+  h.classList.remove('cmp'); if (over(h) || over(t)) h.classList.add('cmp');
+  r.classList.remove('cmp'); if (over(r) || r.querySelector('#q')?.clientWidth < 140) r.classList.add('cmp');
+}
+for (const c of ['#secF2', '#tagF2']) document.querySelector(c)?.addEventListener('wheel', e => {   // la rueda desplaza en horizontal las etiquetas de la fila
+  const el = e.currentTarget; if (el.scrollWidth <= el.clientWidth || Math.abs(e.deltaX) > Math.abs(e.deltaY)) return;
+  el.scrollLeft += e.deltaY; e.preventDefault();
+}, {passive: false});
 function fnameDraw() {   // un único indicador de guardado, junto al nombre del proyecto
   const el = $('#fname'), f = path ? path.split(/[\\/]/).pop() : '', on = syOn(), s = on ? syState() : '';
   const T = !on ? (dirty ? ['pend', 'Sin guardar'] : path ? ['ok', 'Guardado'] : ['', '(sin archivo)'])
@@ -294,7 +309,7 @@ function render() {
   tg('#tbSec', F.tbSec, 'Sección', F.sec || F.noSec); tg('#tbTag', F.tbTag, 'Etiquetas', F.tags.size || F.exTags.size || F.noTag);
   $('#secF2').hidden = !F.tbSec; $('#tagF2').hidden = !F.tbTag; $('#grpChk').checked = F.group;
   selDraw(0);
-  $('#d-search').hidden = !F.q && !advRules().length; advDraw(); $('#d-tr').hidden = !db.trash.length; $('#trLbl').textContent = 'Papelera' + (db.trash.length ? ` (${db.trash.length})` : ''); $('#tbView').textContent = db.settings.view === 'table' ? '▦ Tarjetas' : '☰ Tabla';
+  $('#d-search').hidden = !F.q && !advRules().length; advDraw(); $('#d-tr').hidden = !db.trash.length; $('#trLbl').textContent = 'Papelera' + (db.trash.length ? ` (${db.trash.length})` : ''); $('#tbView').innerHTML = db.settings.view === 'table' ? '▦<span class="bl"> Tarjetas</span>' : '☰<span class="bl"> Tabla</span>';
   const nextKey = Object.keys(SORTS).find(k => !F.sorts.some(s => s.k === k)) || 'title';
   $('#sortUI').innerHTML = F.sorts.map((s, i) => `<div class="row"><select data-onchange="sortSet(${i},this.value)">${Object.entries(SORTS).map(([k, v]) => `<option value="${k}" ${s.k === k ? 'selected' : ''}>${v}</option>`).join('')}</select>
     <button title="${s.d > 0 ? 'Ascendente (A→Z, antiguo→reciente)' : 'Descendente (Z→A, reciente→antiguo)'}" data-onclick="sortFlip(${i})">${s.d > 0 ? '▲' : '▼'}</button>

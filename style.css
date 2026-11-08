@@ -230,3 +230,19 @@ body.fdrop::after{content:"Suelta aquí para importar (.bib, .ris, .txt, CSL-JSO
 #cmdk{width:min(560px,calc(100vw - 32px));padding:10px;top:12vh;margin-top:0}#cmdQ{width:100%;box-sizing:border-box;font-size:16px}#cmdL{display:flex;flex-direction:column;max-height:50vh;overflow:auto;margin:8px 0 4px}#cmdL button{text-align:left;border:0;background:none;padding:7px 10px;border-radius:6px}#cmdL button.on,#cmdL button:hover{background:color-mix(in srgb,var(--pri) 16%,transparent)}.cmdh{opacity:.7}
 /* Avisos y confirmaciones propios */
 dialog.ask{max-width:min(440px,calc(100vw - 32px));padding:18px 20px}dialog.ask p{margin:0 0 14px;line-height:1.45}dialog.ask .row{justify-content:flex-end;gap:8px}dialog.ask .pri.danger{background:var(--red);border-color:var(--red);color:#fff}
+
+/* Escritorio: cabecera y fila de «Nuevo paper» en una sola línea; en ventanas estrechas se comprimen en vez de saltar de línea */
+html:not(.mv) header{flex-wrap:nowrap;min-width:0}
+html:not(.mv) header>h1{flex:0 4 auto;min-width:3ch;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+html:not(.mv) header>.pj{flex:0 1 auto;min-width:0}html:not(.mv) #pjName{flex:0 1 auto;min-width:3ch;text-overflow:ellipsis}
+html:not(.mv) #fname{min-width:1.2em}
+html:not(.mv) header>.row{flex:0 0 auto;flex-wrap:nowrap;margin-left:auto}html:not(.mv) header .row button{white-space:nowrap}
+html:not(.mv) header.cmp .bl,html:not(.mv) header.cmp #syncBtn .syl{display:none}
+html:not(.mv) main>.row{flex-wrap:nowrap;min-width:0;overflow-x:auto;scrollbar-width:none}html:not(.mv) main>.row::-webkit-scrollbar{display:none}
+html:not(.mv) main>.row>button{flex:0 0 auto;white-space:nowrap}
+html:not(.mv) main>.row>.bar{display:contents}html:not(.mv) main>.row .bar>button{flex:0 0 auto;white-space:nowrap}
+html:not(.mv) main>.row .chips{flex:0 1 auto;flex-wrap:nowrap;min-width:0;overflow-x:auto;scrollbar-width:none}html:not(.mv) main>.row .chips::-webkit-scrollbar{display:none}
+html:not(.mv) main>.row .chip{flex:0 0 auto;white-space:nowrap}html:not(.mv) main>.row .chips small{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+html:not(.mv) main>.row>#q{flex:1 1 220px;max-width:220px;min-width:70px}
+html:not(.mv) #count{flex:0 0 auto;white-space:nowrap}
+html:not(.mv) main>.row.cmp .bl{display:none}

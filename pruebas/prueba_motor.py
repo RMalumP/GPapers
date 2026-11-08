@@ -260,5 +260,21 @@ with sync_playwright() as pw:
     eq('saca el DOI de un texto con enlaces', pg.evaluate("('Mira https://onlinelibrary.wiley.com/doi/full/10.1002/anie.202000001/full.').match(DOI_RE)[0].replace(/[.,;:)\\]}>'\"]+$/, '').replace(/\\/(full|abstract|pdf|epdf)$/i, '')"), '10.1002/anie.202000001')
     eq('sin errores al compartir', errs, [])
     b.close()
+# ---- Barras de una línea en escritorio (ventana estrecha, no móvil)
+with sync_playwright() as pw:
+    kw = {'executable_path': '/opt/pw-browsers/chromium'} if os.path.exists('/opt/pw-browsers/chromium') else {}
+    b = pw.chromium.launch(**kw); errs = []
+    H = "(() => { const h = e => Math.round(e.getBoundingClientRect().height); return [h($('header')), h($('main > .row'))]; })()"
+    for w in (1400, 940, 700):
+        ctx = b.new_context(viewport={'width': w, 'height': 600}, service_workers='block'); pg = ctx.new_page(); pg.on('pageerror', lambda e: errs.append(str(e)))
+        pg.add_init_script("window.ASK_AUTO = 'accept'"); pg.goto('file://' + str(folder / 'index.html')); pg.wait_for_timeout(1000)
+        pg.evaluate("$('#appName').textContent = 'Las Publicaciones de la muerte'; for (let i = 0; i < 8; i++) db.tags.push({id: 'w' + i, name: 'Etiqueta larga ' + i, color: '#8888cc'}); F.tbTag = true; $('#side').classList.add('min'); render()"); pg.wait_for_timeout(200)
+        hh, rh = pg.evaluate(H)
+        eq(f'{w}px: la cabecera y la fila de «Nuevo paper» ocupan una línea', [hh < 70, rh < 45], [True, True])
+        if w == 700:
+            eq('700px: los botones se acortan (el texto completo queda en su título)', pg.evaluate("[$('header').classList.contains('cmp'), $('main > .row').classList.contains('cmp'), $('#tbView').textContent.trim().length > 2, getComputedStyle($('main > .row .bl')).display]"), [True, True, True, 'none'])
+        ctx.close()
+    eq('sin errores al comprimir las barras', errs, [])
+    b.close()
 print(f'{n - fail}/{n} pruebas correctas (total)')
 sys.exit(1 if fail else 0)

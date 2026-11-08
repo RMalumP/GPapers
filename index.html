@@ -9,8 +9,8 @@
   <div class="row">
     <button id="syncBtn" data-onclick="syClick(event)" title="Conectar con Google Drive" aria-label="Conectar con Google Drive" data-st="off" hidden><span class="syi">🔄</span><span class="syl">Conectar con Google Drive</span><span class="syb"></span></button>
     <button data-onclick="save(false)" title="Guardar (Ctrl+S)" aria-label="Guardar">💾</button>
-    <button data-onclick="openMenu(event)" title="Importar referencias: archivo (.bib, .ris, .txt de ScienceDirect), texto pegado (BibTeX, RIS o citas de Google Scholar) o DOI">📥 Importar</button>
-    <button class="pri" data-onclick="openEx()">Exportar citas</button>
+    <button data-onclick="openMenu(event)" title="Importar referencias: archivo (.bib, .ris, .txt de ScienceDirect), texto pegado (BibTeX, RIS o citas de Google Scholar) o DOI">📥<span class="bl"> Importar</span></button>
+    <button class="pri" data-onclick="openEx()" title="Exportar citas">Exportar<span class="bl"> citas</span></button>
     <span class="fm"><button id="fmBtn" data-onclick="fmToggle(event)" aria-haspopup="true" aria-expanded="false" title="Abrir, guardar como, importar y autoguardado">Archivo ▾</button>
       <div id="fmenu" hidden>
         <button data-onclick="fmClose();doOpen()">📂 Abrir un archivo JSON…</button>
@@ -55,7 +55,7 @@
   <p class="sbinfo">Gestor papers: organiza tus papers y sincronízalos con tu Google Drive. · <a href="privacidad.html" data-onclick="event.preventDefault();openPriv()">Política de privacidad</a></p>
   </aside>
   <main>
-    <div class="row"><button class="pri" data-onclick="openPaper()">+ Nuevo paper</button><button id="tbView" class="tg" data-onclick="viewToggle()" title="Cambiar entre tarjetas y tabla compacta"></button><div class="bar"><button id="tbSec" class="tg" data-onclick="put(F,'tbSec',!F.tbSec,render)" data-oncontextmenu="groupMenu(event)" title="Clic: mostrar u ocultar las secciones · Clic derecho: agrupar por sección"></button><div id="secF2" class="chips" hidden></div></div><div class="bar"><button id="tbTag" class="tg" data-onclick="put(F,'tbTag',!F.tbTag,render)" data-oncontextmenu="modeMenu(event)" title="Clic: mostrar u ocultar las etiquetas · Clic derecho: cómo combinarlas"></button><div id="tagF2" class="chips"></div></div><button id="selAll" class="tg" data-onclick="selVisible()" title="Seleccionar todos los papers que se ven">☑ Visibles</button><span id="count" title="Papers que se ven, del total del proyecto, y cuántos hay seleccionados"></span></div>
+    <div class="row"><button class="pri" data-onclick="openPaper()" title="Nuevo paper">+<span class="bl"> Nuevo paper</span></button><button id="tbView" class="tg" data-onclick="viewToggle()" title="Cambiar entre tarjetas y tabla compacta"></button><div class="bar"><button id="tbSec" class="tg" data-onclick="put(F,'tbSec',!F.tbSec,render)" data-oncontextmenu="groupMenu(event)" title="Clic: mostrar u ocultar las secciones · Clic derecho: agrupar por sección"></button><div id="secF2" class="chips" hidden></div></div><div class="bar"><button id="tbTag" class="tg" data-onclick="put(F,'tbTag',!F.tbTag,render)" data-oncontextmenu="modeMenu(event)" title="Clic: mostrar u ocultar las etiquetas · Clic derecho: cómo combinarlas"></button><div id="tagF2" class="chips"></div></div><button id="selAll" class="tg" data-onclick="selVisible()" title="Seleccionar todos los papers que se ven">☑<span class="bl"> Visibles</span></button><span id="count" title="Papers que se ven, del total del proyecto, y cuántos hay seleccionados"></span></div>
     <div id="actF" hidden></div>
     <div id="list"></div>
   </main>
