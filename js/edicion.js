@@ -33,7 +33,7 @@ function drawD() {
     rel('url');
     for (const n of PDF_N) {   // el segundo hueco aparece cuando ya hay un PDF enlazado
       const P = D[pdfF(n)], L = n === 2 ? 'PDF 2' : 'PDF'; if (n === 2 && !D.pdf && !P) continue;
-      put(!!P, `<div class="w pdfrow" data-pdf="${n}"><span>📄 ${L}: ${P ? `<b>${esc(P.name)}</b>` : '<i>ninguno</i>'}</span><button data-onclick="pdfPick(${n})">${P ? 'Cambiar…' : n === 2 ? 'Enlazar un segundo PDF…' : 'Enlazar un PDF…'}</button>${P ? `<button data-onclick="pdfOpen('${D.id}',${n})">Abrir</button><label>Página <input type="number" min="1" style="width:5em" value="${P.page || ''}" data-oninput="pdfSetPage(this.value,${n})" placeholder="1"></label><button class="x" data-onclick="pdfClear(${n})" title="Quitar el enlace al ${L}">✕</button>` : ''}${n === 1 ? `<small>${db.settings.pdfDrive ? 'El PDF se copia a tu Google Drive privado (Configuración).' : 'El archivo no se sube a ningún sitio: solo se recuerda su nombre.'} Puedes enlazar hasta dos PDF por paper.</small>` : ''}</div>`);
+      put(!!P, `<div class="w pdfrow" data-pdf="${n}"><span>📄 ${L}: ${P ? `<b>${esc(P.name)}</b>` : '<i>ninguno</i>'}</span><button data-onclick="pdfPick(${n})">${P ? 'Cambiar…' : n === 2 ? 'Enlazar un segundo PDF…' : 'Enlazar un PDF…'}</button>${P ? `<button data-onclick="pdfOpen('${D.id}',${n})">Abrir</button><label>Página <input type="number" min="1" style="width:5em" value="${P.page || ''}" data-oninput="pdfSetPage(this.value,${n})" placeholder="1"></label>${annN(P) ? `<span class="annc" title="Subrayados, notas y comentarios">${annN(P)}</span>` : ''}<select data-onchange="pdfSetVis(this.value,${n})" title="¿Guardar también una copia, con los subrayados, en tu Drive normal (carpeta «GPapers»)?" aria-label="Copia en el Drive normal"><option value="">Drive normal: ${db.settings.pdfVis ? 'sí' : 'no'} (Configuración)</option><option value="si" ${P.vis === 'si' ? 'selected' : ''}>También en mi Drive normal</option><option value="no" ${P.vis === 'no' ? 'selected' : ''}>Solo en la carpeta oculta</option></select><button class="x" data-onclick="pdfClear(${n})" title="Quitar el enlace al ${L}">✕</button>` : ''}${n === 1 ? `<small>${db.settings.pdfDrive ? 'El PDF se copia a tu Google Drive privado (Configuración).' : 'El archivo no se sube a ningún sitio: solo se recuerda su nombre.'} Puedes enlazar hasta dos PDF por paper.</small>` : ''}</div>`);
     }
     ['venue', 'doi', 'accessed'].forEach(rel);
     put((D.linkMode || 'auto') !== 'auto', `<label>Enlace en la cita (si hay DOI y URL)<select data-onchange="put(D,'linkMode',this.value)">${Object.entries(LINK_MODES).map(([k, v]) => `<option value="${k}" ${D.linkMode === k ? 'selected' : ''}>${v}</option>`).join('')}</select></label>`);
@@ -576,7 +576,7 @@ function commit() {
   if (PEND.has(D.id)) idb('readwrite', st => st.put(PEND.get(D.id), 'img:' + D.id)).catch(() => {});
   for (const n of PDF_N) { const k = pdfKey(D.id, n);   // enlaces de los PDF en este navegador
     if (PEND_PDF.has(k)) idb('readwrite', st => st.put(PEND_PDF.get(k), 'pdf:' + k)).catch(() => {});
-    if (!D[pdfF(n)]) idb('readwrite', st => st.delete('pdf:' + k)).catch(() => {}); }
+    if (!D[pdfF(n)]) pdfForget(k); }
   syncRelated(old ? old.related : [], D);
   i < 0 ? db.papers.push(D) : db.papers[i] = D;
   markDirty(); $('#dlg').close(); render();

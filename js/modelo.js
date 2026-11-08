@@ -37,8 +37,8 @@ const TPL_DEF = [   // plantillas de nota de serie; {fecha} y {paper} se sustitu
   {id: 't_res', name: 'Resumen del paper', text: '**Objetivo:** \n**Método:** \n**Resultados:** \n**Limitaciones:** '},
   {id: 't_cit', name: 'Cita textual', text: '**Cita:** \n**Página:** \n**Comentario:** '},
   {id: 't_ide', name: 'Idea propia', text: '**Idea:** \n**Relación con mi tema:** \n**Siguiente paso:** '}];
-const defSettings = () => ({palette: 'azul', appName: 'Papers', showFile: true, showImg: true, showProgress: false, pdfDrive: false, customTypes: [], customStyles: [], mainStyle: 'apa', citeOnlyMain: false, aliasInMore: false, shortcuts: {...SC_DEF}, fmtOpen: false, view: 'cards', templates: TPL_DEF.map(t => ({...t})), export: {fmt: 'txt', style: 'apa', order: 'auto', num: false, notes: false, particles: false, title: '', lang: 'es', dateFmt: 'long', vanAll: false, ppChap: true, numFmt: 'auto', disamb: true, abbrList: true, inText: false}});   // ajustes por defecto (se guardan en el JSON)
-let db = {version: 1, sections: [], tags: [], papers: [], trash: [], settings: defSettings()}, path = null, dirty = false, auto = false, D, tab = 'data', MG, timer;
+const defSettings = () => ({palette: 'azul', appName: 'Papers', showFile: true, showImg: true, showProgress: false, pdfDrive: false, pdfVis: false, showInbox: true, customTypes: [], customStyles: [], mainStyle: 'apa', citeOnlyMain: false, aliasInMore: false, shortcuts: {...SC_DEF}, fmtOpen: false, view: 'cards', templates: TPL_DEF.map(t => ({...t})), export: {fmt: 'txt', style: 'apa', order: 'auto', num: false, notes: false, particles: false, title: '', lang: 'es', dateFmt: 'long', vanAll: false, ppChap: true, numFmt: 'auto', disamb: true, abbrList: true, inText: false}});   // ajustes por defecto (se guardan en el JSON)
+let db = {version: 1, sections: [], tags: [], papers: [], trash: [], inbox: [], settings: defSettings()}, path = null, dirty = false, auto = false, D, tab = 'data', MG, timer;
 const F = {q: '', sorts: [{k: 'title', d: 1}], group: false, sec: '', tags: new Set(), read: '', minRating: 0, inNotes: false, mode: 'any', tbSec: false, tbTag: true, exTags: new Set(), noTag: false, noSec: false, yFrom: 0, yTo: 0, adv: {mode: 'all', rules: []}};   // exTags: etiquetas excluidas · noTag / noSec: solo papers sin etiquetas / sin sección · yFrom, yTo: años (0 = sin límite) · adv: búsqueda avanzada
 const SEL = new Set();   // ids de papers seleccionados
 const READ = {por_leer: 'Por leer', leyendo: 'Leyendo', leido: 'Leído'};   // estado de lectura (único por paper)
@@ -96,8 +96,38 @@ function NEWF(p) {   // rellena los campos nuevos de un paper (JSON antiguo, imp
   p.editors = Array.isArray(p.editors) ? p.editors.filter(x => typeof x === 'string' && x.trim()) : [];
   p.authorType = Object.hasOwn(AUTH_T, p.authorType) ? p.authorType : 'auto';
   p.linkMode = Object.hasOwn(LINK_MODES, p.linkMode) ? p.linkMode : 'auto'; p.hideAccessed = !!p.hideAccessed; p.image = imgOk(p.image);
-  for (const k of ['pdf', 'pdf2']) { const v = p[k]; p[k] = v && typeof v === 'object' && typeof v.name === 'string' && v.name ? {name: v.name.slice(0, 260), ...(pdfPage(v.page) ? {page: pdfPage(v.page)} : {})} : null; }   // hasta dos PDF enlazados
+  for (const k of ['pdf', 'pdf2']) p[k] = pdfClean(p[k]);   // hasta dos PDF enlazados (con sus subrayados y comentarios)
   return p;
+}
+/* ===== PDF: subrayados, comentarios y notas (visor, js/visor.js) =====
+   Cada PDF (de un paper, o de la bandeja «PDF por citar») lleva sus anotaciones en «ann»: van con la biblioteca, así se sincronizan con Drive,
+   se deshacen y se copian como todo lo demás. Coordenadas en el espacio del PDF (puntos, origen abajo a la izquierda), como las anotaciones del propio PDF:
+   {id, k: 'hl' (subrayado de texto) | 'area' (zona, para escaneados) | 'note' (nota en un punto), p: página desde 0, q: [x1, y1, x2, y2, …] (un rectángulo por línea),
+    c: color, t: texto subrayado, m: comentario, src: id de la anotación del PDF de la que viene (al importarla), at: creada, up: cambiada}. */
+const ANN_K = new Set(['hl', 'area', 'note']), HEX_RX = /^#[0-9a-f]{6}$/i;
+const annStr = (v, n) => typeof v === 'string' ? v.slice(0, n) : '';
+function annClean(l) {   // el mismo orden de campos siempre: normalizar dos veces da lo mismo (la sincronización compara el JSON)
+  if (!Array.isArray(l)) return []; const seen = new Set(), out = [];
+  for (const a of l) {
+    if (!a || typeof a !== 'object' || typeof a.id !== 'string' || !a.id || a.id.length > 40 || seen.has(a.id) || !ANN_K.has(a.k) || !Number.isInteger(a.p) || a.p < 0 || a.p > 99999) continue;
+    const q = Array.isArray(a.q) ? a.q.filter(Number.isFinite).slice(0, 800) : []; if (!q.length || q.length % 4) continue;
+    seen.add(a.id); const t = annStr(a.t, 4000), m = annStr(a.m, 20000), src = annStr(a.src, 60);
+    out.push({id: a.id, k: a.k, p: a.p, q: q.map(x => Math.round(x * 100) / 100), c: HEX_RX.test(a.c) ? a.c.toLowerCase() : '#ffd400', ...(t ? {t} : {}), ...(m ? {m} : {}), ...(src ? {src} : {}), at: annStr(a.at, 40), up: annStr(a.up, 40)});
+    if (out.length >= 5000) break;
+  }
+  return out;
+}
+const PDF_VIS = new Set(['si', 'no']);   // por PDF: también en el Drive normal (si), solo en la carpeta oculta (no); sin el campo, lo de Configuración
+function pdfClean(v) {
+  if (!v || typeof v !== 'object' || typeof v.name !== 'string' || !v.name) return null;
+  const ann = annClean(v.ann), from = annStr(v.from, 80), vid = typeof v.vid === 'string' && /^[\w-]{6,200}$/.test(v.vid) ? v.vid : '';
+  return {name: v.name.slice(0, 260), ...(pdfPage(v.page) ? {page: pdfPage(v.page)} : {}), ...(ann.length ? {ann} : {}), ...(PDF_VIS.has(v.vis) ? {vis: v.vis} : {}), ...(vid ? {vid} : {}), ...(from ? {from} : {})};
+}
+function inboxClean(l) {   // bandeja «PDF por citar»: PDF sin paper todavía
+  if (!Array.isArray(l)) return []; const seen = new Set();
+  return l.map(x => { if (!x || typeof x !== 'object' || typeof x.id !== 'string' || !/^[a-z0-9]{4,40}$/.test(x.id) || seen.has(x.id)) return null; seen.add(x.id);
+    const p = pdfClean(x); if (!p) return null; const doi = annStr(x.doi, 200), guess = annStr(x.guess, 400);
+    return {id: x.id, ...p, ...(doi ? {doi} : {}), ...(guess ? {guess} : {}), at: annStr(x.at, 40), up: annStr(x.up, 40)}; }).filter(Boolean).slice(0, 2000);
 }
 /* ===== Eventos de la interfaz =====
    El HTML no lleva onclick en línea (la CSP de index.html los bloquea): cada elemento dice qué hacer en data-on<evento>, p. ej. data-onclick="openPaper('p1')".

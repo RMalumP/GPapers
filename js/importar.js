@@ -334,7 +334,7 @@ function fillGo() {
   if ($('#f_authors')?.checked && r.authorType === 'entidad' && D.authorType === 'auto') D.authorType = 'entidad';
   D.doi = r.doi; $('#imp').close(); drawD();
 }
-function openMenu(e) { ctxShow(e, `<div class="ctxh">Importar referencias</div><button data-onclick="openImport('file')">📄 Desde archivo (.bib, .ris, .txt o CSL-JSON)</button><button data-onclick="openImport('text')">📋 Pegar BibTeX, RIS o citas de Google Scholar</button><button data-onclick="openImport('doi')">🔎 Buscar por DOI, ISBN o título</button>`); }
+function openMenu(e) { ctxShow(e, `<div class="ctxh">Importar referencias</div><button data-onclick="openImport('file')">📄 Desde archivo (.bib, .ris, .txt o CSL-JSON)</button><button data-onclick="openImport('text')">📋 Pegar BibTeX, RIS o citas de Google Scholar</button><button data-onclick="openImport('doi')">🔎 Buscar por DOI, ISBN o título</button><button data-onclick="ctxClose();inboxPick()">📥 PDF sin cita (bandeja «PDF por citar»)</button>`); }
 /* ---- Compartir con GPapers (Android: «Compartir» desde el navegador o la app de la revista; ver share_target en manifest.json) ----
    Llega como index.html?title=…&text=…&url=…: se busca un DOI (o un ISBN) en lo compartido y, si no hay, el título de la página. */
 const DOI_RE = /\b10\.\d{4,9}\/[^\s"<>]+/;
@@ -356,9 +356,10 @@ document.addEventListener('dragleave', e => { if (!e.relatedTarget || e.relatedT
 document.addEventListener('drop', async e => {
   document.body.classList.remove('fdrop');
   if (!fileDrag(e) || document.querySelector('dialog[open]') || TAB.passive) return; e.preventDefault();
-  const it = [...e.dataTransfer.items].find(i => i.kind === 'file'), hp = it?.getAsFileSystemHandle?.(), f = e.dataTransfer.files[0]; if (!f) return;   // el enlace al archivo se pide antes de cualquier await
+  const its = [...e.dataTransfer.items].filter(i => i.kind === 'file'), hps = its.map(i => FSA ? i.getAsFileSystemHandle?.() : null), it = its[0], hp = hps[0], f = e.dataTransfer.files[0]; if (!f) return;   // el enlace al archivo se pide antes de cualquier await
   const name = f.name, ext = (name.match(/\.(\w+)$/) || [, ''])[1].toLowerCase();
-  if (ext === 'pdf') return toast('Para enlazar un PDF, abre el paper (Editar) y usa «PDF» en Datos.', [], 5000);
+  const pdfs = [...e.dataTransfer.files].map((file, i) => ({file, hp: hps[i]})).filter(x => /\.pdf$/i.test(x.file.name) || x.file.type === 'application/pdf');
+  if (pdfs.length) return inboxAdd(await Promise.all(pdfs.map(async x => { let h = null; try { h = await x.hp; if (h && h.kind !== 'file') h = null; } catch (err) {} return {file: x.file, h}; })));   // PDF soltados: a la bandeja «PDF por citar»
   if (!['json', 'bib', 'ris', 'txt'].includes(ext)) return toast('Suelta un archivo .bib, .ris, .txt, CSL-JSON o un proyecto .json.', [], 5000);
   let text; try { text = await f.text(); } catch (err) { return say('No se pudo leer el archivo: ' + err.message); }
   if (ext === 'json' && !isCsl(text)) { let h = null; try { h = FSA ? await hp : null; if (h && h.kind !== 'file') h = null; } catch (err) {} return pjOpenFile(text, name, h); }

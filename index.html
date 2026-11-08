@@ -2,7 +2,7 @@
 <html lang="es"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://accounts.google.com; style-src 'self' 'unsafe-inline' https://accounts.google.com; img-src * data: blob:; connect-src 'self' data: blob: https://www.googleapis.com https://oauth2.googleapis.com https://accounts.google.com https://api.crossref.org https://openlibrary.org https://api.openalex.org; frame-src https://accounts.google.com; object-src 'none'; base-uri 'self'; form-action 'none'">
-<title>Gestor de papers</title><meta name="description" content="Gestor de papers académicos: notas, secciones, etiquetas, citas en varios estilos y sincronización opcional con tu propio Google Drive."><link rel="stylesheet" href="style.css"><link rel="stylesheet" href="movil.css"><script src="js/movil.js"></script><link rel="manifest" href="manifest.json"><meta name="theme-color" content="#2457c5"><link rel="icon" href="icon-192.png"></head>
+<title>Gestor de papers</title><meta name="description" content="Gestor de papers académicos: notas, secciones, etiquetas, citas en varios estilos y sincronización opcional con tu propio Google Drive."><link rel="stylesheet" href="style.css"><link rel="stylesheet" href="movil.css"><link rel="stylesheet" href="visor.css"><script src="js/movil.js"></script><link rel="manifest" href="manifest.json"><meta name="theme-color" content="#2457c5"><link rel="icon" href="icon-192.png"></head>
 <body>
 <header>
   <h1 id="appName">Papers</h1><span class="pj"><span class="pjs" aria-hidden="true">/</span><input id="pjName" maxlength="60" spellcheck="false" autocomplete="off" aria-label="Nombre del proyecto" title="Nombre del proyecto (su archivo JSON se llama igual). Escribe para cambiarlo." placeholder="Proyecto" data-oninput="pjSize(this)" data-onchange="pjRename(this.value)" data-onkeydown="pjKey(event,this)"><button id="pjBtn" data-onclick="pjMenu(event)" title="Proyectos: cambiar, crear o borrar" aria-label="Proyectos">▾</button></span><span id="pjProg" hidden><span class="pjb"></span><small></small></span><span id="fname"></span>
@@ -19,6 +19,7 @@
         <button data-onclick="fmClose();openImport('file')">📄 Desde archivo (.bib, .ris, .txt o CSL-JSON)…</button>
         <button data-onclick="fmClose();openImport('text')">📋 Pegar BibTeX, RIS o citas de Google Scholar…</button>
         <button data-onclick="fmClose();openImport('doi')">🔎 Buscar por DOI, ISBN o título…</button>
+        <button data-onclick="fmClose();inboxPick()">📥 PDF sin cita a la bandeja «PDF por citar»…</button>
         <hr><label><input type="checkbox" id="auto" data-onchange="setAuto(this)"> Autoguardado</label>
       </div></span>
   </div>
@@ -57,8 +58,9 @@
   <main>
     <div class="row"><button class="pri" data-onclick="openPaper()" title="Nuevo paper">+<span class="bl"> Nuevo paper</span></button><button id="tbView" class="tg" data-onclick="viewToggle()" title="Cambiar entre tarjetas y tabla compacta"></button><div class="bar"><button id="tbSec" class="tg" data-onclick="put(F,'tbSec',!F.tbSec,render)" data-oncontextmenu="groupMenu(event)" title="Clic: mostrar u ocultar las secciones · Clic derecho: agrupar por sección"></button><div id="secF2" class="chips" hidden></div></div><div class="bar"><button id="tbTag" class="tg" data-onclick="put(F,'tbTag',!F.tbTag,render)" data-oncontextmenu="modeMenu(event)" title="Clic: mostrar u ocultar las etiquetas · Clic derecho: cómo combinarlas"></button><div id="tagF2" class="chips"></div></div><button id="selAll" class="tg" data-onclick="selVisible()" title="Seleccionar todos los papers que se ven">☑<span class="bl"> Visibles</span></button><span id="count" title="Papers que se ven, del total del proyecto, y cuántos hay seleccionados"></span></div>
     <div id="actF" hidden></div>
+    <div id="inbox" hidden></div>
     <div id="list"></div>
   </main>
 </div>
 <div id="ctx" hidden></div><dialog id="dlg"></dialog><dialog id="mg"></dialog><dialog id="ex"></dialog><dialog id="nv"></dialog><dialog id="cfg"></dialog><dialog id="imp"></dialog><dialog id="rv"></dialog><dialog id="sv"></dialog><dialog id="img"></dialog><dialog id="help"></dialog><dialog id="lk"></dialog><dialog id="tr"></dialog><dialog id="gr"></dialog><dialog id="sy"></dialog><dialog id="pv"></dialog><dialog id="cr"></dialog><dialog id="bk"></dialog><dialog id="dp"></dialog><dialog id="ps"></dialog><dialog id="cmdk" aria-label="Paleta de órdenes"></dialog>
-<script src="js/modelo.js"></script><script src="js/citas.js"></script><script src="js/persistencia.js"></script><script src="js/importar.js"></script><script src="js/config.js"></script><script src="js/lista.js"></script><script src="js/edicion.js"></script><script src="js/drive.js"></script><script src="js/extras.js"></script><script src="app.js"></script></body></html>
+<script src="js/modelo.js"></script><script src="js/citas.js"></script><script src="js/persistencia.js"></script><script src="js/importar.js"></script><script src="js/config.js"></script><script src="js/lista.js"></script><script src="js/edicion.js"></script><script src="js/drive.js"></script><script src="js/extras.js"></script><script src="js/visor.js"></script><script src="js/bandeja.js"></script><script src="app.js"></script></body></html>
