@@ -334,7 +334,7 @@ function fillGo() {
   if ($('#f_authors')?.checked && r.authorType === 'entidad' && D.authorType === 'auto') D.authorType = 'entidad';
   D.doi = r.doi; $('#imp').close(); drawD();
 }
-function openMenu(e) { ctxShow(e, `<div class="ctxh">Importar referencias</div><button data-onclick="openImport('file')">📄 Desde archivo (.bib, .ris, .txt o CSL-JSON)</button><button data-onclick="openImport('text')">📋 Pegar BibTeX, RIS o citas de Google Scholar</button><button data-onclick="openImport('doi')">🔎 Buscar por DOI, ISBN o título</button><button data-onclick="ctxClose();inboxPick()">📥 PDF sin cita (bandeja «PDF por citar»)</button>`); }
+function openMenu(e) { ctxShow(e, `<div class="ctxh">Importar referencias</div><button data-onclick="openImport('file')">📄 Desde archivo (.bib, .ris, .txt o CSL-JSON)</button><button data-onclick="openImport('text')">📋 Pegar BibTeX, RIS o citas de Google Scholar</button><button data-onclick="openImport('doi')">🔎 Buscar por DOI, ISBN o título</button><button data-onclick="ctxClose();inboxPick()">🗃️ PDF sin cita (bandeja «PDF por citar»)</button>`); }
 /* ---- Compartir con GPapers (Android: «Compartir» desde el navegador o la app de la revista; ver share_target en manifest.json) ----
    Llega como index.html?title=…&text=…&url=…: se busca un DOI (o un ISBN) en lo compartido y, si no hay, el título de la página. */
 const DOI_RE = /\b10\.\d{4,9}\/[^\s"<>]+/;

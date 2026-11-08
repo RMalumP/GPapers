@@ -169,6 +169,11 @@ El HTML no lleva `onclick` ni otros manejadores en línea: `index.html` tiene un
 - Desde `file://` el visor propio no puede cargar sus módulos: el PDF se abre en el visor del navegador.
 - Archivos nuevos: `js/visor.js`, `js/bandeja.js`, `visor.css`, `lib/`. Pruebas: `pruebas/prueba_visor.py` (con `pruebas/prueba.pdf`).
 
+## Bandeja 🗃️ (v39.4)
+- La bandeja «PDF por citar» lleva el icono 🗃️ (sección, botón de la cabecera y menús).
+- **Crear todas las citas**: con varios PDF con DOI, las busca a la vez en CrossRef y crea los papers; las que fallan (o ya estaban, o sin DOI) se quedan en la bandeja y se dice cuáles. Un solo «Deshacer».
+- **Duplicados**: si el DOI ya es un paper de la biblioteca, avisa («Ya tienes este paper: …») con «🔗 Enlazar a ese paper»; «Crear cita» pregunta antes de duplicarlo.
+
 ## Google Drive más rápido (v39.3)
 - **Cambiar de proyecto sin esperar**: el proyecto que dejas se guarda aquí al momento y sus cambios se suben a Drive en segundo plano (`syStored`, fusionando con lo que haya llegado de otros dispositivos); el nuevo se abre enseguida. Al arrancar, se suben también los de otros proyectos que no llegaron a Drive.
 - **Primero las citas**: cada vuelta lista solo los archivos del proyecto abierto (la limpieza de proyectos borrados, una vez al día); las imágenes que ya están en este dispositivo no se vuelven a descargar, y los PDF van después, en cola.
