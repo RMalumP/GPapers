@@ -56,6 +56,7 @@ function validate(d) {
     p.reading = Object.hasOwn(READ, p.reading) ? p.reading : 'por_leer'; p.rating = Number.isInteger(p.rating) && p.rating >= 0 && p.rating <= 5 ? p.rating : 0; p.sectionIds ??= [...new Set(p.notes.map(n => n.sectionId).filter(Boolean))]; NEWF(p); });
   const byId = new Map(d.papers.map(p => [p.id, p]));   // relaciones: sin ids rotos ni repetidos y siempre simétricas
   d.papers.forEach(p => { p.related = [...new Set(p.related)].filter(i => i !== p.id && byId.has(i)); p.refTo = [...new Set(Array.isArray(p.refTo) ? p.refTo : [])].filter(i => i !== p.id && byId.has(i)); });
+  d.inbox = inboxClean(d.inbox);
   d.trash = (Array.isArray(d.trash) ? d.trash : []).filter(t => t && t.at && t.paper && t.paper.id && typeof t.paper.title === 'string' && Array.isArray(t.paper.authors) && trashLeft(t) > 0);   // la papelera caduca a los 5 días
   d.papers.forEach(p => p.related.forEach(i => { const q = byId.get(i); if (!q.related.includes(p.id)) q.related.push(p.id); }));
   [...d.tags, ...d.sections].forEach((x, i) => { if (!x.id || typeof x.name !== 'string') throw Error(`etiqueta/sección n.º ${i + 1} sin id o nombre`); });
@@ -64,7 +65,7 @@ function validate(d) {
   d.settings = {...defSettings(), ...sIn, shortcuts: {...SC_DEF}};
   d.settings.export = {...defSettings().export, ...(sIn.export && typeof sIn.export === 'object' ? sIn.export : {})};
   const xo = d.settings.export; if (!['es', 'en'].includes(xo.lang)) xo.lang = 'es'; if (!['long', 'dmy', 'iso'].includes(xo.dateFmt)) xo.dateFmt = 'long'; xo.vanAll = !!xo.vanAll; xo.ppChap = !!xo.ppChap; xo.disamb = !!xo.disamb; xo.abbrList = xo.abbrList !== false; if (!['auto', 'dot', 'br', 'par'].includes(xo.numFmt)) xo.numFmt = 'auto';
-  d.settings.showProgress = !!d.settings.showProgress; d.settings.citeOnlyMain = !!d.settings.citeOnlyMain; d.settings.aliasInMore = !!d.settings.aliasInMore; if (typeof d.settings.mainStyle !== 'string') d.settings.mainStyle = 'apa'; d.settings.pdfDrive = !!d.settings.pdfDrive; d.settings.fmtOpen = !!d.settings.fmtOpen; d.settings.view = d.settings.view === 'table' ? 'table' : 'cards';
+  d.settings.showProgress = !!d.settings.showProgress; d.settings.citeOnlyMain = !!d.settings.citeOnlyMain; d.settings.aliasInMore = !!d.settings.aliasInMore; if (typeof d.settings.mainStyle !== 'string') d.settings.mainStyle = 'apa'; d.settings.pdfDrive = !!d.settings.pdfDrive; d.settings.pdfVis = !!d.settings.pdfVis; d.settings.showInbox = d.settings.showInbox !== false; d.settings.fmtOpen = !!d.settings.fmtOpen; d.settings.view = d.settings.view === 'table' ? 'table' : 'cards';
   if (!Array.isArray(d.settings.templates)) d.settings.templates = defSettings().templates;
   d.settings.templates = d.settings.templates.filter(t => t && typeof t.name === 'string' && typeof t.text === 'string').map(t => ({id: t.id || uid(), name: t.name, text: t.text}));
   d.settings.customTypes = [...new Map((Array.isArray(sIn.customTypes) ? sIn.customTypes : []).map(ctClean).filter(Boolean).map(c => [c.id, c])).values()];

@@ -81,7 +81,7 @@ with sync_playwright() as pw:
     eq('y está en el destino', A.evaluate("db.papers.some(p => p.id === 's1')"), True)
     # ---- 4. PDF enlazado
     A.evaluate("pjOpen(PJ.list[0].id)"); A.wait_for_timeout(800)
-    A.evaluate("""window.__open = []; window.open = u => { window.__open.push(u); };
+    A.evaluate("""window.VW_NATIVE = true; window.__open = []; window.open = u => { window.__open.push(u); };
       window.__pickN = 0; window.showOpenFilePicker = async () => { window.__pickN++; return [{name: 'articulo.pdf', queryPermission: async () => 'granted', requestPermission: async () => 'granted', getFile: async () => new File(['%PDF-1.4 prueba'], 'articulo.pdf', {type: 'application/pdf'})}]; }; null""")
     A.evaluate("openPaper('d1'); tab = 'data'; drawD()")
     eq('en Datos hay una fila para enlazar el PDF', ('Enlazar un PDF' in A.inner_text('#dlg .pdfrow'), 'ninguno' in A.inner_text('#dlg .pdfrow')), (True, True))
@@ -182,7 +182,7 @@ with sync_playwright() as pw:
     eq('la opción se sincroniza con los ajustes comunes', P1.evaluate("db.settings.pdfDrive"), True)
     cQ, Q1 = devD()
     Q1.click('#syncBtn'); Q1.click('#sy button:has-text("Continuar")'); Q1.wait_for_timeout(1200); Q1.click('#sy button:has-text("Aceptar")')
-    Q1.evaluate("window.__open = []; window.open = u => { window.__open.push(u); }; window.showOpenFilePicker = async () => { window.__pick = 1; throw Object.assign(Error('x'), {name: 'AbortError'}); }; null")
+    Q1.evaluate("window.VW_NATIVE = true; window.__open = []; window.open = u => { window.__open.push(u); }; window.showOpenFilePicker = async () => { window.__pick = 1; throw Object.assign(Error('x'), {name: 'AbortError'}); }; null")
     eq('otro dispositivo: el paper llega con su PDF', Q1.evaluate("db.papers.find(p => p.id === 'k1').pdf"), {'name': 'articulo.pdf'})
     Q1.evaluate("pdfOpen('k1')"); Q1.wait_for_timeout(1000)
     eq('y lo abre descargándolo de Drive, sin pedir el archivo', Q1.evaluate("[window.__open.length, (window.__open[0] || '').startsWith('blob:'), window.__pick || 0]"), [1, True, 0])

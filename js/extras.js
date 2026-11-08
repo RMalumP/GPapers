@@ -36,7 +36,7 @@ function privHTML() {
     <li><b>Borrar la copia de Google Drive</b>: menú del icono 🔄 → «Borrar mis datos de Google Drive», o el botón de abajo (con la sesión iniciada).</li>
     <li><b>Quitar el permiso a la aplicación</b> en todos tus dispositivos: <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener">myaccount.google.com/permissions</a>.</li>
     <li><b>Datos de este navegador</b>: Ayuda → «Aplicación instalada» → «Olvidar la copia de sesión», o borra los datos del sitio desde el navegador. Tus archivos JSON solo los borras tú.</li>
-    <li><b>Copias de seguridad y filtros guardados</b> se guardan solo en este navegador (nunca en Google Drive). Los <b>PDF enlazados</b> no se leen ni se envían a ningún sitio, salvo que actives en Configuración «Subir a mi Google Drive los PDF enlazados»: entonces cada PDF se copia a la carpeta privada y oculta de tu Google Drive (mismo permiso <code>drive.appdata</code>), solo para que puedas abrirlo desde tus otros dispositivos. Se borra de allí si quitas el enlace, y con «Borrar mis datos de Google Drive».</li></ul>
+    <li><b>Copias de seguridad y filtros guardados</b> se guardan solo en este navegador (nunca en Google Drive). Los <b>PDF enlazados</b> no se leen ni se envían a ningún sitio, salvo que actives en Configuración «Subir a mi Google Drive los PDF enlazados»: entonces cada PDF se copia a la carpeta privada y oculta de tu Google Drive (mismo permiso <code>drive.appdata</code>), solo para que puedas abrirlo desde tus otros dispositivos. Se borra de allí si quitas el enlace, y con «Borrar mis datos de Google Drive». <b>Visor de PDF:</b> los PDF se abren y se anotan dentro de este navegador; los subrayados y comentarios se guardan en tu biblioteca (y viajan con ella a tu carpeta oculta si sincronizas). <b>Copia en tu Drive normal (opcional):</b> si activas «Guardar también los PDF en mi Drive normal», Google te pide además el permiso <code>drive.file</code>, que solo deja ver y cambiar los archivos que crea la propia aplicación: una carpeta «GPapers» con una copia de cada PDF con sus anotaciones. La aplicación sigue sin poder leer ningún otro archivo de tu Drive, y esa carpeta es tuya: no se borra al quitar el enlace ni con «Borrar mis datos de Google Drive».</li></ul>
     ${syAvail() ? `<p class="sypv">${on ? `Google Drive: <b>sesión iniciada</b>${p.who ? ' como ' + esc(p.who) : ''}${p.last ? ' · última sincronización ' + syAgo(p.last) : ''}.</p><p class="row"><button data-onclick="syLogout()">🚪 Cerrar sesión</button><button class="danger" data-onclick="syWipe()">🗑 Borrar mi copia de Google Drive</button>` : 'Google Drive: <b>sin conectar</b>. <button data-onclick="$(\'#pv\').close();syIntro()">🔄 Sincronizar…</button>'}</p>` : ''}
     <h4>Contacto</h4><p>Dudas sobre esta política: <a href="mailto:r.malumbresp@gmail.com">r.malumbresp@gmail.com</a> o <a href="mailto:rmalum01@ucm.es">rmalum01@ucm.es</a>. Versión para enlazar: <a href="privacidad.html" target="_blank" rel="noopener">privacidad.html</a>.</p></div>`;
 }
@@ -46,7 +46,8 @@ function openPriv() { $('#pv').innerHTML = privHTML(); if (!$('#pv').open) $('#p
 function openCred() {
   $('#cr').innerHTML = `<div class="dh"><h2>Créditos</h2><div class="dbtn"><button data-onclick="$('#cr').close()">Cerrar ✕</button></div></div>
     <dl class="cred"><dt>Dirección:</dt><dd>R.M.P.</dd><dt>Desarrollo:</dt><dd>Vibe Coding con Claude</dd>
-    <dt>Derechos:</dt><dd><a href="https://creativecommons.org/licenses/by-sa/4.0/deed.es" target="_blank" rel="noopener">Licencia CC BY-SA</a></dd><dt>Versión:</dt><dd>v${APP_V}</dd></dl>`;
+    <dt>Derechos:</dt><dd><a href="https://creativecommons.org/licenses/by-sa/4.0/deed.es" target="_blank" rel="noopener">Licencia CC BY-SA</a></dd><dt>Versión:</dt><dd>v${APP_V}</dd></dl>
+    <p class="empty" style="font-size:12px">Visor de PDF: <a href="https://mozilla.github.io/pdf.js/" target="_blank" rel="noopener">PDF.js</a> (Apache 2.0) y <a href="https://pdf-lib.js.org/" target="_blank" rel="noopener">pdf-lib</a> (MIT).</p>`;
   if (!$('#cr').open) $('#cr').showModal();
 }
 
@@ -160,33 +161,54 @@ const pdfsOf = p => PDF_N.filter(n => p[pdfF(n)]);   // huecos con PDF de un pap
 async function pdfChoose(key) {   // elige el archivo de un hueco (guardándolo en el borrador o en el paper); devuelve el File
   if (FSA) { const [h] = await showOpenFilePicker({types: PDF_T}); PEND_PDF.set(key, h); return {file: await h.getFile(), h}; }
   const file = await new Promise(res => { const i = document.createElement('input'); i.type = 'file'; i.accept = '.pdf,application/pdf'; i.onchange = () => res(i.files[0] || null); i.oncancel = () => res(null); i.click(); });
-  if (!file) throw Object.assign(Error('cancelado'), {name: 'AbortError'}); PDF_FILES.set(key, file); return {file};
+  if (!file) throw Object.assign(Error('cancelado'), {name: 'AbortError'}); PDF_FILES.set(key, file); pdfKeep(key, file); return {file};
 }
+/* Sin acceso a archivos (móvil, Safari, Firefox) el navegador no puede volver a leer un PDF elegido: se guarda una copia en este navegador
+   («pdfb:<clave>», hasta 100 MB), igual que la que se descarga de Google Drive, para no tener que elegirlo ni descargarlo cada vez. */
+const PDF_KEEP = 100 * 1048576;
+const pdfKeep = (key, file) => { if (file && file.size <= PDF_KEEP) idb('readwrite', st => st.put(new Blob([file], {type: 'application/pdf'}), 'pdfb:' + key)).catch(() => {}); };
+const pdfKept = async (key, name) => { const b = await idb('readonly', st => st.get('pdfb:' + key)).catch(() => null); return b instanceof Blob ? new File([b], name || 'documento.pdf', {type: 'application/pdf'}) : null; };
+const pdfForget = key => idb('readwrite', st => { st.delete('pdf:' + key); st.delete('pdfb:' + key); return st.delete('pdft:' + key); }).catch(() => {});
 async function pdfPick(n = 1) {
   const f = pdfF(n);
-  try { const {file} = await pdfChoose(pdfKey(D.id, n)); D[f] = {name: file.name, ...(pdfPage(D[f]?.page) ? {page: D[f].page} : {})}; drawD(); }
+  try { const {file} = await pdfChoose(pdfKey(D.id, n)); const o = D[f]; D[f] = o && o.name === file.name ? {...o} : {name: file.name, ...(pdfPage(o?.page) ? {page: o.page} : {}), ...(o?.vis ? {vis: o.vis} : {})}; drawD(); }   // el mismo archivo (movido): se quedan sus anotaciones
   catch (e) { if (e.name !== 'AbortError') say('No se pudo elegir el archivo: ' + e.message); }
 }
-function pdfClear(n = 1) { const k = pdfKey(D.id, n); PEND_PDF.delete(k); PDF_FILES.delete(k); D[pdfF(n)] = null; drawD(); }
+async function pdfClear(n = 1) {
+  const k = pdfKey(D.id, n), o = D[pdfF(n)];
+  if (o?.ann?.length && !await askOk(`Este PDF tiene ${o.ann.length} ${o.ann.length === 1 ? 'anotación' : 'anotaciones'} (subrayados, notas y comentarios). Si quitas el enlace, se pierden.`, {ok: 'Quitar el PDF', danger: true})) return;
+  PEND_PDF.delete(k); PDF_FILES.delete(k); D[pdfF(n)] = null; drawD();
+}
 function pdfSetPage(v, n = 1) { const p = D[pdfF(n)]; if (p) { const x = pdfPage(v); x ? p.page = x : delete p.page; } }
+function pdfSetVis(v, n = 1) { const p = D[pdfF(n)]; if (!p) return; PDF_VIS.has(v) ? p.vis = v : delete p.vis; if (v === 'si') pdfVisAsk(); }
+async function pdfFile(key, pf, ask = true) {   // el archivo de un PDF enlazado: de esta sesión, del enlace guardado, de la copia del navegador, de Google Drive o, si no, se pide
+  let file = PDF_FILES.get(key);
+  if (!file && FSA) {
+    const h = PEND_PDF.get(key) || await idb('readonly', st => st.get('pdf:' + key)).catch(() => null);
+    if (h) try { if (await h.queryPermission({mode: 'read'}) === 'granted' || await h.requestPermission({mode: 'read'}) === 'granted') file = await h.getFile(); else { toast('Sin permiso para leer el PDF.'); return null; } } catch (e) { toast(`No se encuentra «${pf.name}»: elígelo de nuevo.`, [], 4000); }
+  }
+  if (!file) file = await pdfKept(key, pf.name) || (pf.from && await pdfKept(pf.from, pf.name));
+  if (!file) { file = await pdfFromDrive(key, pf.name) || (pf.from && await pdfFromDrive(pf.from, pf.name)); if (file) pdfKeep(key, file); }   // subido por otro dispositivo (o desde la bandeja)
+  if (!file && ask) {   // archivo movido o sin copia en Drive: se vuelve a enlazar
+    const r = await pdfChoose(key); file = r.file; if (r.h) idb('readwrite', st => st.put(r.h, 'pdf:' + key)).catch(() => {});
+    if (file.name !== pf.name) toast(`Has elegido «${file.name}», distinto de «${pf.name}».`, [], 4000);
+  }
+  return file;
+}
+function pdfNative(file, page) {   // el visor del navegador, en otra pestaña (desde file:// o si se pide)
+  const url = URL.createObjectURL(file.type === 'application/pdf' ? file : new Blob([file], {type: 'application/pdf'})) + (pdfPage(page) ? '#page=' + pdfPage(page) : '');
+  window.open(url, '_blank'); setTimeout(() => URL.revokeObjectURL(url.split('#')[0]), 120000);
+}
 async function pdfOpen(id, n = 1) {
   const p = D && D.id === id && $('#dlg').open ? D : db.papers.find(x => x.id === id), pf = p && p[pdfF(n)], key = pdfKey(id, n); if (!pf) return;   // con el editor abierto, el borrador
   try {
-    let file = PDF_FILES.get(key);
-    if (!file && FSA) {
-      const h = PEND_PDF.get(key) || await idb('readonly', st => st.get('pdf:' + key)).catch(() => null);
-      if (h) try { if (await h.queryPermission({mode: 'read'}) === 'granted' || await h.requestPermission({mode: 'read'}) === 'granted') file = await h.getFile(); else return toast('Sin permiso para leer el PDF.'); } catch (e) { toast(`No se encuentra «${pf.name}»: elígelo de nuevo.`, [], 4000); }
-    }
-    if (!file) file = await pdfFromDrive(key, pf.name);   // subido por otro dispositivo
-    if (!file) {   // archivo movido o sin copia en Drive: se vuelve a enlazar
-      const r = await pdfChoose(key); file = r.file; if (r.h) idb('readwrite', st => st.put(r.h, 'pdf:' + key)).catch(() => {});
-      if (file.name !== pf.name) toast(`Has elegido «${file.name}», distinto de «${pf.name}».`, [], 4000);
-    }
-    const url = URL.createObjectURL(file.type === 'application/pdf' ? file : new Blob([file], {type: 'application/pdf'})) + (pdfPage(pf.page) ? '#page=' + pdfPage(pf.page) : '');
-    window.open(url, '_blank'); setTimeout(() => URL.revokeObjectURL(url.split('#')[0]), 120000);
+    const file = await pdfFile(key, pf); if (!file) return;
+    if (vwCan()) vwOpen({kind: 'paper', id, n}, file); else pdfNative(file, pf.page);
   } catch (e) { if (e.name !== 'AbortError') say('No se pudo abrir el PDF: ' + e.message); }
 }
-const pdfBtns = (p, full) => pdfsOf(p).map(n => `<button class="sm" data-onclick="pdfOpen('${p.id}',${n})" title="Abrir el PDF enlazado: ${esc(p[pdfF(n)].name)}">📄${full ? ' PDF' : ''}${n === 2 ? ' 2' : ''}</button>`).join('');   // botones de la tarjeta (full) y de la tabla
+const annN = pf => pf?.ann?.length || 0;
+const pdfBtns = (p, full) => pdfsOf(p).map(n => { const pf = p[pdfF(n)], a = annN(pf);
+  return `<button class="sm" data-onclick="pdfOpen('${p.id}',${n})" title="Abrir el PDF: ${esc(pf.name)}${a ? ` · ${a} ${a === 1 ? 'anotación' : 'anotaciones'} (subrayados y notas)` : ''}">📄${full ? ' PDF' : ''}${n === 2 ? ' 2' : ''}${a ? `<span class="annc">${a}</span>` : ''}</button>`; }).join('');   // botones de la tarjeta (full) y de la tabla, con cuántas anotaciones tiene
 
 /* ===== Mover o copiar papers a otro proyecto =====
    Los papers seleccionados (con sus notas, etiquetas, secciones y las relaciones entre ellos) pasan a la copia de trabajo del otro

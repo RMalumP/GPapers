@@ -1,0 +1,180 @@
+'use strict';
+/* ===== Bandeja «PDF por citar» y copia de los PDF en el Drive normal (v39) =====
+   La bandeja guarda PDF que aún no tienen cita (db.inbox, ver inboxClean en js/modelo.js): se abren en el mismo visor, con subrayados y comentarios,
+   y salen de uno en uno encima de la lista para crear su cita (por el DOI de la primera página) o asignarlos a un paper que ya existe.
+   El archivo vive como el de cualquier PDF enlazado, con la clave «in-<id>»: copia en este navegador («pdfb:»), miniatura («pdft:») y, si se
+   activa, copia en la carpeta oculta de Drive (gpapers-pdf-in-<id>).
+   Drive normal: con «Guardar también en mi Drive normal» (Configuración, o en cada PDF), cada PDF se copia ya anotado a la carpeta «GPapers»
+   del Drive de la persona, para abrirlo desde Drive, Acrobat o Foxit. Usa el permiso drive.file (no sensible: la app solo ve los archivos que
+   ella crea), que se pide la primera vez que se activa. La copia del Drive normal es solo de salida: GPapers nunca la lee ni la borra. */
+const inKey = id => 'in-' + id;
+const pdfVisOf = pf => !!pf && (pf.vis === 'si' || pf.vis !== 'no' && !!db.settings.pdfVis);
+const IB = {i: 0};
+const ibFold = () => { try { return localStorage.getItem('gp-ib-fold') === '1'; } catch (e) { return false; } };
+function ibFoldSet(v) { try { localStorage.setItem('gp-ib-fold', v ? '1' : '0'); } catch (e) {} inboxDraw(); }
+async function inboxDraw() {
+  const box = $('#inbox'); if (!box) return; const L = db.inbox || [];
+  box.hidden = !L.length || db.settings.showInbox === false; if (box.hidden) { box.innerHTML = ''; return; }
+  IB.i = Math.max(0, Math.min(IB.i, L.length - 1)); const it = L[IB.i], a = annN(it), fold = ibFold();
+  box.innerHTML = `<div class="ibh"><button class="ibf" data-onclick="ibFoldSet(${!fold})" aria-expanded="${!fold}" title="Plegar o desplegar"><span class="car">${fold ? '▸' : '▾'}</span><b>📥 PDF por citar</b><span class="ibn">${L.length}</span></button>
+    ${fold ? '' : `<span class="ibnav"><button data-onclick="inboxGo(-1)" aria-label="Anterior" ${L.length < 2 ? 'disabled' : ''}>‹</button><span>${IB.i + 1} de ${L.length}</span><button data-onclick="inboxGo(1)" aria-label="Siguiente" ${L.length < 2 ? 'disabled' : ''}>›</button></span>`}
+    <button class="sm ibadd" data-onclick="inboxPick()" title="Añadir PDF a la bandeja (también puedes soltarlos en la ventana)">＋ PDF</button></div>
+    ${fold ? '' : `<div class="ibc" data-id="${it.id}"><button class="ibt" data-onclick="inboxOpen('${it.id}')" title="Abrir en el visor"><span class="ibi">📄</span></button>
+      <div class="ibd"><b class="ibname" title="${esc(it.name)}">${esc(it.name)}</b>
+        ${it.guess ? `<small title="Título que se ha leído del PDF">${esc(it.guess)}</small>` : ''}${it.doi ? `<small>DOI: ${esc(it.doi)}</small>` : '<small class="ibno">Sin DOI en la primera página: la cita se crea con el título y la completas tú.</small>'}
+        ${a ? `<small>🖍 ${a} ${a === 1 ? 'anotación' : 'anotaciones'}</small>` : ''}
+        <div class="row ibb"><button class="pri" data-onclick="inboxCite('${it.id}')" title="${it.doi ? 'Crea la cita con los datos de CrossRef y abre su ficha para revisarla' : 'Crea la cita con el título y abre su ficha para completarla'}">＋ Crear cita</button>
+          <button data-onclick="inboxAssign('${it.id}')" title="La cita ya existe: el PDF pasa a ese paper">🔗 Asignar a un paper</button>
+          <button data-onclick="inboxOpen('${it.id}')">📖 Abrir</button>${L.length > 1 ? `<button data-onclick="inboxGo(1)" title="Dejarlo para luego y ver el siguiente">Después ›</button>` : ''}
+          <button class="x" data-onclick="inboxDel('${it.id}')" title="Quitar de la bandeja">✕</button></div></div></div>`}`;
+  if (!fold) { const th = await idb('readonly', st => st.get('pdft:' + inKey(it.id))).catch(() => null), b = box.querySelector(`.ibc[data-id="${it.id}"] .ibt`);
+    if (b && typeof th === 'string' && th.startsWith('data:image/')) b.innerHTML = `<img src="${th}" alt="">`; }
+}
+function inboxGo(d) { const n = (db.inbox || []).length; if (!n) return; IB.i = (IB.i + d + n) % n; inboxDraw(); }
+async function inboxPick() {
+  try {
+    if (FSA) { const hs = await showOpenFilePicker({types: PDF_T, multiple: true}); return inboxAdd(await Promise.all(hs.map(async h => ({file: await h.getFile(), h})))); }
+    const fs = await new Promise(res => { const i = document.createElement('input'); i.type = 'file'; i.accept = '.pdf,application/pdf'; i.multiple = true; i.onchange = () => res([...i.files]); i.oncancel = () => res([]); i.click(); });
+    if (fs.length) inboxAdd(fs.map(file => ({file})));
+  } catch (e) { if (e.name !== 'AbortError') say('No se pudo elegir el archivo: ' + e.message); }
+}
+async function inboxAdd(L) {   // L: [{file, h?}]
+  L = L.filter(x => x.file && (/\.pdf$/i.test(x.file.name) || x.file.type === 'application/pdf')); if (!L.length) return;
+  const now = new Date().toISOString(), add = [];
+  for (const {file, h} of L) {
+    const it = {id: uid(), name: file.name.slice(0, 260), at: now, up: now}, key = inKey(it.id);
+    PDF_FILES.set(key, file); pdfKeep(key, file); if (h) idb('readwrite', st => st.put(h, 'pdf:' + key)).catch(() => {});
+    add.push(it);
+  }
+  db.inbox = [...(db.inbox || []), ...add]; markDirty(); IB.i = db.inbox.length - add.length; inboxDraw();
+  toast(`${add.length === 1 ? '1 PDF' : add.length + ' PDF'} en la bandeja «PDF por citar».`, [{t: 'Deshacer', fn: undo}], 5000);
+  if (db.settings.showInbox === false) toast('La sección «PDF por citar» está oculta: actívala en Configuración → Datos y Drive.', [], 5000);
+  if (vwCan()) for (const it of add) await inboxScan(it.id, PDF_FILES.get(inKey(it.id)));
+}
+/* Lee la primera página: miniatura, DOI y título probable (metadatos del PDF o la línea de letra más grande). Solo con http(s): PDF.js no se carga desde file://. */
+async function inboxScan(id, file) {
+  let doc; try {
+    const L = await vwLib(); doc = await L.getDocument({data: new Uint8Array(await file.arrayBuffer()), cMapUrl: vwUrl('cmaps/'), cMapPacked: true, standardFontDataUrl: vwUrl('standard_fonts/'), isEvalSupported: false}).promise;
+    const pg = await doc.getPage(1), v = pg.getViewport({scale: 1}), s = 180 / v.width, vp = pg.getViewport({scale: s}), cv = document.createElement('canvas');
+    cv.width = Math.round(vp.width); cv.height = Math.round(vp.height); await pg.render({canvasContext: cv.getContext('2d', {alpha: false}), viewport: vp}).promise;
+    await idb('readwrite', st => st.put(cv.toDataURL('image/jpeg', .72), 'pdft:' + inKey(id))).catch(() => {});
+    let txt = '', big = {h: 0, s: ''}; for (let i = 1; i <= Math.min(2, doc.numPages); i++) { const tc = await (await doc.getPage(i)).getTextContent();
+      for (const t of tc.items) { if (typeof t.str !== 'string') continue; txt += t.str + (t.hasEOL ? '\n' : ' '); const h = Math.hypot(t.transform[2], t.transform[3]); if (i === 1 && t.str.trim().length > 3 && h > big.h + .5) big = {h, s: t.str.trim()}; else if (i === 1 && Math.abs(h - big.h) < .5 && big.s.length < 200) big.s += ' ' + t.str.trim(); } }
+    const doi = (txt.replace(/\s*\n\s*/g, ' ').match(DOI_RE) || [''])[0].replace(/[.,;:)\]}>'"]+$/, '').toLowerCase();
+    const meta = await doc.getMetadata().catch(() => null), mt = String(meta?.info?.Title || '').trim();
+    const guess = (mt.length > 8 && !/^(microsoft word|untitled|doi|\S+\.(docx?|pdf|tex))/i.test(mt) ? mt : big.s).replace(/\s+/g, ' ').trim().slice(0, 400);
+    const it = (db.inbox || []).find(x => x.id === id); if (!it) return;
+    if ((doi && it.doi !== doi) || (guess && it.guess !== guess)) { if (doi) it.doi = doi; if (guess) it.guess = guess; it.up = new Date().toISOString(); markDirty(); }
+    inboxDraw();
+  } catch (e) { console.debug('[bandeja]', e); } finally { try { doc?.destroy(); } catch (e) {} }
+}
+async function inboxOpen(id) {
+  const it = (db.inbox || []).find(x => x.id === id); if (!it) return;
+  try { const file = await pdfFile(inKey(id), it); if (!file) return; if (vwCan()) vwOpen({kind: 'inbox', id}, file); else pdfNative(file, it.page); }
+  catch (e) { if (e.name !== 'AbortError') say('No se pudo abrir el PDF: ' + e.message); }
+}
+async function inboxDel(id) {
+  const it = (db.inbox || []).find(x => x.id === id); if (!it) return;
+  if (annN(it) && !await askOk(`«${it.name}» tiene ${annN(it)} ${annN(it) === 1 ? 'anotación' : 'anotaciones'}. ¿Quitarlo de la bandeja?`, {ok: 'Quitar', danger: true})) return;
+  db.inbox = db.inbox.filter(x => x !== it); markDirty(); inboxDraw(); toast(`«${shortTxt(it.name)}» quitado de la bandeja.`, [{t: 'Deshacer', fn: undo}], 5000);
+}
+async function ibMove(it, pid, n) {   // el archivo de la bandeja pasa al hueco de un paper (enlace, copia del navegador y miniatura)
+  const from = inKey(it.id), to = pdfKey(pid, n);
+  if (PDF_FILES.has(from)) PDF_FILES.set(to, PDF_FILES.get(from));
+  await idb('readwrite', st => { for (const pre of ['pdf:', 'pdfb:', 'pdft:']) { const q = st.get(pre + from); q.onsuccess = () => { if (q.result != null) { st.put(q.result, pre + to); st.delete(pre + from); } }; } return null; }).catch(() => {});
+  return {name: it.name, ...(it.page ? {page: it.page} : {}), ...(it.ann?.length ? {ann: structuredClone(it.ann)} : {}), ...(it.vis ? {vis: it.vis} : {}), ...(it.vid ? {vid: it.vid} : {}), from};   // from: la copia de Drive sigue con el nombre de la bandeja
+}
+async function inboxCite(id) {
+  const it = (db.inbox || []).find(x => x.id === id); if (!it) return;
+  let r = null;
+  if (it.doi) { toast('Buscando los datos del DOI en CrossRef…', [], 2500); try { r = await fetchDoi(it.doi); } catch (e) { toast(e.message + ' Se crea con el título.', [], 5000); } }
+  r ||= {title: it.guess || it.name.replace(/\.pdf$/i, '').replace(/[_]+/g, ' '), authors: [], year: '', type: 'articulo', doi: it.doi || '', url: it.doi ? 'https://doi.org/' + it.doi : ''};
+  const now = new Date().toISOString(), pid = uid();
+  const p = NEWF({id: pid, created: now, title: r.title || it.name, alias: '', reading: 'por_leer', rating: 0, sectionIds: F.sec ? [F.sec] : [], authors: r.authors || [], year: r.year ? +r.year : '', url: r.url || '', type: r.type || 'articulo',
+    venue: r.venue || '', doi: r.doi || '', ...Object.fromEntries(IMP_F.filter(k => r[k] != null).map(k => [k, r[k]])), general: '', tagIds: [], notes: [], cites: {}, related: [], refTo: [], history: [{t: now, s: 'Creado desde la bandeja «PDF por citar»'}]});
+  p.pdf = await ibMove(it, pid, 1);
+  db.inbox = db.inbox.filter(x => x !== it); db.papers.push(p); markDirty(); render();
+  toast(`Cita creada${r.authors?.length ? '' : ': complétala en su ficha'}.`, [{t: 'Deshacer', fn: undo}], 6000); openPaper(pid);
+}
+function inboxAssign(id) {
+  const it = (db.inbox || []).find(x => x.id === id); if (!it) return;
+  let d = $('#ibp'); if (!d) { d = document.createElement('dialog'); d.id = 'ibp'; document.body.append(d); }
+  d.innerHTML = `<div class="dh"><h2>Asignar «${esc(shortTxt(it.name))}» a un paper</h2><div class="dbtn"><button data-onclick="$('#ibp').close()">Cerrar ✕</button></div></div>
+    <input id="ibpQ" type="search" placeholder="Busca por título, autor o año…" style="width:100%" data-oninput="ibpList('${id}',this.value)"><div id="ibpL" class="ibpl"></div>`;
+  d.showModal(); ibpList(id, ''); $('#ibpQ').focus();
+}
+function ibpList(id, q) {
+  const n = norm(q || '').split(/\s+/).filter(Boolean), L = db.papers.filter(p => !(p.pdf && p.pdf2)).map(p => ({p, s: norm([p.title, p.alias, p.year, ...p.authors].join(' '))}))
+    .filter(x => !q || n.every(w => x.s.includes(w))).slice(0, 60);
+  $('#ibpL').innerHTML = L.length ? L.map(({p}) => `<button data-onclick="ibpGo('${id}','${p.id}')"><b>${esc(shortTxt(p.alias || p.title) || '(sin título)')}</b><small>${esc(p.authors.slice(0, 3).join('; '))}${p.year ? ' (' + esc(p.year) + ')' : ''}${p.pdf ? ' · ya tiene un PDF: será el PDF 2' : ''}</small></button>`).join('')
+    : '<p class="empty">Ningún paper coincide (o todos tienen ya dos PDF).</p>';
+}
+async function ibpGo(id, pid) {
+  const it = (db.inbox || []).find(x => x.id === id), p = db.papers.find(x => x.id === pid); if (!it || !p) return; const n = p.pdf ? 2 : 1;
+  p[pdfF(n)] = await ibMove(it, pid, n); p.modified = new Date().toISOString(); logChange(p, `PDF${n === 2 ? ' 2' : ''} desde la bandeja: ${it.name}`);
+  db.inbox = db.inbox.filter(x => x !== it); markDirty(); $('#ibp').close(); render(); toast(`PDF asignado a «${shortTxt(p.alias || p.title)}».`, [{t: 'Deshacer', fn: undo}], 5000);
+}
+
+/* ---- Copia en el Drive normal (carpeta «GPapers») ---- */
+const SY_FILE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
+function pdfVisAsk() {   // al activar la copia en el Drive normal: el permiso de Google, si aún no se ha dado
+  if (!syAvail()) return;
+  if (!syOn()) return toast('Para copiar los PDF a tu Drive normal, conecta antes Google Drive (botón 🔄 de la cabecera).', [], 6000);
+  if (syP().fileScope) { if (syAuto()) sySoon(800); return; }
+  toast('Google te pedirá permiso para crear la carpeta «GPapers» en tu Drive (la app solo verá lo que ella crea).', [{t: 'Dar permiso', fn: syGrantFile}], 0, 'vis');
+}
+function syGrantFile() {
+  return syGis().then(() => new Promise((ok, ko) => google.accounts.oauth2.initTokenClient({client_id: SY_CFG.clientId, scope: syScopes(true), include_granted_scopes: true,
+    callback: r => { if (r && r.access_token && String(r.scope || '').includes('drive.file')) { sySet({fileScope: true}); syTokPut(r.access_token, +r.expires_in); toast('Permiso concedido: los PDF se copiarán a la carpeta «GPapers» de tu Drive.', [], 4000); if (syAuto()) sySoon(500); ok(); }
+      else { toast('Sin ese permiso los PDF se quedan solo en la carpeta oculta.', [], 5000); ko(Error('denegado')); } },
+    error_callback: e => ko(Error(e && e.type || 'cerrada'))}).requestAccessToken({prompt: 'consent'}))).catch(() => {});
+}
+async function syVisFolder(tok) {
+  let id = null; try { id = localStorage.getItem('gp-vis-folder'); } catch (e) {}
+  if (id) { try { const j = await (await syDrive(tok, `/drive/v3/files/${id}?fields=id,trashed`)).json(); if (j.id && !j.trashed) return id; } catch (e) { if (e.estado === 401) throw e; } }
+  const q = "name='GPapers' and mimeType='application/vnd.google-apps.folder' and trashed=false";
+  const j = await (await syDrive(tok, '/drive/v3/files?pageSize=10&fields=files(id,name)&q=' + encodeURIComponent(q))).json();
+  id = j.files?.[0]?.id || (await (await syDrive(tok, '/drive/v3/files?fields=id', {method: 'POST', headers: {'Content-Type': 'application/json; charset=UTF-8'}, body: JSON.stringify({name: 'GPapers', mimeType: 'application/vnd.google-apps.folder'})})).json()).id;
+  try { localStorage.setItem('gp-vis-folder', id); } catch (e) {} return id;
+}
+async function syVisUp(tok, id, folder, name, bytes) {
+  const r = await syDrive(tok, `/upload/drive/v3/files${id ? '/' + id : ''}?uploadType=resumable&fields=id`, {method: id ? 'PATCH' : 'POST',
+    headers: {'Content-Type': 'application/json; charset=UTF-8', 'X-Upload-Content-Type': 'application/pdf'}, body: JSON.stringify(id ? {name} : {name, parents: [folder], mimeType: 'application/pdf'})});
+  const loc = r.headers.get('Location'); if (!loc) throw Error('reanudable');
+  const u = await fetch(loc, {method: 'PUT', headers: {'Content-Type': 'application/pdf'}, body: bytes, cache: 'no-store'});
+  if (!u.ok) { const e = Error('drive ' + u.status); e.estado = u.status; throw e; }
+  return u.json();
+}
+const visName = s => { if (s.it) return s.it.name; const p = s.p, a = (p.authors[0] || '').split(',')[0].trim();
+  return `${[a, p.year].filter(Boolean).join(' ')}${a || p.year ? ' - ' : ''}${p.alias || p.title}`.replace(/[\\/:*?"<>|\n\r]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 140) + (s.n === 2 ? ' (2)' : '') + '.pdf'; };
+let VIS_RUN = null; const VIS_IDS = new Map();   // una sola subida a la vez; el id de lo ya creado en esta sesión (para no duplicar si la ficha aún no lo tiene)
+function syPdfsVis(tok, m) { const run = (VIS_RUN || Promise.resolve()).then(() => syPdfsVis1(tok, m)); VIS_RUN = run.catch(() => {}); return run; }
+async function syPdfsVis1(tok, m) {   // cada PDF con «también en mi Drive normal», ya anotado, si cambió desde la última vez (y no está abierto en el visor)
+  if (!syP().fileScope || !vwCan()) return; const L = pdfSlots(m, false).filter(s => pdfVisOf(s.pf)); if (!L.length) return;
+  const openKey = VW.open && VW.src ? (VW.src.kind === 'inbox' ? inKey(VW.src.id) : pdfKey(VW.src.id, VW.src.n)) : '';
+  let folder = null;
+  for (const s of L) {
+    if (s.key === openKey) continue;
+    try {
+      const file = await pdfLocal(s.key) || (s.pf.from && await pdfLocal(s.pf.from)) || await pdfFromDrive(s.key, s.pf.name, true); if (!file || file.size > SY_CFG.pdfMax) continue;
+      const name = visName(s), sig = syHash(JSON.stringify(s.pf.ann || []) + '|' + file.size + '|' + name), k = `pdfVis:${PJ.cur}:${s.key}`, rec = await idb('readonly', st => st.get(k)).catch(() => null);
+      const vid = s.pf.vid || VIS_IDS.get(PJ.cur + ':' + s.key); if (rec === sig && vid) continue;
+      let bytes; try { bytes = await vwPdfOut(file, s.pf.ann || []); } catch (e) { bytes = new Uint8Array(await file.arrayBuffer()); }   // cifrado: se sube tal cual
+      folder ||= await syVisFolder(tok);
+      let r; try { r = await syVisUp(tok, vid, folder, name, bytes); } catch (e) { if (vid && e.estado === 404) r = await syVisUp(tok, null, folder, name, bytes); else throw e; }   // la borraste de Drive: se crea otra
+      if (r.id) VIS_IDS.set(PJ.cur + ':' + s.key, r.id); await idb('readwrite', st => st.put(sig, k)).catch(() => {});
+      if (r.id && r.id !== s.pf.vid) { const live = pdfSlots(db, false).find(x => x.key === s.key); if (live && live.pf.vid !== r.id) { live.pf.vid = r.id; if (live.it) live.it.up = new Date().toISOString(); else live.p.modified = new Date().toISOString(); markDirty(); } }
+    } catch (e) { if (e.estado === 401) throw e; if (e.estado === 403 && !SY.visWarned) { SY.visWarned = true; toast('No se pudo copiar un PDF a tu Drive normal: falta el permiso o el Drive está lleno.', [{t: 'Dar permiso', fn: syGrantFile}], 8000); } console.debug('[visible]', e); }
+  }
+}
+function setPdfVis(on) { setCfg('pdfVis', on); if (on) pdfVisAsk(); }
+function setShowInbox(on) { setCfg('showInbox', on); inboxDraw(); }
+
+/* ---- Del visor a las notas del paper ---- */
+function vwToNote() {
+  vwSaveComment(); const a = vwAnns().find(x => x.id === VW.pop), p = vwPaper(); if (!a || !p) return;
+  const content = [a.t ? `«${a.t}» (p. ${a.p + 1})` : `(p. ${a.p + 1})`, a.m].filter(Boolean).join('\n\n');
+  const note = {id: uid(), sectionId: p.sectionIds?.[0] || '', content};
+  if (p === D) { D.notes.push(note); drawD(); toast('Añadido a las notas del paper (se guarda al guardar la ficha).', [], 3000); return; }
+  p.notes.push(note); p.modified = new Date().toISOString(); logChange(p, 'Nota desde el PDF (p. ' + (a.p + 1) + ')'); markDirty(); toast('Añadido a las notas del paper.', [{t: 'Deshacer', fn: undo}], 3000);
+}

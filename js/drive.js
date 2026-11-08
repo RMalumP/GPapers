@@ -63,7 +63,10 @@ function syList(x, y, z, pick, key = e => e.id) {   // lista de objetos con id: 
 const syWhen = p => p.modified || p.created || '';
 const syGen = (a, b, c) => syObj(a, b, c, true);
 const syLst = (pick, key) => (x, y, z, h) => syList(x, y, h ? z || [] : null, pick, key);
-function syPaper(a, b, c) { const mine = syWhen(a) >= syWhen(b); return syObj(a, b, c, mine, {notes: syLst((p, q, r) => syObj(p, q, r, mine))}); }
+const syAnn = syLst((a, b, c) => syObj(a, b, c, (a.up || '') >= (b.up || '')));   // subrayados y comentarios: uno a uno; si los dos cambian el mismo, gana el cambiado más tarde
+const syPdf = mine => (x, y, z, h) => x && y && typeof x === 'object' && typeof y === 'object' && x.name === y.name ? syObj(x, y, h && z && z.name === x.name ? z : null, mine, {ann: syAnn}) : syVal(x, y, z, h, mine);   // el mismo PDF: campo a campo
+function syPaper(a, b, c) { const mine = syWhen(a) >= syWhen(b); return syObj(a, b, c, mine, {notes: syLst((p, q, r) => syObj(p, q, r, mine)), pdf: syPdf(mine), pdf2: syPdf(mine)}); }
+const syInbox = (a, b, c) => syObj(a, b, c, (a.up || '') >= (b.up || ''), {ann: syAnn});
 function sySettings(x, y, z) {
   const o = syObj(x, y, z, true, {customTypes: syLst(syGen), customStyles: syLst(syGen), templates: syLst(syGen),
     export: (a, b, c, h) => syObj(a, b, h ? c : null, true), shortcuts: (a, b, c, h) => syObj(a, b, h ? c : null, true)});
@@ -71,9 +74,9 @@ function sySettings(x, y, z) {
   return o;
 }
 function syMerge(L, R, B) {   // L = este dispositivo, R = Google Drive, B = última versión sincronizada (null la primera vez: se unen)
-  const o = syObj(L, R, B, true, {sections: syLst(syGen), tags: syLst(syGen), papers: syLst(syPaper), trash: syLst(syGen, t => t.paper.id),
+  const o = syObj(L, R, B, true, {sections: syLst(syGen), tags: syLst(syGen), papers: syLst(syPaper), trash: syLst(syGen, t => t.paper.id), inbox: syLst(syInbox),
     settings: (x, y, z, h) => sySettings(x || {}, y || {}, h ? z || {} : null)});
-  o.papers ||= []; o.trash ||= []; o.tags ||= []; o.sections ||= [];
+  o.papers ||= []; o.trash ||= []; o.inbox ||= []; o.tags ||= []; o.sections ||= [];
   const live = new Map(o.papers.map(p => [p.id, p]));   // en la lista y en la papelera a la vez (un lado lo borró y el otro lo editó): gana lo último
   o.trash = o.trash.filter(t => { const p = live.get(t.paper.id); if (!p) return true; if (t.at > syWhen(p)) { o.papers.splice(o.papers.indexOf(p), 1); return true; } return false; });
   const T = new Set(o.tags.map(t => t.id)), S = new Set(o.sections.map(s => s.id));   // sin referencias a etiquetas o secciones borradas en el otro lado
@@ -82,7 +85,7 @@ function syMerge(L, R, B) {   // L = este dispositivo, R = Google Drive, B = úl
   return o;
 }
 /* ---- Solo lo que cambió: parches campo a campo ---- */
-const SY_KEY = {papers: e => e.id, tags: e => e.id, sections: e => e.id, notes: e => e.id, customTypes: e => e.id, customStyles: e => e.id, templates: e => e.id, trash: t => t.paper && t.paper.id};   // listas que se comparan elemento a elemento
+const SY_KEY = {papers: e => e.id, ann: e => e.id, inbox: e => e.id, tags: e => e.id, sections: e => e.id, notes: e => e.id, customTypes: e => e.id, customStyles: e => e.id, templates: e => e.id, trash: t => t.paper && t.paper.id};   // listas que se comparan elemento a elemento
 const syIsObj = v => !!v && typeof v === 'object' && !Array.isArray(v);
 function syDiff(a, b, f) {   // parche de a → b: {$: valor} sustituye · {o: {campo: parche}} objeto · {l: {id: parche}, ord: [ids]} lista por id · {x: 1} borra
   if (syS(a) === syS(b)) return undefined;
@@ -127,27 +130,30 @@ async function syUploadFile(tok, id, name, file) {   // siempre reanudable: el a
 }
 async function pdfLocal(id) {   // id: clave del hueco (pdfKey). El PDF si este dispositivo puede leerlo ahora sin preguntar
   try {
-    if (!FSA) return PDF_FILES.get(id) || null;
-    const h = PEND_PDF.get(id) || await idb('readonly', st => st.get('pdf:' + id)).catch(() => null);
-    return h && await h.queryPermission({mode: 'read'}) === 'granted' ? await h.getFile() : null;
+    if (PDF_FILES.has(id)) return PDF_FILES.get(id);
+    const h = FSA && (PEND_PDF.get(id) || await idb('readonly', st => st.get('pdf:' + id)).catch(() => null));
+    if (h && await h.queryPermission({mode: 'read'}) === 'granted') return await h.getFile();
+    return await pdfKept(id);   // la copia guardada en este navegador (móvil, o descargada de Drive)
   } catch (e) { return null; }
 }
 async function syPdfs(tok, files, m, N) {
   try {
     const have = new Map(files.filter(f => f.name.startsWith(N.pdf)).map(f => [f.name.slice(N.pdf.length), f])), old = Date.now() - 864e5;
-    if (m.settings.pdfDrive) for (const p of m.papers) for (const n of pdfsOf(p)) {
-      const key = pdfKey(p.id, n), file = await pdfLocal(key); if (!file || file.size > SY_CFG.pdfMax) continue;
+    if (m.settings.pdfDrive) for (const {key} of pdfSlots(m, false)) {
+      const file = await pdfLocal(key); if (!file || file.size > SY_CFG.pdfMax) continue;
       const f = have.get(key), k = `pdfUp:${PJ.cur}:${key}`, sig = `${file.size}:${file.lastModified}`, rec = await idb('readonly', st => st.get(k)).catch(() => null);
       if (f && (rec === sig || !rec && +f.size === file.size)) { if (rec !== sig) idb('readwrite', st => st.put(sig, k)).catch(() => {}); continue; }   // ya está en Drive
       await syUploadFile(tok, f && f.id, N.pdf + key, file); await idb('readwrite', st => st.put(sig, k)).catch(() => {});
     }
-    const used = new Set(syPapersOf(m).flatMap(p => pdfsOf(p).map(n => pdfKey(p.id, n))));
+    const used = new Set(pdfSlots(m, true).flatMap(({key, pf}) => pf.from ? [key, pf.from] : [key]));
     for (const [id, f] of have) if (!used.has(id) && Date.parse(f.modifiedTime) < old) await syDel(tok, f.id);   // el paper ya no tiene PDF
   } catch (e) { if (e.estado === 401) throw e; if (!SY.pdfWarned) { SY.pdfWarned = true; toast(e.estado === 403 ? 'No se pudo subir un PDF: puede que tu Google Drive esté lleno.' : 'No se pudo subir un PDF a Google Drive; se reintentará.', [], 6000); } }
 }
-async function pdfFromDrive(id, name) {   // id: clave del hueco (pdfKey). El PDF subido por otro dispositivo (solo con acceso vigente: no se abre ninguna ventana de Google)
+const pdfSlots = (m, trash) => [...(trash ? syPapersOf(m) : m.papers || []).flatMap(p => pdfsOf(p).map(n => ({key: pdfKey(p.id, n), pf: p[pdfF(n)], p, n}))),
+  ...(m.inbox || []).map(it => ({key: inKey(it.id), pf: it, it}))];   // todos los PDF del proyecto: de los papers (y de la papelera) y de la bandeja
+async function pdfFromDrive(id, name, quiet) {   // id: clave del hueco (pdfKey). El PDF subido por otro dispositivo (solo con acceso vigente: no se abre ninguna ventana de Google)
   const tok = syOn() && syTokGet(); if (!tok) return null;
-  try { const f = (await syLs(tok)).find(x => x.name === syNames(PJ.cur).pdf + id); if (!f) return null; toast('Descargando el PDF de tu Google Drive…', [], 3000);
+  try { const f = (await syLs(tok)).find(x => x.name === syNames(PJ.cur).pdf + id); if (!f) return null; if (!quiet) toast('Descargando el PDF de tu Google Drive…', [], 3000);
     return new File([await (await syDrive(tok, `/drive/v3/files/${f.id}?alt=media`)).blob()], name, {type: 'application/pdf'}); } catch (e) { return null; }
 }
 function setPdfDrive(on) { setCfg('pdfDrive', on); if (on && syAuto()) sySoon(500); }
@@ -201,11 +207,12 @@ function syGesture() {   // sin acceso: el siguiente clic o tecla (en cualquier 
 }
 const syGis = () => window.google?.accounts?.oauth2 ? Promise.resolve() : new Promise((ok, ko) => {
   const s = document.createElement('script'); s.src = 'https://accounts.google.com/gsi/client'; s.async = true; s.onload = ok; s.onerror = () => ko(Error('red')); document.head.appendChild(s); });
+const syScopes = file => 'https://www.googleapis.com/auth/drive.appdata' + (file || syP().fileScope ? ' https://www.googleapis.com/auth/drive.file' : '');   // drive.file solo si se activó la copia en el Drive normal (js/bandeja.js)
 function syToken(inter) {   // inter = false: renueva el acceso sin ventana (solo si ya se dio el permiso y sigue abierta la sesión de Google)
   const t = syTokGet(); if (t) return Promise.resolve(t);
   return syGis().then(() => new Promise((ok, ko) => {
     const lim = inter ? 0 : setTimeout(() => ko(Error('silencio')), 15000), fin = () => clearTimeout(lim);
-    google.accounts.oauth2.initTokenClient({client_id: SY_CFG.clientId, scope: 'https://www.googleapis.com/auth/drive.appdata',
+    google.accounts.oauth2.initTokenClient({client_id: SY_CFG.clientId, scope: syScopes(),
       callback: r => { fin(); if (r && r.access_token) { syTokPut(r.access_token, +r.expires_in); ok(r.access_token); } else ko(Error(r && r.error || 'denegado')); },
       error_callback: e => { fin(); ko(Error(e && e.type || 'cerrada')); }}).requestAccessToken({prompt: inter ? '' : 'none'});
   }));
@@ -311,7 +318,7 @@ async function syGc(tok, files, idx) {   // archivos de proyectos borrados: los 
 }
 
 /* ---- Una vuelta de sincronización ---- */
-const syBlocked = () => [...document.querySelectorAll('dialog[open]')].some(d => !['help', 'pv', 'sy', 'cr'].includes(d.id));   // ventanas que editan datos: no se les cambia nada debajo
+const syBlocked = () => [...document.querySelectorAll('dialog[open]')].some(d => !['help', 'pv', 'sy', 'cr', 'vw'].includes(d.id));   // ventanas que editan datos: no se les cambia nada debajo
 const syTrivial = () => !db.papers.length && !db.trash.length || path === 'ejemplo_papers.json' && !dirty;   // aquí solo está el ejemplo: manda Drive sin preguntar
 async function syOnce(inter) {
   const tok = await syToken(inter), files = await syLs(tok), id = PJ.cur, N = syNames(id);
@@ -351,6 +358,7 @@ async function syOnce(inter) {
   await syGc(tok, files, I.w ? iF : null);
   await syBaseSet(N, m); sySet({last: Date.now()});
   await syPdfs(tok, files, m, N);
+  await syPdfsVis(tok, m);
   if (syPlainS(db) === mS) { dirty = false; hdr(); sessionSoon(); }   // ya está guardado en Drive
   return {news, first: !R.w};
 }

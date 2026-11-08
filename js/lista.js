@@ -43,7 +43,7 @@ const has = (p, t) => p.tagIds.includes(t);   // las etiquetas son independiente
 const SEARCH = new WeakMap();   // texto de búsqueda ya normalizado de cada paper: solo se recalcula si cambia
 function searchTxt(p) {
   const raw = [p.title, p.alias, p.year, ...p.authors, p.venue, p.doi, ...p.tagIds.map(i => tagById(i)?.name), ...p.sectionIds.map(i => secById(i)?.name),
-    ...(F.inNotes ? [p.general, ...p.notes.map(n => n.content), ...Object.values(p.cites)] : [])].join(' ');
+    ...(F.inNotes ? [p.general, ...p.notes.map(n => n.content), ...Object.values(p.cites), ...pdfsOf(p).flatMap(n => (p[pdfF(n)].ann || []).flatMap(a => [a.t, a.m]))] : [])].join(' ');   // con «Incluir notas», también los subrayados y comentarios de sus PDF
   let c = SEARCH.get(p); if (!c || c.raw !== raw) SEARCH.set(p, c = {raw, n: norm(raw)}); return c.n;
 }
 const QP = {autor: 'au', autores: 'au', author: 'au', au: 'au', ano: 'yr', year: 'yr', revista: 've', venue: 've', editorial: 've', doi: 'doi', etiqueta: 'tag', tag: 'tag', seccion: 'sec', section: 'sec'};
@@ -303,6 +303,7 @@ let listW = 0; new ResizeObserver(([e]) => { if (Math.abs(e.contentRect.width - 
 let RENDER_HOLD = false, RENDER_HELD = false;   // al arrancar se pinta una sola vez, al final (ver bootApp en app.js)
 function render() {
   if (RENDER_HOLD) { RENDER_HELD = true; return; }
+  if (VW.open) return vwDbChanged();   // con el visor abierto, la lista se repinta al cerrarlo
   hdr();
   filtDraw();
   const tg = (id, open, label, active) => { const b = $(id); b.textContent = `${label} ${open ? '▾' : '▸'}${!open && active ? ' •' : ''}`; b.classList.toggle('on', open); };   // «•» = hay filtro activo con la lista plegada
@@ -319,7 +320,7 @@ function render() {
   LIST.L = L; LIST.shown = part ? LIST.step : L.length;
   $('#list').innerHTML = (listHTML(part ? L.slice(0, LIST.step) : L) + (part ? moreHTML() : '')) || '<p class="empty">No hay papers que mostrar. Crea uno con «Nuevo paper» o ajusta los filtros.</p>';
   fitTags(); hydrateImgs(); moreWatch(); uiSoon(); kMark();
-  LIST.n = L.length; countDraw(); progDraw();
+  LIST.n = L.length; countDraw(); progDraw(); inboxDraw();
 }
 const LIST = {L: [], n: 0, shown: 0, get step() { return document.documentElement.classList.contains('mv') ? 40 : 150; }};   // lo que se ve en la lista y cuántos papers lleva pintados (en el móvil caben pocas tarjetas: se pintan de 40 en 40)
 const moreHTML = () => `<p class="more"><button data-onclick="listMore()">Mostrar ${Math.min(LIST.step, LIST.L.length - LIST.shown)} más (quedan ${LIST.L.length - LIST.shown})</button></p>`;
@@ -675,7 +676,7 @@ document.addEventListener('keydown', e => {
 });
 /* ---- Paleta de órdenes (Ctrl+K): busca acciones y papers por nombre ---- */
 const CMDS = () => [
-  ['＋ Nuevo paper', () => openPaper()], ['📥 Importar: buscar por DOI, ISBN o título', () => openImport('doi')], ['📄 Importar desde archivo', () => openImport('file')], ['📋 Importar: pegar BibTeX, RIS o citas', () => openImport('text')],
+  ['＋ Nuevo paper', () => openPaper()], ['📥 Importar: buscar por DOI, ISBN o título', () => openImport('doi')], ['📄 Importar desde archivo', () => openImport('file')], ['📋 Importar: pegar BibTeX, RIS o citas', () => openImport('text')], ['📥 PDF sin cita a la bandeja «PDF por citar»', () => inboxPick()],
   ['📤 Exportar citas', () => openEx()], ['💾 Guardar', () => save(false)], ['💾 Guardar como…', () => save(true)], ['📂 Abrir un archivo JSON', () => doOpen()],
   ['⚙️ Configuración', () => openCfg()], ['❓ Ayuda', () => openHelp()], ['🗑️ Papelera', () => trOpen()], ['🕸️ Relaciones', () => grOpen()], ['🧬 Buscar duplicados', () => dpOpen()], ['🛟 Copias de seguridad', () => bkOpen()],
   [db.settings.view === 'table' ? '▦ Ver como tarjetas' : '☰ Ver como tabla', () => viewToggle()], ['☰ Plegar o desplegar la barra lateral', () => sbToggle()], ['☑ Seleccionar los visibles', () => selVisible()],
