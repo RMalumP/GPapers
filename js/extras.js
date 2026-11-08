@@ -224,16 +224,39 @@ async function psGo(tid) {
 }
 
 /* ===== Copias de seguridad de cada proyecto =====
-   Una copia al abrir cada día (y antes de restaurar o de sustituirlo todo por lo de Drive) en IndexedDB
-   («bk:<id>»): las últimas 10 (4 si son muy grandes). Solo viven en este navegador; la papelera y Drive no las sustituyen. */
+   Una copia al abrir cada día (y antes de restaurar o de sustituirlo todo por lo de Drive) en IndexedDB: las últimas 10 (4 si son muy grandes).
+   «bk:<id>» es solo el índice (fecha, motivo, papers, tamaño y huella), así abrir la app no lee las copias enteras; cada copia va en
+   «bkd:<id>:<k>», en el mismo formato compacto que la copia de trabajo (las imágenes incrustadas, una sola vez, en «imgd:<huella>»).
+   Las copias de versiones anteriores (con el JSON dentro del índice) se pasan a este formato la próxima vez que se guarda una.
+   Solo viven en este navegador; la papelera y Drive no las sustituyen. */
 const BK_MAX = 10;
 const bkList = (id = PJ.cur) => idb('readonly', st => st.get('bk:' + id)).then(L => Array.isArray(L) ? L : []).catch(() => []);
+const bkKey = (id, k) => `bkd:${id}:${k}`;
+const bkRange = id => IDBKeyRange.bound(`bkd:${id}:`, `bkd:${id}:\uffff`);
+async function bkJSON(c, id = PJ.cur) {   // el JSON completo de una copia, con sus imágenes (como el archivo que se guarda)
+  if (typeof c.json === 'string') return c.json;   // copia antigua
+  const d = await projData(await idb('readonly', st => st.get(bkKey(id, c.k))).catch(() => null));
+  if (!d) throw Error('no se encuentra la copia');
+  return JSON.stringify(d, null, 2);
+}
+async function bkPutList(id, L, add) {   // escribe el índice (sin JSON dentro) y lo que haga falta: copias nuevas, antiguas por convertir y borrados
+  const keep = new Set(L.map(c => c.k).filter(Boolean)), old = L.filter(c => typeof c.json === 'string');
+  old.forEach(c => { c.k = c.k || uid(); c.h = c.h || ''; keep.add(c.k); });
+  const ks = await idb('readonly', st => st.getAllKeys(bkRange(id))).catch(() => []);
+  await idb('readwrite', st => {
+    (add || []).forEach(([k, rec, imgs]) => projPut(st, bkKey(id, k), rec, imgs));
+    old.forEach(c => st.put({v: 1, json: c.json}, bkKey(id, c.k)));
+    ks.filter(k => !keep.has(k.slice(`bkd:${id}:`.length))).forEach(k => st.delete(k));
+    return st.put(L.map(({json, ...c}) => c), 'bk:' + id);
+  }).then(() => (add || []).forEach(([, , imgs]) => projSaved(imgs))).catch(() => {});
+}
 async function bkTake(why, force, id = PJ.cur) {   // la copia se hace del estado que hay al llamar (antes de cualquier await)
-  if (!BOOTED || id !== PJ.cur) return; const json = dbJSON(), n = db.papers.length, any = n + db.trash.length + db.sections.length + db.tags.length;
+  if (!BOOTED || id !== PJ.cur) return; const n = db.papers.length, any = n + db.trash.length + db.sections.length + db.tags.length;
   if (!any && !force) return;
-  const L = await bkList(id); if (!force && L.length && L[0].json === json) return;   // sin cambios desde la última
-  L.unshift({at: new Date().toISOString(), why, n, size: json.length, json}); L.length = Math.min(L.length, json.length > 3e6 ? 4 : BK_MAX);
-  await idb('readwrite', st => st.put(L, 'bk:' + id)).catch(() => {});
+  const [json, imgs] = projWire(db), h = syHash(json), size = dbJSON().length;
+  const L = await bkList(id); if (!force && L.length && L[0].h === h) return;   // sin cambios desde la última
+  const k = uid(); L.unshift({at: new Date().toISOString(), why, n, size, h, k}); L.length = Math.min(L.length, size > 3e6 ? 4 : BK_MAX);
+  await bkPutList(id, L, [[k, {v: 1, json}, imgs]]);
 }
 const bkDaily = async () => { const L = await bkList(); if (!L.length || Date.now() - Date.parse(L[0].at) > 864e5) await bkTake('Automática'); };
 const bkFmt = c => new Date(c.at).toLocaleString('es', {dateStyle: 'medium', timeStyle: 'short'});
@@ -246,12 +269,12 @@ async function bkOpen() {
   if (!$('#bk').open) $('#bk').showModal();
 }
 async function bkNow() { await bkTake('Manual', true); bkOpen(); }
-async function bkDownload(i) { const c = (await bkList())[i]; if (c) download(c.json, `${pjCur().name} · copia ${c.at.slice(0, 10)}.json`, 'application/json'); }
-async function bkDelete(i) { const L = await bkList(); L.splice(i, 1); await idb('readwrite', st => st.put(L, 'bk:' + PJ.cur)).catch(() => {}); bkOpen(); }
+async function bkDownload(i) { const c = (await bkList())[i]; if (c) download(await bkJSON(c), `${pjCur().name} · copia ${c.at.slice(0, 10)}.json`, 'application/json'); }
+async function bkDelete(i) { const L = await bkList(); L.splice(i, 1); await bkPutList(PJ.cur, L); bkOpen(); }
 async function bkRestore(i) {
   const c = (await bkList())[i]; if (!c) return;
   if (!confirm(`¿Restaurar la copia del ${bkFmt(c)} (${c.n} papers)?\nSe sustituye lo que hay ahora en «${pjCur().name}»; antes se guarda una copia del estado actual y puedes deshacerlo (${db.settings.shortcuts.undo}).`)) return;
-  let d; try { d = JSON.parse(c.json); d.settings = structuredClone(db.settings); d = validate(d); } catch (e) { return alert('La copia no es válida: ' + e.message); } finally { syncTypes(db.settings.customTypes); syncStyles(db.settings.customStyles, db.settings.export); }
+  let d; try { d = JSON.parse(await bkJSON(c)); d.settings = structuredClone(db.settings); d = validate(d); } catch (e) { return alert('La copia no es válida: ' + e.message); } finally { syncTypes(db.settings.customTypes); syncStyles(db.settings.customStyles, db.settings.export); }
   await bkTake('Antes de restaurar', true);
   const hist = new Map(db.papers.map(p => [p.id, p.history])); db = d; db.papers.forEach(p => p.history = hist.get(p.id) || []);
   for (const id of [...SEL]) if (!db.papers.some(p => p.id === id)) SEL.delete(id);
@@ -270,7 +293,7 @@ const pjFile = n => (String(n).replace(/[\\/:*?"<>|\u0000-\u001f]/g, '-').trim()
 const pjNameFor = f => { const b = String(f || '').split(/[\\/]/).pop().replace(/\.json$/i, '').trim(); return !b ? 'Mi biblioteca' : b === 'ejemplo_papers' ? 'Ejemplo' : b.slice(0, 60); };
 const pjUnique = (n, skip) => { let o = n, i = 2; while (PJ.list.some(p => p.id !== skip && p.name.toLowerCase() === o.toLowerCase())) o = `${n} (${i++})`; return o; };
 const pjSave = () => BOOTED ? idb('readwrite', st => st.put({v: 1, cur: PJ.cur, list: PJ.list, gone: PJ.gone}, 'projects')).catch(() => {}) : Promise.resolve();
-const pjDrop = id => { const N = syNames(id); return idb('readwrite', st => { ['proj:' + id, 'h:' + id, 'bk:' + id, 'fav:' + id, 'rec:' + id, 'syncBase' + N.key, 'syncCache' + N.key].forEach(k => st.delete(k)); return st.count(); }).catch(() => {}); };
+const pjDrop = id => { const N = syNames(id); return idb('readwrite', st => { ['proj:' + id, 'h:' + id, 'bk:' + id, 'fav:' + id, 'rec:' + id, 'syncBase' + N.key, 'syncCache' + N.key].forEach(k => st.delete(k)); st.delete(bkRange(id)); return st.count(); }).catch(() => {}); };
 function pjShow() {
   const p = pjCur(), i = $('#pjName'); if (!p || !i) return;
   if (document.activeElement !== i) i.value = p.name; i.size = Math.max(6, i.value.length + 1); document.title = p.name + ' · Gestor de papers';
@@ -294,7 +317,7 @@ async function pjLoad(id, text, file, h) {   // abre un proyecto: su copia de tr
   if (!syOn()) $('#auto').checked = auto;
   if (h) rememberHandle(); hdr(); await sessionNow();
   if (text != null) syLoaded(); else if (syAuto()) sySoon(300);
-  bkDaily(); favLoad();
+  bkDaily(); favLoad(); tabHello();
 }
 async function pjOpen(id) {   // cambiar de proyecto (menú ▾ de la cabecera)
   ctxClose(); const p = PJ.list.find(x => x.id === id); if (!p || id === PJ.cur) return;
@@ -360,3 +383,33 @@ function pjMenu(e) {
     + L.map(p => `<button class="pji" data-onclick="pjOpen('${p.id}')">${tick(p.id === PJ.cur)}${esc(p.name)} <small>${p.remote ? '☁ en Google Drive' : (p.id === PJ.cur ? db.papers.length : p.n || 0) + ' papers'}</small></button>`).join('')
     + '<hr><button data-onclick="pjNew()">＋ Nuevo proyecto</button><button data-onclick="ctxClose();doOpen()">📂 Abrir un JSON como proyecto…</button><button data-onclick="ctxClose();pjEdit()">✏️ Cambiar el nombre</button>' + (handle ? `<button data-onclick="pjReload()" title="Vuelve a leer «${esc(path || '')}» del disco (descarta lo que no hayas guardado)">↻ Volver a leer «${esc(path || '')}»</button>` : '') + '<button data-onclick="ctxClose();dpOpen()">🔍 Buscar duplicados…</button><button data-onclick="bkOpen()">🕘 Copias de seguridad…</button><button class="danger" data-onclick="pjDel()">🗑 Borrar este proyecto…</button>');
 }
+/* ===== Varias pestañas =====
+   Dos pestañas con el mismo proyecto escribirían la misma copia de trabajo y el mismo archivo, y ganaría la última sin avisar.
+   Cada pestaña dice qué proyecto abre (BroadcastChannel «gpapers»); si otra ya lo tiene, esta queda en pausa (sin guardar ni sincronizar)
+   con un aviso y «Usar en esta pestaña»: la otra guarda lo pendiente, se pone en pausa y esta recarga con lo último. */
+const TAB = {id: uid(), at: 0, passive: false, bc: 'BroadcastChannel' in window ? new BroadcastChannel('gpapers') : null, wait: null};
+const tabSend = (t, x = {}) => { try { TAB.bc?.postMessage({t, from: TAB.id, proj: PJ.cur, ...x}); } catch (e) {} };
+const tabHello = () => { if (!TAB.passive) { TAB.at = Date.now(); tabSend('hi', {at: TAB.at}); } };   // at: cuándo abrió el proyecto (si dos lo abren a la vez, se queda el primero)
+function tabPause(by) {   // esta pestaña deja de escribir: el proyecto se usa en otra
+  TAB.passive = true; clearTimeout(timer); clearTimeout(tSes); clearTimeout(SY.tm); SY.tm = 0;
+  let o = $('#tabLock'); if (!o) { o = document.createElement('div'); o.id = 'tabLock'; o.setAttribute('role', 'alertdialog'); o.setAttribute('aria-modal', 'true'); document.body.appendChild(o); }
+  o.innerHTML = `<div class="tlb"><h2>Proyecto abierto en otra pestaña</h2><p>«${esc(pjCur()?.name || '')}» ${by ? 'se está usando' : 'ya está abierto'} en otra pestaña de este navegador. Para no pisar los cambios de una con los de la otra, esta pestaña queda en pausa: no guarda ni sincroniza.</p>`
+    + `<div class="row"><button class="pri" data-onclick="tabTake()">Usar en esta pestaña</button></div><small>La otra pestaña guardará lo pendiente y quedará en pausa. También puedes cerrar esta.</small></div>`;
+  o.hidden = false; o.querySelector('button').focus();
+}
+function tabTake() {   // pide el proyecto a la otra pestaña y recarga con lo que ella haya guardado (si no contesta, se recarga igual)
+  const go = () => { clearTimeout(TAB.wait); RELOADING = true; location.reload(); };
+  TAB.wait = setTimeout(go, 2000); TAB.go = go; tabSend('take');
+}
+if (TAB.bc) TAB.bc.onmessage = async ({data: m}) => {
+  if (!m || m.from === TAB.id || !BOOTED) return;
+  if (m.t === 'given' && m.to === TAB.id) return TAB.go?.();
+  if (m.proj !== PJ.cur) return;
+  if (m.t === 'hi' && !TAB.passive) { if (TAB.at < m.at || TAB.at === m.at && TAB.id < m.from) tabSend('here', {to: m.from}); else tabPause(false); }
+  else if (m.t === 'here' && m.to === TAB.id && !TAB.passive) tabPause(false);
+  else if (m.t === 'take' && !TAB.passive) {
+    try { clearTimeout(timer); if (auto && handle && dirty) await save(false); await sessionNow(); uiNow(); } catch (e) {}
+    tabPause(true); tabSend('given', {to: m.from});
+  }
+};
+document.addEventListener('keydown', e => { if (TAB.passive && !e.target.closest?.('#tabLock')) { e.stopImmediatePropagation(); e.preventDefault(); } }, true);   // en pausa, los atajos no cambian nada

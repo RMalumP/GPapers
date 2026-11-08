@@ -1,0 +1,112 @@
+# Pruebas de las mejoras de motor, funciones e interfaz (v38): sincronización sin trabajo repetido, búsqueda por palabras,
+# acciones en lote, varias pestañas, copias de seguridad ligeras… (Chromium)
+import sys, json, os, pathlib
+from playwright.sync_api import sync_playwright
+folder = pathlib.Path(sys.argv[1] if len(sys.argv) > 1 else '.').resolve()
+n = fail = 0
+def eq(name, got, want):
+    global n, fail
+    n += 1
+    if got != want:
+        fail += 1; print('FALLA', name, '\n  got :', json.dumps(got, ensure_ascii=False), '\n  want:', json.dumps(want, ensure_ascii=False))
+IMG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='
+SEED = """() => { db.papers.length = 0; db.sections.length = 0; db.tags.length = 0; db.trash.length = 0; F.sorts = [{k: 'title', d: 1}]; F.group = false; F.q = ''; F.inNotes = false; F.tags.clear(); SEL.clear();
+  db.tags.push({id: 'tml', name: 'Machine learning', color: '#3366aa'}, {id: 'tbio', name: 'Biología', color: '#33aa66'});
+  db.sections.push({id: 'sint', name: 'Introducción', tagIds: []}, {id: 'smet', name: 'Métodos', tagIds: []});
+  const P = (id, o) => NEWF({id, title: '', authors: [], year: '', venue: '', type: 'articulo', doi: '', url: '', accessed: '', general: '', notes: [], tagIds: [], sectionIds: [], cites: {}, related: [], refTo: [], history: [], reading: 'por_leer', rating: 0, ...o});
+  db.papers.push(P('a', {title: 'Redes neuronales profundas', authors: ['García, Ana', 'Smith, John'], year: 2020, venue: 'Nature', doi: '10.1000/abc', tagIds: ['tml'], sectionIds: ['sint']}),
+    P('b', {title: 'Genética de poblaciones', authors: ['Pérez, Luis'], year: 2015, venue: 'Cell', tagIds: ['tbio'], sectionIds: ['smet'], general: 'resumen sobre tempestades'}),
+    P('c', {title: 'Aprendizaje por refuerzo', authors: ['García, Marta'], year: 2010, venue: 'Science'}));
+  UNDO.length = 0; REDO.length = 0; lastSnap = snapDb(); render(); }"""
+P1 = "NEWF({id: 'p1', title: 'Uno', authors: [], year: 2020, type: 'articulo', tagIds: [], sectionIds: [], notes: [], cites: {}, related: [], refTo: [], history: [], reading: 'por_leer', rating: 0})"
+with sync_playwright() as pw:
+    kw = {'executable_path': '/opt/pw-browsers/chromium'} if os.path.exists('/opt/pw-browsers/chromium') else {}
+    b = pw.chromium.launch(**kw); ctx = b.new_context(viewport={'width': 1200, 'height': 800}, service_workers='block'); pg = ctx.new_page(); errs = []
+    pg.on('pageerror', lambda e: errs.append(str(e))); pg.on('console', lambda m: errs.append(m.text) if m.type == 'error' else None); pg.on('dialog', lambda d: d.accept())
+    pg.goto('file://' + str(folder / 'index.html')); pg.wait_for_timeout(500)
+
+    # ---- M1: normalizar para Drive no repite el trabajo
+    pg.evaluate(SEED)
+    eq('normalizar dos veces lo mismo solo trabaja una vez', pg.evaluate("""() => { SY_NM.clear(); let c = 0; const raw = syNormRaw; syNormRaw = d => (c++, raw(d));
+      const d = syPlain(db), a = syNormS(d), b2 = syNormS(JSON.parse(JSON.stringify(d))), c2 = syNormS(JSON.parse(a)); syNormRaw = raw; return [c, a === b2, a === c2]; }"""), [1, True, True])
+    eq('el resultado es el de siempre', pg.evaluate("syNormS(syPlain(db)) === syS(syPlain(validate(structuredClone(syPlain(db)))))"), True)
+    eq('cambiar algo vuelve a normalizar', pg.evaluate("() => { const a = syNormS(syPlain(db)); db.papers[0].title = 'Otro'; const r = syNormS(syPlain(db)) !== a; db.papers[0].title = 'Redes neuronales profundas'; return r; }"), True)
+    eq('recuerda pocos resultados', pg.evaluate("() => { for (let i = 0; i < 20; i++) { db.papers[0].year = 1900 + i; syNormS(syPlain(db)); } db.papers[0].year = 2020; return SY_NM.size <= SY_NM_MAX; }"), True)
+
+    # ---- F1 + U4: búsqueda por palabras con resaltado
+    pg.evaluate(SEED)
+    Q = lambda q: pg.evaluate("q => { F.q = q; return visible().map(p => p.id); }", q)
+    eq('palabras en cualquier orden', Q('garcia 2020'), ['a'])
+    eq('sin tildes ni mayúsculas', Q('GENÉTICA'), ['b'])
+    eq('busca en revista y DOI', [Q('nature'), Q('10.1000/abc')], [['a'], ['a']])
+    eq('busca en etiquetas y secciones', [Q('machine'), Q('metodos')], [['a'], ['b']])
+    eq('autor: solo mira los autores', sorted(Q('autor:garcia')), ['a', 'c'])
+    eq('año: exacto y por rango', [Q('año:2015'), sorted(Q('año:2010-2015')), sorted(Q('year:2012-'))], [['b'], ['b', 'c'], ['a', 'b']])
+    eq('#etiqueta y etiqueta:', [Q('#bio'), Q('etiqueta:machine')], [['b'], ['a']])
+    eq('-palabra excluye', sorted(Q('-garcia')), ['b'])
+    eq('"frase exacta"', [Q('"redes neuronales"'), Q('"neuronales redes"')], [['a'], []])
+    eq('revista: y seccion:', [Q('revista:cell'), Q('seccion:intro')], [['b'], ['a']])
+    eq('un prefijo desconocido se busca tal cual', Q('http:'), [])
+    eq('las notas solo con la casilla', [Q('tempestades'), pg.evaluate("() => { F.inNotes = true; F.q = 'tempestades'; const r = visible().map(p => p.id); F.inNotes = false; return r; }")], [[], ['b']])
+    pg.evaluate("F.q = 'garcia redes'; render()")
+    eq('resalta las palabras en título y autores', pg.evaluate("[...document.querySelectorAll('#list .card mark')].map(m => m.textContent)"), ['Redes', 'García'])
+    eq('resaltar respeta las tildes del texto', pg.evaluate("hl('Árbol de García', ['arbol', 'garcia'])"), '<mark>Árbol</mark> de <mark>García</mark>')
+    eq('resaltar escapa el HTML', pg.evaluate("hl('<b>x</b> y', ['y'])"), '&lt;b&gt;x&lt;/b&gt; <mark>y</mark>')
+    pg.evaluate("setView('table'); render()")
+    eq('también en la tabla', pg.evaluate("document.querySelectorAll('#list .tbl mark').length"), 2)
+    pg.evaluate("setView('cards'); F.q = ''; render()")
+    eq('sin búsqueda no se marca nada', pg.evaluate("document.querySelectorAll('#list mark').length"), 0)
+
+    # ---- U1: acciones en lote
+    pg.evaluate(SEED)
+    pg.evaluate("SEL.add('a'); SEL.add('b'); render()")
+    eq('la selección muestra las acciones en lote', pg.evaluate("[!$('#sg-sel').hidden, document.querySelectorAll('#sg-sel .blk button').length]"), [True, 4])
+    pg.evaluate("bulkRead('leido')")
+    eq('lectura en lote', pg.evaluate("db.papers.map(p => p.reading)"), ['leido', 'leido', 'por_leer'])
+    pg.evaluate("bulkRate(4)")
+    eq('valoración en lote', pg.evaluate("db.papers.map(p => p.rating)"), [4, 4, 0])
+    pg.evaluate("bulkTag('tbio', 1)")
+    eq('añadir etiqueta en lote', pg.evaluate("db.papers.map(p => p.tagIds.join())"), ['tml,tbio', 'tbio', ''])
+    pg.evaluate("bulkTag('tbio', 0); bulkSec('smet', 1)")
+    eq('quitar etiqueta y añadir sección', pg.evaluate("db.papers.map(p => p.tagIds.join() + '|' + p.sectionIds.join())"), ['tml|sint,smet', '|smet', '|'])
+    pg.evaluate("bulkMenu({preventDefault() {}, stopPropagation() {}, clientX: 10, clientY: 10}, 'tag')")
+    eq('el menú de etiquetas ofrece añadir y quitar', pg.evaluate("[...$('#ctx').querySelectorAll('button')].map(b => b.textContent)"), ['＋ Machine learning', '＋ Biología', '− Machine learning'])
+    pg.evaluate("ctxClose(); lastRecAt = 0; bulkTrash()")
+    eq('a la papelera en lote', pg.evaluate("[db.papers.map(p => p.id), db.trash.length, SEL.size]"), [['c'], 2, 0])
+    pg.evaluate("undo()")
+    eq('un solo Ctrl+Z lo devuelve', pg.evaluate("db.papers.map(p => p.id).sort()"), ['a', 'b', 'c'])
+
+    # ---- M4: copias de seguridad ligeras
+    pg.evaluate(SEED)
+    pg.evaluate("img => { db.papers[0].image = {kind: 'data', data: img}; }", IMG)
+    pg.evaluate("bkTake('Prueba', true)"); pg.wait_for_timeout(300)
+    eq('el índice no lleva las copias dentro', pg.evaluate("bkList().then(L => [L[0].why, 'json' in L[0], typeof L[0].k, typeof L[0].h])"), ['Prueba', False, 'string', 'string'])
+    eq('la copia va aparte y sin la imagen dentro', pg.evaluate("img => bkList().then(L => idb('readonly', st => st.get(bkKey(PJ.cur, L[0].k)))).then(r => [r.img, r.json.includes(img), r.json.includes('Redes neuronales')])", IMG), [1, False, True])
+    eq('al descargarla lleva la imagen', pg.evaluate("img => bkList().then(L => bkJSON(L[0])).then(j => [JSON.parse(j).papers[0].image.data === img, JSON.parse(j).papers.length])", IMG), [True, 3])
+    eq('sin cambios no se repite', pg.evaluate("bkTake('Otra').then(() => bkList()).then(L => L.length)"), 1)
+    pg.evaluate("""() => idb('readwrite', st => st.put([{at: '2020-01-01T00:00:00Z', why: 'Antigua', n: 1, size: 10, json: JSON.stringify({version: 1, papers: [], tags: [], sections: [], trash: []})}], 'bk:' + PJ.cur))""")
+    pg.evaluate("bkTake('Nueva', true)"); pg.wait_for_timeout(300)
+    eq('una copia antigua se convierte al guardar otra', pg.evaluate("bkList().then(L => [L.map(c => c.why), L.some(c => 'json' in c)])"), [['Nueva', 'Antigua'], False])
+    eq('y se sigue pudiendo leer', pg.evaluate("bkList().then(L => bkJSON(L[1])).then(j => JSON.parse(j).papers.length)"), 0)
+    pg.evaluate("bkDelete(1)"); pg.wait_for_timeout(300)
+    eq('borrar una copia borra sus datos', pg.evaluate("idb('readonly', st => st.getAllKeys(bkRange(PJ.cur))).then(ks => ks.length)"), 1)
+    pg.evaluate("db.papers[0].image = null; sessionNow()"); pg.wait_for_timeout(200)
+    pg.evaluate("imgGc()"); pg.wait_for_timeout(300)
+    eq('las imágenes de las copias no se borran', pg.evaluate("img => idb('readonly', st => st.get('imgd:' + imgHash(img)))", IMG), IMG)
+
+    eq('sin errores', errs, [])
+
+    # ---- M3: varias pestañas con el mismo proyecto
+    ctx2 = b.new_context(service_workers='block'); errs2 = []
+    A = ctx2.new_page(); A.on('pageerror', lambda e: errs2.append(str(e))); A.goto('file://' + str(folder / 'index.html')); A.wait_for_timeout(800)
+    A.evaluate(f"db.papers.push({P1}); markDirty()")
+    B = ctx2.new_page(); B.on('pageerror', lambda e: errs2.append(str(e))); B.goto('file://' + str(folder / 'index.html')); B.wait_for_timeout(1200)
+    eq('la segunda pestaña queda en pausa con un aviso', [A.evaluate("TAB.passive"), B.evaluate("TAB.passive"), B.is_visible('#tabLock')], [False, True, True])
+    eq('en pausa no guarda la copia de trabajo', B.evaluate("db.papers.push({id: 'zz'}); sessionNow().then(() => idb('readonly', st => st.get('proj:' + PJ.cur))).then(r => r.json.includes('zz'))"), False)
+    B.click('#tabLock button.pri'); B.wait_for_timeout(2500)
+    eq('«Usar en esta pestaña» cambia los papeles y trae lo último', [A.evaluate("TAB.passive"), A.is_visible('#tabLock'), B.evaluate("TAB.passive"), B.evaluate("db.papers.map(p => p.title)")], [True, True, False, ['Uno']])
+    eq('en pausa los atajos no hacen nada', A.evaluate("() => { const n = db.papers.length; document.body.dispatchEvent(new KeyboardEvent('keydown', {key: 'z', ctrlKey: true, bubbles: true})); return db.papers.length === n; }"), True)
+    eq('sin errores con varias pestañas', errs2, [])
+    b.close()
+print(f'{n - fail}/{n} pruebas correctas')
+sys.exit(1 if fail else 0)

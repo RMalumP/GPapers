@@ -21,14 +21,58 @@ function sortList(L) {   // ordena por todos los criterios, en cascada; d = 1 as
     const c = typeof x === 'number' ? x - y : COLL.compare(x, y); if (c) return c * d; } return 0; }).map(e => e.p);
 }
 const has = (p, t) => p.tagIds.includes(t);   // las etiquetas son independientes de las secciones
+/* ---- Búsqueda rápida: cada palabra por separado y en cualquier orden ----
+   «garcia 2020» encuentra «García, Ana (2020)». También: "frase exacta", -palabra (excluir), autor:…, año:2020 o año:2010-2020,
+   revista:…, doi:…, #etiqueta (o etiqueta:…) y seccion:…. Sin prefijo se busca en título, alias, año, autores, revista, DOI, etiquetas y secciones
+   (y en notas y citas con «Incluir notas»). */
 const SEARCH = new WeakMap();   // texto de búsqueda ya normalizado de cada paper: solo se recalcula si cambia
 function searchTxt(p) {
-  const raw = [p.title, p.alias, p.year, ...p.authors, ...(F.inNotes ? [p.general, ...p.notes.map(n => n.content), ...Object.values(p.cites)] : [])].join(' ');
+  const raw = [p.title, p.alias, p.year, ...p.authors, p.venue, p.doi, ...p.tagIds.map(i => tagById(i)?.name), ...p.sectionIds.map(i => secById(i)?.name),
+    ...(F.inNotes ? [p.general, ...p.notes.map(n => n.content), ...Object.values(p.cites)] : [])].join(' ');
   let c = SEARCH.get(p); if (!c || c.raw !== raw) SEARCH.set(p, c = {raw, n: norm(raw)}); return c.n;
 }
+const QP = {autor: 'au', autores: 'au', author: 'au', au: 'au', ano: 'yr', year: 'yr', revista: 've', venue: 've', editorial: 've', doi: 'doi', etiqueta: 'tag', tag: 'tag', seccion: 'sec', section: 'sec'};
+let QC = {raw: null, T: []};
+function qParse(raw) {   // el texto de la caja → [{k: '' | 'au' | 'yr' | 've' | 'doi' | 'tag' | 'sec', v (normalizado), neg, a, b (años)}]
+  if (QC.raw === raw) return QC.T;
+  const T = [], re = /(-?)(?:([\p{L}]+):)?(?:"([^"]*)"?|(\S+))/gu; let m;
+  while ((m = re.exec(raw || ''))) {
+    const [, neg, pre, ph, w] = m; let v = ph ?? w ?? '', k = '';
+    if (pre) { k = QP[norm(pre)] || ''; if (!k) v = pre + ':' + v; }   // «http://…» o un prefijo desconocido: se busca tal cual
+    if (!k && !ph && v.length > 1 && v[0] === '#') { k = 'tag'; v = v.slice(1); }
+    v = norm(v).trim(); if (!v) continue;
+    const t = {k, v, neg: !!neg};
+    if (k === 'yr') { const y = /^(\d{1,4})?\s*(?:[-–]\s*(\d{1,4})?)?$/.exec(v); if (!y || !y[1] && !y[2]) { t.k = ''; } else { t.a = +y[1] || 0; t.b = /[-–]/.test(v) ? +y[2] || 9999 : t.a; } }
+    T.push(t);
+  }
+  return (QC = {raw, T}).T;
+}
+function qTest(p, T) {
+  for (const t of T) {
+    const v = t.v, k = t.k;
+    const ok = !k ? searchTxt(p).includes(v) : k === 'au' ? norm(p.authors.join('; ')).includes(v) : k === 'yr' ? +p.year > 0 && +p.year >= t.a && +p.year <= t.b
+      : k === 've' ? norm(p.venue).includes(v) : k === 'doi' ? norm(p.doi).includes(v)
+      : k === 'tag' ? p.tagIds.some(i => norm(tagById(i)?.name).includes(v)) : p.sectionIds.some(i => norm(secById(i)?.name).includes(v));
+    if (ok === t.neg) return false;
+  }
+  return true;
+}
+/* Resaltado: las palabras buscadas se marcan en el título y los autores de tarjetas y tabla, sin distinguir tildes ni mayúsculas */
+let HL = {t: [], a: []};
+const hlSet = T => { const f = T.filter(t => !t.neg && !t.k).map(t => t.v); HL = {t: f, a: [...f, ...T.filter(t => !t.neg && t.k === 'au').map(t => t.v)]}; };
+function hl(s, terms) {
+  s = String(s ?? ''); if (!terms.length || !s) return esc(s);
+  let n = ''; const map = [];
+  for (let i = 0; i < s.length; i++) { const c = norm(s[i]); for (let j = 0; j < c.length; j++) { n += c[j]; map.push(i); } }
+  const on = new Uint8Array(s.length);
+  for (const t of terms) for (let i = n.indexOf(t); i >= 0; i = n.indexOf(t, i + t.length)) for (let j = i; j < i + t.length; j++) on[map[j]] = 1;
+  let o = '', open = 0;
+  for (let i = 0; i < s.length; i++) { if (on[i] !== open) { o += on[i] ? '<mark>' : '</mark>'; open = on[i]; } o += esc(s[i]); }
+  return o + (open ? '</mark>' : '');
+}
 function visible() {
-  const q = norm(F.q);
-  return sortList(db.papers.filter(p => (!q || searchTxt(p).includes(q))
+  const T = qParse(F.q); hlSet(T);
+  return sortList(db.papers.filter(p => (!T.length || qTest(p, T))
     && (!F.sec || p.sectionIds.includes(F.sec)) && (!F.read || p.reading === F.read) && p.rating >= F.minRating && (!F.tags.size || [...F.tags][F.mode === 'all' ? 'every' : 'some'](t => has(p, t)))
     && (!F.noSec || !p.sectionIds.some(secById)) && (!F.noTag || !p.tagIds.some(tagById)) && (!F.exTags.size || ![...F.exTags].some(t => has(p, t)))
     && (!F.yFrom || +p.year >= F.yFrom) && (!F.yTo || (+p.year > 0 && +p.year <= F.yTo)) && advTest(p)));
@@ -210,8 +254,8 @@ const starsHTML = p => `<span class="stv${p.rating ? '' : ' none'}" data-onconte
 const rdHTML = p => `<span class="rd"><button class="rst" style="--c:${READ_C[p.reading]}" title="Clic: cambiar el estado de lectura" data-onclick="cycleRead('${p.id}')">${READ[p.reading]}</button>${starsHTML(p)}</span>`;
 function starMenu(e, id) { ctxShow(e, '<div class="ctxh">Valoración</div>' + [5, 4, 3, 2, 1, 0].map(n => `<button data-onclick="setRating('${id}',${n})">${n ? '★'.repeat(n) + '☆'.repeat(5 - n) : 'Sin valorar'}</button>`).join('')); }
 function setRating(id, n) { const p = db.papers.find(x => x.id === id); ctxClose(); if (!p || p.rating === n) return; logChange(p, `Valoración: ${p.rating || '—'} → ${n || '—'}`); p.rating = n; markDirty(); renderPaper(id); }
-const card = (p, from) => `<article class="card" data-id="${p.id}" draggable="true" ${F.group ? `data-from="${from || ''}"` : ''}><div class="ct"><label class="sel"><input type="checkbox" ${SEL.has(p.id) ? 'checked' : ''} data-onchange="toggleSel('${p.id}')"> Seleccionar</label><button class="sm" data-onclick="openPaper('${p.id}')">Editar</button><button class="sm cpb" data-onclick="copyCardCite('${p.id}',this)" title="Copiar la cita (estilo elegido en Exportar), con cursiva al pegar en Word">📋</button>${pdfBtns(p, true)}${p.tagIds.length ? `<span class="tl">${tagsOf(p)}</span>` : ''}${rdHTML(p)}<button class="x" title="Eliminar" data-onclick="delPaper('${p.id}')">✕</button></div><div class="th">${thumbHTML(p, 'sm')}<h3>${esc(p.alias || p.title)}</h3></div>${p.alias ? `<div class="sub">${esc(p.title)}</div>` : ''}
-    <div class="au"><span>${esc(p.authors.join('; '))} ${p.year ? '(' + esc(p.year) + ')' : ''}</span></div>
+const card = (p, from) => `<article class="card" data-id="${p.id}" draggable="true" ${F.group ? `data-from="${from || ''}"` : ''}><div class="ct"><label class="sel"><input type="checkbox" ${SEL.has(p.id) ? 'checked' : ''} data-onchange="toggleSel('${p.id}')"> Seleccionar</label><button class="sm" data-onclick="openPaper('${p.id}')">Editar</button><button class="sm cpb" data-onclick="copyCardCite('${p.id}',this)" title="Copiar la cita (estilo elegido en Exportar), con cursiva al pegar en Word">📋</button>${pdfBtns(p, true)}${p.tagIds.length ? `<span class="tl">${tagsOf(p)}</span>` : ''}${rdHTML(p)}<button class="x" title="Eliminar" data-onclick="delPaper('${p.id}')">✕</button></div><div class="th">${thumbHTML(p, 'sm')}<h3>${hl(p.alias || p.title, HL.t)}</h3></div>${p.alias ? `<div class="sub">${hl(p.title, HL.t)}</div>` : ''}
+    <div class="au"><span>${hl(p.authors.join('; '), HL.a)} ${p.year ? '(' + esc(p.year) + ')' : ''}</span></div>
     ${/^https?:/i.test(p.url) ? `<a href="${esc(p.url)}" target="_blank" rel="noopener noreferrer">${esc(p.url)}</a>` : ''}
     
     <div class="row"><button class="sm" data-onclick="toggleNotes('${p.id}')" data-oncontextmenu="viewNotes(event,'${p.id}')" title="Clic: desplegar notas · Clic derecho: abrir el visor de notas">Notas (${pNotes(p).length}) ${EXP.has(p.id) ? '▾' : '▸'}</button>${relCount(p) ? `<button class="sm" data-onclick="viewRel('${p.id}')" title="Relaciones: relacionados, cita a y citado por">🔗 ${relCount(p)}</button>` : ''}</div>${EXP.has(p.id) ? notesHTML(p) : ''}</article>`;
@@ -222,7 +266,7 @@ function thSort(k) {   // clic en una cabecera: ese criterio pasa a ser el princ
 const rowHTML = (p, from) => `<tr class="rw" data-id="${p.id}" draggable="true" ${F.group ? `data-from="${from || ''}"` : ''}>
   <td><input type="checkbox" aria-label="Seleccionar" ${SEL.has(p.id) ? 'checked' : ''} data-onchange="toggleSel('${p.id}')"></td>
   <td class="timg">${thumbHTML(p, 'xs')}</td>
-  <td class="tt"><a class="tl2" data-onclick="openPaper('${p.id}')" title="${esc(p.alias || p.title)} · Clic: editar">${esc(p.alias || p.title)}</a></td><td title="${esc(p.authors.join('; '))}">${esc(p.authors.join('; '))}</td><td>${esc(p.year)}</td><td title="${esc(p.venue)}">${esc(p.venue)}</td>
+  <td class="tt"><a class="tl2" data-onclick="openPaper('${p.id}')" title="${esc(p.alias || p.title)} · Clic: editar">${hl(p.alias || p.title, HL.t)}</a></td><td title="${esc(p.authors.join('; '))}">${hl(p.authors.join('; '), HL.a)}</td><td>${esc(p.year)}</td><td title="${esc(p.venue)}">${esc(p.venue)}</td>
   <td><button class="rst" style="--c:${READ_C[p.reading]}" title="Clic: cambiar el estado de lectura" data-onclick="cycleRead('${p.id}')">${READ[p.reading]}</button></td><td>${starsHTML(p)}</td>
   <td title="${esc(p.sectionIds.map(secById).filter(Boolean).map(s => s.name).join(', '))}">${p.sectionIds.map(secById).filter(Boolean).map(s => chip(s, 1)).join('')}</td><td title="${esc(p.tagIds.map(tagById).filter(Boolean).map(t => t.name).join(', '))}">${tagsOf(p)}</td>
   <td class="nw"><button class="sm cpb" data-onclick="copyCardCite('${p.id}',this)" title="Copiar la cita (estilo elegido en Exportar), con cursiva al pegar en Word">📋</button>${pdfBtns(p)}<button class="sm" data-onclick="toggleNotes('${p.id}')" data-oncontextmenu="viewNotes(event,'${p.id}')" title="Clic: desplegar · Clic derecho: visor de notas">${pNotes(p).length} ${EXP.has(p.id) ? '▾' : '▸'}</button>${relCount(p) ? `<button class="sm" data-onclick="viewRel('${p.id}')" title="Relaciones">🔗 ${relCount(p)}</button>` : ''}</td>
@@ -355,6 +399,40 @@ function toggleSel(id) { SEL.has(id) ? SEL.delete(id) : SEL.add(id);   // solo c
   const c = $(`#list [data-id="${id}"] input[type=checkbox]`); if (c) c.checked = SEL.has(id); selDraw(); }
 function selVisible() { visible().forEach(p => SEL.add(p.id)); render(); }
 function selNone() { SEL.clear(); render(); }
+/* ---- Acciones en lote sobre la selección: lectura, valoración, etiquetas, secciones y papelera (un solo Ctrl+Z las deshace) ---- */
+const selPapers = () => db.papers.filter(p => SEL.has(p.id));
+const nPap = n => n === 1 ? '1 paper' : n + ' papers';
+function bulkDo(fn, msg) {
+  ctxClose(); let n = 0; selPapers().forEach(p => { if (fn(p)) { n++; p.modified = new Date().toISOString(); } });
+  if (n) { markDirty(); render(); }
+  toast(n ? msg(n) : 'No había nada que cambiar.', n ? [{t: 'Deshacer', fn: undo}] : [], 5000);
+}
+function bulkMenu(e, k) {
+  const b = (on, t) => `<button data-onclick="${on}">${t}</button>`, S = selPapers();
+  let h = '';
+  if (k === 'read') h = '<div class="ctxh">Estado de lectura</div>' + Object.entries(READ).map(([v, t]) => b(`bulkRead('${v}')`, t)).join('');
+  else if (k === 'rate') h = '<div class="ctxh">Valoración</div>' + [5, 4, 3, 2, 1, 0].map(n => b(`bulkRate(${n})`, n ? '★'.repeat(n) : 'Sin valorar')).join('');
+  else {
+    const L = k === 'tag' ? db.tags : db.sections, f = k === 'tag' ? 'tagIds' : 'sectionIds', fn = k === 'tag' ? 'bulkTag' : 'bulkSec', on = L.filter(x => S.some(p => p[f].includes(x.id)));
+    if (!L.length) h = `<div class="ctxh">No hay ${k === 'tag' ? 'etiquetas' : 'secciones'}</div>`;
+    else h = `<div class="ctxh">Añadir ${k === 'tag' ? 'etiqueta' : 'sección'}</div>` + L.map(x => b(`${fn}('${x.id}',1)`, '＋ ' + esc(x.name))).join('')
+      + (on.length ? `<div class="ctxh">Quitar</div>` + on.map(x => b(`${fn}('${x.id}',0)`, '− ' + esc(x.name))).join('') : '');
+  }
+  ctxShow(e, h);
+}
+function bulkRead(v) { bulkDo(p => { if (p.reading === v) return false; logChange(p, `Lectura: ${READ[p.reading]} → ${READ[v]}`); p.reading = v; return true; }, n => `${nPap(n)}: «${READ[v]}».`); }
+function bulkRate(v) { bulkDo(p => { if (p.rating === v) return false; logChange(p, `Valoración: ${p.rating || '—'} → ${v || '—'}`); p.rating = v; return true; }, n => `Valoración cambiada en ${nPap(n)}.`); }
+function bulkList(f, id, add, name, what) {
+  bulkDo(p => { const i = p[f].indexOf(id); if (add ? i >= 0 : i < 0) return false; add ? p[f].push(id) : p[f].splice(i, 1); logChange(p, `${what} ${add ? 'añadida' : 'quitada'}: ${name}`); return true; },
+    n => `«${name}» ${add ? 'añadida a' : 'quitada de'} ${nPap(n)}.`);
+}
+function bulkTag(id, add) { bulkList('tagIds', id, add, tagById(id)?.name || '?', 'Etiqueta'); }
+function bulkSec(id, add) { bulkList('sectionIds', id, add, secById(id)?.name || '?', 'Sección'); }
+function bulkTrash() {
+  ctxClose(); const ids = [...SEL].filter(id => db.papers.some(p => p.id === id)); if (!ids.length) return;
+  ids.forEach(trashPaper); SEL.clear(); markDirty(); render();
+  toast(`${nPap(ids.length)} a la papelera (se guardan ${TRASH_DAYS} días).`, [{t: 'Deshacer', fn: undo}], 6000);
+}
 /* ===== Exportar (texto, BibTeX, RIS, Word) y bibliografía ordenada ===== */
 const ex = () => db.settings.export;
 const EXF = {txt: ['Texto (.txt)', 'text/plain'], bib: ['BibTeX (.bib)', 'text/plain'], ris: ['RIS (.ris)', 'text/plain'], doc: ['Word (.doc)', 'application/msword'], docx: ['Word (.docx)', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document']};

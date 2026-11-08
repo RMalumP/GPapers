@@ -39,9 +39,9 @@ function mgAdd(id) { db[MG].push({id, name: 'Nueva', color: '#2457c5', tagIds: [
    Aparte del JSON, la app guarda (1) una copia de trabajo, para reabrir justo donde lo dejaste aunque no hayas guardado, y
    (2) el estado de la interfaz (filtros, orden, barra lateral, bloques plegados). Viven fuera de la caché de la aplicación,
    así que las actualizaciones no los tocan y no hace falta borrar datos para recibir una versión nueva. */
-const APP_V = '37.8';   // debe coincidir con la versión de sw.js
+const APP_V = '38.0';   // debe coincidir con la versión de sw.js
 let BOOTED = false, RELOADING = false, SWREG = null, tSes = 0, tUi = 0, lastUi = '';
-const sessionNow = () => { clearTimeout(tSes); if (!BOOTED) return Promise.resolve();   // copia de trabajo del proyecto abierto (y la lista de proyectos)
+const sessionNow = () => { clearTimeout(tSes); if (!BOOTED || TAB.passive) return Promise.resolve();   // copia de trabajo del proyecto abierto (y la lista de proyectos)
   const p = pjCur(); if (p) { Object.assign(p, {n: db.papers.length, file: path, dirty}); delete p.remote; }
   const [json, add] = projWire(db);   // JSON compacto y con las imágenes aparte (solo se escriben las nuevas)
   return idb('readwrite', st => { st.put({v: 1, cur: PJ.cur, list: PJ.list, gone: PJ.gone}, 'projects'); return projPut(st, 'proj:' + PJ.cur, {v: 1, path, dirty, at: new Date().toISOString(), json}, add); }).then(() => projSaved(add)).catch(() => {}); };
@@ -71,7 +71,7 @@ async function forgetAppData() {
   if (!confirm(`Se borrarán de este navegador ${n === 1 ? 'el proyecto' : `los ${n} proyectos`} (copias de trabajo) y el estado de la interfaz. Tus archivos JSON y tu Google Drive no se tocan: guarda antes lo que no tengas guardado. ¿Continuar?`)) return;
   BOOTED = false; clearTimeout(tSes); clearTimeout(tUi);
   const ks = await idb('readonly', st => st.getAllKeys()).catch(() => []);
-  await idb('readwrite', st => { ks.filter(k => typeof k === 'string' && /^(session|ui|projects|proj:|imgd:|h:|bk:|fav:|rec:|sync)/.test(k)).forEach(k => st.delete(k)); return st.count(); }).catch(() => {});
+  await idb('readwrite', st => { ks.filter(k => typeof k === 'string' && /^(session|ui|projects|proj:|imgd:|h:|bk:|bkd:|fav:|rec:|sync)/.test(k)).forEach(k => st.delete(k)); return st.count(); }).catch(() => {});
   toast('Datos de este navegador borrados. La próxima vez la aplicación arrancará limpia.');   // en esta pestaña ya no se guarda nada más
 }
 const reloadApp = async () => { RELOADING = true; await sessionNow(); await uiNow(); location.reload(); };
@@ -102,7 +102,7 @@ async function bootApp() {
   pjShow(); instShow(); applyUI(ui); BOOTED = true; lastUi = JSON.stringify(uiState()); if (restored) uiNow();
   if (pj && !restored) pjSave(); else if (!restored || old) await sessionNow(); else clearTimeout(tSes);   // recuperada tal cual: no hace falta volver a escribirla
   if (old) { if (handle) rememberHandle(); idb('readwrite', st => st.delete('session')).catch(() => {}); }
-  bkDaily(); favLoad(); afterPaint(imgGc);
+  bkDaily(); favLoad(); afterPaint(imgGc); tabHello();
 }
 document.addEventListener('visibilitychange', () => { if (document.hidden) { sessionNow(); uiNow(); } });
 addEventListener('pagehide', () => { sessionNow(); uiNow(); });

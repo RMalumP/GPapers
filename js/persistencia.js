@@ -34,9 +34,9 @@ async function projData(rec) {   // lee una copia de trabajo (con o sin imágene
   if (refs.length) await idb('readonly', st => { refs.forEach(h => { const q = st.get('imgd:' + h); q.onsuccess = () => { if (typeof q.result === 'string') { imgs.set(h, q.result); IMG_H.set(q.result, h); IMG_SAVED.add(h); } }; }); return null; });
   return JSON.parse(rec.json, (k, v) => k === 'image' && v && v.kind === 'data' && typeof v.ref === 'string' ? (imgs.has(v.ref) ? {kind: 'data', data: imgs.get(v.ref)} : null) : v);
 }
-async function imgGc() {   // borra las imágenes que ya no usa ninguna copia de trabajo
+async function imgGc() {   // borra las imágenes que ya no usa ninguna copia de trabajo ni de seguridad
   const keys = await idb('readonly', st => st.getAllKeys()).catch(() => []), used = new Set();
-  const projs = keys.filter(k => typeof k === 'string' && k.startsWith('proj:')), imgs = keys.filter(k => typeof k === 'string' && k.startsWith('imgd:'));
+  const projs = keys.filter(k => typeof k === 'string' && (k.startsWith('proj:') || k.startsWith('bkd:'))), imgs = keys.filter(k => typeof k === 'string' && k.startsWith('imgd:'));
   if (!imgs.length) return;
   for (const k of projs) { const r = await idb('readonly', st => st.get(k)).catch(() => null); if (r && typeof r.json === 'string') for (const m of r.json.matchAll(/"ref":"([0-9a-f]+)"/g)) used.add(m[1]); }
   syPapersOf(db).forEach(p => { if (p.image?.kind === 'data' && p.image.data) used.add(imgHash(p.image.data)); });   // y las del proyecto abierto, aunque aún no se hayan guardado
@@ -123,7 +123,7 @@ function record() {   // antes de cada cambio guarda el estado anterior; los cam
   if (!(Date.now() - lastRecAt < 1500 && UNDO.length)) { UNDO.push(lastSnap); if (UNDO.length > MAXU) UNDO.shift(); }
   lastRecAt = Date.now(); REDO.length = 0; lastSnap = cur;
 }
-function touch() { hdr(); sessionSoon(); clearTimeout(timer); if (auto && handle) timer = setTimeout(() => save(false), 1000); if (!SY.applying && syAuto()) sySoon(); }   // con Google Drive conectado, el cambio se sube a los 3 s
+function touch() { if (TAB.passive) return; hdr(); sessionSoon(); clearTimeout(timer); if (auto && handle) timer = setTimeout(() => save(false), 1000); if (!SY.applying && syAuto()) sySoon(); }   // con Google Drive conectado, el cambio se sube a los 3 s
 function markDirty() { record(); dirty = true; touch(); }
 function undo() { if (UNDO.length) { REDO.push(snapDb()); restore(UNDO.pop()); } }
 function redo() { if (REDO.length) { UNDO.push(snapDb()); restore(REDO.pop()); } }
