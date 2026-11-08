@@ -334,7 +334,7 @@ function pjShow() {
 const pjIdle = () => new Promise(ok => { const t = () => SY.busy ? setTimeout(t, 100) : ok(); t(); });   // espera a que termine la sincronización en curso
 async function pjLeave() {   // antes de cambiar de proyecto: lo pendiente se guarda en su archivo (con autoguardado), se sube a Drive y queda su copia de trabajo
   clearTimeout(timer); if (auto && handle && dirty) await save(false);
-  await pjIdle(); if (syAuto() && (dirty || SY.tm)) await syRun(false);
+  await pjIdle(); PJ.left = syAuto() && (dirty || SY.tm) ? PJ.cur : null;   // no se espera a Drive: se sube en segundo plano al abrir el otro
   clearTimeout(SY.tm); SY.tm = 0; await sessionNow();
   if (VWB.sats.size) { vwBc({t: 'bye', pj: PJ.cur}); VWB.sats.clear(); }   // el visor de otra pestaña pasa a guardar él mismo
 }
@@ -344,6 +344,7 @@ async function pjLoad(id, text, file, h) {   // abre un proyecto: su copia de tr
   if (!d || typeof d !== 'object') d = {version: 1, sections: [], tags: [], papers: [], trash: []};
   if (text == null || !d.settings) d.settings = structuredClone(db.settings);
   PJ.cur = id; pjShow();
+  if (PJ.left && PJ.left !== id) { const l = PJ.left; setTimeout(() => syStoredSoon(l), 50); } PJ.left = null;
   if (!await loadText(JSON.stringify(d), text != null ? file : r && typeof r.path === 'string' ? r.path : null, true))
     await loadText(JSON.stringify({version: 1, sections: [], tags: [], papers: [], trash: [], settings: db.settings}), null, true);
   handle = h || null; if (text == null) { dirty = !!(r && r.dirty); try { if (FSA) handle = await idb('readonly', st => st.get('h:' + id)) || null; } catch (e) {} }
@@ -356,7 +357,7 @@ async function pjLoad(id, text, file, h) {   // abre un proyecto: su copia de tr
 async function pjOpen(id) {   // cambiar de proyecto (menú ▾ de la cabecera)
   ctxClose(); const p = PJ.list.find(x => x.id === id); if (!p || id === PJ.cur) return;
   if (p.remote && !syOn()) return toast('Este proyecto está en Google Drive: conecta 🔄 para abrirlo.');
-  await pjLeave(); await pjLoad(id);
+  await pjLeave(); await SY_BG.get(id); await pjLoad(id);   // si aún se estaba subiendo, se espera a que acabe
   toast(`Proyecto «${p.name}»${p.remote ? ': descargando de Google Drive…' : ''}`, [], 2500);
 }
 async function pjNew() {
