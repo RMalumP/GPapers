@@ -6,6 +6,7 @@
 <body>
 <header>
   <h1 id="appName">Papers</h1><span class="pj"><span class="pjs" aria-hidden="true">/</span><input id="pjName" maxlength="60" spellcheck="false" autocomplete="off" aria-label="Nombre del proyecto" title="Nombre del proyecto (su archivo JSON se llama igual). Escribe para cambiarlo." placeholder="Proyecto" data-oninput="pjSize(this)" data-onchange="pjRename(this.value)" data-onkeydown="pjKey(event,this)"><button id="pjBtn" data-onclick="pjMenu(event)" title="Proyectos: cambiar, crear o borrar" aria-label="Proyectos">▾</button></span><span id="pjProg" hidden><span class="pjb"></span><small></small></span><span id="fname"></span>
+  <button id="ibBtn" class="ibbtn" data-onclick="ibToggle()" title="PDF por citar: mostrar u ocultar" aria-label="PDF por citar" aria-expanded="false" hidden>📄<b></b></button>
   <div class="row">
     <button id="syncBtn" data-onclick="syClick(event)" title="Conectar con Google Drive" aria-label="Conectar con Google Drive" data-st="off" hidden><span class="syi">🔄</span><span class="syl">Conectar con Google Drive</span><span class="syb"></span></button>
     <button data-onclick="save(false)" title="Guardar (Ctrl+S)" aria-label="Guardar">💾</button>

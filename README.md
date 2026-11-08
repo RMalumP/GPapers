@@ -169,6 +169,13 @@ El HTML no lleva `onclick` ni otros manejadores en línea: `index.html` tiene un
 - Desde `file://` el visor propio no puede cargar sus módulos: el PDF se abre en el visor del navegador.
 - Archivos nuevos: `js/visor.js`, `js/bandeja.js`, `visor.css`, `lib/`. Pruebas: `pruebas/prueba_visor.py` (con `pruebas/prueba.pdf`).
 
+## Móvil y bandeja (v39.2)
+- **Zoom nítido**: con mucho zoom, la página entera no cabe en memoria a resolución completa (`vwMaxPx`); al parar, se repinta a resolución completa solo el trozo que se ve (`vwDetail`).
+- **Panel de anotaciones en el móvil**: hoja desde abajo (antes salía fuera de la pantalla, porque es un `<aside>` y heredaba el estilo del menú lateral).
+- **Tocar para leer**: las notas 🗒 se abren con el dedo y son más grandes; los subrayados con comentario llevan 💬; con el dedo hay más margen para acertar.
+- **Botón «atrás» del móvil**: cierra la ventana o el menú abiertos (ficha, Configuración, Exportar, menú lateral…) en lugar de salir de la aplicación.
+- **Bandeja «PDF por citar»**: por defecto debajo de la lista (Configuración: encima); opción de mostrarla solo con el botón 📄 N de la cabecera; «🖍 N anotaciones · ver» abre el PDF con la lista de anotaciones.
+
 ## Pestaña aparte, otras apps, comentarios y más (v39.1)
 - **Visor en otra pestaña** (ordenador): 📄 abre el visor en una pestaña nueva para seguir usando la aplicación a la vez (Configuración → Datos: «en una pestaña nueva» o «dentro de la aplicación»; Ctrl + clic hace lo contrario; en móvil y tableta, siempre dentro). La pestaña del visor (`index.html?vw=…`) no guarda por su cuenta: manda cada cambio de las anotaciones a la principal por `BroadcastChannel('gpapers-vw')` y recibe lo que cambie allí (deshacer, Drive). Si la principal se cierra o cambia de proyecto, el visor pasa a guardar él mismo; al volver a abrir la aplicación, le devuelve el proyecto.
 - **Abrir en otra app** (⋯ del visor): con el menú «Compartir» del sistema (Acrobat, Drive, Foxit…), el PDF tal cual o con las anotaciones; sin él, el visor del navegador.

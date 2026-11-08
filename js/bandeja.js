@@ -13,8 +13,11 @@ const IB = {i: 0};
 const ibFold = () => { try { return localStorage.getItem('gp-ib-fold') === '1'; } catch (e) { return false; } };
 function ibFoldSet(v) { try { localStorage.setItem('gp-ib-fold', v ? '1' : '0'); } catch (e) {} inboxDraw(); }
 async function inboxDraw() {
-  const box = $('#inbox'); if (!box) return; const L = db.inbox || [];
-  box.hidden = !L.length || db.settings.showInbox === false; if (box.hidden) { box.innerHTML = ''; return; }
+  const box = $('#inbox'); if (!box) return; const L = db.inbox || [], s = db.settings, list = $('#list'), btn = $('#ibBtn');
+  if (list && (s.inboxPos === 'top' ? box.nextElementSibling !== list : list.nextElementSibling !== box)) s.inboxPos === 'top' ? list.before(box) : list.after(box);   // abajo (por defecto) o arriba de la lista
+  const off = !L.length || s.showInbox === false;
+  if (btn) { btn.hidden = off || !s.inboxBtn; btn.querySelector('b').textContent = L.length; btn.setAttribute('aria-expanded', String(!!IB.shown)); btn.classList.toggle('on', !!IB.shown); }
+  box.hidden = off || s.inboxBtn && !IB.shown; if (box.hidden) { box.innerHTML = ''; return; }
   IB.i = Math.max(0, Math.min(IB.i, L.length - 1)); const it = L[IB.i], a = annN(it), fold = ibFold();
   box.innerHTML = `<div class="ibh"><button class="ibf" data-onclick="ibFoldSet(${!fold})" aria-expanded="${!fold}" title="Plegar o desplegar"><span class="car">${fold ? '▸' : '▾'}</span><b>📥 PDF por citar</b><span class="ibn">${L.length}</span></button>
     ${fold ? '' : `<span class="ibnav"><button data-onclick="inboxGo(-1)" aria-label="Anterior" ${L.length < 2 ? 'disabled' : ''}>‹</button><span>${IB.i + 1} de ${L.length}</span><button data-onclick="inboxGo(1)" aria-label="Siguiente" ${L.length < 2 ? 'disabled' : ''}>›</button></span>`}
@@ -22,7 +25,7 @@ async function inboxDraw() {
     ${fold ? '' : `<div class="ibc" data-id="${it.id}"><button class="ibt" data-onclick="inboxOpen('${it.id}',event)" title="Abrir en el visor"><span class="ibi">📄</span></button>
       <div class="ibd"><b class="ibname" title="${esc(it.name)}">${esc(it.name)}</b>
         ${it.guess ? `<small title="Título que se ha leído del PDF">${esc(it.guess)}</small>` : ''}${it.doi ? `<small>DOI: ${esc(it.doi)}</small>` : '<small class="ibno">Sin DOI en la primera página: la cita se crea con el título y la completas tú.</small>'}
-        ${a ? `<small>🖍 ${a} ${a === 1 ? 'anotación' : 'anotaciones'}</small>` : ''}
+        ${a ? `<button class="ibann" data-onclick="inboxOpenSide('${it.id}',event)" title="Abrir el PDF con la lista de subrayados y comentarios">🖍 ${a} ${a === 1 ? 'anotación' : 'anotaciones'} · ver</button>` : ''}
         <div class="row ibb"><button class="pri" data-onclick="inboxCite('${it.id}')" title="${it.doi ? 'Crea la cita con los datos de CrossRef y abre su ficha para revisarla' : 'Crea la cita con el título y abre su ficha para completarla'}">＋ Crear cita</button>
           <button data-onclick="inboxAssign('${it.id}')" title="La cita ya existe: el PDF pasa a ese paper">🔗 Asignar a un paper</button>
           <button data-onclick="inboxOpen('${it.id}',event)">📖 Abrir</button>${L.length > 1 ? `<button data-onclick="inboxGo(1)" title="Dejarlo para luego y ver el siguiente">Después ›</button>` : ''}
@@ -73,6 +76,8 @@ async function inboxOpen(id, ev) {
   try { const file = await pdfFile(inKey(id), it); if (!file) return; vwOpenAny({kind: 'inbox', id}, file, ev, it.page); }
   catch (e) { if (e.name !== 'AbortError') say('No se pudo abrir el PDF: ' + e.message); }
 }
+function inboxOpenSide(id, ev) { VW.sideNext = true; return inboxOpen(id, ev); }   // con el panel de anotaciones abierto
+function ibToggle() { IB.shown = !IB.shown; inboxDraw(); if (IB.shown) setTimeout(() => $('#inbox')?.scrollIntoView({block: 'nearest', behavior: 'smooth'}), 30); }
 async function inboxDel(id) {
   const it = (db.inbox || []).find(x => x.id === id); if (!it) return;
   if (annN(it) && !await askOk(`«${it.name}» tiene ${annN(it)} ${annN(it) === 1 ? 'anotación' : 'anotaciones'}. ¿Quitarlo de la bandeja?`, {ok: 'Quitar', danger: true})) return;
