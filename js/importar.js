@@ -110,6 +110,49 @@ async function fetchDoi(raw) {
   } catch (e) { throw Error(e.name === 'AbortError' ? 'CrossRef tardó demasiado en responder.' : e instanceof TypeError ? 'No se pudo conectar con CrossRef (¿sin conexión, o abierta desde file://?).' : e.message); }
   finally { clearTimeout(tm); }
 }
+/* ---- CSL-JSON (Zotero, Pandoc…) ---- */
+const CSLR = {'article-journal': 'articulo', article: 'articulo', 'article-magazine': 'articulo', book: 'libro', chapter: 'capitulo', 'paper-conference': 'congreso', thesis: 'tesis', webpage: 'web',
+  'article-newspaper': 'prensa', 'post-weblog': 'blog', report: 'informe', standard: 'norma', patent: 'patente', map: 'mapa', dataset: 'dataset', software: 'software', motion_picture: 'audiovisual', broadcast: 'audiovisual',
+  song: 'audio', post: 'redsocial', 'entry-dictionary': 'diccionario', 'entry-encyclopedia': 'diccionario', speech: 'presentacion', personal_communication: 'personal', legislation: 'legislacion', bill: 'legislacion', legal_case: 'jurisprudencia'};
+const isCsl = t => { try { const j = JSON.parse(t); const a = Array.isArray(j) ? j : j && j.items; return Array.isArray(a) && a.length > 0 && a.every(x => x && typeof x === 'object' && typeof x.type === 'string' && 'title' in x); } catch (e) { return false; } };
+const str = v => v == null ? '' : cleanText(Array.isArray(v) ? v[0] : v);
+function parseCsl(t) {
+  const j = JSON.parse(t), a = Array.isArray(j) ? j : j.items, nm = n => n.literal || [n.family, n.given].filter(Boolean).join(', ') || n.given || '';
+  const dt = d => d?.['date-parts']?.[0] || (d?.raw ? String(d.raw).match(/\d+/g)?.map(Number) : null) || [];
+  return a.map(x => { const ty = CSLR[x.type] || 'articulo', is = dt(x.issued), ac = dt(x.accessed), ent = (x.author || []).length && x.author.every(n => n.literal);
+    const pub = CSL_PUB.has(ty);
+    return {title: cleanText(x.title), authors: (x.author || []).map(nm).filter(Boolean), year: is[0] ? String(is[0]) : '', venue: cleanText(pub ? x.publisher || x['container-title'] : x['container-title'] || ''), doi: normDoi(x.DOI), url: x.URL || '', type: ty,
+      ...refFields(ty, {volume: str(x.volume), issue: str(x.issue), pages: normPages(x.page), publisher: pub ? '' : cleanText(x.publisher), place: str(x['publisher-place']), edition: str(x.edition), editors: (x.editor || []).map(nm).filter(Boolean),
+        pubDate: is.length === 3 ? isoDate(...is) : '', accessed: ac.length === 3 ? isoDate(...ac) : '', isbn: str(x.ISBN), issn: str(x.ISSN), authorType: ent ? 'entidad' : 'auto'}),
+      general: cleanText(x.abstract || '')}; });
+}
+/* ---- Buscar por ISBN (Open Library) o por título (CrossRef) ---- */
+const isIsbn = s => { const d = String(s || '').replace(/^isbn[:\s]*/i, '').replace(/[\s-]/g, '').toUpperCase(); return /^(97[89]\d{10}|\d{9}[\dX])$/.test(d) ? d : ''; };
+const isDoi = s => /^10\.\d{4,9}\/\S+$/.test(normDoi(s));
+async function apiJson(url, who) {   // GET con 10 s de espera y mensajes claros
+  const ac = new AbortController(), tm = setTimeout(() => ac.abort(), 10000);
+  try { const r = await fetch(url, {signal: ac.signal}); if (!r.ok) throw Error(`${who} respondió con un error (${r.status}).`); return await r.json(); }
+  catch (e) { throw Error(e.name === 'AbortError' ? `${who} tardó demasiado en responder.` : e instanceof TypeError ? `No se pudo conectar con ${who} (¿sin conexión, o abierta desde file://?).` : e.message); }
+  finally { clearTimeout(tm); }
+}
+function fromOpenLibrary(b, isbn) {   // libro de la API de Open Library → referencia de la app
+  const pub = cleanText(b.publishers?.[0]?.name), pg = b.number_of_pages ? String(b.number_of_pages) : '';
+  return {title: cleanText(b.title + (b.subtitle ? ': ' + b.subtitle : '')), authors: (b.authors || []).map(a => fixAuthor(cleanText(a.name))).filter(Boolean), year: (String(b.publish_date || '').match(/\d{4}/) || [''])[0],
+    venue: pub, doi: '', url: b.url || '', type: 'libro', ...refFields('libro', {publisher: '', place: cleanText(b.publish_places?.[0]?.name), isbn, pages: pg})};
+}
+async function fetchIsbn(raw) {
+  const i = isIsbn(raw); if (!i) throw Error('Ese ISBN no es válido.');
+  const j = await apiJson(`https://openlibrary.org/api/books?bibkeys=ISBN:${i}&format=json&jscmd=data`, 'Open Library'), b = j['ISBN:' + i];
+  if (!b) throw Error('Open Library no encuentra ese ISBN.');
+  return fromOpenLibrary(b, i);
+}
+async function searchTitle(q) {   // hasta 6 resultados de CrossRef para elegir
+  q = String(q || '').trim(); if (q.length < 4) throw Error('Escribe un DOI, un ISBN o al menos unas palabras del título.');
+  const j = await apiJson('https://api.crossref.org/works?rows=6&query.bibliographic=' + encodeURIComponent(q), 'CrossRef');
+  const L = (j.message?.items || []).filter(m => m.DOI && m.title?.[0]).map(m => fromCrossref(m, normDoi(m.DOI)));
+  if (!L.length) throw Error('CrossRef no encuentra nada con ese título.');
+  return L;
+}
 /* ---- Texto de ScienceDirect (.txt «Export citation → Text») y citas copiadas de Google Scholar (APA, MLA, Chicago, Harvard, Vancouver) ---- */
 const isSdTxt = t => /^\s*(Volume|ISSN|ISBN|Pages)\s.+,\s*$/m.test(t) && /\n\s*\(https?:\/\/[^)]+\)\s*$|https?:\/\/doi\.org\/\S+\.\s*$/m.test(t);
 const sdAuthors = l => l.replace(/,\s*$/, '').split(/,\s*|\s+and\s+/).map(a => a.trim()).filter(Boolean).map(fixAuthor);
@@ -182,26 +225,34 @@ function openImport(mode) {   // desde el menú del clic derecho en 📂 (o el a
 async function impFile() {
   try {
     let text;
-    if (FSA) { const [h] = await showOpenFilePicker({types: [{description: 'Referencias (BibTeX, RIS o texto)', accept: {'text/plain': ['.bib', '.ris', '.txt']}}]}); text = await (await h.getFile()).text(); }
-    else { const r = await pickFile('.bib,.ris,.txt'); if (!r) return; text = r.text; }
+    if (FSA) { const [h] = await showOpenFilePicker({types: [{description: 'Referencias (BibTeX, RIS o texto)', accept: {'text/plain': ['.bib', '.ris', '.txt'], 'application/json': ['.json']}}]}); text = await (await h.getFile()).text(); }
+    else { const r = await pickFile('.bib,.ris,.txt,.json'); if (!r) return; text = r.text; }
     impText(text);
   } catch (e) { if (e.name !== 'AbortError') alert('No se pudo leer el archivo: ' + e.message); }
 }
 function impText(t) {
   t = t.replace(/^\uFEFF/, '');
-  const refs = /^\s*TY\s{2}-/m.test(t) ? parseRis(t) : /@\w+\s*\{/.test(t) ? parseBib(t) : isSdTxt(t) ? parseSd(t) : parseCites(t);
-  if (!refs.length) return alert('No se reconoce ninguna referencia. Usa BibTeX (.bib), RIS (.ris), el texto (.txt) de ScienceDirect o citas copiadas de Google Scholar, una por línea.');
+  if (/^\s*[[{]/.test(t) && !isCsl(t)) { try { if (Array.isArray(JSON.parse(t).papers)) return alert('Este JSON es un proyecto de la aplicación: ábrelo con Archivo ▾ → «Abrir un archivo JSON…».'); } catch (e) {} }
+  const refs = isCsl(t) ? parseCsl(t) : /^\s*TY\s{2}-/m.test(t) ? parseRis(t) : /@\w+\s*\{/.test(t) ? parseBib(t) : isSdTxt(t) ? parseSd(t) : parseCites(t);
+  if (!refs.length) return alert('No se reconoce ninguna referencia. Usa BibTeX (.bib), RIS (.ris), CSL-JSON (.json), el texto (.txt) de ScienceDirect o citas copiadas de Google Scholar, una por línea.');
   IMP = {mode: 'prev', refs: impPrepare(refs)}; impDraw(); if (!$('#imp').open) $('#imp').showModal();
 }
-async function impDoi() {
-  $('#iMsg').textContent = 'Buscando…';
-  try { IMP = {mode: 'prev', refs: impPrepare([await fetchDoi($('#iDoi').value)])}; impDraw(); } catch (e) { $('#iMsg').textContent = e.message; }
+async function impDoi() {   // un DOI, un ISBN o un título (este da varios resultados para elegir)
+  const v = $('#iDoi').value; $('#iMsg').textContent = 'Buscando…';
+  try {
+    if (isDoi(v)) IMP = {mode: 'prev', refs: impPrepare([await fetchDoi(v)])};
+    else if (isIsbn(v)) IMP = {mode: 'prev', refs: impPrepare([await fetchIsbn(v)])};
+    else IMP = {mode: 'pick', q: v, refs: impPrepare(await searchTitle(v))};
+    impDraw();
+  } catch (e) { $('#iMsg').textContent = e.message; }
 }
+function impPick(i) { const r = IMP.refs[i]; if (!r) return; r.on = !r.bad; IMP = {mode: 'prev', refs: [r]}; impDraw(); }
 function impDraw() {
   const m = IMP.mode, close = `<button data-onclick="$('#imp').close()">Cancelar</button>`;
   let h = `<h2>${m === 'fill' ? 'Datos de CrossRef' : 'Importar referencias'}</h2>`;
   if (m === 'text') h += `<textarea id="iTxt" style="min-height:220px" placeholder="Pega aquí BibTeX, RIS, el texto de ScienceDirect o citas de Google Scholar (una por línea, en APA, MLA, Chicago, Harvard o Vancouver)"></textarea><div class="row" style="margin-top:10px"><button class="pri" data-onclick="impText($('#iTxt').value)">Analizar</button>${close}</div>`;
-  else if (m === 'doi') h += `<div class="row"><input id="iDoi" style="flex:1" placeholder="10.1000/xyz123 o https://doi.org/…" data-onkeydown="onEnter(event,impDoi)"><button class="pri" data-onclick="impDoi()">Buscar</button></div><p id="iMsg" class="empty"></p>${close}`;
+  else if (m === 'pick') h += `<p>Resultados de CrossRef para «${esc(IMP.q)}». Elige el que buscas:</p><div class="ilist">${IMP.refs.map((r, i) => `<div class="irow"><span><b>${esc(r.title)}</b>${r.dup ? ' <span class="tag-dup">Duplicado</span>' : ''}<br><small>${esc(r.authors.slice(0, 3).join('; '))}${r.authors.length > 3 ? ' et al.' : ''}${r.year ? ' (' + esc(r.year) + ')' : ''}${r.venue ? ' · ' + esc(r.venue) : ''}</small></span><button class="sm" style="margin-left:auto" data-onclick="impPick(${i})">Elegir</button></div>`).join('')}</div><div class="row" style="margin-top:10px"><button data-onclick="openImport('doi')">← Buscar otra cosa</button>${close}</div>`;
+  else if (m === 'doi') h += `<p class="empty" style="margin-top:0">Escribe un DOI, un ISBN (libros, en Open Library) o el título (CrossRef te propone varios resultados).</p><div class="row"><input id="iDoi" style="flex:1" placeholder="DOI, ISBN o título" aria-label="DOI, ISBN o título" data-onkeydown="onEnter(event,impDoi)"><button class="pri" data-onclick="impDoi()">Buscar</button></div><p id="iMsg" class="empty"></p>${close}`;
   else if (m === 'fill') {
     const j = v => Array.isArray(v) ? v.join('; ') : String(v ?? ''), r = IMP.ref, cur = k => j(D[k]), nw = k => j(r[k]), L = FLD.filter(([k]) => nw(k) && nw(k) !== cur(k) && (!FLD_T[k] || shows(k, r.type)));
     h += (L.length ? '<p>Marca los datos que quieras aplicar (por defecto, solo los campos vacíos):</p>' + L.map(([k, t]) => `<label class="irow"><input type="checkbox" id="f_${k}" ${cur(k) ? '' : 'checked'}><span><b>${t}</b><br><small>Ahora: ${esc(cur(k)) || '—'}</small><br><small>CrossRef: ${esc(nw(k))}</small></span></label>`).join('') : '<p>CrossRef no aporta datos nuevos.</p>')
@@ -234,4 +285,33 @@ function fillGo() {
   if ($('#f_authors')?.checked && r.authorType === 'entidad' && D.authorType === 'auto') D.authorType = 'entidad';
   D.doi = r.doi; $('#imp').close(); drawD();
 }
-function openMenu(e) { ctxShow(e, `<div class="ctxh">Importar referencias</div><button data-onclick="openImport('file')">📄 Desde archivo (.bib, .ris o .txt)</button><button data-onclick="openImport('text')">📋 Pegar BibTeX, RIS o citas de Google Scholar</button><button data-onclick="openImport('doi')">🔎 Buscar por DOI</button>`); }
+function openMenu(e) { ctxShow(e, `<div class="ctxh">Importar referencias</div><button data-onclick="openImport('file')">📄 Desde archivo (.bib, .ris, .txt o CSL-JSON)</button><button data-onclick="openImport('text')">📋 Pegar BibTeX, RIS o citas de Google Scholar</button><button data-onclick="openImport('doi')">🔎 Buscar por DOI, ISBN o título</button>`); }
+/* ---- Compartir con GPapers (Android: «Compartir» desde el navegador o la app de la revista; ver share_target en manifest.json) ----
+   Llega como index.html?title=…&text=…&url=…: se busca un DOI (o un ISBN) en lo compartido y, si no hay, el título de la página. */
+const DOI_RE = /\b10\.\d{4,9}\/[^\s"<>]+/;
+function shareIn() {
+  let P; try { P = new URL(location.href).searchParams; } catch (e) { return; }
+  const t = P.get('title') || '', x = P.get('text') || '', l = P.get('url') || ''; if (!t && !x && !l) return false;
+  try { history.replaceState(null, '', location.pathname); } catch (e) {}
+  let all = [l, x, t].join(' '); try { all = decodeURIComponent(all); } catch (e) {}
+  const doi = (all.match(DOI_RE) || [''])[0].replace(/[.,;:)\]}>'"]+$/, '').replace(/\/(full|abstract|pdf|epdf)$/i, '');
+  const isbn = [x, t].map(isIsbn).find(Boolean);
+  const q = doi || isbn || (t || x.replace(/https?:\/\/\S+/g, '')).trim() || l;
+  openImport('doi'); $('#iDoi').value = q; if (q) impDoi();
+  return true;
+}
+/* ---- Soltar archivos en la ventana: .bib, .ris, .txt o CSL-JSON → Importar; un JSON de la aplicación → se abre como proyecto ---- */
+const fileDrag = e => [...(e.dataTransfer?.types || [])].includes('Files');
+document.addEventListener('dragover', e => { if (!fileDrag(e) || document.querySelector('dialog[open]')) return; e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; document.body.classList.add('fdrop'); });
+document.addEventListener('dragleave', e => { if (!e.relatedTarget || e.relatedTarget === document.documentElement) document.body.classList.remove('fdrop'); });
+document.addEventListener('drop', async e => {
+  document.body.classList.remove('fdrop');
+  if (!fileDrag(e) || document.querySelector('dialog[open]') || TAB.passive) return; e.preventDefault();
+  const it = [...e.dataTransfer.items].find(i => i.kind === 'file'), hp = it?.getAsFileSystemHandle?.(), f = e.dataTransfer.files[0]; if (!f) return;   // el enlace al archivo se pide antes de cualquier await
+  const name = f.name, ext = (name.match(/\.(\w+)$/) || [, ''])[1].toLowerCase();
+  if (ext === 'pdf') return toast('Para enlazar un PDF, abre el paper (Editar) y usa «PDF» en Datos.', [], 5000);
+  if (!['json', 'bib', 'ris', 'txt'].includes(ext)) return toast('Suelta un archivo .bib, .ris, .txt, CSL-JSON o un proyecto .json.', [], 5000);
+  let text; try { text = await f.text(); } catch (err) { return alert('No se pudo leer el archivo: ' + err.message); }
+  if (ext === 'json' && !isCsl(text)) { let h = null; try { h = FSA ? await hp : null; if (h && h.kind !== 'file') h = null; } catch (err) {} return pjOpenFile(text, name, h); }
+  impText(text);
+});

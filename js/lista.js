@@ -435,7 +435,7 @@ function bulkTrash() {
 }
 /* ===== Exportar (texto, BibTeX, RIS, Word) y bibliografía ordenada ===== */
 const ex = () => db.settings.export;
-const EXF = {txt: ['Texto (.txt)', 'text/plain'], bib: ['BibTeX (.bib)', 'text/plain'], ris: ['RIS (.ris)', 'text/plain'], doc: ['Word (.doc)', 'application/msword'], docx: ['Word (.docx)', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document']};
+const EXF = {txt: ['Texto (.txt)', 'text/plain'], bib: ['BibTeX (.bib)', 'text/plain'], ris: ['RIS (.ris)', 'text/plain'], csl: ['CSL-JSON (.json: Zotero, Pandoc…)', 'application/json'], doc: ['Word (.doc)', 'application/msword'], docx: ['Word (.docx)', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document']};
 const isTl = f => f === 'txt' || f === 'doc' || f === 'docx';   // formatos de texto con estilo de cita (los demás son BibTeX y RIS)
 const EXO = {auto: 'Automático (según el estilo: APA alfabético; Vancouver, lista)', list: 'Orden de la lista', alpha: 'Alfabético', year: 'Por año'};
 const secName = id => secById(id)?.name || 'Sin sección';
@@ -521,6 +521,26 @@ const BIBV = {informe: 'institution', norma: 'organization', patente: 'organizat
 const STOPW = new Set(['the', 'and', 'for', 'del', 'los', 'las', 'una', 'con', 'por', 'que']);
 const texEsc = s => String(s).replace(/([&%$#_])/g, '\\$1');
 const bibName = (p, x) => { x = x.trim(); return p.authorType === 'entidad' || (p.authorType !== 'persona' && isOrg(x)) ? `{${texEsc(x)}}` : texEsc(x); };   // entidades entre llaves
+/* ---- CSL-JSON (el formato de Zotero, Mendeley, Pandoc y citeproc) ---- */
+const CSLT = {articulo: 'article-journal', libro: 'book', capitulo: 'chapter', congreso: 'paper-conference', tesis: 'thesis', web: 'webpage', prensa: 'article-newspaper', blog: 'post-weblog', informe: 'report',
+  norma: 'standard', patente: 'patent', mapa: 'map', dataset: 'dataset', software: 'software', basedatos: 'dataset', audiovisual: 'motion_picture', audio: 'song', redsocial: 'post', ia: 'software',
+  diccionario: 'entry-dictionary', presentacion: 'speech', personal: 'personal_communication', legislacion: 'legislation', jurisprudencia: 'legal_case'};
+const CSL_PUB = new Set(['libro', 'tesis', 'informe', 'norma', 'patente', 'mapa', 'software', 'ia', 'presentacion']);   // en estos, «Revista / editorial» es la editorial o institución
+const cslName = (p, a) => p.authorType === 'entidad' || !String(a).includes(',') ? {literal: a} : {family: a.split(',')[0].trim(), given: a.split(',').slice(1).join(',').trim()};
+const cslDate = (y, d) => okDate(d) ? {'date-parts': [d.split('-').map(Number)]} : +y ? {'date-parts': [[+y]]} : undefined;
+function cslItem(p) {
+  p = effP(p); const ty = p.type, o = {id: p.id, type: CSLT[ty] || 'document', title: p.title};
+  const au = p.authorType === 'sin_autor' ? [] : p.authors; if (au.length) o.author = au.map(a => cslName(p, a));
+  if (p.editors?.length) o.editor = p.editors.map(a => cslName({}, a));
+  const is = cslDate(p.year, p.pubDate); if (is) o.issued = is; if (okDate(p.accessed)) o.accessed = cslDate(0, p.accessed);
+  if (p.venue) o[CSL_PUB.has(ty) ? 'publisher' : 'container-title'] = p.venue;
+  if (p.publisher && !o.publisher) o.publisher = p.publisher;
+  const f = {place: 'publisher-place', volume: 'volume', issue: 'issue', pages: 'page', edition: 'edition', isbn: 'ISBN', issn: 'ISSN', thesisType: 'genre', docNumber: 'number', ecli: 'authority', shorthand: 'title-short'};
+  for (const [k, c] of Object.entries(f)) if (p[k]) o[c] = String(p[k]);
+  if (p.doi) o.DOI = p.doi; if (/^https?:/i.test(p.url || '')) o.URL = p.url;
+  return o;
+}
+const cslJSON = L => JSON.stringify(L.map(cslItem), null, 2);
 function bibtex(L) {
   L = L.map(effP);
   const used = new Map();
@@ -575,7 +595,7 @@ function exUI() {
 }
 function drawEx() {
   const o = ex(), L = exList();
-  $('#exText').value = o.fmt === 'bib' ? bibtex(L) : o.fmt === 'ris' ? ris(L) : exText(L, o);   // la vista previa es editable (salvo en Word)
+  $('#exText').value = o.fmt === 'bib' ? bibtex(L) : o.fmt === 'ris' ? ris(L) : o.fmt === 'csl' ? cslJSON(L) : exText(L, o);   // la vista previa es editable (salvo en Word)
   $('#exText').readOnly = o.fmt === 'doc' || o.fmt === 'docx'; $('#exRich').hidden = !isTl(o.fmt);
   $('#exMsg').textContent = L.length ? `${L.length} papers${EXOM ? ` (${EXOM} omitidos: este estilo no los incluye en la lista)` : ''}` : 'No hay papers para exportar.';
 }
@@ -597,8 +617,9 @@ async function exCopyRich() {   // con sangría francesa, para pegar en Word o D
 async function exSave() {
   const o = ex(), L = exList(), [lbl, mime] = EXF[o.fmt]; if (!L.length) return alert('No hay nada que exportar.');
   const text = o.fmt === 'doc' ? wordDoc(L, o) : o.fmt === 'docx' ? exDocx(L, o) : $('#exText').value;
-  try { if (FSA) { const h = await showSaveFilePicker({suggestedName: 'citas.' + o.fmt, types: [{description: lbl, accept: {[mime]: ['.' + o.fmt]}}]}); await writeTo(h, text); }
-    else download(text, 'citas.' + o.fmt, mime); }
+  const ext = o.fmt === 'csl' ? 'json' : o.fmt;
+  try { if (FSA) { const h = await showSaveFilePicker({suggestedName: 'citas.' + ext, types: [{description: lbl, accept: {[mime]: ['.' + ext]}}]}); await writeTo(h, text); }
+    else download(text, 'citas.' + ext, mime); }
   catch (e) { if (e.name !== 'AbortError') alert('Error al guardar: ' + e.message); }
 }
 document.querySelectorAll('dialog:not(#dlg)').forEach(d => {   // todas las ventanas se cierran con un clic fuera (sin tocar la de edición que haya debajo); la de editar paper guarda al salir, más abajo

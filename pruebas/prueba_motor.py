@@ -94,6 +94,50 @@ with sync_playwright() as pw:
     pg.evaluate("imgGc()"); pg.wait_for_timeout(300)
     eq('las imágenes de las copias no se borran', pg.evaluate("img => idb('readonly', st => st.get('imgd:' + imgHash(img)))", IMG), IMG)
 
+    # ---- F2: buscar por ISBN (Open Library) y por título (CrossRef), con respuestas simuladas
+    CR_ITEM = {'DOI': '10.5555/xyz', 'type': 'journal-article', 'title': ['Deep learning'], 'author': [{'family': 'LeCun', 'given': 'Yann'}], 'issued': {'date-parts': [[2015, 5, 28]]}, 'container-title': ['Nature'], 'volume': '521', 'page': '436-444'}
+    ctx.route('https://api.crossref.org/works?**', lambda r: r.fulfill(json={'message': {'items': [CR_ITEM, {**CR_ITEM, 'DOI': '10.5555/otro', 'title': ['Deep learning II']}]}}))
+    ctx.route('https://api.crossref.org/works/**', lambda r: r.fulfill(json={'message': CR_ITEM}))
+    ctx.route('https://openlibrary.org/**', lambda r: r.fulfill(json={'ISBN:9780262035613': {'title': 'Deep Learning', 'authors': [{'name': 'Ian Goodfellow'}, {'name': 'Yoshua Bengio'}], 'publishers': [{'name': 'MIT Press'}], 'publish_date': '2016', 'publish_places': [{'name': 'Cambridge'}], 'url': 'https://openlibrary.org/books/x'}}))
+    pg.evaluate(SEED)
+    eq('reconoce DOI, ISBN y título', pg.evaluate("[isDoi('https://doi.org/10.1000/abc'), isIsbn('978-0-262-03561-3'), isIsbn('ISBN 0-306-40615-2'), isDoi('redes neuronales'), isIsbn('12345')]"), [True, '9780262035613', '0306406152', False, ''])
+    pg.evaluate("openImport('doi'); $('#iDoi').value = '978-0-262-03561-3'; impDoi()"); pg.wait_for_timeout(500)
+    eq('por ISBN trae el libro de Open Library', pg.evaluate("[IMP.mode, IMP.refs[0].title, IMP.refs[0].authors, IMP.refs[0].year, IMP.refs[0].venue, IMP.refs[0].type, IMP.refs[0].isbn, IMP.refs[0].place]"),
+       ['prev', 'Deep Learning', ['Goodfellow, Ian', 'Bengio, Yoshua'], '2016', 'MIT Press', 'libro', '9780262035613', 'Cambridge'])
+    pg.evaluate("openImport('doi'); $('#iDoi').value = 'deep learning lecun'; impDoi()"); pg.wait_for_timeout(500)
+    eq('por título propone varios resultados', pg.evaluate("[IMP.mode, IMP.refs.length, document.querySelectorAll('#imp .irow button').length]"), ['pick', 2, 2])
+    pg.click('#imp .irow button >> nth=1'); pg.wait_for_timeout(200)
+    eq('al elegir uno pasa a la vista previa para importarlo', pg.evaluate("[IMP.mode, IMP.refs.length, IMP.refs[0].doi, IMP.refs[0].on, $('#iGo').textContent]"), ['prev', 1, '10.5555/otro', True, 'Importar 1'])
+    pg.evaluate("$('#imp').close()")
+
+    # ---- F5: CSL-JSON
+    pg.evaluate(SEED)
+    pg.evaluate("db.papers[0].pubDate = '2020-03-05'; db.papers[0].volume = '12'; db.papers[0].pages = '1-10'; db.papers[0].accessed = '2024-01-02'")
+    csl = pg.evaluate("JSON.parse(cslJSON(db.papers))")
+    eq('exporta CSL-JSON', [csl[0]['type'], csl[0]['author'], csl[0]['issued'], csl[0]['container-title'], csl[0]['DOI'], csl[0]['volume'], csl[0]['page'], csl[0]['accessed']],
+       ['article-journal', [{'family': 'García', 'given': 'Ana'}, {'family': 'Smith', 'given': 'John'}], {'date-parts': [[2020, 3, 5]]}, 'Nature', '10.1000/abc', '12', '1-10', {'date-parts': [[2024, 1, 2]]}])
+    eq('el formato sale en Exportar', pg.evaluate("'csl' in EXF"), True)
+    pg.evaluate("t => impText(t)", json.dumps(csl + [{'type': 'book', 'title': 'Libro de entidad', 'author': [{'literal': 'OMS'}], 'publisher': 'Ginebra Press', 'issued': {'date-parts': [['2019']]}, 'ISBN': ['978-1']}]))
+    eq('lo importa de vuelta', pg.evaluate("IMP.refs.map(r => [r.title, r.authors.join('; '), r.year, r.venue, r.type, r.dup])"),
+       [['Redes neuronales profundas', 'García, Ana; Smith, John', '2020', 'Nature', 'articulo', True], ['Genética de poblaciones', 'Pérez, Luis', '2015', 'Cell', 'articulo', True],
+        ['Aprendizaje por refuerzo', 'García, Marta', '2010', 'Science', 'articulo', True], ['Libro de entidad', 'OMS', '2019', 'Ginebra Press', 'libro', False]])
+    eq('con fechas, páginas e ISBN', pg.evaluate("[IMP.refs[0].pubDate, IMP.refs[0].pages, IMP.refs[0].accessed, IMP.refs[3].isbn, IMP.refs[3].authorType]"), ['2020-03-05', '1-10', '2024-01-02', '978-1', 'entidad'])
+    pg.evaluate("$('#imp').close()")
+
+    # ---- F4: soltar archivos en la ventana
+    DROP = """([name, text]) => { const dt = new DataTransfer(); dt.items.add(new File([text], name)); 
+      document.dispatchEvent(new DragEvent('dragover', {dataTransfer: dt, bubbles: true, cancelable: true})); const over = document.body.classList.contains('fdrop');
+      document.body.dispatchEvent(new DragEvent('drop', {dataTransfer: dt, bubbles: true, cancelable: true})); return over; }"""
+    pg.evaluate("document.querySelectorAll('dialog[open]').forEach(d => d.close())")
+    eq('al arrastrar un archivo se avisa dónde soltarlo', pg.evaluate(DROP, ['refs.bib', '@article{a, title={Soltado}, author={Ruiz, Eva}, year={2021}}']), True)
+    pg.wait_for_timeout(300)
+    eq('un .bib soltado abre Importar', pg.evaluate("[$('#imp').open, IMP.refs.map(r => r.title), document.body.classList.contains('fdrop')]"), [True, ['Soltado'], False])
+    pg.evaluate("$('#imp').close()")
+    pg.evaluate(DROP, ['Otro proyecto.json', json.dumps({'version': 1, 'papers': [], 'tags': [], 'sections': []})]); pg.wait_for_timeout(800)
+    eq('un JSON de la aplicación se abre como proyecto', pg.evaluate("pjCur().name"), 'Otro proyecto')
+    pg.evaluate(DROP, ['paper.pdf', '%PDF']); pg.wait_for_timeout(200)
+    eq('un PDF explica dónde enlazarlo', pg.evaluate("$('#toast').textContent.includes('PDF')"), True)
+
     eq('sin errores', errs, [])
 
     # ---- M3: varias pestañas con el mismo proyecto
@@ -108,5 +152,19 @@ with sync_playwright() as pw:
     eq('en pausa los atajos no hacen nada', A.evaluate("() => { const n = db.papers.length; document.body.dispatchEvent(new KeyboardEvent('keydown', {key: 'z', ctrlKey: true, bubbles: true})); return db.papers.length === n; }"), True)
     eq('sin errores con varias pestañas', errs2, [])
     b.close()
-print(f'{n - fail}/{n} pruebas correctas')
+
+# ---- F3: compartir con la aplicación (share_target)
+with sync_playwright() as pw:
+    kw = {'executable_path': '/opt/pw-browsers/chromium'} if os.path.exists('/opt/pw-browsers/chromium') else {}
+    b = pw.chromium.launch(**kw); ctx = b.new_context(service_workers='block'); pg = ctx.new_page(); errs = []
+    pg.on('pageerror', lambda e: errs.append(str(e)))
+    ctx.route('https://api.crossref.org/works/**', lambda r: r.fulfill(json={'message': {'DOI': '10.1016/j.cell.2020.01.001', 'type': 'journal-article', 'title': ['Compartido'], 'author': [], 'issued': {'date-parts': [[2020]]}}}))
+    man = json.loads((folder / 'manifest.json').read_text(encoding='utf-8'))
+    eq('el manifiesto ofrece compartir con la app', man.get('share_target', {}).get('params'), {'title': 'title', 'text': 'text', 'url': 'url'})
+    pg.goto('file://' + str(folder / 'index.html') + '?title=Un%20art%C3%ADculo&url=https%3A%2F%2Fdoi.org%2F10.1016%2Fj.cell.2020.01.001'); pg.wait_for_timeout(2500)
+    eq('lo compartido abre Importar con el DOI encontrado', pg.evaluate("[$('#imp').open, IMP.mode, IMP.refs[0]?.title, location.search]"), [True, 'prev', 'Compartido', ''])
+    eq('saca el DOI de un texto con enlaces', pg.evaluate("('Mira https://onlinelibrary.wiley.com/doi/full/10.1002/anie.202000001/full.').match(DOI_RE)[0].replace(/[.,;:)\\]}>'\"]+$/, '').replace(/\\/(full|abstract|pdf|epdf)$/i, '')"), '10.1002/anie.202000001')
+    eq('sin errores al compartir', errs, [])
+    b.close()
+print(f'{n - fail}/{n} pruebas correctas (total)')
 sys.exit(1 if fail else 0)

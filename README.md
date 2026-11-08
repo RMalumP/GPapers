@@ -142,6 +142,12 @@ El HTML no lleva `onclick` ni otros manejadores en línea: `index.html` tiene un
 - **Sincronización sin trabajo repetido**: normalizar la biblioteca (`syNormS`) recuerda sus últimos resultados por la huella del JSON, así cada vuelta con Drive ya no lo hace 4 veces (con 2000 papers, ~1,2 s menos de pantalla congelada en un móvil medio).
 - **Copias de seguridad ligeras**: `bk:<id>` es solo el índice y cada copia va en `bkd:<id>:<k>`, compacta y con las imágenes aparte (`imgd:`); al abrir ya no se leen todas las copias. Las de versiones anteriores se convierten solas.
 
+## Añadir papers más rápido (v38.1, fase B)
+- **Buscar por DOI, ISBN o título** (📥 Importar → 🔎): un DOI va a CrossRef; un ISBN, a Open Library (`fetchIsbn`); unas palabras del título muestran hasta 6 resultados de CrossRef para elegir (`searchTitle`). La CSP permite `openlibrary.org` (y `api.openalex.org`, para la fase C) y la política de privacidad lo explica.
+- **Compartir con la app** (Android): `share_target` en `manifest.json`; lo compartido llega como `index.html?title=…&text=…&url=…` y `shareIn` busca un DOI, un ISBN o el título y abre Importar.
+- **Soltar archivos** en la ventana: .bib, .ris, .txt o CSL-JSON abren Importar; un .json de la aplicación se abre como proyecto (con su enlace al archivo en Chrome/Edge).
+- **CSL-JSON**: se importa (`parseCsl`) y se exporta (formato «CSL-JSON» en Exportar, `cslJSON`).
+
 ## Sincronización con Google Drive, Privacidad y Créditos (F14)
 - **Final de la barra lateral**: Papelera, Configuración, una línea, «ℹ️ Información» (Ayuda y Créditos, discretos y plegada por defecto; se recuerda si la abres) y, siempre visible y con la misma letra, una línea que explica qué es la app con el enlace **Política de privacidad** (v31.1: sustituye al botón Privacidad; Google lo pide en la página principal para verificar la marca).
 - **©️ Créditos** (barra lateral, en «Información»): dirección, desarrollo, derechos (licencia CC BY-SA) y la versión de la aplicación.
