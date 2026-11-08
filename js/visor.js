@@ -43,7 +43,7 @@ function vwMut(fn, quiet) {   // cambia las anotaciones (en todos sus sitios), l
   const hs = vwHolders(); if (!hs.length) return;
   for (const h of hs) { if (!Array.isArray(h.ann)) h.ann = []; fn(h.ann); if (VW.src.kind === 'inbox') h.up = vwNow(); }
   const P = VW.src.kind === 'paper' && db.papers.find(p => p.id === VW.src.id); if (P && hs.includes(P[pdfF(VW.src.n)])) P.modified = vwNow();
-  VW.dirty = true; markDirty(); if (!quiet) vwDrawAnn();
+  annAutoSync(VW.src); VW.dirty = true; markDirty(); if (!quiet) vwDrawAnn(); vwSatPush();
 }
 const vwAdd = a => vwMut(l => l.push(structuredClone(a)));
 const vwUpd = (id, o, quiet) => vwMut(l => { const a = l.find(x => x.id === id); if (a) Object.assign(a, o, {up: vwNow()}); }, quiet);
@@ -89,7 +89,7 @@ async function vwOpen(src, file) {
   const d = $('#vw'); vw$('.vwt').textContent = vwTitle(); vw$('.vwt').title = vwTitle(); $('#vwPages').innerHTML = ''; $('#vwLoad').hidden = false; $('#vwLoad').textContent = 'Abriendo el PDF…';
   $('#vwQ').value = ''; $('#vwQn').textContent = ''; vwPopClose(); $('#vwSel').hidden = true; VW.side = !document.documentElement.classList.contains('mv') && innerWidth > 1100 && vwSideOn(); vwSideShow();
   if (!d.open) d.showModal(); vwModeShow(); vwColorShow(); vwCount();
-  if (!VW.pushed) { try { history.pushState({vw: 1}, ''); VW.pushed = true; } catch (e) {} }   // el botón «atrás» del móvil cierra el visor
+  if (!VW.pushed && !VW_TAB) { try { history.pushState({vw: 1}, ''); VW.pushed = true; } catch (e) {} }   // el botón «atrás» del móvil cierra el visor
   try {
     const L = await vwLib(); if (gen !== VW.gen) return;
     const task = L.getDocument({data: new Uint8Array(await file.arrayBuffer()), cMapUrl: vwUrl('cmaps/'), cMapPacked: true, standardFontDataUrl: vwUrl('standard_fonts/'), isEvalSupported: false, enableXfa: false});
@@ -134,6 +134,7 @@ async function vwClose(fromPop, keepHist) {
   if (RENDER_VW) { RENDER_VW = false; render(); } else if (src?.kind === 'paper' && db.papers.some(p => p.id === src.id)) renderPaper(src.id);
   if (src?.kind === 'inbox') inboxDraw();
   if ($('#dlg').open && D && src?.kind === 'paper' && D.id === src.id) drawD();
+  if (VW_TAB) return vwSatClose();
   if (syAuto()) sySoon(1500);
 }
 function vwHoldersOf(src) { const s = VW.src; VW.src = src; try { return vwHolders(); } finally { VW.src = s; } }
@@ -141,9 +142,21 @@ let RENDER_VW = false;   // la lista no se repinta debajo del visor: se hace al 
 function vwDbChanged() {   // la biblioteca cambió (deshacer, Google Drive): se vuelven a pintar las anotaciones
   if (!VW.open) return; RENDER_VW = true; vw$('.vwt').textContent = vwTitle();
   if (!vwHolders().length) { toast('Este PDF ya no está enlazado.', [], 4000); return vwClose(); }
-  vwDrawAnn(); if (VW.pop && !vwAnns().some(a => a.id === VW.pop)) vwPopClose();
+  vwDrawAnn(); if (VW.pop && !vwAnns().some(a => a.id === VW.pop)) vwPopClose(); vwSatPush();
 }
-async function vwNative() { const f = VW.file, pf = vwHolders()[0]; if (f) pdfNative(f, pf?.page); }
+async function vwNative() { const f = VW.file; if (f) pdfNative(f, VW.cur + 1); }
+const vwCanShare = () => { try { return !!navigator.canShare && navigator.canShare({files: [new File([''], 'a.pdf', {type: 'application/pdf'})]}); } catch (e) { return false; } };
+async function vwOther(ann) {   // abrir en otra app: el menú «Compartir» del sistema (Acrobat, Drive, Foxit…); si no hay, el visor del navegador
+  const pf = vwHolders()[0]; if (!VW.file) return; let f = VW.file;
+  const name = (pf?.name || f.name || 'documento.pdf').replace(/\.pdf$/i, '') + (ann ? ' (anotado)' : '') + '.pdf';
+  if (ann) { try { f = new File([await vwPdfOut(VW.file, vwAnns())], name, {type: 'application/pdf'}); } catch (e) { return say(e.message); } }
+  else if (f.type !== 'application/pdf' || f.name !== name) f = new File([f], name, {type: 'application/pdf'});
+  if (vwCanShare()) {
+    try { await navigator.share({files: [f], title: vwTitle()}); return; }
+    catch (e) { if (e.name === 'AbortError') return; if (e.name === 'NotAllowedError') return toast('Listo para abrir en otra app.', [{t: '📲 Abrir', fn: () => navigator.share({files: [f], title: vwTitle()}).catch(() => {})}], 8000); }   // tardó demasiado en prepararse: hace falta otro toque
+  }
+  pdfNative(f, VW.cur + 1);
+}
 function vwEsc() {
   if (!$('#vwPop').hidden) return vwPopClose();
   if (!$('#vwSel').hidden) { getSelection().removeAllRanges(); $('#vwSel').hidden = true; return; }
@@ -446,12 +459,15 @@ function vwSideShow() { const s = $('#vwSide'); s.hidden = !VW.side; $('#vw').cl
 function vwSideDraw() {
   const s = $('#vwSide'), all = vwAnns(), f = VW.filt, L = all.filter(a => !f || (f === 'cm' ? a.m : a.c === f)).sort((a, b) => a.p - b.p || vwTop(a) - vwTop(b));
   const fr = VW.foreign || [], frV = fr.filter(x => !x.dup && !all.some(a => a.src === x.id));
-  s.innerHTML = `<div class="vwsh"><b>Anotaciones${all.length ? ` (${all.length})` : ''}</b><button class="vwib" data-onclick="vwSide(false)" aria-label="Cerrar el panel">✕</button></div>
+  const pk = VW.pick, n = pk?.size || 0;
+  s.innerHTML = `<div class="vwsh"><b>Anotaciones${all.length ? ` (${all.length})` : ''}</b>${all.length ? `<button class="vwpk${pk ? ' on' : ''}" data-onclick="vwPickToggle()" title="Elegir varias para copiarlas o llevarlas a las notas">${pk ? '✓ Elegir' : '☐ Elegir'}</button>` : ''}<button class="vwib" data-onclick="vwSide(false)" aria-label="Cerrar el panel">✕</button></div>
     <div class="vwsf"><button class="${f ? '' : 'on'}" data-onclick="vwFilt('')">Todas</button>${VW_COLORS.filter(([c]) => all.some(a => a.c === c)).map(([c, t]) => `<button class="vwc${f === c ? ' on' : ''}" style="--c:${c}" title="Solo ${t.toLowerCase()}" data-onclick="vwFilt('${c}')"></button>`).join('')}<button class="${f === 'cm' ? 'on' : ''}" data-onclick="vwFilt('cm')" title="Solo las que tienen comentario">💬</button></div>
-    <div class="vwsl">${L.length ? L.map(a => `<button class="vwi${VW.pop === a.id ? ' on' : ''}" style="--c:${a.c}" data-onclick="vwJump('${a.id}')"><small>p. ${a.p + 1} · ${a.k === 'note' ? '🗒 Nota' : a.k === 'area' ? '▭ Zona' : '🖍'}</small>${a.t ? `<span class="vwit">${esc(a.t.length > 220 ? a.t.slice(0, 220) + '…' : a.t)}</span>` : ''}${a.m ? `<span class="vwim">💬 ${esc(a.m.length > 300 ? a.m.slice(0, 300) + '…' : a.m)}</span>` : ''}</button>`).join('')
+    <div class="vwsl">${L.length ? L.map(a => `<button class="vwi${VW.pop === a.id || pk?.has(a.id) ? ' on' : ''}" style="--c:${a.c}" data-onclick="vwPick('${a.id}')"${pk ? ` aria-pressed="${pk.has(a.id)}"` : ''}><small>${pk ? (pk.has(a.id) ? '☑ ' : '☐ ') : ''}p. ${a.p + 1} · ${a.k === 'note' ? '🗒 Nota' : a.k === 'area' ? '▭ Zona' : '🖍'}</small>${a.t ? `<span class="vwit">${esc(a.t.length > 220 ? a.t.slice(0, 220) + '…' : a.t)}</span>` : ''}${a.m ? `<span class="vwim">💬 ${esc(a.m.length > 300 ? a.m.slice(0, 300) + '…' : a.m)}</span>` : ''}</button>`).join('')
       : `<p class="empty">${all.length ? 'Ninguna con este filtro.' : 'Aún no hay anotaciones. Selecciona texto y elige un color, o usa 🖍 Subrayar, ▭ Zona o 🗒 Nota.'}</p>`}</div>
     ${frV.length ? `<details class="vwfr"><summary>${frV.length} ${frV.length === 1 ? 'anotación que ya traía' : 'anotaciones que ya traía'} el PDF</summary>${frV.slice(0, 300).map(x => `<button class="vwi" style="--c:${x.c}" data-onclick="vwGoForeign('${x.id}')"><small>p. ${x.p + 1} · ${esc(x.sub)}${x.who ? ' · ' + esc(x.who) : ''}</small>${x.m ? `<span class="vwim">${esc(x.m.slice(0, 300))}</span>` : ''}</button>`).join('')}<button class="pri" data-onclick="vwImport()" title="Pasan a ser tuyas: se pueden cambiar, comentar y sincronizar">Hacerlas editables</button></details>` : ''}
-    <div class="vwsx">${all.length ? '<button data-onclick="vwMd()" title="Descargar todos los subrayados y comentarios como resumen en Markdown">⬇ Resumen (.md)</button>' : ''}<button data-onclick="vwOut()" title="Descargar el PDF con los subrayados y comentarios dentro (se ven en Acrobat, Foxit y otros lectores)">⬇ PDF anotado</button></div>`;
+    ${all.length ? `<div class="vwsx vwexp"><small>${n ? `${n} ${n === 1 ? 'elegida' : 'elegidas'}` : f ? 'Las del filtro' : 'Todas'}:</small><select data-onchange="vwExpFmt(this.value)" aria-label="Formato" title="Formato al copiar o llevar a las notas">${ANN_FMTS.map(([k, t]) => `<option value="${k}" ${db.settings.annFmt === k ? 'selected' : ''}>${t}</option>`).join('')}</select>
+      <button data-onclick="vwExpCopy()" title="Copiar al portapapeles, para pegarlas en otro sitio">📋 Copiar</button><button data-onclick="vwExpNotes()" title="${n || f ? 'Añadirlas como nota nueva del paper' : 'Una nota «Anotaciones del PDF» en el paper: si ya existe, se actualiza'}">📝 A las notas</button><button data-onclick="vwExpMd()" title="Descargar como resumen en Markdown">⬇ .md</button></div>` : ''}
+    <div class="vwsx"><button data-onclick="vwOut()" title="Descargar el PDF con los subrayados y comentarios dentro (se ven en Acrobat, Foxit y otros lectores)">⬇ PDF anotado</button></div>`;
 }
 const vwTop = a => { const p = VW.pages[a.p], b = p && vwBoxes(p, a.q)[0]; return b ? b.y : 0; };
 function vwFilt(f) { VW.filt = f; vwSideDraw(); }
@@ -548,7 +564,8 @@ function vwMore(e) {
   e.stopPropagation(); const r = e.currentTarget.getBoundingClientRect(), paper = vwPaper(), P = paper && db.papers.find(p => p.id === paper.id), pf = vwHolders()[0];
   const vis = pf ? pdfVisOf(pf) : false;
   vwMenu(r, `<button data-onclick="vwOut()">⬇ Descargar el PDF con las anotaciones</button>${vwAnns().length ? '<button data-onclick="vwMd()">⬇ Resumen de subrayados y comentarios (.md)</button>' : ''}
-    <button data-onclick="vwNative()">↗ Abrir con el visor del navegador</button>
+    ${vwCanShare() ? `<button data-onclick="vwOther(false)">📲 Abrir en otra app…</button>${vwAnns().length ? '<button data-onclick="vwOther(true)">📲 Abrir en otra app, con las anotaciones…</button>' : ''}` : ''}
+    <button data-onclick="vwNative()">↗ Abrir con el visor del navegador</button>${vwAnns().length && !vwCanShare() ? '<button data-onclick="vwOther(true)">↗ Abrir con el visor del navegador, con las anotaciones</button>' : ''}
     ${P && !$('#dlg').open ? '<button data-onclick="vwFicha()">📝 Ficha del paper</button>' : ''}${VW.src?.kind === 'inbox' ? '<button data-onclick="vwCite()">＋ Crear la cita de este PDF</button>' : ''}
     ${pf ? `<hr><button data-onclick="vwVis()">${tick(vis)}Guardar también en mi Drive normal (con los subrayados)</button>` : ''}`);
 }
@@ -562,7 +579,7 @@ function vwCite() { const s = VW.src; vwClose(); setTimeout(() => inboxCite(s.id
 function vwVis() {
   const pf = vwHolders()[0]; if (!pf) return; const on = !pdfVisOf(pf);
   vwHolders().forEach(h => { if (on === !!db.settings.pdfVis) delete h.vis; else h.vis = on ? 'si' : 'no'; }); const P = vwPaper(); if (P) P.modified = vwNow(); markDirty();
-  if (on) pdfVisAsk(); toast(on ? 'Se guardará una copia con los subrayados en la carpeta «GPapers» de tu Drive.' : 'Este PDF ya no se copiará a tu Drive normal (la copia que ya esté allí no se borra).', [], 4500);
+  vwSatPush(); if (on) pdfVisAsk(); toast(on ? 'Se guardará una copia con los subrayados en la carpeta «GPapers» de tu Drive.' : 'Este PDF ya no se copiará a tu Drive normal (la copia que ya esté allí no se borra).', [], 4500);
 }
 function vwMd() {   // resumen en Markdown
   const L = [...vwAnns()].sort((a, b) => a.p - b.p || vwTop(a) - vwTop(b)), name = VW_COLORS.reduce((o, [c, t]) => (o[c] = t, o), {});
@@ -617,3 +634,88 @@ async function vwPdfOut(file, anns) {
   }
   return doc.save({useObjectStreams: false});
 }
+
+/* ===== El visor en otra pestaña (ordenador) =====
+   📄 abre el visor en una pestaña nueva (index.html?vw=…) para seguir usando la aplicación en la otra. Esa pestaña es un «satélite»:
+   no guarda ni sincroniza; cada cambio de las anotaciones se lo manda a la pestaña principal (canal «gpapers-vw»), que lo guarda como
+   siempre, y la principal le manda lo que cambie por su lado (deshacer, Google Drive). Si no hay pestaña principal, o se cierra,
+   el satélite pasa a guardar él mismo (con lo último que guardó la principal). Configuración → Datos: «en pestaña nueva» o «dentro». */
+const VW_TAB = (() => { try { const q = new URLSearchParams(location.search).get('vw'); if (!q) return null; const o = JSON.parse(q);
+  return o && typeof o.pj === 'string' && typeof o.id === 'string' && (o.kind === 'paper' || o.kind === 'inbox') ? {pj: o.pj, kind: o.kind, id: o.id, n: o.n === 2 ? 2 : 1} : null; } catch (e) { return null; } })();
+if (VW_TAB) { TAB.sat = true; TAB.passive = true; }
+const VWB = {bc: 'BroadcastChannel' in window ? new BroadcastChannel('gpapers-vw') : null, id: uid(), sats: new Map(), files: new Map(), wait: new Map(), tm: 0};
+const vwBc = m => { try { VWB.bc?.postMessage({from: VWB.id, ...m}); } catch (e) {} };
+const vwSrcKey = s => s.kind === 'inbox' ? inKey(s.id) : pdfKey(s.id, s.n);
+const vwSrcEq = (a, b) => a && b && a.kind === b.kind && a.id === b.id && (a.n || 1) === (b.n || 1);
+const vwPart = h => ({ann: h.ann || [], vis: h.vis || '', page: h.page || 0});
+function vwApplyPart(src, x) {   // pone en el PDF (en todos sus sitios) las anotaciones que llegan de la otra pestaña
+  const hs = vwHoldersOf(src); if (!hs.length || JSON.stringify(vwPart(hs[0])) === JSON.stringify(x)) return false;
+  for (const h of hs) { if (x.ann.length) h.ann = structuredClone(x.ann); else delete h.ann; if (x.vis) h.vis = x.vis; else delete h.vis; if (x.page) h.page = x.page; else delete h.page; }
+  if (src.kind === 'inbox') hs[0].up = vwNow(); else { const P = db.papers.find(p => p.id === src.id); if (P) P.modified = vwNow(); }
+  return true;
+}
+const vwTabWant = () => vwCan() && !VW_TAB && !document.documentElement.classList.contains('mv') && !matchMedia('(pointer: coarse)').matches && db.settings.pdfTab !== 'app';
+async function vwTabOpen(src, file) {   // desde la pestaña principal
+  const k = vwSrcKey(src); VWB.files.delete(k); VWB.files.set(k, file); while (VWB.files.size > 6) VWB.files.delete(VWB.files.keys().next().value);
+  await sessionNow(); const url = 'index.html?vw=' + encodeURIComponent(JSON.stringify({pj: PJ.cur, ...src}));
+  if (!window.open(url, '_blank')) toast('El navegador no dejó abrir la pestaña nueva.', [{t: 'Abrir pestaña', fn: () => window.open(url, '_blank')}, {t: 'Abrir aquí', fn: () => vwOpen(src, file)}], 0);
+}
+function vwOpenAny(src, file, ev, page) {   // 📄: pestaña nueva o dentro de la aplicación (Ctrl + clic: lo contrario de lo elegido)
+  if (!vwCan()) return pdfNative(file, page);
+  if (src.kind === 'paper') { const P = db.papers.find(p => p.id === src.id), pf = P && P[pdfF(src.n)], d = D && D.id === src.id && $('#dlg').open && D[pdfF(src.n)]; if (!pf || d && d.name !== pf.name) return vwOpen(src, file); }   // aún sin guardar en la ficha: aquí
+  const alt = !!(ev && (ev.ctrlKey || ev.metaKey)), canTab = vwCan() && !VW_TAB && !document.documentElement.classList.contains('mv');
+  if (canTab && vwTabWant() !== alt) return vwTabOpen(src, file);
+  vwOpen(src, file);
+}
+function vwSatPush() { if (!TAB.sat || !VW.src) return; const h = vwHolders()[0]; if (h) vwBc({t: 'pf', pj: PJ.cur, src: VW.src, pf: vwPart(h)}); }
+function vwSatNotify() {   // pestaña principal: cuenta a los satélites lo que cambió en sus PDF
+  if (!VWB.sats.size || TAB.passive) return; clearTimeout(VWB.tm);
+  VWB.tm = setTimeout(() => { const items = [...VWB.sats.values()].map(src => { const h = vwHoldersOf(src)[0]; return h ? {src, pf: vwPart(h)} : null; }).filter(Boolean); if (items.length) vwBc({t: 'state', pj: PJ.cur, items}); }, 250);
+}
+async function vwSatOwn(reload) {   // el satélite pasa a guardar él mismo (no hay pestaña principal con este proyecto)
+  if (!TAB.sat) return; const src = VW.src || (VW_TAB && {kind: VW_TAB.kind, id: VW_TAB.id, n: VW_TAB.n}), h = src && vwHoldersOf(src)[0], keep = h ? vwPart(h) : null;
+  if (reload) { try { const r = await idb('readonly', st => st.get('proj:' + PJ.cur)), d = await projData(r); if (d) await loadText(d, r && typeof r.path === 'string' ? r.path : null, true); } catch (e) {} }
+  TAB.sat = false; TAB.passive = false; TAB.wasSat = true;
+  if (keep && vwApplyPart(src, keep)) markDirty(); if (VW.open) vwDrawAnn();
+  tabHello(); syIcon(); if (syAuto()) sySoon(500);
+}
+function vwSatYield() {   // vuelve a abrirse la pestaña principal: el satélite le deja el proyecto
+  TAB.passive = true; TAB.sat = true; clearTimeout(timer); clearTimeout(tSes); clearTimeout(SY.tm); SY.tm = 0;
+  if (VW.src) setTimeout(() => { vwBc({t: 'hello', pj: PJ.cur, src: VW.src}); vwSatPush(); }, 300);
+}
+async function vwSatBoot() {   // arranque de la pestaña del visor
+  const src = {kind: VW_TAB.kind, id: VW_TAB.id, n: VW_TAB.n}, msg = t => { $('#list') && ($('#list').innerHTML = `<p class="empty" style="padding:24px">${esc(t)}</p>`); toast(t, [], 0); };
+  if (PJ.cur !== VW_TAB.pj) { TAB.sat = false; TAB.passive = false; tabHello(); return msg('Este proyecto no está en este navegador: ábrelo desde la pestaña principal.'); }
+  const main = await new Promise(ok => { VWB.ack = ok; vwBc({t: 'hello', pj: PJ.cur, src}); setTimeout(() => ok(false), 1200); }); VWB.ack = null;
+  if (!main) await vwSatOwn(false);
+  const pf = vwHoldersOf(src)[0]; if (!pf) return msg('Este PDF ya no está enlazado.');
+  document.title = '📄 ' + (src.kind === 'inbox' ? pf.name : (db.papers.find(p => p.id === src.id)?.title || pf.name));
+  let file = main ? await new Promise(ok => { VWB.wait.set('f', ok); vwBc({t: 'need', pj: PJ.cur, src}); setTimeout(() => ok(null), 4000); }) : null; VWB.wait.delete('f');
+  if (!file) file = await pdfFile(vwSrcKey(src), pf, false).catch(() => null);
+  if (!file) return toast(`Elige el archivo «${pf.name}» para abrirlo.`, [{t: 'Elegir el PDF…', fn: async () => { const f = await pdfFile(vwSrcKey(src), pf).catch(() => null); if (f) vwOpen(src, f); }}], 0);
+  vwOpen(src, file);
+}
+function vwSatClose() {   // al cerrar el visor de la pestaña aparte: se cierra la pestaña
+  vwSatPush(); vwBc({t: 'gone'});
+  const end = () => { try { window.close(); } catch (e) {} setTimeout(() => { if (!window.closed) location.replace('index.html'); }, 400); };
+  if (!TAB.passive) sessionNow().finally(end); else end();
+}
+if (VWB.bc) VWB.bc.onmessage = async ({data: m}) => {
+  if (!m || m.from === VWB.id || !BOOTED) return;
+  if (TAB.sat) {   // pestaña del visor
+    if (m.to && m.to !== VWB.id) return;
+    if (m.t === 'ack' && m.pj === PJ.cur) VWB.ack?.(true);
+    else if (m.t === 'file' && m.file) VWB.wait.get('f')?.(m.file);
+    else if (m.t === 'state' && m.pj === PJ.cur && VW.open) { const it = m.items.find(x => vwSrcEq(x.src, VW.src)); if (it && vwApplyPart(VW.src, it.pf)) { vwDrawAnn(); if (VW.pop && !vwAnns().some(a => a.id === VW.pop)) vwPopClose(); if (VW.side) vwSideDraw(); vwCount(); } }
+    else if (m.t === 'bye' && m.pj === PJ.cur) setTimeout(() => vwSatOwn(true), 800);   // la principal se cerró o cambió de proyecto
+    return;
+  }
+  if (TAB.passive || m.pj !== PJ.cur) return;   // pestaña principal (la que guarda este proyecto)
+  if (m.t === 'hello') { VWB.sats.set(m.from, m.src); vwBc({t: 'ack', to: m.from, pj: PJ.cur}); }
+  else if (m.t === 'need') { const k = vwSrcKey(m.src), h = vwHoldersOf(m.src)[0]; let f = VWB.files.get(k) || null; if (!f && h) f = await pdfFile(k, h, false).catch(() => null); if (f) vwBc({t: 'file', to: m.from, file: f}); }
+  else if (m.t === 'pf') { VWB.sats.set(m.from, m.src); if (vwApplyPart(m.src, m.pf)) { annAutoSync(m.src); markDirty(); if (VW.open && vwSrcEq(VW.src, m.src)) vwDrawAnn(); else render(); if ($('#dlg').open && D && m.src.kind === 'paper' && D.id === m.src.id) drawD(); } }
+  else if (m.t === 'note') { const P = db.papers.find(p => p.id === m.pid); if (P && m.note && !P.notes.some(n => n.id === m.note.id)) { P.notes.push(m.note); P.modified = vwNow(); logChange(P, m.what || 'Nota desde el PDF'); markDirty(); render(); if ($('#dlg').open && D && D.id === P.id) { D.notes.push(structuredClone(m.note)); drawD(); } } }
+  else if (m.t === 'annnote') { const P = db.papers.find(p => p.id === m.src.id), pf = P && P[pdfF(m.src.n)]; if (pf && annNoteSet(P, m.src.n || 1, pf.ann || [], m.fmt)) { P.modified = vwNow(); logChange(P, 'Nota «Anotaciones del PDF»'); markDirty(); render(); } }
+  else if (m.t === 'gone') VWB.sats.delete(m.from);
+};
+addEventListener('pagehide', () => { if (!TAB.passive && !VW_TAB && VWB.sats.size) vwBc({t: 'bye', pj: PJ.cur}); });

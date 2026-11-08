@@ -303,6 +303,7 @@ let listW = 0; new ResizeObserver(([e]) => { if (Math.abs(e.contentRect.width - 
 let RENDER_HOLD = false, RENDER_HELD = false;   // al arrancar se pinta una sola vez, al final (ver bootApp en app.js)
 function render() {
   if (RENDER_HOLD) { RENDER_HELD = true; return; }
+  vwSatNotify();
   if (VW.open) return vwDbChanged();   // con el visor abierto, la lista se repinta al cerrarlo
   hdr();
   filtDraw();

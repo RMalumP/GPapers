@@ -92,3 +92,5 @@ html.mv #vwSel{position:fixed;gap:8px}html.mv #vwSel .vwc{width:32px;height:32px
 .ibb{margin-top:6px;gap:6px}.ibb button{font-size:13px;padding:4px 9px}.ibb .x{margin-left:auto}
 .ibpl{display:flex;flex-direction:column;gap:6px;margin-top:10px;max-height:60vh;overflow:auto}.ibpl button{display:flex;flex-direction:column;align-items:flex-start;text-align:left;gap:2px}.ibpl small{opacity:.7}
 html.mv #inbox{margin:6px 0}html.mv .ibt{width:72px;height:96px}html.mv .ibb button{flex:1 1 auto}
+.vwsh .vwpk{margin-left:auto;font-size:12px;padding:3px 8px}.vwsh .vwpk.on{background:var(--pri);color:#fff;border-color:var(--pri)}.vwsh .vwpk+.vwib{margin-left:4px}
+.vwexp{align-items:center}.vwexp small{color:var(--mut,#666)}.vwexp select{font-size:13px;padding:3px 4px;max-width:150px}
