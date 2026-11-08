@@ -39,7 +39,7 @@ function mgAdd(id) { db[MG].push({id, name: 'Nueva', color: '#2457c5', tagIds: [
    Aparte del JSON, la app guarda (1) una copia de trabajo, para reabrir justo donde lo dejaste aunque no hayas guardado, y
    (2) el estado de la interfaz (filtros, orden, barra lateral, bloques plegados). Viven fuera de la caché de la aplicación,
    así que las actualizaciones no los tocan y no hace falta borrar datos para recibir una versión nueva. */
-const APP_V = '39.0';   // debe coincidir con la versión de sw.js
+const APP_V = '39.1';   // debe coincidir con la versión de sw.js
 let BOOTED = false, RELOADING = false, SWREG = null, tSes = 0, tUi = 0, lastUi = '';
 const sessionNow = fast => { clearTimeout(tSes); if (!BOOTED || TAB.passive) return Promise.resolve();   // fast (desde sessionSoon): si acaba de hacerse la copia para deshacer, se usa esa (un JSON entero menos por cambio)   // copia de trabajo del proyecto abierto (y la lista de proyectos)
   const p = pjCur(); if (p) { Object.assign(p, {n: db.papers.length, file: path, dirty}); delete p.remote; }
@@ -48,7 +48,7 @@ const sessionNow = fast => { clearTimeout(tSes); if (!BOOTED || TAB.passive) ret
 const sessionSoon = () => { clearTimeout(tSes); tSes = setTimeout(() => sessionNow(true), 700); };
 const uiState = () => ({v: 1, F: {sorts: F.sorts, group: F.group, sec: F.sec, tags: [...F.tags], read: F.read, minRating: F.minRating, inNotes: F.inNotes, mode: F.mode, tbSec: F.tbSec, tbTag: F.tbTag, ...fExtra()},
   side: {min: $('#side').classList.contains('min'), w: sbW(), fold: [...document.querySelectorAll('#side .sg.fold')].map(e => e.id), more: !$('#sg-more').classList.contains('fold'), ff: [...document.querySelectorAll('#side .fs.fold')].filter(e => e.id !== 'fs-adv').map(e => e.id), adv: !$('#fs-adv').classList.contains('fold')}, cite: CITE_SEL, dataAll: DATA_ALL, citeOpen: [...CITE_OPEN], allFold: [...ALL_FOLD], cfg: [...CFG_OPEN], help: [...HELP_OPEN]});
-const uiNow = () => { clearTimeout(tUi); if (!BOOTED) return Promise.resolve(); const s = JSON.stringify(uiState()); if (s === lastUi) return Promise.resolve(); lastUi = s; return idb('readwrite', st => st.put(JSON.parse(s), 'ui')).catch(() => {}); };
+const uiNow = () => { clearTimeout(tUi); if (!BOOTED || TAB.sat) return Promise.resolve(); const s = JSON.stringify(uiState()); if (s === lastUi) return Promise.resolve(); lastUi = s; return idb('readwrite', st => st.put(JSON.parse(s), 'ui')).catch(() => {}); };
 const uiSoon = () => { clearTimeout(tUi); tUi = setTimeout(uiNow, 500); };
 function applyUI(u) {   // lo guardado nunca se fía: cada dato se valida contra el estado actual (un paper o etiqueta borrados no rompen nada)
   if (!u || u.v !== 1) return; const f = u.F || {}, strs = a => (Array.isArray(a) ? a : []).filter(x => typeof x === 'string' && x.length < 40).slice(0, 40);
@@ -86,6 +86,7 @@ async function bootApp() {
   const okId = x => x && typeof x.id === 'string' && /^[a-z0-9]+$/.test(x.id) && typeof x.name === 'string';
   if (pj && pj.v === 1 && Array.isArray(pj.list) && pj.list.some(okId)) {   // proyectos guardados: se abre el último
     PJ.list = pj.list.filter(okId); PJ.cur = PJ.list.some(p => p.id === pj.cur && !p.remote) ? pj.cur : (PJ.list.find(p => !p.remote) || PJ.list[0]).id; PJ.gone = Array.isArray(pj.gone) ? pj.gone.filter(x => typeof x === 'string') : [];
+    if (VW_TAB && PJ.list.some(p => p.id === VW_TAB.pj && !p.remote)) PJ.cur = VW_TAB.pj;   // pestaña del visor: su proyecto
     try { ses = await idb('readonly', st => st.get('proj:' + PJ.cur)); } catch (e) {}
   } else { try { ses = await idb('readonly', st => st.get('session')); old = !!ses; } catch (e) {} }   // versión anterior (una sola biblioteca): pasa a ser el primer proyecto
   let restored = false;
@@ -116,7 +117,8 @@ RENDER_HOLD = true;   // mientras se lee la copia de trabajo y el estado de la i
 bootApp().finally(() => { RENDER_HOLD = false; RENDER_HELD = false; render(); afterPaint(shareIn); }).then(() => { syIcon(); try { const t = JSON.parse(localStorage.getItem(SY_TOK)); if (t && t.exp > Date.now()) syTokWatch(t.exp); } catch (e) {}
   if (syOn() && syP().cid !== SY_CFG.clientId) {   // la sesión era de otro proyecto de Google (otra carpeta oculta): hay que dar permiso al nuevo una vez
     SY.st = 'reconnect'; SY.consent = true; syIcon(); toast('La sincronización con Google Drive ha cambiado de proyecto: pulsa «Conectar» y da permiso una vez. Tus datos siguen aquí.', [{t: 'Conectar', fn: syConnect}], 0, 'sy');
-  } else if (syAuto()) afterPaint(() => syRun(false)); });   // con la sesión de Google Drive recordada, se trae lo último al abrir (cuando la lista ya se ve)
+  } else if (syAuto()) afterPaint(() => syRun(false));
+  if (VW_TAB) vwSatBoot(); });   // con la sesión de Google Drive recordada, se trae lo último al abrir (cuando la lista ya se ve)
 render();
 lastSnap = snapDb();
 applySettings();

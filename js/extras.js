@@ -199,28 +199,30 @@ function pdfNative(file, page) {   // el visor del navegador, en otra pestaña (
   const url = URL.createObjectURL(file.type === 'application/pdf' ? file : new Blob([file], {type: 'application/pdf'})) + (pdfPage(page) ? '#page=' + pdfPage(page) : '');
   window.open(url, '_blank'); setTimeout(() => URL.revokeObjectURL(url.split('#')[0]), 120000);
 }
-async function pdfOpen(id, n = 1) {
+async function pdfOpen(id, n = 1, ev) {
   const p = D && D.id === id && $('#dlg').open ? D : db.papers.find(x => x.id === id), pf = p && p[pdfF(n)], key = pdfKey(id, n); if (!pf) return;   // con el editor abierto, el borrador
   try {
     const file = await pdfFile(key, pf); if (!file) return;
-    if (vwCan()) vwOpen({kind: 'paper', id, n}, file); else pdfNative(file, pf.page);
+    vwOpenAny({kind: 'paper', id, n}, file, ev, pf.page);
   } catch (e) { if (e.name !== 'AbortError') say('No se pudo abrir el PDF: ' + e.message); }
 }
 const annN = pf => pf?.ann?.length || 0;
 const pdfBtns = (p, full) => pdfsOf(p).map(n => { const pf = p[pdfF(n)], a = annN(pf);
-  return `<button class="sm" data-onclick="pdfOpen('${p.id}',${n})" title="Abrir el PDF: ${esc(pf.name)}${a ? ` · ${a} ${a === 1 ? 'anotación' : 'anotaciones'} (subrayados y notas)` : ''}">📄${full ? ' PDF' : ''}${n === 2 ? ' 2' : ''}${a ? `<span class="annc">${a}</span>` : ''}</button>`; }).join('');   // botones de la tarjeta (full) y de la tabla, con cuántas anotaciones tiene
+  return `<button class="sm" data-onclick="pdfOpen('${p.id}',${n},event)" title="Abrir el PDF: ${esc(pf.name)}${a ? ` · ${a} ${a === 1 ? 'anotación' : 'anotaciones'} (subrayados y notas)` : ''}">📄${full ? ' PDF' : ''}${n === 2 ? ' 2' : ''}${a ? `<span class="annc">${a}</span>` : ''}</button>`; }).join('');   // botones de la tarjeta (full) y de la tabla, con cuántas anotaciones tiene
 
 /* ===== Mover o copiar papers a otro proyecto =====
    Los papers seleccionados (con sus notas, etiquetas, secciones y las relaciones entre ellos) pasan a la copia de trabajo del otro
    proyecto. Las etiquetas y secciones se buscan por nombre y, si no existen allí, se crean. Se ve al abrir ese proyecto. */
 function psOpen() {
-  const ids = [...SEL].filter(id => db.papers.some(p => p.id === id)), T = PJ.list.filter(p => p.id !== PJ.cur && !p.remote);
+  const ids = [...SEL].filter(id => db.papers.some(p => p.id === id)), T = PJ.list.filter(p => p.id !== PJ.cur && !p.remote), R = PJ.list.filter(p => p.id !== PJ.cur && p.remote);
   if (!ids.length) return toast('Selecciona antes los papers que quieres mover o copiar (casilla «Seleccionar» de cada uno).', [], 4000);
+  if (!T.length && R.length) return toast(`Tus otros proyectos solo están en Google Drive: abre una vez el de destino en este dispositivo (▾ junto al nombre) y vuelve a intentarlo.`, [], 6000);
   if (!T.length) return toast('Necesitas otro proyecto en este dispositivo: crea uno con ▾ junto al nombre del proyecto.', [], 4500);
   $('#ps').innerHTML = `<div class="dh"><h2>Mover o copiar ${ids.length} ${ids.length === 1 ? 'paper' : 'papers'}</h2><div class="dbtn"><button data-onclick="$('#ps').close()">Cerrar ✕</button></div></div>
     <p class="empty">Desde «${esc(pjCur().name)}» a otro proyecto. Se llevan las notas, etiquetas y secciones (se crean en el destino si no existen) y las relaciones entre los papers elegidos.</p>
     <label class="row"><input type="radio" name="psm" value="copy" checked> Copiar (se quedan también aquí)</label><label class="row"><input type="radio" name="psm" value="move"> Mover (dejan de estar aquí)</label>
-    <h4>Proyecto de destino</h4>${T.map(p => `<button class="pji2" data-onclick="psGo('${p.id}')">${esc(p.name)} <small>${p.n || 0} papers</small></button>`).join('')}`;
+    <h4>Proyecto de destino</h4>${T.map(p => `<button class="pji2" data-onclick="psGo('${p.id}')">${esc(p.name)} <small>${p.n || 0} papers</small></button>`).join('')}${R.length ? `<p class="empty"><small>${R.map(p => '«' + esc(p.name) + '»').join(', ')}: solo ${R.length === 1 ? 'está' : 'están'} en Google Drive; ábrelo una vez en este dispositivo para poder copiar a él.</small></p>` : ''}
+    <p class="empty"><small>Los PDF enlazados viajan con su paper, con sus subrayados y comentarios.</small></p>`;
   $('#ps').showModal();
 }
 async function psGo(tid) {
@@ -237,6 +239,12 @@ async function psGo(tid) {
     p.notes.forEach(n => { n.sectionId = n.sectionId ? mapSec(n.sectionId) || '' : ''; });
     p.related = uq(p.related.filter(x => idMap.has(x)).map(x => idMap.get(x))); p.refTo = uq((p.refTo || []).filter(x => idMap.has(x)).map(x => idMap.get(x)));
     const fix = t => [...idMap].reduce((s, [a, b]) => a === b ? s : s.split(`[[p:${a}]]`).join(`[[p:${b}]]`), String(t ?? '')); p.general = fix(p.general); p.notes.forEach(n => n.content = fix(n.content));
+    for (const n of PDF_N) { const pf = p[pdfF(n)]; if (!pf) continue; const ok = pdfKey(old, n), nk = pdfKey(p.id, n);   // el PDF, también en el otro proyecto
+      if (nk !== ok) delete pf.vid;   // copia: su propia copia en el Drive normal
+      const f = await pdfLocal(ok) || await pdfFromDrive(ok, pf.name, true); if (!f) continue;
+      const h = FSA && await idb('readonly', st => st.get('pdf:' + ok)).catch(() => null);
+      if (nk !== ok) { PDF_FILES.set(nk, f); if (h) await idb('readwrite', st => st.put(h, 'pdf:' + nk)).catch(() => {}); }
+      if (!h && !await pdfKept(nk)) pdfKeep(nk, f); }   // copia en el navegador: el otro proyecto la sube a su carpeta de Drive
     d.papers.push(p);
   }
   await bkTake('Antes de ' + (mode === 'move' ? 'mover' : 'copiar') + ' papers a «' + tp.name + '»', true);
@@ -317,7 +325,7 @@ const pjCur = () => PJ.list.find(p => p.id === PJ.cur);
 const pjFile = n => (String(n).replace(/[\\/:*?"<>|\u0000-\u001f]/g, '-').trim() || 'papers') + '.json';   // nombre de su archivo JSON
 const pjNameFor = f => { const b = String(f || '').split(/[\\/]/).pop().replace(/\.json$/i, '').trim(); return !b ? 'Mi biblioteca' : b === 'ejemplo_papers' ? 'Ejemplo' : b.slice(0, 60); };
 const pjUnique = (n, skip) => { let o = n, i = 2; while (PJ.list.some(p => p.id !== skip && p.name.toLowerCase() === o.toLowerCase())) o = `${n} (${i++})`; return o; };
-const pjSave = () => BOOTED ? idb('readwrite', st => st.put({v: 1, cur: PJ.cur, list: PJ.list, gone: PJ.gone}, 'projects')).catch(() => {}) : Promise.resolve();
+const pjSave = () => BOOTED && !TAB.sat ? idb('readwrite', st => st.put({v: 1, cur: PJ.cur, list: PJ.list, gone: PJ.gone}, 'projects')).catch(() => {}) : Promise.resolve();
 const pjDrop = id => { const N = syNames(id); return idb('readwrite', st => { ['proj:' + id, 'h:' + id, 'bk:' + id, 'fav:' + id, 'rec:' + id, 'syncBase' + N.key, 'syncCache' + N.key].forEach(k => st.delete(k)); st.delete(bkRange(id)); return st.count(); }).catch(() => {}); };
 function pjShow() {
   const p = pjCur(), i = $('#pjName'); if (!p || !i) return;
@@ -328,6 +336,7 @@ async function pjLeave() {   // antes de cambiar de proyecto: lo pendiente se gu
   clearTimeout(timer); if (auto && handle && dirty) await save(false);
   await pjIdle(); if (syAuto() && (dirty || SY.tm)) await syRun(false);
   clearTimeout(SY.tm); SY.tm = 0; await sessionNow();
+  if (VWB.sats.size) { vwBc({t: 'bye', pj: PJ.cur}); VWB.sats.clear(); }   // el visor de otra pestaña pasa a guardar él mismo
 }
 async function pjLoad(id, text, file, h) {   // abre un proyecto: su copia de trabajo (o el texto de un archivo) con los ajustes comunes
   const r = text == null ? await idb('readonly', st => st.get('proj:' + id)).catch(() => null) : null;
@@ -406,7 +415,7 @@ function pjMenu(e) {
   e.stopPropagation(); const r = e.currentTarget.getBoundingClientRect(), L = [...PJ.list].sort((a, b) => a.name.localeCompare(b.name, 'es'));
   ctxShow({preventDefault() {}, stopPropagation() {}, clientX: r.left, clientY: r.bottom + 4}, '<div class="ctxh">Proyectos</div>'
     + L.map(p => `<button class="pji" data-onclick="pjOpen('${p.id}')">${tick(p.id === PJ.cur)}${esc(p.name)} <small>${p.remote ? '☁ en Google Drive' : (p.id === PJ.cur ? db.papers.length : p.n || 0) + ' papers'}</small></button>`).join('')
-    + '<hr><button data-onclick="pjNew()">＋ Nuevo proyecto</button><button data-onclick="ctxClose();doOpen()">📂 Abrir un JSON como proyecto…</button><button data-onclick="ctxClose();pjEdit()">✏️ Cambiar el nombre</button>' + (handle ? `<button data-onclick="pjReload()" title="Vuelve a leer «${esc(path || '')}» del disco (descarta lo que no hayas guardado)">↻ Volver a leer «${esc(path || '')}»</button>` : '') + '<button data-onclick="ctxClose();dpOpen()">🔍 Buscar duplicados…</button><button data-onclick="bkOpen()">🕘 Copias de seguridad…</button><button class="danger" data-onclick="pjDel()">🗑 Borrar este proyecto…</button>');
+    + '<hr><button data-onclick="pjNew()">＋ Nuevo proyecto</button><button data-onclick="ctxClose();doOpen()">📂 Abrir un JSON como proyecto…</button><button data-onclick="ctxClose();pjEdit()">✏️ Cambiar el nombre</button>' + (handle ? `<button data-onclick="pjReload()" title="Vuelve a leer «${esc(path || '')}» del disco (descarta lo que no hayas guardado)">↻ Volver a leer «${esc(path || '')}»</button>` : '') + (() => { const n = [...SEL].filter(id => db.papers.some(p => p.id === id)).length; return `<button data-onclick="ctxClose();psOpen()" title="${n ? 'Copiar o mover los papers seleccionados a otro de tus proyectos' : 'Primero marca papers con su casilla «Seleccionar»'}">📦 Copiar o mover ${n ? n + ' seleccionado' + (n === 1 ? '' : 's') : 'los seleccionados'} a otro proyecto…</button>`; })() + '<button data-onclick="ctxClose();dpOpen()">🔍 Buscar duplicados…</button><button data-onclick="bkOpen()">🕘 Copias de seguridad…</button><button class="danger" data-onclick="pjDel()">🗑 Borrar este proyecto…</button>');
 }
 /* ===== Varias pestañas =====
    Dos pestañas con el mismo proyecto escribirían la misma copia de trabajo y el mismo archivo, y ganaría la última sin avisar.
@@ -430,6 +439,7 @@ if (TAB.bc) TAB.bc.onmessage = async ({data: m}) => {
   if (!m || m.from === TAB.id || !BOOTED) return;
   if (m.t === 'given' && m.to === TAB.id) return TAB.go?.();
   if (m.proj !== PJ.cur) return;
+  if (m.t === 'hi' && TAB.wasSat && !TAB.passive) { await sessionNow(); return vwSatYield(); }   // vuelve la pestaña principal: el visor aparte le deja el proyecto
   if (m.t === 'hi' && !TAB.passive) { if (TAB.at < m.at || TAB.at === m.at && TAB.id < m.from) tabSend('here', {to: m.from}); else tabPause(false); }
   else if (m.t === 'here' && m.to === TAB.id && !TAB.passive) tabPause(false);
   else if (m.t === 'take' && !TAB.passive) {
@@ -437,4 +447,4 @@ if (TAB.bc) TAB.bc.onmessage = async ({data: m}) => {
     tabPause(true); tabSend('given', {to: m.from});
   }
 };
-document.addEventListener('keydown', e => { if (TAB.passive && !e.target.closest?.('#tabLock')) { e.stopImmediatePropagation(); e.preventDefault(); } }, true);   // en pausa, los atajos no cambian nada
+document.addEventListener('keydown', e => { if (TAB.passive && !TAB.sat && !e.target.closest?.('#tabLock')) { e.stopImmediatePropagation(); e.preventDefault(); } }, true);   // en pausa, los atajos no cambian nada

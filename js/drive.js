@@ -136,12 +136,13 @@ async function pdfLocal(id) {   // id: clave del hueco (pdfKey). El PDF si este 
     return await pdfKept(id);   // la copia guardada en este navegador (móvil, o descargada de Drive)
   } catch (e) { return null; }
 }
-async function syPdfs(tok, files, m, N) {
+async function syPdfs(tok, files, m, N, pj = PJ.cur) {
   try {
     const have = new Map(files.filter(f => f.name.startsWith(N.pdf)).map(f => [f.name.slice(N.pdf.length), f])), old = Date.now() - 864e5;
     if (m.settings.pdfDrive) for (const {key} of pdfSlots(m, false)) {
       const file = await pdfLocal(key); if (!file || file.size > SY_CFG.pdfMax) continue;
-      const f = have.get(key), k = `pdfUp:${PJ.cur}:${key}`, sig = `${file.size}:${file.lastModified}`, rec = await idb('readonly', st => st.get(k)).catch(() => null);
+      if (PJ.cur !== pj) return;   // cambiaste de proyecto: sigue la próxima vez
+      const f = have.get(key), k = `pdfUp:${pj}:${key}`, sig = `${file.size}:${file.lastModified}`, rec = await idb('readonly', st => st.get(k)).catch(() => null);
       if (f && (rec === sig || !rec && +f.size === file.size)) { if (rec !== sig) idb('readwrite', st => st.put(sig, k)).catch(() => {}); continue; }   // ya está en Drive
       await syUploadFile(tok, f && f.id, N.pdf + key, file); await idb('readwrite', st => st.put(sig, k)).catch(() => {});
     }
@@ -170,13 +171,20 @@ function syWire(d) {   // copia para Drive: {kind: 'data', data} → {kind: 'dat
   for (const p of syPapersOf(w)) if (p.image && p.image.kind === 'data' && p.image.data) { const h = syHash(p.image.data); SY.img.set(h, p.image.data); p.image = {kind: 'data', ref: h}; refs.add(h); }
   return [w, refs];
 }
+async function syPool(items, fn, n = 6) {   // fn sobre cada elemento, hasta n a la vez
+  let i = 0; const work = async () => { while (i < items.length) { const x = items[i++]; await fn(x); } };
+  await Promise.all(Array.from({length: Math.min(n, items.length)}, work));
+}
+let SY_PDF = Promise.resolve();   // los PDF de cada vuelta, en cola y en segundo plano
+function syPdfJob(j) {
+  const run = SY_PDF.then(async () => { if (PJ.cur !== j.id || !syOn()) return;
+    try { await syPdfs(j.tok, j.files, j.m, j.N, j.id); await syPdfsVis(j.tok, j.m, j.id); } catch (e) { if (e.estado === 401) syTokDel(); } });
+  SY_PDF = run.catch(() => {}); return run;
+}
 async function syUnwire(tok, w, files, N) {   // vuelve a poner las imágenes; solo descarga las que este dispositivo no tiene
-  const d = structuredClone(w);
-  for (const p of syPapersOf(d)) {
-    const r = p.image && p.image.kind === 'data' && p.image.ref; if (!r) continue;
-    if (!SY.img.has(r)) { const f = files.find(x => x.name === N.img + r); if (f) try { SY.img.set(r, await (await syDrive(tok, `/drive/v3/files/${f.id}?alt=media`)).text()); } catch (e) {} }
-    p.image = SY.img.has(r) ? {kind: 'data', data: SY.img.get(r)} : null;
-  }
+  const d = structuredClone(w), P = syPapersOf(d).filter(p => p.image && p.image.kind === 'data' && p.image.ref);
+  await syPool([...new Set(P.map(p => p.image.ref))].filter(r => !SY.img.has(r)), async r => { const f = files.find(x => x.name === N.img + r); if (f) try { SY.img.set(r, await (await syDrive(tok, `/drive/v3/files/${f.id}?alt=media`)).text()); } catch (e) {} });
+  for (const p of P) { const r = p.image.ref; p.image = SY.img.has(r) ? {kind: 'data', data: SY.img.get(r)} : null; }
   return d;
 }
 
@@ -265,10 +273,8 @@ async function syRemote(tok, files, N) {   // el proyecto en Drive (con huellas 
   }
   const all = files.filter(f => f.name.startsWith(N.d)).sort((a, b) => a.name < b.name ? -1 : 1), ds = all.filter(f => !inc.includes(f.name));
   for (const k of Object.keys(c.deltas)) if (!all.some(f => f.name === k)) delete c.deltas[k];
-  for (const f of ds) {
-    if (!c.deltas[f.name]) { const j = await syGet(tok, f.id); if (!syOk(j) || !j.patch) continue; c.deltas[f.name] = j.patch; }
-    w = syPatch(w || syEmpty(), c.deltas[f.name]);
-  }
+  await syPool(ds.filter(f => !c.deltas[f.name]), async f => { const j = await syGet(tok, f.id); if (syOk(j) && j.patch) c.deltas[f.name] = j.patch; });   // se descargan a la vez (hasta 6)
+  for (const f of ds) if (c.deltas[f.name]) w = syPatch(w || syEmpty(), c.deltas[f.name]);   // y se aplican en orden
   await syCacheSet(N, c);
   return {w, c, sf, lf, all, files, n: ds.length, N};
 }
@@ -312,8 +318,7 @@ function syIdxApply(M) {   // la lista que llega de Drive: proyectos nuevos de o
 }
 async function syGc(tok, files, idx) {   // archivos de proyectos borrados: los borrados aquí, enseguida; los que no están en el índice, pasado un día (por si acaban de crearse)
   const ids = idx && new Set(idx.projects.map(p => p.id)), old = Date.now() - 864e5;
-  for (const f of files) { const k = syPjOf(f.name); if (!k) continue;
-    if (PJ.gone.includes(k) && !PJ.list.some(p => p.id === k) || ids && k !== 'main' && !ids.has(k) && Date.parse(f.modifiedTime) < old) await syDel(tok, f.id); }
+  await syPool(files.filter(f => { const k = syPjOf(f.name); return k && (PJ.gone.includes(k) && !PJ.list.some(p => p.id === k) || ids && k !== 'main' && !ids.has(k) && Date.parse(f.modifiedTime) < old); }), f => syDel(tok, f.id));
   if (PJ.gone.length) { PJ.gone = []; pjSave(); }
 }
 
@@ -322,8 +327,8 @@ const syBlocked = () => [...document.querySelectorAll('dialog[open]')].some(d =>
 const syTrivial = () => !db.papers.length && !db.trash.length || path === 'ejemplo_papers.json' && !dirty;   // aquí solo está el ejemplo: manda Drive sin preguntar
 async function syOnce(inter) {
   const tok = await syToken(inter), files = await syLs(tok), id = PJ.cur, N = syNames(id);
-  const I = await syIdxGet(tok, files), iB = await idb('readonly', st => st.get('syncIdxBase')).catch(() => null);
-  const R = await syRemote(tok, files, N), rw = R.w ? await syUnwire(tok, R.w, files, N) : null;
+  const [I, iB, R] = await Promise.all([syIdxGet(tok, files), idb('readonly', st => st.get('syncIdxBase')).catch(() => null), syRemote(tok, files, N)]);   // a la vez: menos esperas
+  const rw = R.w ? await syUnwire(tok, R.w, files, N) : null;
   const snap = syPlainS(db), plain = JSON.parse(snap), curS = syNormS(plain, snap);
   const iM = I.w ? syIdxMerge(syIdxLocal(plain.settings), I.w, iB) : syIdxLocal(plain.settings);
   for (const p of PJ.list) if ((p.id === id ? dirty : p.dirty) && !iM.projects.some(e => e.id === p.id)) iM.projects.push(pjEntry(p));   // borrado en otro dispositivo, pero aquí tiene cambios sin guardar: se queda
@@ -357,10 +362,8 @@ async function syOnce(inter) {
     R.c.deltas[name] = p; await syCacheSet(N, R.c); } }
   await syGc(tok, files, I.w ? iF : null);
   await syBaseSet(N, m); sySet({last: Date.now()});
-  await syPdfs(tok, files, m, N);
-  await syPdfsVis(tok, m);
   if (syPlainS(db) === mS) { dirty = false; hdr(); sessionSoon(); }   // ya está guardado en Drive
-  return {news, first: !R.w};
+  return {news, first: !R.w, pdf: {tok, files, m, N, id}};   // los PDF se suben después, sin hacer esperar (p. ej. al cambiar de proyecto)
 }
 async function syRun(inter, gesture) {   // gesture: viene de un clic o una tecla (el navegador deja abrir la ventana de Google)
   if (TAB.passive) return null;   // el proyecto se usa en otra pestaña
@@ -370,10 +373,12 @@ async function syRun(inter, gesture) {   // gesture: viene de un clic o una tecl
     if (SY.consent || !gesture && (SY.st === 'reconnect' || Date.now() - syTried() < 6e4)) { SY.st = 'reconnect'; if (!SY.consent) syGesture(); syIcon(); return null; }   // consent: hace falta «Conectar»
     syTry();
   }
-  clearTimeout(SY.tm); SY.tm = 0; SY.busy = true; SY.wait = false; SY.st = 'busy'; syIcon();
+  clearTimeout(SY.tm); SY.tm = 0; SY.busy = true; SY.wait = false; SY.st = 'busy'; syIcon(); const t0 = Date.now();
   try {
     let r; try { r = await syOnce(inter); } catch (e) { if (e.estado !== 401) throw e; syTokDel(); r = await syOnce(inter); }   // el acceso había caducado
-    SY.st = SY.wait ? 'wait' : 'idle'; syToastOff(); if (r && r.gone) setTimeout(() => pjGone(r.gone)); return r;
+    SY.st = SY.wait ? 'wait' : 'idle'; syToastOff(); if (r && r.gone) setTimeout(() => pjGone(r.gone));
+    SY.ms = Date.now() - t0; if (r && r.pdf) { const job = syPdfJob(r.pdf); if (inter || gesture) await job; }   // a mano se espera a los PDF; en automático, no
+    return r;
   } catch (e) {
     SY.st = /silencio|interaction|login|consent|popup|cerrada|denegado|access_denied|immediate/i.test(e.message) ? 'reconnect' : 'error'; SY.err = e;
     if (inter) throw e;
@@ -411,12 +416,13 @@ const syState = () => !syOn() ? 'off' : ['busy', 'wait', 'reconnect', 'error'].i
 function syIcon() {
   fnameDraw(); const b = $('#syncBtn'); if (!b) return; b.hidden = !syAvail();
   const st = syState(), p = syP(); b.dataset.st = st;
+  const l = b.querySelector('.syl'), lt = st === 'off' ? SY_TXT.off : 'Google Drive · ' + SY_TXT[st]; if (l && l.textContent !== lt) l.textContent = lt;   // en el móvil se ve en el menú ⋯: dice si ya hay sesión
   b.title = st === 'off' ? SY_TXT.off : `Google Drive: ${SY_TXT[st]}${p.last ? ' · última vez ' + syAgo(p.last) : ''} (clic: opciones)`; b.setAttribute('aria-label', b.title);
 }
 function syClick(e) {
   e.stopPropagation(); if (!syOn()) return syIntro();
   const p = syP(), st = syState(), r = e.currentTarget.getBoundingClientRect();
-  ctxShow({preventDefault() {}, stopPropagation() {}, clientX: r.left, clientY: r.bottom + 4}, `<div class="ctxh">Google Drive${p.who ? ' · ' + esc(p.who) : ''}<br>${esc(SY_TXT[st])}${p.last ? ' · ' + syAgo(p.last) : ''}</div>`
+  ctxShow({preventDefault() {}, stopPropagation() {}, clientX: r.left, clientY: r.bottom + 4}, `<div class="ctxh">Google Drive${p.who ? ' · ' + esc(p.who) : ''}<br>${esc(SY_TXT[st])}${p.last ? ' · ' + syAgo(p.last) : ''}${SY.ms ? `<br><small>Última vuelta: ${(SY.ms / 1000).toLocaleString('es', {maximumFractionDigits: 1})} s</small>` : ''}</div>`
     + (st === 'reconnect' ? '<button data-onclick="ctxClose();syConnect()">🔑 Volver a conectar</button>' : '')
     + `<button data-onclick="ctxClose();syNow()">🔄 Sincronizar ahora</button><button data-onclick="ctxClose();syAutoSet(!syAuto())">${tick(syAuto())}Autoguardado en Drive</button>`
     + '<button data-onclick="ctxClose();syIntro()">❔ ¿Cómo funciona?</button><button data-onclick="ctxClose();syLogout()">🚪 Cerrar sesión</button><button class="danger" data-onclick="ctxClose();syWipe()">🗑 Borrar mis datos de Google Drive</button>');
@@ -490,7 +496,7 @@ async function syLogout(quiet) {
   if (!quiet && syAuto() && dirty && !SY.busy) await syRun(false);   // sube lo último antes de salir
   clearTimeout(SY.tm); clearTimeout(SY.exp); try { localStorage.removeItem('gp-sync'); } catch (e) {} syTokDel(); await syForget(); SY.st = 'idle';
   PJ.list = PJ.list.filter(p => !p.remote); pjSave(); pjShow();   // los proyectos que solo están en Drive dejan de verse aquí (siguen en tu Drive)
-  $('#auto').checked = auto; if (!FSA) $('#auto').disabled = true; syIcon(); if ($('#pv').open) openPriv();
+  $('#auto').checked = auto; if (!FSA) $('#auto').disabled = true; syIcon(); if ($('#pv').open) openPriv(); if ($('#cfg').open) drawCfg();
   if (!quiet) toast('Sesión de Google Drive cerrada. Tus datos siguen en este dispositivo y en tu Drive.', [], 5000);
 }
 async function syWipe() {

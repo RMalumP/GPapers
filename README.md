@@ -169,6 +169,13 @@ El HTML no lleva `onclick` ni otros manejadores en línea: `index.html` tiene un
 - Desde `file://` el visor propio no puede cargar sus módulos: el PDF se abre en el visor del navegador.
 - Archivos nuevos: `js/visor.js`, `js/bandeja.js`, `visor.css`, `lib/`. Pruebas: `pruebas/prueba_visor.py` (con `pruebas/prueba.pdf`).
 
+## Pestaña aparte, otras apps, comentarios y más (v39.1)
+- **Visor en otra pestaña** (ordenador): 📄 abre el visor en una pestaña nueva para seguir usando la aplicación a la vez (Configuración → Datos: «en una pestaña nueva» o «dentro de la aplicación»; Ctrl + clic hace lo contrario; en móvil y tableta, siempre dentro). La pestaña del visor (`index.html?vw=…`) no guarda por su cuenta: manda cada cambio de las anotaciones a la principal por `BroadcastChannel('gpapers-vw')` y recibe lo que cambie allí (deshacer, Drive). Si la principal se cierra o cambia de proyecto, el visor pasa a guardar él mismo; al volver a abrir la aplicación, le devuelve el proyecto.
+- **Abrir en otra app** (⋯ del visor): con el menú «Compartir» del sistema (Acrobat, Drive, Foxit…), el PDF tal cual o con las anotaciones; sin él, el visor del navegador.
+- **Sacar los comentarios** (panel 💬): 📋 Copiar, 📝 A las notas y ⬇ .md, en formato texto, Markdown o con la cita en el texto («…» (Pérez, 2024, p. 3)); con todas, una sola nota «Anotaciones del PDF» por PDF que se actualiza; con un filtro o «Elegir», una nota nueva. Opción «Mantener al día» (Configuración) y botón «📄 Traer anotaciones del PDF» en la ficha.
+- **Copiar o mover a otro proyecto** también desde el menú ▾ del proyecto; los PDF enlazados (y sus anotaciones) viajan con el paper.
+- **Google Drive**: el botón dice si hay sesión (en el móvil se lee en ⋯) y Configuración → Datos tiene «Sincronizar ahora» y «Cerrar sesión». Cambiar de proyecto es más rápido: los cambios e imágenes se descargan a la vez y los PDF se suben después, sin hacer esperar; el menú 🔄 dice cuánto tardó la última vuelta.
+
 ## Sincronización con Google Drive, Privacidad y Créditos (F14)
 - **Final de la barra lateral**: Papelera, Configuración, una línea, «ℹ️ Información» (Ayuda y Créditos, discretos y plegada por defecto; se recuerda si la abres) y, siempre visible y con la misma letra, una línea que explica qué es la app con el enlace **Política de privacidad** (v31.1: sustituye al botón Privacidad; Google lo pide en la página principal para verificar la marca).
 - **©️ Créditos** (barra lateral, en «Información»): dirección, desarrollo, derechos (licencia CC BY-SA) y la versión de la aplicación.
