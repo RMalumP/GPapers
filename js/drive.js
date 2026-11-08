@@ -154,7 +154,7 @@ const pdfSlots = (m, trash) => [...(trash ? syPapersOf(m) : m.papers || []).flat
   ...(m.inbox || []).map(it => ({key: inKey(it.id), pf: it, it}))];   // todos los PDF del proyecto: de los papers (y de la papelera) y de la bandeja
 async function pdfFromDrive(id, name, quiet) {   // id: clave del hueco (pdfKey). El PDF subido por otro dispositivo (solo con acceso vigente: no se abre ninguna ventana de Google)
   const tok = syOn() && syTokGet(); if (!tok) return null;
-  try { const f = (await syLs(tok)).find(x => x.name === syNames(PJ.cur).pdf + id); if (!f) return null; if (!quiet) toast('Descargando el PDF de tu Google Drive…', [], 3000);
+  try { const nm = syNames(PJ.cur).pdf + id, f = (await syLs(tok, `name = '${nm}'`)).find(x => x.name === nm); if (!f) return null; if (!quiet) toast('Descargando el PDF de tu Google Drive…', [], 3000);
     return new File([await (await syDrive(tok, `/drive/v3/files/${f.id}?alt=media`)).blob()], name, {type: 'application/pdf'}); } catch (e) { return null; }
 }
 function setPdfDrive(on) { setCfg('pdfDrive', on); if (on && syAuto()) sySoon(500); }
@@ -168,7 +168,7 @@ const syHash = s => {   // huella de 64 bits + longitud (cyrb53 doble): la misma
 const syPapersOf = d => [...(d.papers || []), ...(d.trash || []).map(t => t && t.paper)].filter(Boolean);
 function syWire(d) {   // copia para Drive: {kind: 'data', data} → {kind: 'data', ref: huella}; devuelve también las huellas usadas
   const w = structuredClone(d), refs = new Set();
-  for (const p of syPapersOf(w)) if (p.image && p.image.kind === 'data' && p.image.data) { const h = syHash(p.image.data); SY.img.set(h, p.image.data); p.image = {kind: 'data', ref: h}; refs.add(h); }
+  for (const p of syPapersOf(w)) if (p.image && p.image.kind === 'data' && p.image.data) { const h = imgHash(p.image.data); SY.img.set(h, p.image.data); p.image = {kind: 'data', ref: h}; refs.add(h); }
   return [w, refs];
 }
 async function syPool(items, fn, n = 6) {   // fn sobre cada elemento, hasta n a la vez
@@ -183,7 +183,10 @@ function syPdfJob(j) {
 }
 async function syUnwire(tok, w, files, N) {   // vuelve a poner las imágenes; solo descarga las que este dispositivo no tiene
   const d = structuredClone(w), P = syPapersOf(d).filter(p => p.image && p.image.kind === 'data' && p.image.ref);
-  await syPool([...new Set(P.map(p => p.image.ref))].filter(r => !SY.img.has(r)), async r => { const f = files.find(x => x.name === N.img + r); if (f) try { SY.img.set(r, await (await syDrive(tok, `/drive/v3/files/${f.id}?alt=media`)).text()); } catch (e) {} });
+  for (const r of new Set(P.map(p => p.image.ref))) if (!SY.img.has(r) && IMG_POOL.has(r)) SY.img.set(r, IMG_POOL.get(r));   // ya están en este dispositivo: no se descargan
+  const miss = [...new Set(P.map(p => p.image.ref))].filter(r => !SY.img.has(r));
+  if (miss.length) await idb('readonly', st => { miss.forEach(h => { const q = st.get('imgd:' + h); q.onsuccess = () => { if (typeof q.result === 'string') SY.img.set(h, q.result); }; }); return null; }).catch(() => {});
+  await syPool(miss.filter(r => !SY.img.has(r)), async r => { const f = files.find(x => x.name === N.img + r); if (f) try { SY.img.set(r, await (await syDrive(tok, `/drive/v3/files/${f.id}?alt=media`)).text()); } catch (e) {} });
   for (const p of P) { const r = p.image.ref; p.image = SY.img.has(r) ? {kind: 'data', data: SY.img.get(r)} : null; }
   return d;
 }
@@ -230,14 +233,18 @@ async function syDrive(tok, ruta, o = {}) {
   if (!r.ok) { const e = Error('drive ' + r.status); e.estado = r.status; throw e; }
   return r;
 }
-async function syLs(tok) {   // archivos de esta aplicación en la carpeta oculta (que comparte con otras webs del mismo proyecto de Google)
+async function syLs(tok, q = "name contains 'gpapers-'") {   // archivos de esta aplicación en la carpeta oculta (que comparte con otras webs del mismo proyecto de Google); q: solo esos
   const out = []; let pt = '';
   do {
-    const j = await (await syDrive(tok, '/drive/v3/files?spaces=appDataFolder&pageSize=1000&fields=nextPageToken,files(id,name,size,md5Checksum,modifiedTime)&q=' + encodeURIComponent("name contains 'gpapers-'") + (pt ? '&pageToken=' + encodeURIComponent(pt) : ''))).json();
+    const j = await (await syDrive(tok, '/drive/v3/files?spaces=appDataFolder&pageSize=1000&fields=nextPageToken,files(id,name,size,md5Checksum,modifiedTime)&q=' + encodeURIComponent(q) + (pt ? '&pageToken=' + encodeURIComponent(pt) : ''))).json();
     out.push(...(j.files || []).filter(f => f.name.startsWith('gpapers-'))); pt = j.nextPageToken;
   } while (pt);
   return out;
 }
+const syLsFor = (tok, N) => syLs(tok, [SY_IDX, N.snap, N.legacy].filter(Boolean).map(n => `name = '${n}'`).concat([N.d, N.img, N.pdf].map(n => `name contains '${n}'`)).join(' or '))   // solo lo de este proyecto (y el índice): menos que listar
+  .then(L => L.filter(f => f.name === SY_IDX || f.name === N.snap || f.name === N.legacy || [N.d, N.img, N.pdf].some(x => f.name.startsWith(x))));
+const syGcDue = () => { try { return Date.now() - (+localStorage.getItem('gp-sy-gc') || 0) > 864e5; } catch (e) { return true; } };   // la limpieza de proyectos borrados, una vez al día
+const syGcDone = () => { try { localStorage.setItem('gp-sy-gc', String(Date.now())); } catch (e) {} };
 const syVer = f => f.md5Checksum || `${f.modifiedTime}:${f.size}`;
 const syGet = async (tok, id) => (await syDrive(tok, `/drive/v3/files/${id}?alt=media`)).json();
 const syDel = (tok, id) => syDrive(tok, '/drive/v3/files/' + id, {method: 'DELETE'}).catch(() => {});
@@ -326,7 +333,8 @@ async function syGc(tok, files, idx) {   // archivos de proyectos borrados: los 
 const syBlocked = () => [...document.querySelectorAll('dialog[open]')].some(d => !['help', 'pv', 'sy', 'cr', 'vw'].includes(d.id));   // ventanas que editan datos: no se les cambia nada debajo
 const syTrivial = () => !db.papers.length && !db.trash.length || path === 'ejemplo_papers.json' && !dirty;   // aquí solo está el ejemplo: manda Drive sin preguntar
 async function syOnce(inter) {
-  const tok = await syToken(inter), files = await syLs(tok), id = PJ.cur, N = syNames(id);
+  const id = PJ.cur, N = syNames(id); await SY_BG.get(id);   // si se estaba subiendo en segundo plano, se espera
+  const tok = await syToken(inter), full = syGcDue() || PJ.gone.length > 0, files = full ? await syLs(tok) : await syLsFor(tok, N);
   const [I, iB, R] = await Promise.all([syIdxGet(tok, files), idb('readonly', st => st.get('syncIdxBase')).catch(() => null), syRemote(tok, files, N)]);   // a la vez: menos esperas
   const rw = R.w ? await syUnwire(tok, R.w, files, N) : null;
   const snap = syPlainS(db), plain = JSON.parse(snap), curS = syNormS(plain, snap);
@@ -360,10 +368,37 @@ async function syOnce(inter) {
     const name = `${N.d}${String(Date.now()).padStart(14, '0')}-${syDev()}.json`;
     await syUpload(tok, null, name, JSON.stringify({app: 'gpapers', v: 2, at: new Date().toISOString(), patch: p}), 'application/json');
     R.c.deltas[name] = p; await syCacheSet(N, R.c); } }
-  await syGc(tok, files, I.w ? iF : null);
+  if (full) { await syGc(tok, files, I.w ? iF : null); syGcDone(); }
   await syBaseSet(N, m); sySet({last: Date.now()});
   if (syPlainS(db) === mS) { dirty = false; hdr(); sessionSoon(); }   // ya está guardado en Drive
   return {news, first: !R.w, pdf: {tok, files, m, N, id}};   // los PDF se suben después, sin hacer esperar (p. ej. al cambiar de proyecto)
+}
+/* ---- Proyectos que no están abiertos: sus cambios se suben en segundo plano (al cambiar de proyecto no se espera) ---- */
+const SY_BG = new Map();   // proyecto → subida en curso
+function syStoredSoon(id) { if (!syAuto() || SY_BG.has(id)) return SY_BG.get(id); const run = syStored(id).catch(() => {}).finally(() => SY_BG.delete(id)); SY_BG.set(id, run); return run; }
+async function syStored(id) {
+  const p = PJ.list.find(x => x.id === id); if (!p || p.remote || PJ.cur === id || TAB.passive) return;
+  const rec = await idb('readonly', st => st.get('proj:' + id)).catch(() => null); if (!rec) return;
+  const N = syNames(id), base = await syBase(N); if (!base) return;   // sin la última versión común: lo resuelve la vuelta normal al abrirlo (puede preguntar)
+  const d = await projData(rec).catch(() => null); if (!d || PJ.cur === id) return;
+  const localS = syNormS(JSON.parse(JSON.stringify(d, syNoHist))); if (localS === JSON.stringify(base)) return;   // nada que subir
+  const tok = await syToken(false), files = await syLsFor(tok, N), R = await syRemote(tok, files, N), rw = R.w ? await syUnwire(tok, R.w, files, N) : null;
+  if (PJ.cur === id) return;
+  const local = JSON.parse(localS), m = rw ? JSON.parse(syNormS(syMerge(local, JSON.parse(syNormS(rw)), base))) : local;
+  const [mw, refs] = syWire(m), have = new Set(files.filter(f => f.name.startsWith(N.img)).map(f => f.name.slice(N.img.length)));
+  await syPool([...refs].filter(h => !have.has(h)), h => syUpload(tok, null, N.img + h, SY.img.get(h), 'text/plain'));
+  if (!R.sf || R.n >= SY_CFG.maxDeltas) await syCompact(tok, R, mw, refs);
+  else { const pt = syDiff(R.w, mw); if (pt) { const name = `${N.d}${String(Date.now()).padStart(14, '0')}-${syDev()}.json`;
+    await syUpload(tok, null, name, JSON.stringify({app: 'gpapers', v: 2, at: new Date().toISOString(), patch: pt}), 'application/json'); R.c.deltas[name] = pt; await syCacheSet(N, R.c); } }
+  await syBaseSet(N, m);
+  if (PJ.cur === id) return;   // lo volviste a abrir mientras tanto: la vuelta normal lo termina
+  const now = await idb('readonly', st => st.get('proj:' + id)).catch(() => null); if (!now || now.at !== rec.at) return;   // cambió mientras tanto (otra pestaña)
+  const [json, add] = projWire(m);
+  await idb('readwrite', st => projPut(st, 'proj:' + id, {...rec, dirty: false, at: new Date().toISOString(), json}, add)).then(() => projSaved(add)).catch(() => {});
+  Object.assign(p, {n: m.papers.length, dirty: false}); pjSave();
+}
+async function syStoredAll() {   // al arrancar: los otros proyectos con cambios que no llegaron a Drive
+  for (const p of [...PJ.list]) if (p.id !== PJ.cur && !p.remote && !TAB.passive) await syStoredSoon(p.id);   // sin cambios no se toca la red
 }
 async function syRun(inter, gesture) {   // gesture: viene de un clic o una tecla (el navegador deja abrir la ventana de Google)
   if (TAB.passive) return null;   // el proyecto se usa en otra pestaña

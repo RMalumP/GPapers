@@ -1,3 +1,4 @@
+import re
 # Google Drive y acceso de Google simulados para las pruebas (prueba_sync.py y prueba_proyectos.py)
 import json, time, urllib.parse
 import hashlib, itertools
@@ -19,7 +20,11 @@ def drive(route, req):
     if req.headers.get('authorization') != 'Bearer tok': return route.fulfill(status=401, headers=CORS, body='{}')
     CALLS.append((m, p, q.get('uploadType', [''])[0], q.get('alt', [''])[0]))
     if m == 'GET' and p == '/drive/v3/files':
-        sub = q['q'][0].split("'")[1] if 'q' in q else ''
+        qs = q['q'][0] if 'q' in q else ''
+        if ' or ' in qs:   # varios nombres: «name = 'x'» exacto o «name contains 'y'»
+            ts = re.findall(r"name (=|contains) '([^']*)'", qs)
+            return ok({'files': [meta(i) for i in STORE if any(STORE[i]['name'] == v if o == '=' else v in STORE[i]['name'] for o, v in ts)]})
+        sub = qs.split("'")[1] if qs else ''
         return ok({'files': [meta(i) for i in STORE if sub in STORE[i]['name']]})
     if m == 'GET' and p == '/drive/v3/about': return ok({'user': {'emailAddress': 'yo@example.com'}})
     if m == 'GET' and p.startswith('/drive/v3/files/') and 'alt' not in q:   # metadatos (carpeta «GPapers» del Drive normal)

@@ -169,6 +169,10 @@ El HTML no lleva `onclick` ni otros manejadores en línea: `index.html` tiene un
 - Desde `file://` el visor propio no puede cargar sus módulos: el PDF se abre en el visor del navegador.
 - Archivos nuevos: `js/visor.js`, `js/bandeja.js`, `visor.css`, `lib/`. Pruebas: `pruebas/prueba_visor.py` (con `pruebas/prueba.pdf`).
 
+## Google Drive más rápido (v39.3)
+- **Cambiar de proyecto sin esperar**: el proyecto que dejas se guarda aquí al momento y sus cambios se suben a Drive en segundo plano (`syStored`, fusionando con lo que haya llegado de otros dispositivos); el nuevo se abre enseguida. Al arrancar, se suben también los de otros proyectos que no llegaron a Drive.
+- **Primero las citas**: cada vuelta lista solo los archivos del proyecto abierto (la limpieza de proyectos borrados, una vez al día); las imágenes que ya están en este dispositivo no se vuelven a descargar, y los PDF van después, en cola.
+
 ## Móvil y bandeja (v39.2)
 - **Zoom nítido**: con mucho zoom, la página entera no cabe en memoria a resolución completa (`vwMaxPx`); al parar, se repinta a resolución completa solo el trozo que se ve (`vwDetail`).
 - **Panel de anotaciones en el móvil**: hoja desde abajo (antes salía fuera de la pantalla, porque es un `<aside>` y heredaba el estilo del menú lateral).
