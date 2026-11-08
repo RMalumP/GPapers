@@ -94,3 +94,11 @@ html.mv #vwSel{position:fixed;gap:8px}html.mv #vwSel .vwc{width:32px;height:32px
 html.mv #inbox{margin:6px 0}html.mv .ibt{width:72px;height:96px}html.mv .ibb button{flex:1 1 auto}
 .vwsh .vwpk{margin-left:auto;font-size:12px;padding:3px 8px}.vwsh .vwpk.on{background:var(--pri);color:#fff;border-color:var(--pri)}.vwsh .vwpk+.vwib{margin-left:4px}
 .vwexp{align-items:center}.vwexp small{color:var(--mut,#666)}.vwexp select{font-size:13px;padding:3px 4px;max-width:150px}
+
+/* v39.2 */
+html.mv #vwSide{transform:none;visibility:visible;width:auto!important;padding-left:0;overflow:hidden;transition:none}   /* es un <aside>: no le aplica el panel lateral del móvil */
+.vwdet{position:absolute;display:block;pointer-events:none}
+.vwcmk{position:absolute;font-style:normal;font-size:calc(var(--scale-factor,1) * 9px);min-width:14px;line-height:1;padding:1px 2px;border-radius:5px;background:color-mix(in srgb,var(--c) 70%,#fff);box-shadow:0 1px 2px #0004;pointer-events:none;z-index:2;transform:translateY(-35%)}
+html.mv .vwnote{width:32px;height:32px;font-size:18px;transform:translate(-7px,-7px)}
+.ibann{background:none;border:0;padding:0;color:var(--pri);font-size:12px;text-align:left;cursor:pointer;text-decoration:underline}
+.ibbtn{display:inline-flex;align-items:center;gap:3px}.ibbtn b{font-size:11px;background:var(--pri);color:#fff;border-radius:9px;padding:0 6px;line-height:16px}.ibbtn.on{outline:2px solid var(--pri)}.ibbtn[hidden]{display:none}

@@ -87,7 +87,7 @@ async function vwOpen(src, file) {
   vwBuild(); if (VW.open) await vwClose(false, true);
   const gen = ++VW.gen; Object.assign(VW, {open: true, src, file, doc: null, pages: [], foreign: null, sel: null, dirty: false, find: {q: '', hits: [], i: -1, txt: new Map()}});
   const d = $('#vw'); vw$('.vwt').textContent = vwTitle(); vw$('.vwt').title = vwTitle(); $('#vwPages').innerHTML = ''; $('#vwLoad').hidden = false; $('#vwLoad').textContent = 'Abriendo el PDF…';
-  $('#vwQ').value = ''; $('#vwQn').textContent = ''; vwPopClose(); $('#vwSel').hidden = true; VW.side = !document.documentElement.classList.contains('mv') && innerWidth > 1100 && vwSideOn(); vwSideShow();
+  $('#vwQ').value = ''; $('#vwQn').textContent = ''; vwPopClose(); $('#vwSel').hidden = true; VW.side = VW.sideNext || !document.documentElement.classList.contains('mv') && innerWidth > 1100 && vwSideOn(); VW.sideNext = false; vwSideShow();
   if (!d.open) d.showModal(); vwModeShow(); vwColorShow(); vwCount();
   if (!VW.pushed && !VW_TAB) { try { history.pushState({vw: 1}, ''); VW.pushed = true; } catch (e) {} }   // el botón «atrás» del móvil cierra el visor
   try {
@@ -204,6 +204,7 @@ function vwScaleSet(s, focus) {   // focus: punto (en la pantalla) que se queda 
   const cx = (sc.scrollLeft + fx) / old, cy = (sc.scrollTop + fy - VW_GAP * VW.cur) / old;
   VW.scale = s; $('#vwPages').style.setProperty('--scale-factor', s); $('#vwZl').textContent = Math.round(s * 100) + ' %';
   sc.scrollLeft = cx * s - fx; sc.scrollTop = cy * s + VW_GAP * VW.cur - fy;
+  for (const p of VW.pages) if (p.det) { try { p.dtask?.cancel(); } catch (e) {} p.det.remove(); p.det = null; }   // el trozo nítido era de la escala anterior
   clearTimeout(VW.zt); VW.zt = setTimeout(vwRerender, 120);
 }
 function vwFitW(keep) {
@@ -242,7 +243,7 @@ async function vwRender(p, gen) {
     const L = PDFJS, task = p.task = p.proxy.render({canvasContext: cv.getContext('2d', {alpha: false}), viewport: vp, transform: os !== 1 ? [os, 0, 0, os, 0, 0] : null,
       annotationMode: L.AnnotationMode.ENABLE_STORAGE});
     await task.promise; p.task = null; if (gen !== VW.gen) return;
-    if (p.cv) p.cv.replaceWith(cv); else p.el.prepend(cv); p.cv = cv; p.rs = s;
+    if (p.cv) p.cv.replaceWith(cv); else p.el.prepend(cv); p.cv = cv; p.rs = s; p.os = os; p.det?.remove(); p.det = null; vwDetailSoon();
     if (!p.tl) {
       const div = document.createElement('div'); div.className = 'textLayer'; p.el.querySelector('.vwa').before(div);
       p.tl = new L.TextLayer({textContentSource: p.proxy.streamTextContent({includeMarkedContent: true, disableNormalization: true}), container: div, viewport: vp});
@@ -256,9 +257,10 @@ function vwFree() {   // libera los lienzos lejanos (memoria del móvil): se vue
   const keep = vwMaxPx() < 6e6 ? 6 : 14, on = VW.pages.filter(p => p.cv);
   if (on.length <= keep) return;
   on.sort((a, b) => Math.abs(b.i - VW.cur) - Math.abs(a.i - VW.cur));
-  for (const p of on.slice(0, on.length - keep)) { if (p.vis) continue; p.cv.width = p.cv.height = 0; p.cv.remove(); p.cv = null; p.rs = 0; if (Math.abs(p.i - VW.cur) > 30 && p.tl) { p.tl.cancel?.(); p.el.querySelector('.textLayer')?.remove(); p.tl = null; } }
+  for (const p of on.slice(0, on.length - keep)) { if (p.vis) continue; p.cv.width = p.cv.height = 0; p.cv.remove(); p.cv = null; p.rs = 0; if (p.det) { p.det.width = p.det.height = 0; p.det.remove(); p.det = null; } if (Math.abs(p.i - VW.cur) > 30 && p.tl) { p.tl.cancel?.(); p.el.querySelector('.textLayer')?.remove(); p.tl = null; } }
 }
 function vwOnScroll() {
+  vwDetailSoon();
   const sc = $('#vwScroll'), y = sc.scrollTop + sc.clientHeight / 3; let lo = 0, hi = VW.pages.length - 1;
   while (lo < hi) { const m = (lo + hi + 1) >> 1; if (VW.pages[m].el.offsetTop <= y) lo = m; else hi = m - 1; }
   if (VW.pages.length && lo !== VW.cur) { VW.cur = lo; }
@@ -309,7 +311,8 @@ function vwDrawAnn() {
     const L = by.get(p.i) || [], layer = p.el.querySelector('.vwa'); if (!L.length && !layer.childElementCount) continue;
     if (!p.vp1 && L.length) { (p.proxy ? Promise.resolve(p.proxy) : VW.doc.getPage(p.i + 1)).then(pr => { p.proxy = pr; p.vp1 = pr.getViewport({scale: 1}); vwDrawAnn(); }); continue; }
     layer.innerHTML = L.map(a => a.k === 'note' ? vwBoxes(p, a.q).slice(0, 1).map(b => `<button class="vwnote" data-a="${a.id}" style="left:${vwPx(b.x)};top:${vwPx(b.y)};--c:${a.c}" title="${esc(a.m || 'Nota')}" aria-label="Nota">🗒</button>`).join('')
-      : vwBoxes(p, a.q).map(b => `<i class="vwhl${a.k === 'area' ? ' area' : ''}${a.m ? ' cm' : ''}${VW.pop === a.id ? ' on' : ''}" data-a="${a.id}" style="left:${vwPx(b.x)};top:${vwPx(b.y)};width:${vwPx(b.w)};height:${vwPx(b.h)};--c:${a.c}"></i>`).join('')).join('');
+      : vwBoxes(p, a.q).map(b => `<i class="vwhl${a.k === 'area' ? ' area' : ''}${a.m ? ' cm' : ''}${VW.pop === a.id ? ' on' : ''}" data-a="${a.id}" style="left:${vwPx(b.x)};top:${vwPx(b.y)};width:${vwPx(b.w)};height:${vwPx(b.h)};--c:${a.c}"></i>`).join('')
+        + (a.m ? (b => b ? `<i class="vwcmk" data-a="${a.id}" style="left:calc(${vwPx(b.x + b.w)} + 2px);top:${vwPx(b.y)};--c:${a.c}" title="${esc(a.m)}">💬</i>` : '')(vwBoxes(p, a.q).at(-1)) : '')).join('');   // 💬: tiene comentario (se toca para verlo)
   }
   vwCount(); if (VW.side) vwSideDraw();
 }
@@ -375,7 +378,8 @@ function vwCaret(x, y) {
   return {n, o};
 }
 function vwDown(e) {
-  if (VW.pinch || e.button > 0 || e.target.closest('.vwnote')) return;
+  if (VW.pinch || e.button > 0) return;
+  if (e.target.closest('.vwnote')) { VW.tap = {x: e.clientX, y: e.clientY, t: Date.now()}; return; }   // tocar una nota la abre (también con el dedo)
   const p = vwPageOf(e.target); if (!p) return;
   if (VW.mode === 'hl') { const c = vwCaret(e.clientX, e.clientY); VW.drag = {kind: 'hl', p, a: c, x: e.clientX, y: e.clientY, id: e.pointerId}; e.preventDefault(); $('#vwScroll').setPointerCapture(e.pointerId); getSelection().removeAllRanges(); }
   else if (VW.mode === 'area') { VW.drag = {kind: 'area', p, x: e.clientX, y: e.clientY, id: e.pointerId}; e.preventDefault(); $('#vwScroll').setPointerCapture(e.pointerId); }
@@ -414,7 +418,8 @@ function vwUp(e) {
   }
 }
 function vwTapAt(x, y) {   // tocar un subrayado o una zona abre su ventanita
-  const hit = [...document.querySelectorAll('#vw .vwhl')].reverse().find(el => { const r = el.getBoundingClientRect(); return x >= r.left - 2 && x <= r.right + 2 && y >= r.top - 2 && y <= r.bottom + 2; });
+  const m = document.documentElement.classList.contains('mv') || matchMedia('(pointer: coarse)').matches ? 10 : 2;   // con el dedo, más margen
+  const hit = [...document.querySelectorAll('#vw .vwhl, #vw .vwcmk')].reverse().find(el => { const r = el.getBoundingClientRect(); return x >= r.left - m && x <= r.right + m && y >= r.top - m && y <= r.bottom + m; });
   if (hit) vwPopOpen(hit.dataset.a); else if (VW.pop) vwPopClose();
 }
 
@@ -641,7 +646,7 @@ async function vwPdfOut(file, anns) {
    siempre, y la principal le manda lo que cambie por su lado (deshacer, Google Drive). Si no hay pestaña principal, o se cierra,
    el satélite pasa a guardar él mismo (con lo último que guardó la principal). Configuración → Datos: «en pestaña nueva» o «dentro». */
 const VW_TAB = (() => { try { const q = new URLSearchParams(location.search).get('vw'); if (!q) return null; const o = JSON.parse(q);
-  return o && typeof o.pj === 'string' && typeof o.id === 'string' && (o.kind === 'paper' || o.kind === 'inbox') ? {pj: o.pj, kind: o.kind, id: o.id, n: o.n === 2 ? 2 : 1} : null; } catch (e) { return null; } })();
+  return o && typeof o.pj === 'string' && typeof o.id === 'string' && (o.kind === 'paper' || o.kind === 'inbox') ? {pj: o.pj, kind: o.kind, id: o.id, n: o.n === 2 ? 2 : 1, side: !!o.side} : null; } catch (e) { return null; } })();
 if (VW_TAB) { TAB.sat = true; TAB.passive = true; }
 const VWB = {bc: 'BroadcastChannel' in window ? new BroadcastChannel('gpapers-vw') : null, id: uid(), sats: new Map(), files: new Map(), wait: new Map(), tm: 0};
 const vwBc = m => { try { VWB.bc?.postMessage({from: VWB.id, ...m}); } catch (e) {} };
@@ -657,7 +662,7 @@ function vwApplyPart(src, x) {   // pone en el PDF (en todos sus sitios) las ano
 const vwTabWant = () => vwCan() && !VW_TAB && !document.documentElement.classList.contains('mv') && !matchMedia('(pointer: coarse)').matches && db.settings.pdfTab !== 'app';
 async function vwTabOpen(src, file) {   // desde la pestaña principal
   const k = vwSrcKey(src); VWB.files.delete(k); VWB.files.set(k, file); while (VWB.files.size > 6) VWB.files.delete(VWB.files.keys().next().value);
-  await sessionNow(); const url = 'index.html?vw=' + encodeURIComponent(JSON.stringify({pj: PJ.cur, ...src}));
+  await sessionNow(); const url = 'index.html?vw=' + encodeURIComponent(JSON.stringify({pj: PJ.cur, ...src, ...(VW.sideNext ? {side: 1} : {})})); VW.sideNext = false;
   if (!window.open(url, '_blank')) toast('El navegador no dejó abrir la pestaña nueva.', [{t: 'Abrir pestaña', fn: () => window.open(url, '_blank')}, {t: 'Abrir aquí', fn: () => vwOpen(src, file)}], 0);
 }
 function vwOpenAny(src, file, ev, page) {   // 📄: pestaña nueva o dentro de la aplicación (Ctrl + clic: lo contrario de lo elegido)
@@ -693,7 +698,7 @@ async function vwSatBoot() {   // arranque de la pestaña del visor
   let file = main ? await new Promise(ok => { VWB.wait.set('f', ok); vwBc({t: 'need', pj: PJ.cur, src}); setTimeout(() => ok(null), 4000); }) : null; VWB.wait.delete('f');
   if (!file) file = await pdfFile(vwSrcKey(src), pf, false).catch(() => null);
   if (!file) return toast(`Elige el archivo «${pf.name}» para abrirlo.`, [{t: 'Elegir el PDF…', fn: async () => { const f = await pdfFile(vwSrcKey(src), pf).catch(() => null); if (f) vwOpen(src, f); }}], 0);
-  vwOpen(src, file);
+  VW.sideNext = VW_TAB.side; vwOpen(src, file);
 }
 function vwSatClose() {   // al cerrar el visor de la pestaña aparte: se cierra la pestaña
   vwSatPush(); vwBc({t: 'gone'});
@@ -719,3 +724,45 @@ if (VWB.bc) VWB.bc.onmessage = async ({data: m}) => {
   else if (m.t === 'gone') VWB.sats.delete(m.from);
 };
 addEventListener('pagehide', () => { if (!TAB.passive && !VW_TAB && VWB.sats.size) vwBc({t: 'bye', pj: PJ.cur}); });
+
+/* ---- Zoom nítido en el móvil: con mucho zoom la página entera no cabe en memoria a máxima resolución (vwMaxPx), así que
+   además se pinta a resolución completa solo el trozo que se ve, encima de la página, al parar de mover o acercar ---- */
+function vwDetailSoon() { clearTimeout(VW.dt); VW.dt = setTimeout(vwDetail, 180); }
+async function vwDetail() {
+  if (!VW.open || VW.pinch) return; const sc = $('#vwScroll'), R = sc.getBoundingClientRect(), dpr = Math.min(devicePixelRatio || 1, 3), gen = VW.gen, s = VW.scale;
+  for (const p of VW.pages) {
+    const ok = p.cv && p.os && p.os < dpr * .95 && Math.abs(p.rs - s) < .01 && p.vis;
+    if (!ok) { if (p.det && !p.vis) { p.det.remove(); p.det = null; } continue; }
+    const r = p.el.getBoundingClientRect(), x0 = Math.max(R.left, r.left) - r.left, y0 = Math.max(R.top, r.top) - r.top, x1 = Math.min(R.right, r.right) - r.left, y1 = Math.min(R.bottom, r.bottom) - r.top;
+    if (x1 - x0 < 8 || y1 - y0 < 8) continue;
+    const k = [Math.floor(x0), Math.floor(y0), Math.ceil(x1), Math.ceil(y1), s].join(); if (p.det && p.det.dataset.k === k) continue;
+    const w = Math.ceil(x1) - Math.floor(x0), h = Math.ceil(y1) - Math.floor(y0); let os = dpr; if (w * h * os * os > vwMaxPx()) os = Math.sqrt(vwMaxPx() / (w * h)); if (os <= p.os * 1.05) continue;
+    try { p.dtask?.cancel(); } catch (e) {}
+    const cv = document.createElement('canvas'); cv.width = Math.floor(w * os); cv.height = Math.floor(h * os); cv.className = 'vwdet'; cv.dataset.k = k;
+    cv.style.cssText = `left:${Math.floor(x0)}px;top:${Math.floor(y0)}px;width:${w}px;height:${h}px`;
+    const vp = p.proxy.getViewport({scale: s}), task = p.dtask = p.proxy.render({canvasContext: cv.getContext('2d', {alpha: false}), viewport: vp, transform: [os, 0, 0, os, -Math.floor(x0) * os, -Math.floor(y0) * os], annotationMode: PDFJS.AnnotationMode.ENABLE_STORAGE});
+    try { await task.promise; } catch (e) { continue; } p.dtask = null;
+    if (gen !== VW.gen || Math.abs(VW.scale - s) > .001 || !p.cv) return;
+    p.det?.remove(); p.cv.after(cv); p.det = cv;
+  }
+}
+
+/* ===== Botón «atrás» del móvil: cierra la ventana o el menú abiertos, no la aplicación =====
+   Al abrir una ventana (ficha, Configuración, Exportar…) o el menú lateral se deja una entrada «guarda» en el historial; «atrás» la gasta
+   y cierra lo de encima (como su ✕). El visor de PDF tiene su propia entrada (vwOpen). */
+const BK = {on: false};
+const bkWant = () => !VW_TAB && (document.documentElement.classList.contains('mv') || matchMedia('(pointer: coarse)').matches);
+const bkTop = () => [...document.querySelectorAll('dialog[open]')].filter(d => d.id !== 'vw').pop();
+const bkMenus = () => /\bmv-(dr|mo)\b/.test(document.documentElement.className);
+function bkGuard() { if (!bkWant() || BK.on) return; try { history.pushState({gpG: 1}, ''); BK.on = true; } catch (e) {} }
+(() => { const sm = HTMLDialogElement.prototype.showModal; HTMLDialogElement.prototype.showModal = function () { sm.call(this); if (this.id !== 'vw') bkGuard(); }; })();
+new MutationObserver(() => { if (bkMenus()) bkGuard(); }).observe(document.documentElement, {attributes: true, attributeFilter: ['class']});
+addEventListener('popstate', e => {
+  if (VW.open && VW.pushed) return;   // lo cierra el visor
+  if (e.state && e.state.gpG) { BK.on = true; return; }   // se cerró algo de encima: seguimos en la guarda
+  if (!BK.on) return; BK.on = false;
+  const d = bkTop();
+  if (d) { if (d.dispatchEvent(new Event('cancel', {cancelable: true}))) d.close(); }
+  else if (bkMenus()) mvClose();
+  setTimeout(() => { if (bkTop() || bkMenus()) bkGuard(); }, 0);   // queda otra ventana abierta (o la ficha pidió confirmar): otra guarda
+});
