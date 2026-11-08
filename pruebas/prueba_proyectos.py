@@ -22,7 +22,7 @@ with sync_playwright() as pw:
     def device(init=None):
         c = b.new_context(viewport={'width': 1200, 'height': 800}, service_workers='block'); c.add_init_script(GOOGLE); c.route('https://www.googleapis.com/**', drive)
         if init: c.add_init_script(init)
-        p = c.new_page(); p.on('pageerror', lambda e: errs.append(str(e))); p.on('console', lambda m: errs.append(m.text) if m.type == 'error' and 'favicon' not in m.text else None); p.on('dialog', lambda d: d.accept())
+        p = c.new_page(); p.on('pageerror', lambda e: errs.append(str(e))); p.on('console', lambda m: errs.append(m.text) if m.type == 'error' and 'favicon' not in m.text else None); p.on('dialog', lambda d: d.accept()); p.add_init_script("window.ASK_AUTO = 'accept'")
         p.goto('http://localhost:8793/index.html'); p.wait_for_timeout(1200); p.evaluate(f"window.P = {PAPER}"); return c, p
     menu = lambda pg: pg.evaluate("[...document.querySelectorAll('#ctx .pji')].map(b => b.textContent.trim())")
     def pick(pg, name): pg.click('#pjBtn'); pg.click(f'#ctx .pji:has-text("{name}")'); pg.wait_for_timeout(500)

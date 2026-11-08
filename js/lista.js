@@ -21,14 +21,58 @@ function sortList(L) {   // ordena por todos los criterios, en cascada; d = 1 as
     const c = typeof x === 'number' ? x - y : COLL.compare(x, y); if (c) return c * d; } return 0; }).map(e => e.p);
 }
 const has = (p, t) => p.tagIds.includes(t);   // las etiquetas son independientes de las secciones
+/* ---- Búsqueda rápida: cada palabra por separado y en cualquier orden ----
+   «garcia 2020» encuentra «García, Ana (2020)». También: "frase exacta", -palabra (excluir), autor:…, año:2020 o año:2010-2020,
+   revista:…, doi:…, #etiqueta (o etiqueta:…) y seccion:…. Sin prefijo se busca en título, alias, año, autores, revista, DOI, etiquetas y secciones
+   (y en notas y citas con «Incluir notas»). */
 const SEARCH = new WeakMap();   // texto de búsqueda ya normalizado de cada paper: solo se recalcula si cambia
 function searchTxt(p) {
-  const raw = [p.title, p.alias, p.year, ...p.authors, ...(F.inNotes ? [p.general, ...p.notes.map(n => n.content), ...Object.values(p.cites)] : [])].join(' ');
+  const raw = [p.title, p.alias, p.year, ...p.authors, p.venue, p.doi, ...p.tagIds.map(i => tagById(i)?.name), ...p.sectionIds.map(i => secById(i)?.name),
+    ...(F.inNotes ? [p.general, ...p.notes.map(n => n.content), ...Object.values(p.cites)] : [])].join(' ');
   let c = SEARCH.get(p); if (!c || c.raw !== raw) SEARCH.set(p, c = {raw, n: norm(raw)}); return c.n;
 }
+const QP = {autor: 'au', autores: 'au', author: 'au', au: 'au', ano: 'yr', year: 'yr', revista: 've', venue: 've', editorial: 've', doi: 'doi', etiqueta: 'tag', tag: 'tag', seccion: 'sec', section: 'sec'};
+let QC = {raw: null, T: []};
+function qParse(raw) {   // el texto de la caja → [{k: '' | 'au' | 'yr' | 've' | 'doi' | 'tag' | 'sec', v (normalizado), neg, a, b (años)}]
+  if (QC.raw === raw) return QC.T;
+  const T = [], re = /(-?)(?:([\p{L}]+):)?(?:"([^"]*)"?|(\S+))/gu; let m;
+  while ((m = re.exec(raw || ''))) {
+    const [, neg, pre, ph, w] = m; let v = ph ?? w ?? '', k = '';
+    if (pre) { k = QP[norm(pre)] || ''; if (!k) v = pre + ':' + v; }   // «http://…» o un prefijo desconocido: se busca tal cual
+    if (!k && !ph && v.length > 1 && v[0] === '#') { k = 'tag'; v = v.slice(1); }
+    v = norm(v).trim(); if (!v) continue;
+    const t = {k, v, neg: !!neg};
+    if (k === 'yr') { const y = /^(\d{1,4})?\s*(?:[-–]\s*(\d{1,4})?)?$/.exec(v); if (!y || !y[1] && !y[2]) { t.k = ''; } else { t.a = +y[1] || 0; t.b = /[-–]/.test(v) ? +y[2] || 9999 : t.a; } }
+    T.push(t);
+  }
+  return (QC = {raw, T}).T;
+}
+function qTest(p, T) {
+  for (const t of T) {
+    const v = t.v, k = t.k;
+    const ok = !k ? searchTxt(p).includes(v) : k === 'au' ? norm(p.authors.join('; ')).includes(v) : k === 'yr' ? +p.year > 0 && +p.year >= t.a && +p.year <= t.b
+      : k === 've' ? norm(p.venue).includes(v) : k === 'doi' ? norm(p.doi).includes(v)
+      : k === 'tag' ? p.tagIds.some(i => norm(tagById(i)?.name).includes(v)) : p.sectionIds.some(i => norm(secById(i)?.name).includes(v));
+    if (ok === t.neg) return false;
+  }
+  return true;
+}
+/* Resaltado: las palabras buscadas se marcan en el título y los autores de tarjetas y tabla, sin distinguir tildes ni mayúsculas */
+let HL = {t: [], a: []};
+const hlSet = T => { const f = T.filter(t => !t.neg && !t.k).map(t => t.v); HL = {t: f, a: [...f, ...T.filter(t => !t.neg && t.k === 'au').map(t => t.v)]}; };
+function hl(s, terms) {
+  s = String(s ?? ''); if (!terms.length || !s) return esc(s);
+  let n = ''; const map = [];
+  for (let i = 0; i < s.length; i++) { const c = norm(s[i]); for (let j = 0; j < c.length; j++) { n += c[j]; map.push(i); } }
+  const on = new Uint8Array(s.length);
+  for (const t of terms) for (let i = n.indexOf(t); i >= 0; i = n.indexOf(t, i + t.length)) for (let j = i; j < i + t.length; j++) on[map[j]] = 1;
+  let o = '', open = 0;
+  for (let i = 0; i < s.length; i++) { if (on[i] !== open) { o += on[i] ? '<mark>' : '</mark>'; open = on[i]; } o += esc(s[i]); }
+  return o + (open ? '</mark>' : '');
+}
 function visible() {
-  const q = norm(F.q);
-  return sortList(db.papers.filter(p => (!q || searchTxt(p).includes(q))
+  const T = qParse(F.q); hlSet(T);
+  return sortList(db.papers.filter(p => (!T.length || qTest(p, T))
     && (!F.sec || p.sectionIds.includes(F.sec)) && (!F.read || p.reading === F.read) && p.rating >= F.minRating && (!F.tags.size || [...F.tags][F.mode === 'all' ? 'every' : 'some'](t => has(p, t)))
     && (!F.noSec || !p.sectionIds.some(secById)) && (!F.noTag || !p.tagIds.some(tagById)) && (!F.exTags.size || ![...F.exTags].some(t => has(p, t)))
     && (!F.yFrom || +p.year >= F.yFrom) && (!F.yTo || (+p.year > 0 && +p.year <= F.yTo)) && advTest(p)));
@@ -176,9 +220,9 @@ function imgOpen() {
   hydrateImgs(); $('#img').showModal();
 }
 function imgSet(v) { D.image = v; imgBox(); if ($('#img').open) imgOpen(); }
-function imgSetUrl() { const u = $('#imgUrl').value.trim(); if (!u) return imgClear(); if (!/^https?:\/\//i.test(u)) return alert('La URL debe empezar por http:// o https://'); PEND.delete(D.id); imgSet({kind: 'url', url: u}); }
+function imgSetUrl() { const u = $('#imgUrl').value.trim(); if (!u) return imgClear(); if (!/^https?:\/\//i.test(u)) return say('La URL debe empezar por http:// o https://'); PEND.delete(D.id); imgSet({kind: 'url', url: u}); }
 function imgClear() { PEND.delete(D.id); imgSet(null); }
-async function imgPickLinked() { try { const [h] = await showOpenFilePicker({types: FILE_IMG_T}); PEND.set(D.id, h); imgSet({kind: 'file', name: h.name}); } catch (e) { if (e.name !== 'AbortError') alert('No se pudo elegir el archivo: ' + e.message); } }
+async function imgPickLinked() { try { const [h] = await showOpenFilePicker({types: FILE_IMG_T}); PEND.set(D.id, h); imgSet({kind: 'file', name: h.name}); } catch (e) { if (e.name !== 'AbortError') say('No se pudo elegir el archivo: ' + e.message); } }
 async function imgEmbedBlob(f) {   // copia reducida (máx. 480 px, JPEG) para guardarla dentro del JSON
   const b = await createImageBitmap(f), k = Math.min(1, 480 / Math.max(b.width, b.height)), c = document.createElement('canvas');
   c.width = Math.max(1, Math.round(b.width * k)); c.height = Math.max(1, Math.round(b.height * k)); c.getContext('2d').drawImage(b, 0, 0, c.width, c.height);
@@ -186,7 +230,7 @@ async function imgEmbedBlob(f) {   // copia reducida (máx. 480 px, JPEG) para g
 }
 function imgPickEmbed() {
   const i = document.createElement('input'); i.type = 'file'; i.accept = 'image/*';
-  i.onchange = async () => { const f = i.files[0]; if (f) try { await imgEmbedBlob(f); } catch (e) { alert('No se pudo leer la imagen: ' + e.message); } };
+  i.onchange = async () => { const f = i.files[0]; if (f) try { await imgEmbedBlob(f); } catch (e) { say('No se pudo leer la imagen: ' + e.message); } };
   i.click();
 }
 function imgFromClipboard(e, inField) {   // imagen copiada (p. ej. «Copiar imagen» en Google Imágenes): archivo, <img> en el HTML o, fuera de un campo, una URL suelta
@@ -196,8 +240,8 @@ function imgFromClipboard(e, inField) {   // imagen copiada (p. ej. «Copiar ima
   const u = m ? m[1].replace(/&amp;/g, '&') : !inField && /^https?:\/\/\S+$/i.test(txt) ? txt : '';
   if (!file && !/^(https?:|data:image\/)/i.test(u)) return false;
   e.preventDefault();
-  if (file) imgEmbedBlob(file).catch(err => alert('No se pudo leer la imagen: ' + err.message));
-  else if (u.startsWith('data:')) fetch(u).then(r => r.blob()).then(imgEmbedBlob).catch(err => alert('No se pudo leer la imagen: ' + err.message));
+  if (file) imgEmbedBlob(file).catch(err => say('No se pudo leer la imagen: ' + err.message));
+  else if (u.startsWith('data:')) fetch(u).then(r => r.blob()).then(imgEmbedBlob).catch(err => say('No se pudo leer la imagen: ' + err.message));
   else { PEND.delete(D.id); imgSet({kind: 'url', url: u}); }
   return true;
 }
@@ -210,8 +254,8 @@ const starsHTML = p => `<span class="stv${p.rating ? '' : ' none'}" data-onconte
 const rdHTML = p => `<span class="rd"><button class="rst" style="--c:${READ_C[p.reading]}" title="Clic: cambiar el estado de lectura" data-onclick="cycleRead('${p.id}')">${READ[p.reading]}</button>${starsHTML(p)}</span>`;
 function starMenu(e, id) { ctxShow(e, '<div class="ctxh">Valoración</div>' + [5, 4, 3, 2, 1, 0].map(n => `<button data-onclick="setRating('${id}',${n})">${n ? '★'.repeat(n) + '☆'.repeat(5 - n) : 'Sin valorar'}</button>`).join('')); }
 function setRating(id, n) { const p = db.papers.find(x => x.id === id); ctxClose(); if (!p || p.rating === n) return; logChange(p, `Valoración: ${p.rating || '—'} → ${n || '—'}`); p.rating = n; markDirty(); renderPaper(id); }
-const card = (p, from) => `<article class="card" data-id="${p.id}" draggable="true" ${F.group ? `data-from="${from || ''}"` : ''}><div class="ct"><label class="sel"><input type="checkbox" ${SEL.has(p.id) ? 'checked' : ''} data-onchange="toggleSel('${p.id}')"> Seleccionar</label><button class="sm" data-onclick="openPaper('${p.id}')">Editar</button><button class="sm cpb" data-onclick="copyCardCite('${p.id}',this)" title="Copiar la cita (estilo elegido en Exportar), con cursiva al pegar en Word">📋</button>${pdfBtns(p, true)}${p.tagIds.length ? `<span class="tl">${tagsOf(p)}</span>` : ''}${rdHTML(p)}<button class="x" title="Eliminar" data-onclick="delPaper('${p.id}')">✕</button></div><div class="th">${thumbHTML(p, 'sm')}<h3>${esc(p.alias || p.title)}</h3></div>${p.alias ? `<div class="sub">${esc(p.title)}</div>` : ''}
-    <div class="au"><span>${esc(p.authors.join('; '))} ${p.year ? '(' + esc(p.year) + ')' : ''}</span></div>
+const card = (p, from) => `<article class="card" data-id="${p.id}" draggable="true" ${F.group ? `data-from="${from || ''}"` : ''}><div class="ct"><label class="sel"><input type="checkbox" ${SEL.has(p.id) ? 'checked' : ''} data-onchange="toggleSel('${p.id}')"> Seleccionar</label><button class="sm" data-onclick="openPaper('${p.id}')">Editar</button><button class="sm cpb" data-onclick="copyCardCite('${p.id}',this)" title="Copiar la cita (estilo elegido en Exportar), con cursiva al pegar en Word">📋</button>${pdfBtns(p, true)}${p.tagIds.length ? `<span class="tl">${tagsOf(p)}</span>` : ''}${rdHTML(p)}<button class="x" title="Eliminar" data-onclick="delPaper('${p.id}')">✕</button></div><div class="th">${thumbHTML(p, 'sm')}<h3>${hl(p.alias || p.title, HL.t)}</h3></div>${p.alias ? `<div class="sub">${hl(p.title, HL.t)}</div>` : ''}
+    <div class="au"><span>${hl(p.authors.join('; '), HL.a)} ${p.year ? '(' + esc(p.year) + ')' : ''}</span></div>
     ${/^https?:/i.test(p.url) ? `<a href="${esc(p.url)}" target="_blank" rel="noopener noreferrer">${esc(p.url)}</a>` : ''}
     
     <div class="row"><button class="sm" data-onclick="toggleNotes('${p.id}')" data-oncontextmenu="viewNotes(event,'${p.id}')" title="Clic: desplegar notas · Clic derecho: abrir el visor de notas">Notas (${pNotes(p).length}) ${EXP.has(p.id) ? '▾' : '▸'}</button>${relCount(p) ? `<button class="sm" data-onclick="viewRel('${p.id}')" title="Relaciones: relacionados, cita a y citado por">🔗 ${relCount(p)}</button>` : ''}</div>${EXP.has(p.id) ? notesHTML(p) : ''}</article>`;
@@ -222,7 +266,7 @@ function thSort(k) {   // clic en una cabecera: ese criterio pasa a ser el princ
 const rowHTML = (p, from) => `<tr class="rw" data-id="${p.id}" draggable="true" ${F.group ? `data-from="${from || ''}"` : ''}>
   <td><input type="checkbox" aria-label="Seleccionar" ${SEL.has(p.id) ? 'checked' : ''} data-onchange="toggleSel('${p.id}')"></td>
   <td class="timg">${thumbHTML(p, 'xs')}</td>
-  <td class="tt"><a class="tl2" data-onclick="openPaper('${p.id}')" title="${esc(p.alias || p.title)} · Clic: editar">${esc(p.alias || p.title)}</a></td><td title="${esc(p.authors.join('; '))}">${esc(p.authors.join('; '))}</td><td>${esc(p.year)}</td><td title="${esc(p.venue)}">${esc(p.venue)}</td>
+  <td class="tt"><a class="tl2" data-onclick="openPaper('${p.id}')" title="${esc(p.alias || p.title)} · Clic: editar">${hl(p.alias || p.title, HL.t)}</a></td><td title="${esc(p.authors.join('; '))}">${hl(p.authors.join('; '), HL.a)}</td><td>${esc(p.year)}</td><td title="${esc(p.venue)}">${esc(p.venue)}</td>
   <td><button class="rst" style="--c:${READ_C[p.reading]}" title="Clic: cambiar el estado de lectura" data-onclick="cycleRead('${p.id}')">${READ[p.reading]}</button></td><td>${starsHTML(p)}</td>
   <td title="${esc(p.sectionIds.map(secById).filter(Boolean).map(s => s.name).join(', '))}">${p.sectionIds.map(secById).filter(Boolean).map(s => chip(s, 1)).join('')}</td><td title="${esc(p.tagIds.map(tagById).filter(Boolean).map(t => t.name).join(', '))}">${tagsOf(p)}</td>
   <td class="nw"><button class="sm cpb" data-onclick="copyCardCite('${p.id}',this)" title="Copiar la cita (estilo elegido en Exportar), con cursiva al pegar en Word">📋</button>${pdfBtns(p)}<button class="sm" data-onclick="toggleNotes('${p.id}')" data-oncontextmenu="viewNotes(event,'${p.id}')" title="Clic: desplegar · Clic derecho: visor de notas">${pNotes(p).length} ${EXP.has(p.id) ? '▾' : '▸'}</button>${relCount(p) ? `<button class="sm" data-onclick="viewRel('${p.id}')" title="Relaciones">🔗 ${relCount(p)}</button>` : ''}</td>
@@ -259,7 +303,7 @@ function render() {
   const L = visible(), part = !F.group && L.length > LIST.step;   // sin agrupar, las listas largas se pintan por partes
   LIST.L = L; LIST.shown = part ? LIST.step : L.length;
   $('#list').innerHTML = (listHTML(part ? L.slice(0, LIST.step) : L) + (part ? moreHTML() : '')) || '<p class="empty">No hay papers que mostrar. Crea uno con «Nuevo paper» o ajusta los filtros.</p>';
-  fitTags(); hydrateImgs(); moreWatch(); uiSoon();
+  fitTags(); hydrateImgs(); moreWatch(); uiSoon(); kMark();
   LIST.n = L.length; countDraw(); progDraw();
 }
 const LIST = {L: [], n: 0, shown: 0, get step() { return document.documentElement.classList.contains('mv') ? 40 : 150; }};   // lo que se ve en la lista y cuántos papers lleva pintados (en el móvil caben pocas tarjetas: se pintan de 40 en 40)
@@ -355,9 +399,43 @@ function toggleSel(id) { SEL.has(id) ? SEL.delete(id) : SEL.add(id);   // solo c
   const c = $(`#list [data-id="${id}"] input[type=checkbox]`); if (c) c.checked = SEL.has(id); selDraw(); }
 function selVisible() { visible().forEach(p => SEL.add(p.id)); render(); }
 function selNone() { SEL.clear(); render(); }
+/* ---- Acciones en lote sobre la selección: lectura, valoración, etiquetas, secciones y papelera (un solo Ctrl+Z las deshace) ---- */
+const selPapers = () => db.papers.filter(p => SEL.has(p.id));
+const nPap = n => n === 1 ? '1 paper' : n + ' papers';
+function bulkDo(fn, msg) {
+  ctxClose(); let n = 0; selPapers().forEach(p => { if (fn(p)) { n++; p.modified = new Date().toISOString(); } });
+  if (n) { markDirty(); render(); }
+  toast(n ? msg(n) : 'No había nada que cambiar.', n ? [{t: 'Deshacer', fn: undo}] : [], 5000);
+}
+function bulkMenu(e, k) {
+  const b = (on, t) => `<button data-onclick="${on}">${t}</button>`, S = selPapers();
+  let h = '';
+  if (k === 'read') h = '<div class="ctxh">Estado de lectura</div>' + Object.entries(READ).map(([v, t]) => b(`bulkRead('${v}')`, t)).join('');
+  else if (k === 'rate') h = '<div class="ctxh">Valoración</div>' + [5, 4, 3, 2, 1, 0].map(n => b(`bulkRate(${n})`, n ? '★'.repeat(n) : 'Sin valorar')).join('');
+  else {
+    const L = k === 'tag' ? db.tags : db.sections, f = k === 'tag' ? 'tagIds' : 'sectionIds', fn = k === 'tag' ? 'bulkTag' : 'bulkSec', on = L.filter(x => S.some(p => p[f].includes(x.id)));
+    if (!L.length) h = `<div class="ctxh">No hay ${k === 'tag' ? 'etiquetas' : 'secciones'}</div>`;
+    else h = `<div class="ctxh">Añadir ${k === 'tag' ? 'etiqueta' : 'sección'}</div>` + L.map(x => b(`${fn}('${x.id}',1)`, '＋ ' + esc(x.name))).join('')
+      + (on.length ? `<div class="ctxh">Quitar</div>` + on.map(x => b(`${fn}('${x.id}',0)`, '− ' + esc(x.name))).join('') : '');
+  }
+  ctxShow(e, h);
+}
+function bulkRead(v) { bulkDo(p => { if (p.reading === v) return false; logChange(p, `Lectura: ${READ[p.reading]} → ${READ[v]}`); p.reading = v; return true; }, n => `${nPap(n)}: «${READ[v]}».`); }
+function bulkRate(v) { bulkDo(p => { if (p.rating === v) return false; logChange(p, `Valoración: ${p.rating || '—'} → ${v || '—'}`); p.rating = v; return true; }, n => `Valoración cambiada en ${nPap(n)}.`); }
+function bulkList(f, id, add, name, what) {
+  bulkDo(p => { const i = p[f].indexOf(id); if (add ? i >= 0 : i < 0) return false; add ? p[f].push(id) : p[f].splice(i, 1); logChange(p, `${what} ${add ? 'añadida' : 'quitada'}: ${name}`); return true; },
+    n => `«${name}» ${add ? 'añadida a' : 'quitada de'} ${nPap(n)}.`);
+}
+function bulkTag(id, add) { bulkList('tagIds', id, add, tagById(id)?.name || '?', 'Etiqueta'); }
+function bulkSec(id, add) { bulkList('sectionIds', id, add, secById(id)?.name || '?', 'Sección'); }
+function bulkTrash() {
+  ctxClose(); const ids = [...SEL].filter(id => db.papers.some(p => p.id === id)); if (!ids.length) return;
+  ids.forEach(trashPaper); SEL.clear(); markDirty(); render();
+  toast(`${nPap(ids.length)} a la papelera (se guardan ${TRASH_DAYS} días).`, [{t: 'Deshacer', fn: undo}], 6000);
+}
 /* ===== Exportar (texto, BibTeX, RIS, Word) y bibliografía ordenada ===== */
 const ex = () => db.settings.export;
-const EXF = {txt: ['Texto (.txt)', 'text/plain'], bib: ['BibTeX (.bib)', 'text/plain'], ris: ['RIS (.ris)', 'text/plain'], doc: ['Word (.doc)', 'application/msword'], docx: ['Word (.docx)', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document']};
+const EXF = {txt: ['Texto (.txt)', 'text/plain'], bib: ['BibTeX (.bib)', 'text/plain'], ris: ['RIS (.ris)', 'text/plain'], csl: ['CSL-JSON (.json: Zotero, Pandoc…)', 'application/json'], doc: ['Word (.doc)', 'application/msword'], docx: ['Word (.docx)', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document']};
 const isTl = f => f === 'txt' || f === 'doc' || f === 'docx';   // formatos de texto con estilo de cita (los demás son BibTeX y RIS)
 const EXO = {auto: 'Automático (según el estilo: APA alfabético; Vancouver, lista)', list: 'Orden de la lista', alpha: 'Alfabético', year: 'Por año'};
 const secName = id => secById(id)?.name || 'Sin sección';
@@ -443,6 +521,26 @@ const BIBV = {informe: 'institution', norma: 'organization', patente: 'organizat
 const STOPW = new Set(['the', 'and', 'for', 'del', 'los', 'las', 'una', 'con', 'por', 'que']);
 const texEsc = s => String(s).replace(/([&%$#_])/g, '\\$1');
 const bibName = (p, x) => { x = x.trim(); return p.authorType === 'entidad' || (p.authorType !== 'persona' && isOrg(x)) ? `{${texEsc(x)}}` : texEsc(x); };   // entidades entre llaves
+/* ---- CSL-JSON (el formato de Zotero, Mendeley, Pandoc y citeproc) ---- */
+const CSLT = {articulo: 'article-journal', libro: 'book', capitulo: 'chapter', congreso: 'paper-conference', tesis: 'thesis', web: 'webpage', prensa: 'article-newspaper', blog: 'post-weblog', informe: 'report',
+  norma: 'standard', patente: 'patent', mapa: 'map', dataset: 'dataset', software: 'software', basedatos: 'dataset', audiovisual: 'motion_picture', audio: 'song', redsocial: 'post', ia: 'software',
+  diccionario: 'entry-dictionary', presentacion: 'speech', personal: 'personal_communication', legislacion: 'legislation', jurisprudencia: 'legal_case'};
+const CSL_PUB = new Set(['libro', 'tesis', 'informe', 'norma', 'patente', 'mapa', 'software', 'ia', 'presentacion']);   // en estos, «Revista / editorial» es la editorial o institución
+const cslName = (p, a) => p.authorType === 'entidad' || !String(a).includes(',') ? {literal: a} : {family: a.split(',')[0].trim(), given: a.split(',').slice(1).join(',').trim()};
+const cslDate = (y, d) => okDate(d) ? {'date-parts': [d.split('-').map(Number)]} : +y ? {'date-parts': [[+y]]} : undefined;
+function cslItem(p) {
+  p = effP(p); const ty = p.type, o = {id: p.id, type: CSLT[ty] || 'document', title: p.title};
+  const au = p.authorType === 'sin_autor' ? [] : p.authors; if (au.length) o.author = au.map(a => cslName(p, a));
+  if (p.editors?.length) o.editor = p.editors.map(a => cslName({}, a));
+  const is = cslDate(p.year, p.pubDate); if (is) o.issued = is; if (okDate(p.accessed)) o.accessed = cslDate(0, p.accessed);
+  if (p.venue) o[CSL_PUB.has(ty) ? 'publisher' : 'container-title'] = p.venue;
+  if (p.publisher && !o.publisher) o.publisher = p.publisher;
+  const f = {place: 'publisher-place', volume: 'volume', issue: 'issue', pages: 'page', edition: 'edition', isbn: 'ISBN', issn: 'ISSN', thesisType: 'genre', docNumber: 'number', ecli: 'authority', shorthand: 'title-short'};
+  for (const [k, c] of Object.entries(f)) if (p[k]) o[c] = String(p[k]);
+  if (p.doi) o.DOI = p.doi; if (/^https?:/i.test(p.url || '')) o.URL = p.url;
+  return o;
+}
+const cslJSON = L => JSON.stringify(L.map(cslItem), null, 2);
 function bibtex(L) {
   L = L.map(effP);
   const used = new Map();
@@ -497,7 +595,7 @@ function exUI() {
 }
 function drawEx() {
   const o = ex(), L = exList();
-  $('#exText').value = o.fmt === 'bib' ? bibtex(L) : o.fmt === 'ris' ? ris(L) : exText(L, o);   // la vista previa es editable (salvo en Word)
+  $('#exText').value = o.fmt === 'bib' ? bibtex(L) : o.fmt === 'ris' ? ris(L) : o.fmt === 'csl' ? cslJSON(L) : exText(L, o);   // la vista previa es editable (salvo en Word)
   $('#exText').readOnly = o.fmt === 'doc' || o.fmt === 'docx'; $('#exRich').hidden = !isTl(o.fmt);
   $('#exMsg').textContent = L.length ? `${L.length} papers${EXOM ? ` (${EXOM} omitidos: este estilo no los incluye en la lista)` : ''}` : 'No hay papers para exportar.';
 }
@@ -517,11 +615,12 @@ async function exCopyRich() {   // con sangría francesa, para pegar en Word o D
   $('#exMsg').textContent = 'Copiado con formato ✓';
 }
 async function exSave() {
-  const o = ex(), L = exList(), [lbl, mime] = EXF[o.fmt]; if (!L.length) return alert('No hay nada que exportar.');
+  const o = ex(), L = exList(), [lbl, mime] = EXF[o.fmt]; if (!L.length) return say('No hay nada que exportar.');
   const text = o.fmt === 'doc' ? wordDoc(L, o) : o.fmt === 'docx' ? exDocx(L, o) : $('#exText').value;
-  try { if (FSA) { const h = await showSaveFilePicker({suggestedName: 'citas.' + o.fmt, types: [{description: lbl, accept: {[mime]: ['.' + o.fmt]}}]}); await writeTo(h, text); }
-    else download(text, 'citas.' + o.fmt, mime); }
-  catch (e) { if (e.name !== 'AbortError') alert('Error al guardar: ' + e.message); }
+  const ext = o.fmt === 'csl' ? 'json' : o.fmt;
+  try { if (FSA) { const h = await showSaveFilePicker({suggestedName: 'citas.' + ext, types: [{description: lbl, accept: {[mime]: ['.' + ext]}}]}); await writeTo(h, text); }
+    else download(text, 'citas.' + ext, mime); }
+  catch (e) { if (e.name !== 'AbortError') say('Error al guardar: ' + e.message); }
 }
 document.querySelectorAll('dialog:not(#dlg)').forEach(d => {   // todas las ventanas se cierran con un clic fuera (sin tocar la de edición que haya debajo); la de editar paper guarda al salir, más abajo
   d.addEventListener('mousedown', e => bdDown = outside(e, d));
@@ -529,6 +628,58 @@ document.querySelectorAll('dialog:not(#dlg)').forEach(d => {   // todas las vent
 });
 function delPaper(id) {
   const p = db.papers.find(x => x.id === id); if (!p) return;
-  if (!confirm(`¿Mover «${p.title}» a la papelera? Podrás restaurarlo durante ${TRASH_DAYS} días.`)) return;
-  trashPaper(id); markDirty(); render();
+  lastRecAt = 0; trashPaper(id); SEL.delete(id); markDirty(); render();   // sin preguntar: se puede deshacer desde el aviso o la papelera
+  toast(`«${shortTxt(p.alias || p.title)}» a la papelera (se guarda ${TRASH_DAYS} días).`, [{t: 'Deshacer', fn: undo}], 6000);
 }
+/* ---- Teclado en la lista: ↑/↓ (o j/k) para moverse, Intro para abrir, Espacio para seleccionar, Supr para la papelera, Esc para soltar ---- */
+let KCUR = '';   // paper con el cursor del teclado
+const kItems = () => [...document.querySelectorAll('#list [data-id]')].filter(e => e.matches('.card, tr.rw'));
+function kMark(scroll) {
+  document.querySelectorAll('#list .kcur').forEach(e => e.classList.remove('kcur'));
+  const el = KCUR && $(`#list [data-id="${KCUR}"]`); if (!el) return;
+  el.classList.add('kcur'); if (scroll) el.scrollIntoView({block: 'nearest'});
+}
+function kMove(d) {
+  let L = kItems(); if (!L.length) return;
+  let i = L.findIndex(e => e.dataset.id === KCUR);
+  if (d > 0 && i === L.length - 1 && $('#list > .more')) { listMore(); L = kItems(); }   // al llegar al final se añade la siguiente parte
+  i = i < 0 ? (d > 0 ? 0 : L.length - 1) : Math.max(0, Math.min(L.length - 1, i + d));
+  KCUR = L[i].dataset.id; kMark(true);
+}
+document.addEventListener('keydown', e => {
+  if (e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey || document.querySelector('dialog[open]') || TAB.passive) return;
+  const t = e.target; if (/^(INPUT|TEXTAREA|SELECT|BUTTON|A)$/.test(t.tagName) && !(t.type === 'checkbox' && t.closest('#list')) || t.isContentEditable) return;
+  const k = e.key, has = KCUR && db.papers.some(p => p.id === KCUR);
+  if (k === 'ArrowDown' || k === 'j') { e.preventDefault(); kMove(1); }
+  else if (k === 'ArrowUp' || k === 'k') { e.preventDefault(); kMove(-1); }
+  else if (!has) return;
+  else if (k === 'Enter' || k === 'o') { e.preventDefault(); openPaper(KCUR); }
+  else if (k === ' ' || k === 'x') { e.preventDefault(); toggleSel(KCUR); const c = $(`#list [data-id="${KCUR}"] input[type=checkbox]`); if (c) c.checked = SEL.has(KCUR); }
+  else if (k === 'Delete') { e.preventDefault(); const L = kItems(), i = L.findIndex(x => x.dataset.id === KCUR), nx = L[i + 1] || L[i - 1]; const id = KCUR; delPaper(id); if (!db.papers.some(p => p.id === id)) { KCUR = nx ? nx.dataset.id : ''; kMark(true); } }
+  else if (k === 'Escape') { KCUR = ''; kMark(); }
+});
+/* ---- Paleta de órdenes (Ctrl+K): busca acciones y papers por nombre ---- */
+const CMDS = () => [
+  ['＋ Nuevo paper', () => openPaper()], ['📥 Importar: buscar por DOI, ISBN o título', () => openImport('doi')], ['📄 Importar desde archivo', () => openImport('file')], ['📋 Importar: pegar BibTeX, RIS o citas', () => openImport('text')],
+  ['📤 Exportar citas', () => openEx()], ['💾 Guardar', () => save(false)], ['💾 Guardar como…', () => save(true)], ['📂 Abrir un archivo JSON', () => doOpen()],
+  ['⚙️ Configuración', () => openCfg()], ['❓ Ayuda', () => openHelp()], ['🗑️ Papelera', () => trOpen()], ['🕸️ Relaciones', () => grOpen()], ['🧬 Buscar duplicados', () => dpOpen()], ['🛟 Copias de seguridad', () => bkOpen()],
+  [db.settings.view === 'table' ? '▦ Ver como tarjetas' : '☰ Ver como tabla', () => viewToggle()], ['☰ Plegar o desplegar la barra lateral', () => sbToggle()], ['☑ Seleccionar los visibles', () => selVisible()],
+  ['✕ Quitar la selección', () => selNone()], ['🧹 Limpiar todos los filtros', () => fClrAll()], ['🔄 Sincronizar con Google Drive', () => syOn() ? syNow() : syConnect()], ['🔍 Buscar en la lista', () => SC_ACT.find()]];
+let CMD = {q: '', i: 0, L: []};
+function cmdOpen() { CMD = {q: '', i: 0, L: []}; const d = $('#cmdk');
+  d.innerHTML = `<input id="cmdQ" type="search" placeholder="Escribe una acción o el título de un paper…" aria-label="Buscar acción o paper" autocomplete="off" data-oninput="cmdSet(this.value)" data-onkeydown="cmdKey(event)"><div id="cmdL" role="listbox"></div><small class="cmdh">↑/↓ para elegir · Intro para ejecutar · Esc para cerrar</small>`;
+  cmdDraw(); d.showModal(); $('#cmdQ').focus(); }
+function cmdSet(v) { CMD.q = v; CMD.i = 0; cmdDraw(); }
+function cmdDraw() {
+  const q = norm(CMD.q).trim(), w = q.split(/\s+/).filter(Boolean), ok = s => w.every(x => norm(s).includes(x));
+  const A = CMDS().filter(([t]) => ok(t)).map(([t, fn]) => ({t, fn}));
+  const P = w.length ? db.papers.filter(p => ok([p.alias, p.title, ...p.authors, p.year].join(' '))).slice(0, 8).map(p => ({t: '📄 ' + (p.alias || p.title) + (p.year ? ` (${p.year})` : ''), fn: () => openPaper(p.id)})) : [];
+  CMD.L = [...A, ...P]; CMD.i = Math.min(CMD.i, Math.max(0, CMD.L.length - 1));
+  $('#cmdL').innerHTML = CMD.L.length ? CMD.L.map((c, i) => `<button role="option" class="${i === CMD.i ? 'on' : ''}" aria-selected="${i === CMD.i}" data-onclick="cmdRun(${i})">${esc(c.t)}</button>`).join('') : '<p class="empty">Nada coincide.</p>';
+  $('#cmdL .on')?.scrollIntoView({block: 'nearest'});
+}
+function cmdKey(e) {
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); CMD.i = (CMD.i + (e.key === 'ArrowDown' ? 1 : -1) + CMD.L.length) % (CMD.L.length || 1); cmdDraw(); }
+  else if (e.key === 'Enter') { e.preventDefault(); cmdRun(CMD.i); }
+}
+function cmdRun(i) { const c = CMD.L[i]; if (!c) return; $('#cmdk').close(); c.fn(); }

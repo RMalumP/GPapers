@@ -9,7 +9,7 @@ function comboOf(e) {   // p. ej. «Ctrl+Shift+Z»; null si solo se ha pulsado u
   return parts.join('+');
 }
 const SC_ACT = {
-  open: () => doOpen(), save: () => save(false), newPaper: () => openPaper(), undo, redo, exportCites: () => openEx(), import: () => openImport('file'), side: () => sbToggle(),
+  open: () => doOpen(), save: () => save(false), newPaper: () => openPaper(), undo, redo, exportCites: () => openEx(), import: () => openImport('file'), side: () => sbToggle(), palette: () => cmdOpen(),
   find: () => { if (!$('#side').classList.contains('min')) $('#sg-search').classList.remove('fold'); $('#q').focus(); }   // con la barra plegada, la búsqueda ya está en la fila de «Nuevo paper»
 };
 document.addEventListener('keydown', e => {
@@ -29,7 +29,7 @@ window.addEventListener('keydown', e => {   // modo grabación: captura la sigui
   if (['Backspace', 'Delete'].includes(e.key) && !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey) return setSC(recAct, '');
   const combo = comboOf(e); if (!combo) return;
   const other = Object.keys(SC_DEF).find(a => a !== recAct && db.settings.shortcuts[a] === combo);
-  if (other) return alert(`«${combo}» ya está asignado a «${SC_NAMES[other]}». Quítalo de esa acción o elige otra combinación.`);
+  if (other) return say(`«${combo}» ya está asignado a «${SC_NAMES[other]}». Quítalo de esa acción o elige otra combinación.`);
   setSC(recAct, combo);
 }, true);
 function setSC(a, combo) { db.settings.shortcuts[a] = combo; recAct = null; markDirty(); drawCfg(); }
@@ -45,8 +45,14 @@ const PAL = {   // l = modo claro, d = modo oscuro, c = color de muestra; «azul
 };
 const VARS = ['pri', 'bg', 'card', 'bd', 'fg', 'red'];
 const LAB = [['pri', 'Acento (botones y selección)'], ['bg', 'Fondo'], ['card', 'Tarjetas y ventanas'], ['bd', 'Bordes'], ['fg', 'Texto'], ['red', 'Eliminar y avisos']];
+/* Tema claro u oscuro: de cada dispositivo (localStorage «gp-theme»: auto, light o dark); «auto» sigue al sistema. js/movil.js lo aplica antes de pintar. */
+const THEMES = {auto: 'Automático (como el sistema)', light: 'Claro', dark: 'Oscuro'};
+const themeGet = () => { try { const t = localStorage.getItem('gp-theme'); return THEMES[t] ? t : 'auto'; } catch (e) { return 'auto'; } };
+const isDark = () => themeGet() === 'dark' || themeGet() === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches;
+function setTheme(t) { try { localStorage.setItem('gp-theme', THEMES[t] ? t : 'auto'); } catch (e) {} applySettings(); if ($('#cfg').open) drawCfg(); }
 function applySettings() {
-  const c = db.settings, root = document.documentElement.style, dark = matchMedia('(prefers-color-scheme: dark)').matches, v = c.palette === 'custom' && c.custom ? c.custom : (PAL[c.palette] || PAL.azul)[dark ? 'd' : 'l'];
+  const t = themeGet(); if (t === 'auto') delete document.documentElement.dataset.theme; else document.documentElement.dataset.theme = t;
+  const c = db.settings, root = document.documentElement.style, dark = isDark(), v = c.palette === 'custom' && c.custom ? c.custom : (PAL[c.palette] || PAL.azul)[dark ? 'd' : 'l'];
   VARS.forEach(k => v[k] ? root.setProperty('--' + k, v[k]) : root.removeProperty('--' + k));
   $('#appName').textContent = c.appName || 'Papers';   // solo cambia la cabecera; el título «Gestor de papers» no se toca
   hdr(); progDraw();
@@ -71,7 +77,7 @@ function drawCfg() {
   const c = db.settings, on = syOn(), p = syP();
   const T = {
     ap: `<label>Nombre de la aplicación<input value="${esc(c.appName)}" maxlength="30" data-oninput="setCfg('appName', this.value)"></label>
-    ${cfgSec('pal', 'Paleta de colores', `<div style="margin:6px 0 10px">${Object.entries(PAL).map(([k, p]) => chip({name: p.n, color: p.c}, c.palette === k, `setCfg('palette','${k}');drawCfg()`)).join('')}${chip({name: 'Personalizada', color: c.custom?.pri || '#888888'}, c.palette === 'custom', 'pickCustom()')}</div>${c.palette === 'custom' && c.custom ? `<div class="cpick">${LAB.map(([k, t]) => `<label class="row"><input type="color" value="${c.custom[k]}" data-oninput="setCustom('${k}', this.value)"> ${t}</label>`).join('')}<button data-onclick="resetPal()">Restablecer a Azul</button></div>` : ''}`)}
+    ${cfgSec('pal', 'Paleta de colores', `<label class="thm">Tema <select data-onchange="setTheme(this.value)" aria-label="Tema">${Object.entries(THEMES).map(([k, v]) => `<option value="${k}" ${themeGet() === k ? 'selected' : ''}>${v}</option>`).join('')}</select> <small>(solo en este dispositivo)</small></label><div style="margin:6px 0 10px">${Object.entries(PAL).map(([k, p]) => chip({name: p.n, color: p.c}, c.palette === k, `setCfg('palette','${k}');drawCfg()`)).join('')}${chip({name: 'Personalizada', color: c.custom?.pri || '#888888'}, c.palette === 'custom', 'pickCustom()')}</div>${c.palette === 'custom' && c.custom ? `<div class="cpick">${LAB.map(([k, t]) => `<label class="row"><input type="color" value="${c.custom[k]}" data-oninput="setCustom('${k}', this.value)"> ${t}</label>`).join('')}<button data-onclick="resetPal()">Restablecer a Azul</button></div>` : ''}`)}
     <label class="row"><input type="checkbox" ${c.showImg !== false ? 'checked' : ''} data-onchange="setCfg('showImg', this.checked);render()"> Mostrar la imagen del paper en las tarjetas y la tabla</label>
     <label class="row"><input type="checkbox" ${c.showFile ? 'checked' : ''} data-onchange="setCfg('showFile', this.checked)"> Mostrar el archivo abierto en la cabecera</label>
     <label class="row"><input type="checkbox" ${c.showProgress ? 'checked' : ''} data-onchange="setCfg('showProgress', this.checked)"> Mostrar el progreso de lectura (papers leídos) junto al nombre del proyecto</label>`,
@@ -269,8 +275,8 @@ function cuTpl(v) { const c = cuCur(); if (!c) return; c.tpl[CU.type] = v; cuTou
 function cuTplClear() { const c = cuCur(); delete c.tpl[CU.type]; cuTouch(); drawCfg(); }
 function cuAdd() { const c = cuNew('Mi estilo ' + (db.settings.customStyles.length + 1)); db.settings.customStyles.push(c); CU = {id: c.id, type: '*', prev: 'ej'}; cuTouch(); drawCfg(); }
 function cuDup() { const c = cuCur(), d = structuredClone(c); d.id = uid(); d.name += ' (copia)'; db.settings.customStyles.push(d); CU.id = d.id; cuTouch(); drawCfg(); }
-function cuDel() {
-  const c = cuCur(); if (!c || !confirm(`¿Eliminar el estilo «${c.name}»? Las citas que lo usen en Exportar volverán a APA.`)) return;
+async function cuDel() {
+  const c = cuCur(); if (!c || !await askOk(`¿Eliminar el estilo «${c.name}»? Las citas que lo usen en Exportar volverán a APA.`, {ok: 'Eliminar', danger: 1})) return;
   db.settings.customStyles = db.settings.customStyles.filter(x => x.id !== c.id); CU.id = ''; cuTouch(); drawCfg();
 }
 function cuEdit(f) {   // aplica f(textarea) sobre la plantilla y guarda el resultado
@@ -280,7 +286,7 @@ function cuIns(txt) { cuEdit(t => { const s = t.selectionStart; t.setRangeText(t
 function cuGroup() { cuEdit(t => { const s = t.selectionStart, e = t.selectionEnd; t.setRangeText('[' + t.value.slice(s, e) + ']', s, e, 'end'); if (s === e) t.setSelectionRange(s + 1, s + 1); }); }
 function cuModIns(m) {
   if (!m) return; cuEdit(t => { const v = t.value, s = t.selectionStart, o = v.lastIndexOf('{', s - 1), c = o < 0 ? -1 : v.indexOf('}', o);
-    if (o < 0 || c < s - 1 || v.slice(o, s).includes('}')) return alert('Coloca el cursor dentro de un campo, p. ej. {title}.');
+    if (o < 0 || c < s - 1 || v.slice(o, s).includes('}')) return say('Coloca el cursor dentro de un campo, p. ej. {title}.');
     const bar = v.indexOf('|', o), at = bar > 0 && bar < c ? bar : c; t.setRangeText(':' + m, at, at, 'end'); });
 }
 /* ===== Ayuda: botón ❓ de la cabecera (o F1) ===== */
@@ -325,7 +331,9 @@ function helpHTML() {
       <li><b>Notas</b>: el botón «Notas (n)» las despliega; clic derecho abre el visor de notas del paper. 🔗 muestra sus relaciones.</li>
       <li><b>Agrupar por sección</b>: en «Ordenar» (o clic derecho en «Sección» sobre la lista). Puedes arrastrar papers entre grupos para cambiarlos de sección.</li></ul>`],
     lateral: ['Barra lateral', `<ul><li>☰ (${kb('side')}) pliega o despliega la barra; arrastra su borde derecho para cambiar el ancho (doble clic lo restablece). Con la barra plegada, la búsqueda pasa a la fila de «Nuevo paper» y cada icono abre la barra en su grupo. Si solo pliegas el grupo Buscar, la caja de búsqueda sigue a todo el ancho y se ocultan la casilla de notas, Ordenar y la búsqueda avanzada. Clic derecho en ☰: plegar o desplegar todos los grupos.</li>
-      <li><b>Buscar 🔍</b> (${kb('find')}): por título, autor o año; la casilla amplía a notas y citas editadas. Al desplegar Buscar aparecen dos niveles: <b>🔎 Búsqueda avanzada</b> (plegada al empezar) y, debajo, <b>Ordenar ⇅</b> (siempre desplegado al abrir Buscar).</li>
+      <li><b>Teclado</b>: en la lista, ↑/↓ (o j/k) mueven el cursor, Intro abre el paper, Espacio lo selecciona y Supr lo manda a la papelera. ${kb('palette')} abre la <b>paleta de órdenes</b>: escribe una acción («exportar», «papelera»…) o el título de un paper.</li>
+      <li><b>Selección</b>: con papers marcados, el grupo Selección cambia a todos a la vez la lectura, la valoración, las etiquetas o las secciones, o los manda a la papelera (un solo ${kb('undo')} lo deshace).</li>
+      <li><b>Buscar 🔍</b> (${kb('find')}): cada palabra por separado y en cualquier orden («garcía 2020»), en título, autores, año, revista, DOI, etiquetas y secciones; las palabras encontradas se resaltan. También <code>"frase exacta"</code>, <code>-palabra</code> para excluir, <code>autor:</code>, <code>año:2020</code> o <code>año:2010-2020</code>, <code>revista:</code>, <code>doi:</code>, <code>#etiqueta</code> y <code>seccion:</code>. La casilla amplía a notas y citas editadas. Al desplegar Buscar aparecen dos niveles: <b>🔎 Búsqueda avanzada</b> (plegada al empezar) y, debajo, <b>Ordenar ⇅</b> (siempre desplegado al abrir Buscar).</li>
       <li><b>Filtros 🎚️</b>: Secciones, Etiquetas, Lectura, Valoración mínima y Años. Secciones, Etiquetas y Lectura se pliegan pulsando su título; junto al título están «📄 Notas» (notas de la sección), cómo combinar etiquetas (alguna o todas), la valoración mínima y los años. Cada chip dice cuántos papers tiene; «Sin sección» y «Sin etiquetas» muestran los que falta clasificar. Clic derecho en una etiqueta para <b>ocultar</b> sus papers (sale tachada). Con 6 etiquetas o más aparece un buscador de etiquetas. Bajo Lectura, el progreso del proyecto. «✎ Gestionar» crea, renombra, recolorea, ordena y borra secciones y etiquetas. Clic derecho en una sección abre sus notas. Arrastra un paper (o los seleccionados) a una sección o etiqueta para añadírsela.</li>
       <li><b>Filtros aplicados</b>: sobre la lista se ven todos, cada uno con su ✕ para quitarlo, y «Limpiar todo».</li>
       <li><b>Ordenar ⇅</b> (dentro de Buscar): varios criterios en cascada (título, autor, año, revista, lectura, valoración, fecha de creación o modificación…), cada uno ascendente o descendente, y «Agrupar por sección».</li>
@@ -359,7 +367,7 @@ function helpHTML() {
       ${helpTbl([['Anexo', 'España. Tribunal Supremo (Sala de lo Penal, Sección 1.ª). Sentencia núm. 1229/2017, de 29 de marzo de 2017.'], ['Caso europeo', 'Tribunal de Justicia de la Unión Europea. Caso Schempp (C-403/03). Sentencia de 12 de julio de 2005, EU:C:2005:446.'], ['En el texto', '(STS 1229/2017 de 29 de marzo, FJ 3) · abreviada: (STS 1229/2017) · (STSJ Madrid de 14 de junio de 2002, FD 2) · (STEDH de 21 de febrero de 2017, ap. 45)']])}
       <p>En la <b>cita en el texto</b> (si la activas en Configuración), «Página o parte citada» es el artículo en la legislación (<i>22.1</i> → art. 22.1 CE) y el fundamento o apartado en la jurisprudencia (<i>3</i> → FJ 3 en el TC, el TS y la AN; FD 3 en los TSJ y las audiencias provinciales; ap. 3 en los tribunales europeos). Puedes escribirlo tal cual (<i>Preámbulo</i>, <i>DA 2.ª</i>).</p>
       <p>Los <b>demás estilos</b> citan la jurisprudencia con esta misma plantilla, porque las guías dicen que se aplica sea cual sea el estilo, y lo avisan. La legislación sigue en ellos como hasta ahora.</p>`],
-    importar: ['Importar referencias', `<p>Botón <b>📥 Importar</b> de la cabecera, a la izquierda de «Exportar citas» (también en <b>Archivo ▾</b> o con ${kb('import')}): desde un archivo <code>.bib</code>, <code>.ris</code> o <code>.txt</code>, pegando texto o buscando por <b>DOI</b>.</p><ul><li><b>Texto de ScienceDirect</b> («Export citation → Export citation to text»): autores, título, revista, volumen, número, páginas o número de artículo, ISSN, DOI y URL; el resumen y las palabras clave van a las notas generales.</li><li><b>Citas de Google Scholar</b> (botón «Citar»): pega una o varias, una por línea, en APA, MLA, Chicago, Harvard o Vancouver; se detectan autores, año, título, revista o editorial, volumen, número y páginas. Revisa la lista: MLA abrevia con «et al.» y Scholar escribe la revista en minúsculas. El BibTeX de Scholar también vale.</li></ul><p> Antes de añadir se revisa la lista, y puedes asignar sección, etiqueta y estado de lectura a todas. Dentro de un paper, «Buscar» junto al DOI propone rellenar solo los campos vacíos o los que marques.</p>`],
+    importar: ['Importar referencias', `<p>Botón <b>📥 Importar</b> de la cabecera, a la izquierda de «Exportar citas» (también en <b>Archivo ▾</b> o con ${kb('import')}): desde un archivo <code>.bib</code>, <code>.ris</code> o <code>.txt</code>, pegando texto o buscando por <b>DOI</b>.</p><ul><li><b>Texto de ScienceDirect</b> («Export citation → Export citation to text»): autores, título, revista, volumen, número, páginas o número de artículo, ISSN, DOI y URL; el resumen y las palabras clave van a las notas generales.</li><li><b>Citas de Google Scholar</b> (botón «Citar»): pega una o varias, una por línea, en APA, MLA, Chicago, Harvard o Vancouver; se detectan autores, año, título, revista o editorial, volumen, número y páginas. Revisa la lista: MLA abrevia con «et al.» y Scholar escribe la revista en minúsculas. El BibTeX de Scholar también vale.</li></ul><p> Antes de añadir se revisa la lista, y puedes asignar sección, etiqueta y estado de lectura a todas. Dentro de un paper, «Buscar» junto al DOI propone rellenar solo los campos vacíos o los que marques.</p><ul><li><b>Buscar por DOI, ISBN o título</b>: un DOI trae el paper de CrossRef, un ISBN trae el libro de Open Library y unas palabras del título muestran hasta 6 resultados de CrossRef para elegir.</li><li><b>CSL-JSON</b> (el formato de Zotero, Mendeley y Pandoc) se importa como los demás y se puede exportar desde «Exportar citas».</li><li><b>Soltar archivos</b>: arrastra a la ventana un .bib, .ris, .txt o CSL-JSON para importarlo, o un .json de la aplicación para abrirlo como proyecto.</li><li><b>Compartir</b> (Android, con la app instalada): en el navegador o en la app de la revista, «Compartir» → Papers busca el DOI de lo compartido (o su título) y abre Importar.</li></ul>`],
     config: ['Configuración', `<p>⚙️ en la barra lateral, con cuatro pestañas: <b>Apariencia</b>, <b>Notas y citas</b>, <b>Atajos</b> y <b>Datos y Drive</b>. Es común a todos los proyectos y se guarda también en cada JSON.</p><ul><li><b>Nombre de la aplicación</b>, <b>paleta de colores</b> (o personalizada), mostrar el archivo abierto en la cabecera y, si quieres, el <b>progreso de lectura</b> (papers leídos) junto al nombre del proyecto (desactivado por defecto).</li>
       <li><b>Estilo de cita principal</b> (Notas y citas; APA 7 por defecto): sale primero en la pestaña Cita (o solo él, si lo marcas), pasa a ser el estilo de Exportar al elegirlo y decide los campos de la vista simplificada de Datos.</li>
       <li><b>Mostrar la imagen</b> del paper en tarjetas y tabla (Apariencia). <b>Barra de formato</b> de las notas desplegada por defecto. <b>Cita en el texto</b> (Chicago) en la pestaña Cita.</li>
@@ -461,9 +469,9 @@ function ctField(k, on) { const c = ctCur(); c.fields = on ? [...new Set([...c.f
 function ctLabel(k, v) { const c = ctCur(); if (v.trim()) c.labels[k] = v; else delete c.labels[k]; ctTouch(); }
 function ctReset() { const c = ctCur(); c.fields = ctFieldsOf(c.like); ctTouch(); drawCfg(); }
 function ctDup() { const c = structuredClone(ctCur()); c.id = uid(); c.name += ' (copia)'; db.settings.customTypes.push(c); CTS.id = c.id; ctTouch(); drawCfg(); }
-function ctDel() {
+async function ctDel() {
   const c = ctCur(), k = 'ct_' + c.id, n = db.papers.filter(p => p.type === k).length;
-  if (!c || !confirm(`¿Eliminar el tipo «${c.name}»?${n ? ` ${n} paper${n > 1 ? 's pasarán' : ' pasará'} a «${TYPES[c.like]}».` : ''}`)) return;
+  if (!c || !await askOk(`¿Eliminar el tipo «${c.name}»?${n ? ` ${n} paper${n > 1 ? 's pasarán' : ' pasará'} a «${TYPES[c.like]}».` : ''}`)) return;
   for (const p of db.papers.concat(db.trash.map(t => t.paper))) if (p.type === k) p.type = c.like;
   for (const s of db.settings.customStyles) delete s.tpl[k];
   db.settings.customTypes = db.settings.customTypes.filter(x => x.id !== c.id); CTS.id = ''; ctTouch(); syncStyles(db.settings.customStyles, db.settings.export); render(); drawCfg();

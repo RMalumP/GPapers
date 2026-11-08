@@ -13,7 +13,7 @@ with sync_playwright() as pw:
     b = pw.chromium.launch(**kw); errs = []
     srv = subprocess.Popen([sys.executable, '-I', '-m', 'http.server', '8797', '-d', str(folder)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL); time.sleep(1)
     c = b.new_context(viewport={'width': 1200, 'height': 800}, service_workers='block'); A = c.new_page()
-    A.on('pageerror', lambda e: errs.append(str(e))); A.on('dialog', lambda d: d.accept())
+    A.on('pageerror', lambda e: errs.append(str(e))); A.on('dialog', lambda d: d.accept()); A.add_init_script("window.ASK_AUTO = 'accept'")
     A.goto('http://localhost:8797/index.html'); A.wait_for_timeout(1200)
     # cabecera
     eq('cabecera: Drive, Guardar, Importar, Exportar y Archivo', A.evaluate("[...document.querySelectorAll('header .row > button, header .row > .fm > button')].map(b => b.textContent.trim().replace(/\\s+/g, ' '))"), ['🔄Conectar con Google Drive', '💾', '📥 Importar', 'Exportar citas', 'Archivo ▾'])
@@ -54,8 +54,8 @@ with sync_playwright() as pw:
     eq('Filtros reúne Secciones, Etiquetas, Lectura, Valoración y Años', A.evaluate("[...document.querySelectorAll('#sg-filt .fh2 b')].map(b => b.textContent)"), ['📁 Secciones', '🏷️ Etiquetas', '📖 Lectura', '⭐ Valoración', '📅 Años'])
     eq('el botón «Visibles» (seleccionar los que se ven) está sobre la lista, con texto corto', A.evaluate("[!!$('#selAll').offsetParent, $('#selAll').closest('main') !== null, $('#selAll').textContent]"), [True, True, '☑ Visibles'])
     A.click('#selAll')
-    eq('seleccionar visibles muestra la barra de Selección con su contador', A.evaluate("[$('#sg-sel').hidden, $('#selT').textContent, [...document.querySelectorAll('#sg-sel .sb button')].map(b => b.textContent)]"), [False, 'Selección (2)', ['Exportar citas…', 'Mover o copiar a otro proyecto…', 'Quitar selección']])
-    A.evaluate("document.querySelector('#sg-sel .sb button:last-child').click()")
+    eq('seleccionar visibles muestra la barra de Selección con su contador', A.evaluate("[$('#sg-sel').hidden, $('#selT').textContent, [...document.querySelectorAll('#sg-sel .sb button')].map(b => b.textContent)]"), [False, 'Selección (2)', ['📖 Lectura ▾', '⭐ Valoración ▾', '🏷️ Etiqueta ▾', '📁 Sección ▾', 'Exportar citas…', 'Mover o copiar a otro proyecto…', '🗑 Enviar a la papelera', 'Quitar selección']])
+    A.evaluate("document.querySelector('#sg-sel .sb > button:last-child').click()")
     eq('quitar la selección la oculta', A.evaluate("$('#sg-sel').hidden"), True)
     A.evaluate("F.read = 'leido'; render()")
     eq('un filtro activo marca el punto de Filtros', A.evaluate("!$('#d-filt').hidden"), True)

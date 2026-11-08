@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="es"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://accounts.google.com; style-src 'self' 'unsafe-inline' https://accounts.google.com; img-src * data: blob:; connect-src 'self' data: blob: https://www.googleapis.com https://oauth2.googleapis.com https://accounts.google.com https://api.crossref.org; frame-src https://accounts.google.com; object-src 'none'; base-uri 'self'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://accounts.google.com; style-src 'self' 'unsafe-inline' https://accounts.google.com; img-src * data: blob:; connect-src 'self' data: blob: https://www.googleapis.com https://oauth2.googleapis.com https://accounts.google.com https://api.crossref.org https://openlibrary.org https://api.openalex.org; frame-src https://accounts.google.com; object-src 'none'; base-uri 'self'; form-action 'none'">
 <title>Gestor de papers</title><meta name="description" content="Gestor de papers académicos: notas, secciones, etiquetas, citas en varios estilos y sincronización opcional con tu propio Google Drive."><link rel="stylesheet" href="style.css"><link rel="stylesheet" href="movil.css"><script src="js/movil.js"></script><link rel="manifest" href="manifest.json"><meta name="theme-color" content="#2457c5"><link rel="icon" href="icon-192.png"></head>
 <body>
 <header>
@@ -16,9 +16,9 @@
         <button data-onclick="fmClose();doOpen()">📂 Abrir un archivo JSON…</button>
         <button data-onclick="fmClose();save(true)">💾 Guardar como…</button>
         <hr><div class="fmh">Importar referencias</div>
-        <button data-onclick="fmClose();openImport('file')">📄 Desde archivo (.bib, .ris o .txt)…</button>
+        <button data-onclick="fmClose();openImport('file')">📄 Desde archivo (.bib, .ris, .txt o CSL-JSON)…</button>
         <button data-onclick="fmClose();openImport('text')">📋 Pegar BibTeX, RIS o citas de Google Scholar…</button>
-        <button data-onclick="fmClose();openImport('doi')">🔎 Buscar por DOI…</button>
+        <button data-onclick="fmClose();openImport('doi')">🔎 Buscar por DOI, ISBN o título…</button>
         <hr><label><input type="checkbox" id="auto" data-onchange="setAuto(this)"> Autoguardado</label>
       </div></span>
   </div>
@@ -27,7 +27,7 @@
   <aside id="side">
     <div id="sbGrip" data-onpointerdown="sbGripDown(event)" data-ondblclick="sbWidthReset()" title="Arrastra para cambiar el ancho de la barra · Doble clic: ancho normal" aria-hidden="true"></div>
     <button class="sh" data-onclick="sbToggle()" data-oncontextmenu="sbAllMenu(event)" title="Plegar / desplegar menú · Clic derecho: plegar o desplegar todos los grupos"><span class="ic">☰</span><span class="lbl">Menú</span></button>
-    <div class="sg" id="sg-search"><div class="sgh"><button class="sh" data-onclick="sbGroup('search')" title="Buscar: desplegar u ocultar Ordenar y Búsqueda avanzada" aria-label="Buscar"><span class="ic">🔍</span><span class="dot" id="d-search" hidden></span></button><input id="q" type="search" placeholder="Título, autor o año" aria-label="Buscar" data-oninput="qSet(this.value)" data-onkeydown="onEnter(event,qSet,this.value,1)"></div>
+    <div class="sg" id="sg-search"><div class="sgh"><button class="sh" data-onclick="sbGroup('search')" title="Buscar: desplegar u ocultar Ordenar y Búsqueda avanzada" aria-label="Buscar"><span class="ic">🔍</span><span class="dot" id="d-search" hidden></span></button><input id="q" type="search" placeholder="Palabras, autor:, año:, #etiqueta" title="Busca cada palabra por separado (título, autores, año, revista, DOI, etiquetas y secciones). También: &quot;frase exacta&quot;, -excluir, autor:garcía, año:2010-2020, revista:…, doi:…, #etiqueta, seccion:…" aria-label="Buscar" data-oninput="qSet(this.value)" data-onkeydown="onEnter(event,qSet,this.value,1)"></div>
       <div class="sb"><label><input type="checkbox" data-onchange="put(F,'inNotes',this.checked,render)"> Incluir notas y citas editadas</label>
         <div class="fs fold" id="fs-adv"><div class="fh2"><button class="fhb" data-onclick="fsToggle('adv')" aria-expanded="false" title="Plegar o desplegar"><span class="car">▾</span><b>🔎 Búsqueda avanzada</b></button><span class="dot" id="d-adv" hidden></span></div><div class="fsb" id="advUI"></div></div>
         <div class="fs" id="fs-sort"><div class="fh2"><button class="fhb" data-onclick="fsToggle('sort')" aria-expanded="true" title="Plegar o desplegar"><span class="car">▾</span><b>⇅ Ordenar</b></button></div><div class="fsb"><div id="sortUI"></div><label><input type="checkbox" id="grpChk" data-onchange="put(F,'group',this.checked,render)"> Agrupar por sección</label></div></div></div></div>
@@ -43,7 +43,7 @@
     <div class="sg" id="sg-rec" hidden><button class="sh" data-onclick="sbGroup('rec')" title="Papers abiertos hace poco"><span class="ic">🕘</span><span class="lbl">Recientes</span></button>
       <div class="sb" id="recL"></div></div>
     <div class="sg" id="sg-sel" hidden><button class="sh" data-onclick="sbGroup('sel')" title="Papers seleccionados"><span class="ic">☑️</span><span class="lbl" id="selT">Selección</span></button>
-      <div class="sb"><button class="pri" data-onclick="openEx()">Exportar citas…</button><button data-onclick="psOpen()">Mover o copiar a otro proyecto…</button><button data-onclick="selNone()">Quitar selección</button></div></div>
+      <div class="sb"><div class="blk"><button data-onclick="bulkMenu(event,'read')" title="Cambiar el estado de lectura de los seleccionados">📖 Lectura ▾</button><button data-onclick="bulkMenu(event,'rate')" title="Cambiar la valoración de los seleccionados">⭐ Valoración ▾</button><button data-onclick="bulkMenu(event,'tag')" title="Añadir o quitar una etiqueta a los seleccionados">🏷️ Etiqueta ▾</button><button data-onclick="bulkMenu(event,'sec')" title="Añadir o quitar una sección a los seleccionados">📁 Sección ▾</button></div><button class="pri" data-onclick="openEx()">Exportar citas…</button><button data-onclick="psOpen()">Mover o copiar a otro proyecto…</button><button class="danger" data-onclick="bulkTrash()">🗑 Enviar a la papelera</button><button data-onclick="selNone()">Quitar selección</button></div></div>
   <button class="sh" data-onclick="grOpen()" title="Gráfico de relaciones entre papers"><span class="ic">🕸️</span><span class="lbl">Relaciones</span></button>
   <button class="sh trb" data-onclick="trOpen()" title="Papelera"><span class="ic">🗑️</span><span class="lbl" id="trLbl">Papelera</span><span class="dot" id="d-tr" hidden></span></button>
   <button class="sh cfgb" data-onclick="openCfg()" title="Configuración"><span class="ic">⚙️</span><span class="lbl">Configuración</span></button>
@@ -60,5 +60,5 @@
     <div id="list"></div>
   </main>
 </div>
-<div id="ctx" hidden></div><dialog id="dlg"></dialog><dialog id="mg"></dialog><dialog id="ex"></dialog><dialog id="nv"></dialog><dialog id="cfg"></dialog><dialog id="imp"></dialog><dialog id="rv"></dialog><dialog id="sv"></dialog><dialog id="img"></dialog><dialog id="help"></dialog><dialog id="lk"></dialog><dialog id="tr"></dialog><dialog id="gr"></dialog><dialog id="sy"></dialog><dialog id="pv"></dialog><dialog id="cr"></dialog><dialog id="bk"></dialog><dialog id="dp"></dialog><dialog id="ps"></dialog>
+<div id="ctx" hidden></div><dialog id="dlg"></dialog><dialog id="mg"></dialog><dialog id="ex"></dialog><dialog id="nv"></dialog><dialog id="cfg"></dialog><dialog id="imp"></dialog><dialog id="rv"></dialog><dialog id="sv"></dialog><dialog id="img"></dialog><dialog id="help"></dialog><dialog id="lk"></dialog><dialog id="tr"></dialog><dialog id="gr"></dialog><dialog id="sy"></dialog><dialog id="pv"></dialog><dialog id="cr"></dialog><dialog id="bk"></dialog><dialog id="dp"></dialog><dialog id="ps"></dialog><dialog id="cmdk" aria-label="Paleta de órdenes"></dialog>
 <script src="js/modelo.js"></script><script src="js/citas.js"></script><script src="js/persistencia.js"></script><script src="js/importar.js"></script><script src="js/config.js"></script><script src="js/lista.js"></script><script src="js/edicion.js"></script><script src="js/drive.js"></script><script src="js/extras.js"></script><script src="app.js"></script></body></html>

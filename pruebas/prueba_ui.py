@@ -15,7 +15,7 @@ SEED = """() => { db.papers.length = 0; db.sections.length = 0; db.tags.length =
 with sync_playwright() as pw:
     kw = {'executable_path': '/opt/pw-browsers/chromium'} if os.path.exists('/opt/pw-browsers/chromium') else {}
     b = pw.chromium.launch(**kw); ctx = b.new_context(permissions=['clipboard-read', 'clipboard-write'], viewport={'width': 1200, 'height': 800}, service_workers='block'); pg = ctx.new_page(); errs = []
-    pg.on('pageerror', lambda e: errs.append(str(e))); pg.on('console', lambda m: errs.append(m.text) if m.type == 'error' else None); pg.on('dialog', lambda d: d.accept())
+    pg.on('pageerror', lambda e: errs.append(str(e))); pg.on('console', lambda m: errs.append(m.text) if m.type == 'error' else None); pg.on('dialog', lambda d: d.accept()); pg.add_init_script("window.ASK_AUTO = 'accept'")
     pg.goto('file://' + str(folder / 'index.html')); pg.wait_for_timeout(300); pg.evaluate('DATA_ALL = true')   # formulario completo (la vista simplificada se prueba en prueba_principal.py)
     pg.evaluate(SEED)
     # ---- Nota general: en el desplegable, el visor y «📄 Notas»
@@ -314,7 +314,7 @@ with sync_playwright() as pw:
     # ---- Fase 8
     # (el almacenamiento privado del navegador y los enlaces a archivos necesitan http, no file://)
     srv = subprocess.Popen([sys.executable, '-I', '-m', 'http.server', '8791', '-d', str(folder)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL); time.sleep(1)
-    pg = ctx.new_page(); pg.on('pageerror', lambda e: errs.append(str(e))); pg.on('dialog', lambda d: d.accept())
+    pg = ctx.new_page(); pg.on('pageerror', lambda e: errs.append(str(e))); pg.on('dialog', lambda d: d.accept()); pg.add_init_script("window.ASK_AUTO = 'accept'")
     # Chromium (desde la 153) cierra la pestaña al leer de IndexedDB un handle del almacenamiento privado (OPFS), que es lo que usa la prueba en lugar del
     # selector de archivos. Los handles se guardan aquí en memoria (en IndexedDB queda una marca) y el resto de IndexedDB funciona como siempre.
     pg.add_init_script("""(() => { const MEM = new Map(), P = IDBObjectStore.prototype, put = P.put, get = P.get, del = P.delete;
@@ -492,7 +492,7 @@ with sync_playwright() as pw:
     swsrc = (folder / 'sw.js').read_text(); appsrc = (folder / 'app.js').read_text()
     eq('la versión de app.js coincide con la del service worker', re.search(r"APP_V = '([\d.]+)'", appsrc).group(1), re.search(r"papers-v([\d.]+)'", swsrc).group(1))
     eq('el service worker sirve primero de la caché de su versión y no toca IndexedDB', ("caches.open(V).then(c => c.match(key" in swsrc, 'indexedDB' in swsrc), (True, False))
-    ctx2 = b.new_context(viewport={'width': 1200, 'height': 800}, service_workers='allow'); p2 = ctx2.new_page(); e2 = []; p2.on('pageerror', lambda e: e2.append(str(e))); p2.on('dialog', lambda d: d.accept())
+    ctx2 = b.new_context(viewport={'width': 1200, 'height': 800}, service_workers='allow'); p2 = ctx2.new_page(); e2 = []; p2.on('pageerror', lambda e: e2.append(str(e))); p2.on('dialog', lambda d: d.accept()); p2.add_init_script("window.ASK_AUTO = 'accept'")
     URL = 'http://localhost:8791/index.html'
     p2.goto(URL); p2.wait_for_timeout(1200)
     eq('primera vez: se abre el ejemplo', p2.evaluate("[path, db.papers.length > 0]"), ['ejemplo_papers.json', True])

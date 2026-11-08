@@ -25,7 +25,7 @@ with sync_playwright() as pw:
         eq(f'escritorio {vp["width"]} px: sin errores', errs, []); ctx.close()
     # ---- Móvil
     ctx = b.new_context(**pw.devices['Pixel 7'], service_workers='block'); pg = ctx.new_page(); errs = []
-    pg.on('pageerror', lambda e: errs.append(str(e))); pg.on('dialog', lambda d: d.accept())
+    pg.on('pageerror', lambda e: errs.append(str(e))); pg.on('dialog', lambda d: d.accept()); pg.add_init_script("window.ASK_AUTO = 'accept'")
     pg.goto('file://' + str(folder / 'index.html')); pg.wait_for_timeout(300); pg.evaluate(SEED)
     eq('móvil: se activa', pg.evaluate(f"[{cls}('mv'), !!$('#mvNav'), !!$('#mvMenuBtn'), !!$('#mvMoreBtn')]"), [True, True, True, True])
     pg.evaluate("""() => { db.papers.length = 0; for (let i = 0; i < 100; i++) db.papers.push(NEWF({id: 'q' + i, title: 'Paper ' + i, authors: ['Pérez, Juan'], year: 2000, venue: '', type: 'articulo', doi: '', url: '', accessed: '', general: '', tagIds: [], notes: [], cites: {}, related: [], refTo: [], history: [], reading: 'por_leer', rating: 0, sectionIds: []})); F.group = false; render(); }""")

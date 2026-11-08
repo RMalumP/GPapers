@@ -22,9 +22,20 @@ const syPjOf = n => /^gpapers-p-([a-z0-9]+)-/.exec(n)?.[1] || (n !== SY_IDX ? 'm
 const syS = v => JSON.stringify(v);
 const syNoHist = (k, v) => k === 'history' ? undefined : v, syPlainS = d => JSON.stringify(d, syNoHist);   // syPlainS(d) === syS(syPlain(d)), sin el paso de ida y vuelta
 const syPlain = d => JSON.parse(syPlainS(d));   // como en el JSON: sin el historial del día
-function syNorm(d) {   // pasa por validate() para comparar siempre la misma forma; validate() ajusta los tipos y estilos globales, así que se devuelven a los de db
-  try { return syPlain(validate(structuredClone(d))); } finally { syncTypes(db.settings.customTypes); syncStyles(db.settings.customStyles, db.settings.export); }
+function syNormRaw(d) {   // pasa por validate() para comparar siempre la misma forma; validate() ajusta los tipos y estilos globales, así que se devuelven a los de db
+  try { return syPlainS(validate(structuredClone(d))); } finally { syncTypes(db.settings.customTypes); syncStyles(db.settings.customStyles, db.settings.export); }
 }
+/* Normalizar es lo más caro de cada vuelta (clonar + validate + JSON: ~300 ms con 2000 papers en un móvil) y casi siempre se repite con lo mismo
+   (la copia local, la de Drive y la fusionada suelen coincidir). SY_NM recuerda el resultado por la huella del JSON de entrada: huella → JSON normalizado.
+   Un resultado normalizado se normaliza en sí mismo, así que también se guarda con su propia huella. Se devuelve texto: quien lo use lo lee con JSON.parse (una copia nueva). */
+const SY_NM = new Map(), SY_NM_MAX = 6;
+function syNormS(d, s = syS(d)) {
+  const k = syHash(s); let o = SY_NM.get(k);
+  if (o === undefined) { o = syNormRaw(d); SY_NM.set(k, o); SY_NM.set(syHash(o), o); while (SY_NM.size > SY_NM_MAX) SY_NM.delete(SY_NM.keys().next().value); }
+  else { SY_NM.delete(k); SY_NM.set(k, o); }   // el más usado, al final (se borran primero los más antiguos)
+  return o;
+}
+const syNorm = d => JSON.parse(syNormS(d));
 function syVal(x, y, z, hasB, mine) {   // un valor: si solo cambió un lado gana ese; si cambiaron los dos, «mine» decide (true = este dispositivo)
   if (syS(x) === syS(y)) return x;
   if (hasB && syS(x) === syS(z)) return y;
@@ -306,24 +317,24 @@ async function syOnce(inter) {
   const tok = await syToken(inter), files = await syLs(tok), id = PJ.cur, N = syNames(id);
   const I = await syIdxGet(tok, files), iB = await idb('readonly', st => st.get('syncIdxBase')).catch(() => null);
   const R = await syRemote(tok, files, N), rw = R.w ? await syUnwire(tok, R.w, files, N) : null;
-  const snap = syPlainS(db), plain = JSON.parse(snap), cur = syNorm(plain);
+  const snap = syPlainS(db), plain = JSON.parse(snap), curS = syNormS(plain, snap);
   const iM = I.w ? syIdxMerge(syIdxLocal(plain.settings), I.w, iB) : syIdxLocal(plain.settings);
   for (const p of PJ.list) if ((p.id === id ? dirty : p.dirty) && !iM.projects.some(e => e.id === p.id)) iM.projects.push(pjEntry(p));   // borrado en otro dispositivo, pero aquí tiene cambios sin guardar: se queda
   if (!iM.projects.some(e => e.id === id)) {   // el proyecto abierto se borró en otro dispositivo: se pasa a otro
     if (iM.projects.length) { syIdxApply(iM); return {gone: id}; }
     iM.projects.push(pjEntry(pjCur()));
   }
-  const local = syNorm({...plain, settings: {...iM.settings, ...syOwn(plain.settings)}});   // con los ajustes comunes que llegan del índice
-  let m = local, replace = false;
+  const localS = syNormS({...plain, settings: {...iM.settings, ...syOwn(plain.settings)}}), local = JSON.parse(localS);   // con los ajustes comunes que llegan del índice
+  let mS = localS, replace = false;
   if (rw) {
-    const remote = syNorm(rw), base = await syBase(N);
-    if (base) m = syNorm(syMerge(local, remote, base));
-    else if (syS(local) === syS(remote) || syTrivial()) { m = remote; replace = syTrivial(); }
+    const remoteS = syNormS(rw), remote = JSON.parse(remoteS), base = await syBase(N);
+    if (base) mS = syNormS(syMerge(local, remote, base));
+    else if (localS === remoteS || syTrivial()) { mS = remoteS; replace = syTrivial(); }
     else { const c = await syAsk(local, remote); if (!c) return {cancel: true};
-      m = c === 'merge' ? syNorm(syMerge(local, remote, null)) : c === 'drive' ? remote : local; replace = c === 'drive'; }
+      mS = c === 'merge' ? syNormS(syMerge(local, remote, null)) : c === 'drive' ? remoteS : localS; replace = c === 'drive'; }
   }
   if (syPlainS(db) !== snap || PJ.cur !== id) { SY.again = true; return {again: true}; }   // cambiaste algo mientras tanto: otra vuelta enseguida
-  const mS = syS(m), news = mS !== syS(cur);
+  const m = mS === localS ? local : JSON.parse(mS), news = mS !== curS;
   if (news && syBlocked()) { SY.wait = true; return {wait: true}; }   // se termina al cerrar la ventana
   syIdxApply(iM);
   if (news) syApply(m, replace);
@@ -344,6 +355,7 @@ async function syOnce(inter) {
   return {news, first: !R.w};
 }
 async function syRun(inter, gesture) {   // gesture: viene de un clic o una tecla (el navegador deja abrir la ventana de Google)
+  if (TAB.passive) return null;   // el proyecto se usa en otra pestaña
   if (!inter && !syOn()) return null;
   if (SY.busy) { SY.again = true; return null; }
   if (!inter && !syTokGet()) {   // sin acceso: renovarlo sin ventana se intenta una sola vez (no a cada cambio ni desde cada pestaña); luego, con el siguiente clic
@@ -466,7 +478,7 @@ async function syConnect() {
   } catch (e) { syDlg('No se ha podido sincronizar', `<p>${esc(syErr(e))}</p>`, [['Cerrar']]); }
 }
 async function syLogout(quiet) {
-  if (!quiet && !confirm('¿Cerrar la sesión de Google Drive en este dispositivo?\nTus datos se quedan aquí y en tu Drive; los demás dispositivos siguen sincronizando.')) return;
+  if (!quiet && !await askOk('¿Cerrar la sesión de Google Drive en este dispositivo?\nTus datos se quedan aquí y en tu Drive; los demás dispositivos siguen sincronizando.')) return;
   if (!quiet && syAuto() && dirty && !SY.busy) await syRun(false);   // sube lo último antes de salir
   clearTimeout(SY.tm); clearTimeout(SY.exp); try { localStorage.removeItem('gp-sync'); } catch (e) {} syTokDel(); await syForget(); SY.st = 'idle';
   PJ.list = PJ.list.filter(p => !p.remote); pjSave(); pjShow();   // los proyectos que solo están en Drive dejan de verse aquí (siguen en tu Drive)
@@ -475,7 +487,7 @@ async function syLogout(quiet) {
 }
 async function syWipe() {
   const only = PJ.list.filter(p => p.remote).map(p => '«' + p.name + '»');
-  if (!confirm(`Se borrará de Google Drive la copia de todos tus proyectos y se cerrará la sesión. Los datos de este dispositivo no se tocan.${only.length ? '\nOJO: ' + only.join(', ') + (only.length === 1 ? ' solo está' : ' solo están') + ' en Google Drive y se perderá' + (only.length === 1 ? '.' : 'n.') : ''}\nSi otro dispositivo sigue conectado, volverá a crearla: cierra allí la sesión antes. ¿Continuar?`)) return;
+  if (!await askOk(`Se borrará de Google Drive la copia de todos tus proyectos y se cerrará la sesión. Los datos de este dispositivo no se tocan.${only.length ? '\nOJO: ' + only.join(', ') + (only.length === 1 ? ' solo está' : ' solo están') + ' en Google Drive y se perderá' + (only.length === 1 ? '.' : 'n.') : ''}\nSi otro dispositivo sigue conectado, volverá a crearla: cierra allí la sesión antes. ¿Continuar?`)) return;
   try { const tok = await syToken(true); for (const f of await syLs(tok)) await syDrive(tok, '/drive/v3/files/' + f.id, {method: 'DELETE'});
     await syLogout(true); toast('Copia de Google Drive borrada y sesión cerrada.', [], 5000); }
   catch (e) { toast(syErr(e)); }

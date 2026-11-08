@@ -15,14 +15,14 @@ SEED = """N => { db.papers.length = 0; db.sections.length = 0; db.tags.length = 
 with sync_playwright() as pw:
     kw = {'executable_path': '/opt/pw-browsers/chromium'} if os.path.exists('/opt/pw-browsers/chromium') else {}
     b = pw.chromium.launch(**kw); ctx = b.new_context(viewport={'width': 1200, 'height': 800}, service_workers='block'); pg = ctx.new_page(); errs = []
-    pg.on('pageerror', lambda e: errs.append(str(e))); pg.on('console', lambda m: errs.append(m.text) if m.type == 'error' else None); pg.on('dialog', lambda d: d.accept())
+    pg.on('pageerror', lambda e: errs.append(str(e))); pg.on('console', lambda m: errs.append(m.text) if m.type == 'error' else None); pg.on('dialog', lambda d: d.accept()); pg.add_init_script("window.ASK_AUTO = 'accept'")
     pg.goto('file://' + str(folder / 'index.html')); pg.wait_for_timeout(300)
     # ---- Deshacer: las imágenes incrustadas no se copian en cada paso
     pg.evaluate(SEED, 3)
     pg.evaluate("img => { db.papers[0].image = {kind: 'data', data: img}; markDirty(); }", IMG)
     pg.evaluate("lastRecAt = 0; db.papers[1].title = 'Cambio'; markDirty()")
-    eq('la copia para deshacer no lleva la imagen', pg.evaluate("img => UNDO.some(u => u.includes(img))", IMG), False)
-    eq('sin imágenes la copia es el JSON de siempre', pg.evaluate("(db.papers[0].image = null, snapDb() === JSON.stringify(db))"), True)
+    eq('la copia para deshacer no lleva la imagen', pg.evaluate("img => UNDO.some(u => snapStr(u).includes(img))", IMG), False)
+    eq('sin imágenes la copia es el JSON de siempre (sin el historial del día)', pg.evaluate("(db.papers[0].image = null, snapStr(snapDb()) === JSON.stringify(db, (k, v) => k === 'history' ? undefined : v))"), True)
     pg.evaluate("img => { db.papers[0].image = {kind: 'data', data: img}; }", IMG)
     pg.evaluate("undo()")
     eq('deshacer devuelve la imagen entera', pg.evaluate("[db.papers[0].image?.data?.length, db.papers[1].title]"), [len(IMG), 'Paper 0001'])

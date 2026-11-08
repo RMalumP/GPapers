@@ -1,5 +1,6 @@
 :root{--bg:#f7f8fa;--fg:#1d2330;--card:#fff;--bd:#d5d9e2;--pri:#2457c5;--red:#b3261e}
-@media(prefers-color-scheme:dark){:root{--bg:#161a22;--fg:#e6e9f0;--card:#1f2430;--bd:#394055;--pri:#6e97ee;--red:#f2877f}}
+@media(prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#161a22;--fg:#e6e9f0;--card:#1f2430;--bd:#394055;--pri:#6e97ee;--red:#f2877f;color-scheme:dark}}
+:root[data-theme=dark]{--bg:#161a22;--fg:#e6e9f0;--card:#1f2430;--bd:#394055;--pri:#6e97ee;--red:#f2877f;color-scheme:dark}:root[data-theme=light]{color-scheme:light}
 *{box-sizing:border-box}body{margin:0;font:15px/1.45 system-ui,sans-serif;background:var(--bg);color:var(--fg)}
 header{display:flex;flex-wrap:wrap;gap:12px;align-items:center;padding:10px 16px;border-bottom:1px solid var(--bd)}
 h1{margin:0;font-size:20px}#fname{opacity:.7;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:8ch}
@@ -214,3 +215,18 @@ main > .row > #q{width:220px;min-width:0;flex:0 1 220px}
 #sg-search .sb .fs{margin-top:4px}#advUI{display:flex;flex-direction:column;gap:6px}#fs-adv.fold #advUI{display:none}.advm{font-size:13px}.advm select{font-size:13px}
 .advr{display:grid;grid-template-columns:1fr 1fr;gap:4px;padding:6px;border:1px solid var(--bd);border-radius:8px;background:var(--card)}.advr select,.advr input{min-width:0;font-size:13px}
 .advr input,.advr > span{grid-column:1}.advr .x{grid-column:2;justify-self:end;border:0;background:none;color:var(--red);padding:2px 6px}#fs-adv .fh2 .dot{margin-left:0}
+
+/* Búsqueda: palabras encontradas en tarjetas y tabla */
+.card mark,.tbl mark{background:color-mix(in srgb,var(--pri) 22%,transparent);color:inherit;border-radius:2px;padding:0 1px}
+/* Varias pestañas: aviso de pausa */
+#tabLock{position:fixed;inset:0;z-index:200;display:flex;align-items:center;justify-content:center;padding:16px;background:#0008}#tabLock[hidden]{display:none}
+#tabLock .tlb{max-width:440px;padding:20px;background:var(--card);color:var(--fg);border:1px solid var(--bd);border-radius:12px;box-shadow:0 8px 32px #0006}#tabLock h2{margin:0 0 8px;font-size:1.15em}#tabLock small{display:block;margin-top:10px;opacity:.75}
+/* Selección: acciones en lote */
+#sg-sel .blk{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:6px}#sg-sel .blk button{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-left:6px;padding-right:6px;font-size:.93em}
+/* Soltar archivos en la ventana */
+body.fdrop::after{content:"Suelta aquí para importar (.bib, .ris, .txt, CSL-JSON) o abrir un proyecto (.json)";position:fixed;inset:8px;z-index:150;display:flex;align-items:center;justify-content:center;padding:16px;text-align:center;font-size:1.1em;font-weight:600;color:var(--pri);background:color-mix(in srgb,var(--card) 88%,transparent);border:3px dashed var(--pri);border-radius:14px;pointer-events:none}
+/* Teclado en la lista y paleta de órdenes */
+#list .kcur{outline:2px solid var(--pri);outline-offset:2px}
+#cmdk{width:min(560px,calc(100vw - 32px));padding:10px;top:12vh;margin-top:0}#cmdQ{width:100%;box-sizing:border-box;font-size:16px}#cmdL{display:flex;flex-direction:column;max-height:50vh;overflow:auto;margin:8px 0 4px}#cmdL button{text-align:left;border:0;background:none;padding:7px 10px;border-radius:6px}#cmdL button.on,#cmdL button:hover{background:color-mix(in srgb,var(--pri) 16%,transparent)}.cmdh{opacity:.7}
+/* Avisos y confirmaciones propios */
+dialog.ask{max-width:min(440px,calc(100vw - 32px));padding:18px 20px}dialog.ask p{margin:0 0 14px;line-height:1.45}dialog.ask .row{justify-content:flex-end;gap:8px}dialog.ask .pri.danger{background:var(--red);border-color:var(--red);color:#fff}

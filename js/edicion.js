@@ -20,7 +20,7 @@ function drawD() {
     const R = relFields(D), top = [], rest = [], has = k => Array.isArray(D[k]) ? D[k].length > 0 : D[k] != null && D[k] !== '';
     const put = (on, html) => html && (on ? top : rest).push(html), rel = k => put(R.has(k) || has(k), ALWAYS_F.includes(k) || shows(k, D.type) ? fh(k) : '');
     const fh = k => ({url: inp('url', 'URL', 'url', 'w'), venue: inp('venue', lbl('venue', 'Revista / editorial / sitio')), accessed: inp('accessed', 'Fecha de consulta', 'date'),
-      doi: `<label>DOI (sin https://doi.org/)<span class="row" style="flex-wrap:nowrap"><input style="flex:1;min-width:0" value="${esc(D.doi)}" data-oninput="put(D,'doi',this.value)"><button data-onclick="doiFill()" title="Rellenar con los datos de CrossRef">Buscar</button></span></label>`,
+      doi: `<label>DOI (sin https://doi.org/)<span class="row" style="flex-wrap:nowrap"><input style="flex:1;min-width:0" value="${esc(D.doi)}" data-oninput="put(D,'doi',this.value)"><button data-onclick="doiFill()" title="Rellenar con los datos de CrossRef">Buscar</button><button data-onclick="oaFill()" title="OpenAlex: resumen, número de citas y PDF en abierto (por el DOI o, sin DOI, por el título)">OpenAlex</button></span></label>`,
       volume: inp('volume', 'Volumen'), issue: inp('issue', lbl('issue', 'Número')), pages: inp('pages', 'Páginas (p. ej. 73-98)'), edition: inp('edition', lbl('edition', 'Edición (desde la 2.ª; p. ej. «2.ª»)')),
       publisher: inp('publisher', lbl('publisher', 'Editorial (del libro o actas)')), place: inp('place', lbl('place', 'Lugar de edición')),
       editors: `<label class="w">Editores del libro (uno por línea: «Apellido, Nombre»)<textarea data-oninput="put(D,'editors',lines(this.value))">${esc(D.editors.join('\n'))}</textarea></label>`,
@@ -291,8 +291,8 @@ function addNoteMenu(e) {
 const tplUI = () => `<div class="sct"><small>({fecha} y {paper} se sustituyen al insertar)</small>${db.settings.templates.map(t => `<div class="tplr"><div class="row" style="flex-wrap:nowrap"><input style="flex:1;min-width:0" value="${esc(t.name)}" data-oninput="setTpl('${t.id}','name',this.value)"><button title="Borrar" data-onclick="delTpl('${t.id}')">✕</button></div><textarea rows="3" data-oninput="setTpl('${t.id}','text',this.value)">${esc(t.text)}</textarea></div>`).join('')}<div class="row"><button data-onclick="addTpl()">+ Nueva plantilla</button><button data-onclick="resetTpl()">Restablecer las de serie</button></div></div>`;
 function setTpl(id, k, v) { const t = db.settings.templates.find(x => x.id === id); if (t) { t[k] = v; markDirty(); } }
 function addTpl() { db.settings.templates.push({id: uid(), name: 'Nueva plantilla', text: ''}); markDirty(); drawCfg(); }
-function delTpl(id) { if (!confirm('¿Borrar esta plantilla?')) return; db.settings.templates = db.settings.templates.filter(x => x.id !== id); markDirty(); drawCfg(); }
-function resetTpl() { if (!confirm('Se restablecerán las plantillas de serie y se perderán las que hayas creado o modificado. ¿Continuar?')) return; db.settings.templates = TPL_DEF.map(t => ({...t})); markDirty(); drawCfg(); }
+async function delTpl(id) { if (!await askOk('¿Borrar esta plantilla?', {ok: 'Borrar', danger: 1})) return; db.settings.templates = db.settings.templates.filter(x => x.id !== id); markDirty(); drawCfg(); }
+async function resetTpl() { if (!await askOk('Se restablecerán las plantillas de serie y se perderán las que hayas creado o modificado. ¿Continuar?')) return; db.settings.templates = TPL_DEF.map(t => ({...t})); markDirty(); drawCfg(); }
 
 /* ===== Enlaces entre notas ([[p:id]] = paper, [[n:id]] = nota) ===== */
 const norm = s => String(s ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();   // búsquedas sin distinguir tildes ni mayúsculas
@@ -373,7 +373,7 @@ async function copyRich(html, text, host) {   // HTML + texto: al pegar en Word 
 }
 async function saveText(text, name, mime, ext, label) {
   try { if (FSA) { const h = await showSaveFilePicker({suggestedName: name, types: [{description: label, accept: {[mime]: ['.' + ext]}}]}); await writeTo(h, text); } else download(text, name, mime); }
-  catch (e) { if (e.name !== 'AbortError') alert('Error al guardar: ' + e.message); }
+  catch (e) { if (e.name !== 'AbortError') say('Error al guardar: ' + e.message); }
 }
 async function svCopy() { $('#svMsg').textContent = (await copyText(svMarkdown(), $('#sv'))) ? 'Copiado ✓' : 'No se pudo copiar'; }
 async function svCopyRich() { $('#svMsg').textContent = (await copyRich(svHtml(), svMarkdown(), $('#sv'))) ? 'Copiado con formato ✓' : 'No se pudo copiar'; }
@@ -455,8 +455,8 @@ function trashRestore(id) {
   by.forEach(r => { const q = db.papers.find(x => x.id === r); if (q && !(q.refTo ??= []).includes(p.id)) q.refTo.push(p.id); });   // vuelve a estar citado por quien lo citaba
   logChange(p, 'Restaurado desde la papelera'); db.papers.push(p); markDirty(); render(); trDraw();
 }
-function trashDelete(id) { if (!confirm('¿Borrar definitivamente este paper? No se podrá recuperar.')) return; db.trash = db.trash.filter(t => t.paper.id !== id); markDirty(); render(); trDraw(); }
-function trashEmpty() { if (!confirm('¿Vaciar la papelera? Los papers que contiene no se podrán recuperar.')) return; db.trash = []; markDirty(); render(); trDraw(); }
+async function trashDelete(id) { if (!await askOk('¿Borrar definitivamente este paper? No se podrá recuperar.', {ok: 'Borrar', danger: 1})) return; db.trash = db.trash.filter(t => t.paper.id !== id); markDirty(); render(); trDraw(); }
+async function trashEmpty() { if (!await askOk('¿Vaciar la papelera? Los papers que contiene no se podrán recuperar.', {ok: 'Vaciar', danger: 1})) return; db.trash = []; markDirty(); render(); trDraw(); }
 function setView(v) { db.settings.view = v; lastSnap = snapDb(); dirty = true; touch(); render(); }   // la vista se recuerda en el JSON sin crear pasos de deshacer
 
 /* ===== Historial de cambios y relaciones ===== */
@@ -567,8 +567,8 @@ async function copyC(k, rich, b) {   // copia la cita sin marcas (texto) o con c
   if (b) { const t = b.textContent; b.textContent = 'Copiado ✓'; setTimeout(() => b.textContent = t, 1400); }
 }
 function commit() {
-  if (!D.title.trim()) { tab = 'data'; drawD(); return alert('El título es obligatorio.'); }
-  if (D.url && !/^https?:\/\//i.test(D.url)) return alert('La URL debe empezar por http:// o https://');
+  if (!D.title.trim()) { tab = 'data'; drawD(); return say('El título es obligatorio.'); }
+  if (D.url && !/^https?:\/\//i.test(D.url)) return say('La URL debe empezar por http:// o https://');
   D.year = D.year ? +D.year : '';
   D.modified = new Date().toISOString();
   const i = db.papers.findIndex(p => p.id === D.id), old = i < 0 ? null : db.papers[i];
@@ -596,9 +596,9 @@ function moveM(id, d) { const a = db[MG], i = a.findIndex(x => x.id === id), j =
   if (j < 0 || j >= a.length) return; [a[i], a[j]] = [a[j], a[i]]; markDirty(); drawMg(); }
 function toggleST(sid, tid) { const s = db.sections.find(x => x.id === sid), i = s.tagIds.indexOf(tid);
   i < 0 ? s.tagIds.push(tid) : s.tagIds.splice(i, 1); markDirty(); drawMg(); }
-function delM(id) {
+async function delM(id) {
   const x = db[MG].find(y => y.id === id);
-  if (!confirm(MG === 'tags' ? `¿Eliminar la etiqueta «${x.name}»? Se quitará de todos los papers y secciones.` : `¿Eliminar la sección «${x.name}»? Se borrarán las notas asociadas a ella.`)) return;
+  if (!await askOk(MG === 'tags' ? `¿Eliminar la etiqueta «${x.name}»? Se quitará de todos los papers y secciones.` : `¿Eliminar la sección «${x.name}»? Se borrarán las notas asociadas a ella.`)) return;
   db[MG] = db[MG].filter(y => y.id !== id);
   if (MG === 'tags') { db.papers.forEach(p => p.tagIds = p.tagIds.filter(t => t !== id)); F.tags.delete(id); F.exTags.delete(id); db.sections.forEach(s => s.tagIds = s.tagIds.filter(t => t !== id)); }
   else { db.papers.forEach(p => { p.notes = p.notes.filter(n => n.sectionId !== id); p.sectionIds = p.sectionIds.filter(x => x !== id); }); if (F.sec === id) F.sec = ''; }

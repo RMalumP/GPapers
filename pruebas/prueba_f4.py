@@ -10,7 +10,7 @@ def eq(name, got, want):
         fail += 1; print('FALLA', name, '\n  got :', json.dumps(got, ensure_ascii=False), '\n  want:', json.dumps(want, ensure_ascii=False))
 with sync_playwright() as pw:
     b = pw.chromium.launch(); ctx = b.new_context(permissions=['clipboard-read', 'clipboard-write']); pg = ctx.new_page(); errs = []
-    pg.on('pageerror', lambda e: errs.append(str(e))); pg.on('console', lambda m: errs.append(m.text) if m.type == 'error' else None); pg.on('dialog', lambda d: d.dismiss())
+    pg.on('pageerror', lambda e: errs.append(str(e))); pg.on('console', lambda m: errs.append(m.text) if m.type == 'error' else None); pg.on('dialog', lambda d: d.dismiss()); pg.add_init_script("window.ASK_AUTO = 'dismiss'")
     pg.goto('file://' + str(folder / 'index.html')); pg.wait_for_timeout(300)
     pg.evaluate("""() => { db.papers.length = 0; db.papers.push(NEWF({id:'p1', title:'Inside the Presidential Debates: Their Improbable Past', authors:['Minow, Newton N.', 'LaMay, Craig L.'], year:2008, venue:'University of Chicago Press', place:'Chicago', type:'libro', doi:'', url:'', accessed:'', general:'', tagIds:[], notes:[], cites:{}, related:[], refTo:[], history:[], reading:'por_leer', rating:0, sectionIds:[]})); UNDO.length = 0; REDO.length = 0; lastSnap = JSON.stringify(db); render(); openPaper('p1'); tab = 'cite'; drawD(); }""")
     eq('por defecto el ajuste está desactivado', pg.evaluate("ex().inText"), False)

@@ -28,12 +28,12 @@ PICK = "r => r && {a: r.authors, y: r.year, t: r.title, v: r.venue, ty: r.type, 
 with sync_playwright() as pw:
     kw = {'executable_path': '/opt/pw-browsers/chromium'} if os.path.exists('/opt/pw-browsers/chromium') else {}
     b = pw.chromium.launch(**kw); ctx = b.new_context(viewport={'width': 1200, 'height': 900}, service_workers='block'); pg = ctx.new_page(); errs = []
-    pg.on('pageerror', lambda e: errs.append(str(e))); pg.on('dialog', lambda d: d.accept())
+    pg.on('pageerror', lambda e: errs.append(str(e))); pg.on('dialog', lambda d: d.accept()); pg.add_init_script("window.ASK_AUTO = 'accept'")
     pg.goto('file://' + str(folder / 'index.html')); pg.wait_for_timeout(400)
     # ---- botón «Importar» en la barra principal
     eq('Importar está en la cabecera, a la izquierda de Exportar citas', pg.evaluate("(b => [!!b.closest('header'), b.nextElementSibling?.textContent])([...document.querySelectorAll('button')].find(b => b.textContent === '📥 Importar'))"), [True, 'Exportar citas'])
     pg.click('button:has-text("📥 Importar")')
-    eq('el botón Importar abre el menú con las tres formas', pg.evaluate("[...document.querySelectorAll('#ctx button')].map(b => b.textContent)"), ['📄 Desde archivo (.bib, .ris o .txt)', '📋 Pegar BibTeX, RIS o citas de Google Scholar', '🔎 Buscar por DOI'])
+    eq('el botón Importar abre el menú con las tres formas', pg.evaluate("[...document.querySelectorAll('#ctx button')].map(b => b.textContent)"), ['📄 Desde archivo (.bib, .ris, .txt o CSL-JSON)', '📋 Pegar BibTeX, RIS o citas de Google Scholar', '🔎 Buscar por DOI, ISBN o título'])
     pg.click('#ctx button:has-text("Pegar")')
     eq('pegar texto: el cuadro explica qué admite', 'Google Scholar' in pg.get_attribute('#iTxt', 'placeholder'), True)
     if shots: pg.screenshot(path=os.path.join(shots, '4_importar_pegar.png'))

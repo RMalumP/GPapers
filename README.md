@@ -36,7 +36,7 @@ Los ajustes son comunes a todos: nombre de la aplicación, colores, atajos, tipo
 - **Ayuda**: «Empezar aquí» y, bajo «Ver toda la ayuda», el resto (la búsqueda abre todo).
 
 ## Copias, duplicados, PDF y filtros
-- **Copias de seguridad** por proyecto (IndexedDB `bk:<id>`): una al abrir cada día y antes de restaurar o de sustituirlo todo por Drive, las últimas 10; crear, descargar, restaurar (deshacible) y borrar desde ▾ → «Copias de seguridad…». Solo en el navegador.
+- **Copias de seguridad** por proyecto (IndexedDB: índice `bk:<id>` y cada copia en `bkd:<id>:<k>`): una al abrir cada día y antes de restaurar o de sustituirlo todo por Drive, las últimas 10; crear, descargar, restaurar (deshacible) y borrar desde ▾ → «Copias de seguridad…». Solo en el navegador.
 - **Buscar duplicados** (grupo Selección): mismo DOI o título; «Quedarme con este» fusiona campos vacíos, etiquetas, secciones, notas y relaciones, y manda los demás a la papelera.
 - **Mover o copiar a otro proyecto** (grupo Selección): notas, etiquetas y secciones (por nombre; se crean si faltan) y relaciones entre los elegidos.
 - **PDF enlazados** (Datos): hasta dos por paper (`pdf` y `pdf2`); solo el nombre y la página van al JSON; el enlace al archivo vive en el navegador. Opcional (Configuración → «Subir a mi Google Drive los PDF enlazados»): cada PDF se copia a la carpeta oculta de Drive (`gpapers-pdf-<id>` y `gpapers-pdf-<id>~2`, subida reanudable, máx. 100 MB) y se abre desde otros dispositivos; se borra al quitar el enlace.
@@ -111,7 +111,7 @@ Un archivo nuevo se añade en los tres sitios; `pruebas/prueba_version.js` lo co
 El HTML no lleva `onclick` ni otros manejadores en línea: `index.html` tiene una CSP que los bloquea (y no permite `eval`). Cada elemento dice qué hacer en `data-on<evento>`, p. ej. `data-onclick="openPaper('p1')"`; ese texto lo lee un minilenguaje (llamadas, lecturas, textos, números, listas, `this`, `event`, `!` y `+`), sin evaluarlo como JavaScript (ver «Eventos de la interfaz» en `js/modelo.js`). Para asignar se usan funciones pequeñas (`put(F,'mode',this.value,render)`, `setHas(…)`, etc., en `app.js`); las variables `const`/`let` que haga falta leer van en `ON_VARS`. `pruebas/prueba_eventos.js` comprueba que no queda ningún manejador en línea y que todos los `data-on` se pueden leer.
 
 ## Pruebas
-`node pruebas/prueba_version.js .`, `node pruebas/prueba_eventos.js .`, `node pruebas/pruebas_citas.js .`, `python3 pruebas/prueba_f4.py .`, `python3 pruebas/prueba_ui.py .`, `python3 pruebas/prueba_sync.py .`, `python3 pruebas/prueba_proyectos.py .`, `python3 pruebas/prueba_mejoras.py .` y `python3 pruebas/prueba_interfaz.py .`, `python3 pruebas/prueba_derecho.py .`, `python3 pruebas/prueba_principal.py .`, `python3 pruebas/prueba_importar.py .`, `python3 pruebas/prueba_rendimiento.py .` (necesitan Playwright con Chromium; la de sincronización simula Google y Drive).
+`node pruebas/prueba_version.js .`, `node pruebas/prueba_eventos.js .`, `node pruebas/pruebas_citas.js .`, `python3 pruebas/prueba_f4.py .`, `python3 pruebas/prueba_ui.py .`, `python3 pruebas/prueba_sync.py .`, `python3 pruebas/prueba_proyectos.py .`, `python3 pruebas/prueba_mejoras.py .` y `python3 pruebas/prueba_interfaz.py .`, `python3 pruebas/prueba_derecho.py .`, `python3 pruebas/prueba_principal.py .`, `python3 pruebas/prueba_importar.py .`, `python3 pruebas/prueba_rendimiento.py .`, `python3 pruebas/prueba_movil.py .`, `python3 pruebas/prueba_motor.py .` (necesitan Playwright con Chromium; la de sincronización simula Google y Drive).
 
 ## Cambios de la ronda F7–F9
 - **Tabla:** columna *Secciones* (se puede seguir agrupando por sección). La pestaña **Cita** va justo después de **Datos**. La **valoración mínima** está en *Filtros*.
@@ -134,6 +134,27 @@ El HTML no lleva `onclick` ni otros manejadores en línea: `index.html` tiene un
 - (v37.7) Las miniaturas incrustadas se muestran con URLs `blob:` en vez de copiar el base64 en el HTML de cada tarjeta, y la app usa una sola conexión a IndexedDB (`idbOpen`).
 
 - (v37.8) Los avisos de reconectar con Google (`toast(…, 'sy')`) se quitan solos en cuanto vuelve el acceso, y pulsar un botón de un aviso lo cierra.
+
+## Motor, búsqueda y selección (v38.0, fase A)
+- **Búsqueda por palabras**: cada palabra por separado y en cualquier orden («garcía 2020»), en título, alias, año, autores, revista, DOI, etiquetas y secciones (y notas y citas con la casilla). Admite `"frase exacta"`, `-palabra`, `autor:`, `año:2020` / `año:2010-2020`, `revista:`, `doi:`, `#etiqueta` (o `etiqueta:`) y `seccion:` (`qParse`/`qTest` en js/lista.js). Las palabras encontradas se **resaltan** en título y autores de tarjetas y tabla (`hl`).
+- **Acciones en lote** (grupo Selección): estado de lectura, valoración, añadir o quitar etiqueta y sección, y enviar a la papelera; cada una se deshace con un solo Ctrl+Z (también desde el aviso).
+- **Varias pestañas**: si el mismo proyecto ya está abierto en otra pestaña, la nueva queda en pausa (no guarda ni sincroniza) con «Usar en esta pestaña»; la otra guarda lo pendiente y pasa a pausa (`TAB`, BroadcastChannel «gpapers», en js/extras.js).
+- **Sincronización sin trabajo repetido**: normalizar la biblioteca (`syNormS`) recuerda sus últimos resultados por la huella del JSON, así cada vuelta con Drive ya no lo hace 4 veces (con 2000 papers, ~1,2 s menos de pantalla congelada en un móvil medio).
+- **Copias de seguridad ligeras**: `bk:<id>` es solo el índice y cada copia va en `bkd:<id>:<k>`, compacta y con las imágenes aparte (`imgd:`); al abrir ya no se leen todas las copias. Las de versiones anteriores se convierten solas.
+
+## Añadir papers más rápido (v38.1, fase B)
+- **Buscar por DOI, ISBN o título** (📥 Importar → 🔎): un DOI va a CrossRef; un ISBN, a Open Library (`fetchIsbn`); unas palabras del título muestran hasta 6 resultados de CrossRef para elegir (`searchTitle`). La CSP permite `openlibrary.org` (y `api.openalex.org`, para la fase C) y la política de privacidad lo explica.
+- **Compartir con la app** (Android): `share_target` en `manifest.json`; lo compartido llega como `index.html?title=…&text=…&url=…` y `shareIn` busca un DOI, un ISBN o el título y abre Importar.
+- **Soltar archivos** en la ventana: .bib, .ris, .txt o CSL-JSON abren Importar; un .json de la aplicación se abre como proyecto (con su enlace al archivo en Chrome/Edge).
+- **CSL-JSON**: se importa (`parseCsl`) y se exporta (formato «CSL-JSON» en Exportar, `cslJSON`).
+
+## Motor, avisos, teclado y más (v38.2, fase C)
+- **Copias por papers** (`snapDb` en js/persistencia.js): cada copia para deshacer es `{head, parts}` con el JSON de cada paper aparte (sin historial y con las imágenes como huella); lo que no cambió reutiliza la misma cadena. Con 2000 papers, las 50 copias de deshacer pasan de ~183 MB a ~4 MB, y un cambio en un móvil medio, de ~285 a ~140 ms (la copia de trabajo reutiliza la copia recién hecha, `SNAP_SES`; al ocultar o cerrar la app se escribe siempre entera). Deshacer conserva el historial del día.
+- **Avisos y confirmaciones propios** (`say`, `askOk` en js/modelo.js) en lugar de `alert` y `confirm`; eliminar un paper ya no pregunta: va a la papelera con «Deshacer» en el aviso. Las pruebas contestan solas con `window.ASK_AUTO`.
+- **Teclado**: ↑/↓ (o j/k), Intro, Espacio y Supr en la lista; **paleta de órdenes** con Ctrl+K (configurable) para acciones y papers.
+- **Duplicados aproximados**: títulos casi iguales (Dice de bigramas ≥ 0,9, mismos números, años a ±1) al importar («Parecido», desmarcado) y en «Buscar duplicados» («título parecido»).
+- **Completar con OpenAlex** (botón junto al DOI en Datos): resumen y número de citas a las notas generales y PDF en abierto como URL.
+- **Tema claro u oscuro a mano** (Configuración → Apariencia → Paleta): Automático, Claro u Oscuro, de cada dispositivo (`gp-theme`).
 
 ## Sincronización con Google Drive, Privacidad y Créditos (F14)
 - **Final de la barra lateral**: Papelera, Configuración, una línea, «ℹ️ Información» (Ayuda y Créditos, discretos y plegada por defecto; se recuerda si la abres) y, siempre visible y con la misma letra, una línea que explica qué es la app con el enlace **Política de privacidad** (v31.1: sustituye al botón Privacidad; Google lo pide en la página principal para verificar la marca).
