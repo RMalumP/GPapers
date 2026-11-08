@@ -148,6 +148,14 @@ El HTML no lleva `onclick` ni otros manejadores en línea: `index.html` tiene un
 - **Soltar archivos** en la ventana: .bib, .ris, .txt o CSL-JSON abren Importar; un .json de la aplicación se abre como proyecto (con su enlace al archivo en Chrome/Edge).
 - **CSL-JSON**: se importa (`parseCsl`) y se exporta (formato «CSL-JSON» en Exportar, `cslJSON`).
 
+## Motor, avisos, teclado y más (v38.2, fase C)
+- **Copias por papers** (`snapDb` en js/persistencia.js): cada copia para deshacer es `{head, parts}` con el JSON de cada paper aparte (sin historial y con las imágenes como huella); lo que no cambió reutiliza la misma cadena. Con 2000 papers, las 50 copias de deshacer pasan de ~183 MB a ~4 MB, y un cambio en un móvil medio, de ~285 a ~140 ms (la copia de trabajo reutiliza la copia recién hecha, `SNAP_SES`; al ocultar o cerrar la app se escribe siempre entera). Deshacer conserva el historial del día.
+- **Avisos y confirmaciones propios** (`say`, `askOk` en js/modelo.js) en lugar de `alert` y `confirm`; eliminar un paper ya no pregunta: va a la papelera con «Deshacer» en el aviso. Las pruebas contestan solas con `window.ASK_AUTO`.
+- **Teclado**: ↑/↓ (o j/k), Intro, Espacio y Supr en la lista; **paleta de órdenes** con Ctrl+K (configurable) para acciones y papers.
+- **Duplicados aproximados**: títulos casi iguales (Dice de bigramas ≥ 0,9, mismos números, años a ±1) al importar («Parecido», desmarcado) y en «Buscar duplicados» («título parecido»).
+- **Completar con OpenAlex** (botón junto al DOI en Datos): resumen y número de citas a las notas generales y PDF en abierto como URL.
+- **Tema claro u oscuro a mano** (Configuración → Apariencia → Paleta): Automático, Claro u Oscuro, de cada dispositivo (`gp-theme`).
+
 ## Sincronización con Google Drive, Privacidad y Créditos (F14)
 - **Final de la barra lateral**: Papelera, Configuración, una línea, «ℹ️ Información» (Ayuda y Créditos, discretos y plegada por defecto; se recuerda si la abres) y, siempre visible y con la misma letra, una línea que explica qué es la app con el enlace **Política de privacidad** (v31.1: sustituye al botón Privacidad; Google lo pide en la página principal para verificar la marca).
 - **©️ Créditos** (barra lateral, en «Información»): dirección, desarrollo, derechos (licencia CC BY-SA) y la versión de la aplicación.

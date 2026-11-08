@@ -58,6 +58,9 @@ const DP_IGN = new Set();   // grupos marcados «no son duplicados» (hasta cerr
 function dpGroups() {
   const P = db.papers, par = P.map((_, i) => i), f = i => par[i] === i ? i : (par[i] = f(par[i])), u = (a, b) => { par[f(a)] = f(b); }, byD = new Map(), byT = new Map();
   P.forEach((p, i) => { const d = normDoi(p.doi), t = normTitle(p.title); if (d) byD.has(d) ? u(i, byD.get(d)) : byD.set(d, i); if (t) byT.has(t) ? u(i, byT.get(t)) : byT.set(t, i); });
+  const T = P.map(p => normTitle(p.title)), K = new Map();   // títulos casi iguales (ver titleSim en js/importar.js)
+  T.forEach((t, i) => nearKeys(t).forEach(k => { if (!K.has(k)) K.set(k, []); K.get(k).push(i); }));
+  K.forEach(L => { for (let a = 0; a < L.length; a++) for (let b = a + 1; b < L.length; b++) { const i = L[a], j = L[b]; if (f(i) !== f(j) && isNear(T[i], P[i].year, T[j], P[j].year)) u(i, j); } });
   const g = new Map(); P.forEach((p, i) => { const r = f(i); if (!g.has(r)) g.set(r, []); g.get(r).push(p); });
   return [...g.values()].filter(a => a.length > 1 && !DP_IGN.has(a.map(p => p.id).sort().join()));
 }
@@ -88,8 +91,8 @@ function dpOpen() { dpDraw(); if (!$('#dp').open) $('#dp').showModal(); }
 function dpDraw() {
   const G = dpGroups();
   $('#dp').innerHTML = `<div class="dh"><h2>Posibles duplicados</h2><div class="dbtn"><button data-onclick="$('#dp').close()">Cerrar ✕</button></div></div>
-    <p class="empty">Papers con el mismo DOI o el mismo título. «Quedarme con este» lo conserva, le añade lo que falte de los otros (campos vacíos, etiquetas, secciones, notas, relaciones) y manda los demás a la papelera.</p>
-    ${G.length ? G.map((g, gi) => `<div class="dpg"><div class="dpt">${g.length} papers · ${g.some((p, i) => g.some((q, j) => i < j && normDoi(p.doi) && normDoi(p.doi) === normDoi(q.doi))) ? 'mismo DOI' : 'mismo título'}</div>
+    <p class="empty">Papers con el mismo DOI, el mismo título o un título casi igual (una errata, un subtítulo de más). «Quedarme con este» lo conserva, le añade lo que falte de los otros (campos vacíos, etiquetas, secciones, notas, relaciones) y manda los demás a la papelera.</p>
+    ${G.length ? G.map((g, gi) => `<div class="dpg"><div class="dpt">${g.length} papers · ${g.some((p, i) => g.some((q, j) => i < j && normDoi(p.doi) && normDoi(p.doi) === normDoi(q.doi))) ? 'mismo DOI' : g.some((p, i) => g.some((q, j) => i < j && normTitle(p.title) === normTitle(q.title))) ? 'mismo título' : 'título parecido'}</div>
       ${g.map(p => `<div class="irow"><span><b>${esc(p.alias || p.title)}</b><br><small>${esc(svAuth(p))}${p.venue ? ' · ' + esc(p.venue) : ''}${p.doi ? ' · ' + esc(p.doi) : ''}<br>${p.notes.length} notas · ${p.tagIds.length} etiquetas · ${p.related.length} relaciones</small></span><button class="sm" style="margin-left:auto" data-onclick="dpMerge('${p.id}', ${esc(JSON.stringify(g.map(x => x.id)).replace(/"/g, '&quot;'))});dpDraw()">Quedarme con este</button></div>`).join('')}
       <div class="row"><button class="sm" data-onclick="DP_IGN.add('${g.map(p => p.id).sort().join()}');dpDraw()">No son duplicados</button></div></div>`).join('') : '<p class="empty">No hay papers duplicados.</p>'}`;
 }
@@ -129,7 +132,7 @@ function favApply(v) {
   F.inNotes = !!f.inNotes; F.mode = f.mode === 'all' ? 'all' : 'any'; fExtraLoad(f); const so = (f.sorts || []).filter(x => x && Object.hasOwn(SORTS, x.k) && (x.d === 1 || x.d === -1)).slice(0, 3); if (so.length) F.sorts = so.map(x => ({k: x.k, d: x.d}));
   document.querySelector('#sg-search .sb input[type=checkbox]').checked = F.inNotes; render();
 }
-function favDel(i) { if (!FAV[i] || !confirm(`¿Borrar la vista «${FAV[i].name}»?`)) return; FAV.splice(i, 1); favPut(); favDraw(); }
+async function favDel(i) { if (!FAV[i] || !await askOk(`¿Borrar la vista «${FAV[i].name}»?`)) return; FAV.splice(i, 1); favPut(); favDraw(); }
 let REC = [];   // papers abiertos hace poco en este proyecto (solo en este navegador), el último primero
 const recPut = () => idb('readwrite', st => st.put(REC, 'rec:' + PJ.cur)).catch(() => {});
 function recPush(id) { REC = [id, ...REC.filter(x => x !== id)].slice(0, 20); recPut(); recDraw(); }
@@ -162,7 +165,7 @@ async function pdfChoose(key) {   // elige el archivo de un hueco (guardándolo 
 async function pdfPick(n = 1) {
   const f = pdfF(n);
   try { const {file} = await pdfChoose(pdfKey(D.id, n)); D[f] = {name: file.name, ...(pdfPage(D[f]?.page) ? {page: D[f].page} : {})}; drawD(); }
-  catch (e) { if (e.name !== 'AbortError') alert('No se pudo elegir el archivo: ' + e.message); }
+  catch (e) { if (e.name !== 'AbortError') say('No se pudo elegir el archivo: ' + e.message); }
 }
 function pdfClear(n = 1) { const k = pdfKey(D.id, n); PEND_PDF.delete(k); PDF_FILES.delete(k); D[pdfF(n)] = null; drawD(); }
 function pdfSetPage(v, n = 1) { const p = D[pdfF(n)]; if (p) { const x = pdfPage(v); x ? p.page = x : delete p.page; } }
@@ -181,7 +184,7 @@ async function pdfOpen(id, n = 1) {
     }
     const url = URL.createObjectURL(file.type === 'application/pdf' ? file : new Blob([file], {type: 'application/pdf'})) + (pdfPage(pf.page) ? '#page=' + pdfPage(pf.page) : '');
     window.open(url, '_blank'); setTimeout(() => URL.revokeObjectURL(url.split('#')[0]), 120000);
-  } catch (e) { if (e.name !== 'AbortError') alert('No se pudo abrir el PDF: ' + e.message); }
+  } catch (e) { if (e.name !== 'AbortError') say('No se pudo abrir el PDF: ' + e.message); }
 }
 const pdfBtns = (p, full) => pdfsOf(p).map(n => `<button class="sm" data-onclick="pdfOpen('${p.id}',${n})" title="Abrir el PDF enlazado: ${esc(p[pdfF(n)].name)}">📄${full ? ' PDF' : ''}${n === 2 ? ' 2' : ''}</button>`).join('');   // botones de la tarjeta (full) y de la tabla
 
@@ -200,7 +203,7 @@ function psOpen() {
 }
 async function psGo(tid) {
   const mode = document.querySelector('#ps input[name=psm]:checked')?.value || 'copy', ids = [...SEL].filter(id => db.papers.some(p => p.id === id)), tp = PJ.list.find(p => p.id === tid);
-  const rec = await idb('readonly', st => st.get('proj:' + tid)).catch(() => null); let d; try { d = await projData(rec); if (!d) throw 0; } catch (e) { return alert('No se pudo leer el proyecto de destino.'); }
+  const rec = await idb('readonly', st => st.get('proj:' + tid)).catch(() => null); let d; try { d = await projData(rec); if (!d) throw 0; } catch (e) { return say('No se pudo leer el proyecto de destino.'); }
   const src = ids.map(id => structuredClone(db.papers.find(p => p.id === id))), srcTags = new Map(db.tags.map(t => [t.id, t])), srcSecs = new Map(db.sections.map(s => [s.id, s]));
   const low = s => String(s).trim().toLowerCase(), tagMap = new Map(), secMap = new Map(), have = new Set(d.papers.map(p => p.id).concat(d.trash.map(t => t.paper.id)));
   const mapTag = id => { const t = srcTags.get(id); if (!t) return null; if (!tagMap.has(id)) { let x = d.tags.find(y => low(y.name) === low(t.name)); if (!x) { x = {...t, id: have.has(t.id) || d.tags.some(y => y.id === t.id) ? uid() : t.id}; d.tags.push(x); } tagMap.set(id, x.id); } return tagMap.get(id); };
@@ -273,8 +276,8 @@ async function bkDownload(i) { const c = (await bkList())[i]; if (c) download(aw
 async function bkDelete(i) { const L = await bkList(); L.splice(i, 1); await bkPutList(PJ.cur, L); bkOpen(); }
 async function bkRestore(i) {
   const c = (await bkList())[i]; if (!c) return;
-  if (!confirm(`¿Restaurar la copia del ${bkFmt(c)} (${c.n} papers)?\nSe sustituye lo que hay ahora en «${pjCur().name}»; antes se guarda una copia del estado actual y puedes deshacerlo (${db.settings.shortcuts.undo}).`)) return;
-  let d; try { d = JSON.parse(await bkJSON(c)); d.settings = structuredClone(db.settings); d = validate(d); } catch (e) { return alert('La copia no es válida: ' + e.message); } finally { syncTypes(db.settings.customTypes); syncStyles(db.settings.customStyles, db.settings.export); }
+  if (!await askOk(`¿Restaurar la copia del ${bkFmt(c)} (${c.n} papers)?\nSe sustituye lo que hay ahora en «${pjCur().name}»; antes se guarda una copia del estado actual y puedes deshacerlo (${db.settings.shortcuts.undo}).`)) return;
+  let d; try { d = JSON.parse(await bkJSON(c)); d.settings = structuredClone(db.settings); d = validate(d); } catch (e) { return say('La copia no es válida: ' + e.message); } finally { syncTypes(db.settings.customTypes); syncStyles(db.settings.customStyles, db.settings.export); }
   await bkTake('Antes de restaurar', true);
   const hist = new Map(db.papers.map(p => [p.id, p.history])); db = d; db.papers.forEach(p => p.history = hist.get(p.id) || []);
   for (const id of [...SEL]) if (!db.papers.some(p => p.id === id)) SEL.delete(id);
@@ -332,7 +335,7 @@ async function pjNew() {
 }
 function pjEdit() { const i = $('#pjName'); i.focus(); i.select(); }
 async function pjOpenFile(text, name, h) {   // un archivo JSON se abre como proyecto: el suyo si ya lo es; si no, uno nuevo con el nombre del archivo
-  try { validate(JSON.parse(text)); } catch (e) { alert('Archivo no válido (se mantienen los datos actuales): ' + e.message); return false; }
+  try { validate(JSON.parse(text)); } catch (e) { say('Archivo no válido (se mantienen los datos actuales): ' + e.message); return false; }
   finally { syncTypes(db.settings.customTypes); syncStyles(db.settings.customStyles, db.settings.export); }   // validate() cambia los tipos y estilos globales
   const d = JSON.parse(text), ex = PJ.list.length === 1 && path === 'ejemplo_papers.json' && !dirty;   // solo está el ejemplo sin tocar: el archivo ocupa su lugar, con sus ajustes
   let id = ex ? PJ.cur : null;
@@ -341,7 +344,7 @@ async function pjOpenFile(text, name, h) {   // un archivo JSON se abre como pro
     else if (p.id === PJ.cur ? path === name : p.file === name) { id = p.id; break; }
   }
   const p = PJ.list.find(x => x.id === id);
-  if (p && !ex && (p.id === PJ.cur ? dirty : p.dirty) && !confirm(`El proyecto «${p.name}» tiene cambios sin guardar. ¿Descartarlos y cargar el archivo?`)) return false;
+  if (p && !ex && (p.id === PJ.cur ? dirty : p.dirty) && !await askOk(`El proyecto «${p.name}» tiene cambios sin guardar. ¿Descartarlos y cargar el archivo?`)) return false;
   if (!ex) {   // ajustes comunes; del archivo solo se añaden los tipos, estilos y plantillas que no estén (los pueden usar sus papers)
     const o = structuredClone(db.settings);
     for (const k of ['customTypes', 'customStyles', 'templates']) { const have = new Set(o[k].map(x => x.id)); for (const x of Array.isArray(d.settings?.[k]) ? d.settings[k] : []) if (x && x.id && !have.has(x.id)) o[k].push(x); }
@@ -365,8 +368,8 @@ async function pjRename(v) {   // el nombre se escribe en la cabecera; el archiv
 }
 async function pjDel() {
   ctxClose(); const p = pjCur();
-  if (PJ.list.length < 2) return alert('Es el único proyecto: crea otro antes de borrar este.');
-  if (!confirm(`¿Borrar el proyecto «${p.name}» de este navegador${syOn() ? ' y de tu Google Drive' : ''}?\nSus papers, notas, secciones y etiquetas desaparecen de la aplicación.${path ? `\nTu archivo «${path}» no se toca.` : '\nNo tiene archivo JSON: si quieres conservarlo, antes pulsa «Guardar como».'}`)) return;
+  if (PJ.list.length < 2) return say('Es el único proyecto: crea otro antes de borrar este.');
+  if (!await askOk(`¿Borrar el proyecto «${p.name}» de este navegador${syOn() ? ' y de tu Google Drive' : ''}?\nSus papers, notas, secciones y etiquetas desaparecen de la aplicación.${path ? `\nTu archivo «${path}» no se toca.` : '\nNo tiene archivo JSON: si quieres conservarlo, antes pulsa «Guardar como».'}`)) return;
   clearTimeout(timer); await pjIdle(); clearTimeout(SY.tm); SY.tm = 0;
   const id = p.id; PJ.list = PJ.list.filter(x => x.id !== id); PJ.gone.push(id);
   await pjLoad(PJ.list[0].id); await pjDrop(id); pjSave(); if (syAuto()) sySoon(300);

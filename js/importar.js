@@ -208,11 +208,31 @@ function parseCite(c) {   // una cita con formato → referencia; null si no se 
   return r;
 }
 const parseCites = t => t.split(/\r?\n/).map(l => l.trim()).filter(Boolean).map(parseCite).filter(Boolean);
+/* ---- Títulos casi iguales (una errata, un subtítulo de más): parecido de bigramas (Dice) ≥ 0,9, años a ±1 como mucho.
+   Solo se comparan títulos que comparten la primera o la última palabra larga, así con miles de papers sigue siendo rápido. */
+const bigr = t => { const s = new Set(); for (let i = 0; i < t.length - 1; i++) s.add(t.slice(i, i + 2)); return s; };
+function titleSim(a, b) {   // a y b ya pasados por normTitle
+  if (!a || !b) return 0; if (a === b) return 1;
+  const [s, l] = a.length <= b.length ? [a, b] : [b, a];
+  if (s.length >= 20 && l.startsWith(s + ' ')) return 0.95;   // el mismo título con subtítulo
+  const A = bigr(a), B = bigr(b); let n = 0; A.forEach(x => { if (B.has(x)) n++; }); return 2 * n / (A.size + B.size || 1);
+}
+const SIM_MIN = 0.9;
+const nearKeys = t => { const w = t.split(' ').filter(x => x.length > 3); return t.length < 12 ? [] : [...new Set([w[0], w.at(-1)].filter(Boolean))]; };
+const yearsNear = (a, b) => !+a || !+b || Math.abs(+a - +b) <= 1;
+const nums = t => (t.match(/\d+/g) || []).join(' ');   // «Parte 1» y «Parte 2» no son el mismo trabajo
+const isNear = (t1, y1, t2, y2) => t1 !== t2 && yearsNear(y1, y2) && nums(t1) === nums(t2) && titleSim(t1, t2) >= SIM_MIN;
+function nearIndex(L) {   // índice para buscar títulos parecidos: palabra → [{t, y, p}]
+  const m = new Map(); L.forEach(p => { const t = normTitle(p.title); nearKeys(t).forEach(k => { if (!m.has(k)) m.set(k, []); m.get(k).push({t, y: p.year, p}); }); }); return m;
+}
+const nearFind = (idx, t, y) => { for (const k of nearKeys(t)) for (const e of idx.get(k) || []) if (isNear(t, y, e.t, e.y)) return e.p; return null; };
 function impPrepare(refs) {   // marca duplicados (mismo DOI o mismo título) frente al archivo y dentro del propio lote
   const dois = new Set(db.papers.map(p => normDoi(p.doi)).filter(Boolean)), tits = new Set(db.papers.map(p => normTitle(p.title)).filter(Boolean));
+  const idx = nearIndex(db.papers);
   refs.forEach(r => { const t = normTitle(r.title); r.bad = !r.title;
-    r.dup = !r.bad && ((r.doi && dois.has(r.doi)) || (t && tits.has(t))); r.on = !r.bad && !r.dup;
-    if (r.doi) dois.add(r.doi); if (t) tits.add(t); });
+    r.dup = !r.bad && ((r.doi && dois.has(r.doi)) || (t && tits.has(t)));
+    const nr = !r.bad && !r.dup && t ? nearFind(idx, t, r.year) : null; r.near = nr ? nr.title : ''; r.on = !r.bad && !r.dup && !nr;
+    if (r.doi) dois.add(r.doi); if (t) { tits.add(t); nearKeys(t).forEach(k => { if (!idx.has(k)) idx.set(k, []); idx.get(k).push({t, y: r.year, p: r}); }); } });
   return refs;
 }
 const FLD = [['title', 'Título'], ['authors', 'Autores'], ['year', 'Año'], ['venue', 'Revista / editorial'], ['url', 'URL'], ['type', 'Tipo'], ['volume', 'Volumen'], ['issue', 'Número'], ['pages', 'Páginas'], ['publisher', 'Editorial'], ['place', 'Lugar'], ['edition', 'Edición'], ['editors', 'Editores'], ['pubDate', 'Fecha de publicación'], ['isbn', 'ISBN'], ['issn', 'ISSN']];
@@ -228,13 +248,13 @@ async function impFile() {
     if (FSA) { const [h] = await showOpenFilePicker({types: [{description: 'Referencias (BibTeX, RIS o texto)', accept: {'text/plain': ['.bib', '.ris', '.txt'], 'application/json': ['.json']}}]}); text = await (await h.getFile()).text(); }
     else { const r = await pickFile('.bib,.ris,.txt,.json'); if (!r) return; text = r.text; }
     impText(text);
-  } catch (e) { if (e.name !== 'AbortError') alert('No se pudo leer el archivo: ' + e.message); }
+  } catch (e) { if (e.name !== 'AbortError') say('No se pudo leer el archivo: ' + e.message); }
 }
 function impText(t) {
   t = t.replace(/^\uFEFF/, '');
-  if (/^\s*[[{]/.test(t) && !isCsl(t)) { try { if (Array.isArray(JSON.parse(t).papers)) return alert('Este JSON es un proyecto de la aplicación: ábrelo con Archivo ▾ → «Abrir un archivo JSON…».'); } catch (e) {} }
+  if (/^\s*[[{]/.test(t) && !isCsl(t)) { try { if (Array.isArray(JSON.parse(t).papers)) return say('Este JSON es un proyecto de la aplicación: ábrelo con Archivo ▾ → «Abrir un archivo JSON…».'); } catch (e) {} }
   const refs = isCsl(t) ? parseCsl(t) : /^\s*TY\s{2}-/m.test(t) ? parseRis(t) : /@\w+\s*\{/.test(t) ? parseBib(t) : isSdTxt(t) ? parseSd(t) : parseCites(t);
-  if (!refs.length) return alert('No se reconoce ninguna referencia. Usa BibTeX (.bib), RIS (.ris), CSL-JSON (.json), el texto (.txt) de ScienceDirect o citas copiadas de Google Scholar, una por línea.');
+  if (!refs.length) return say('No se reconoce ninguna referencia. Usa BibTeX (.bib), RIS (.ris), CSL-JSON (.json), el texto (.txt) de ScienceDirect o citas copiadas de Google Scholar, una por línea.');
   IMP = {mode: 'prev', refs: impPrepare(refs)}; impDraw(); if (!$('#imp').open) $('#imp').showModal();
 }
 async function impDoi() {   // un DOI, un ISBN o un título (este da varios resultados para elegir)
@@ -249,17 +269,25 @@ async function impDoi() {   // un DOI, un ISBN o un título (este da varios resu
 function impPick(i) { const r = IMP.refs[i]; if (!r) return; r.on = !r.bad; IMP = {mode: 'prev', refs: [r]}; impDraw(); }
 function impDraw() {
   const m = IMP.mode, close = `<button data-onclick="$('#imp').close()">Cancelar</button>`;
-  let h = `<h2>${m === 'fill' ? 'Datos de CrossRef' : 'Importar referencias'}</h2>`;
+  let h = `<h2>${m === 'fill' ? 'Datos de CrossRef' : m === 'oa' ? 'Datos de OpenAlex' : 'Importar referencias'}</h2>`;
+  if (m === 'oa') { const o = IMP.oa, row = (id, on, t, v) => `<label class="irow"><input type="checkbox" id="${id}" ${on ? 'checked' : ''}><span><b>${t}</b><br><small>${v}</small></span></label>`;
+    const L = [o.abstract && row('oa_abs', !/resumen/i.test(D.general || ''), 'Resumen → a las notas generales', esc(o.abstract.length > 400 ? o.abstract.slice(0, 400) + '…' : o.abstract)),
+      o.cites != null && row('oa_cit', false, 'Número de citas → a las notas generales', `Citado ${o.cites} ${o.cites === 1 ? 'vez' : 'veces'} según OpenAlex`),
+      o.pdf && row('oa_pdf', !D.url, D.url ? 'PDF en abierto → a las notas generales (ya hay URL)' : 'PDF en abierto → como URL', `<a href="${esc(o.pdf)}" target="_blank" rel="noopener noreferrer">${esc(o.pdf)}</a>`)].filter(Boolean);
+    h += (o.byDoi ? '' : `<p class="empty">Encontrado por el título: «${esc(o.title)}»${o.year ? ` (${esc(o.year)})` : ''}. Comprueba que es el mismo trabajo.</p>`)
+      + (L.length ? '<p>Marca lo que quieras añadir:</p>' + L.join('') : '<p>OpenAlex no tiene resumen, citas ni PDF en abierto de este trabajo.</p>')
+      + `<div class="row" style="margin-top:12px">${L.length ? '<button class="pri" data-onclick="oaGo()">Añadir</button>' : ''}<button data-onclick="$('#imp').close()">Cancelar</button></div>`;
+    $('#imp').innerHTML = h; return; }
   if (m === 'text') h += `<textarea id="iTxt" style="min-height:220px" placeholder="Pega aquí BibTeX, RIS, el texto de ScienceDirect o citas de Google Scholar (una por línea, en APA, MLA, Chicago, Harvard o Vancouver)"></textarea><div class="row" style="margin-top:10px"><button class="pri" data-onclick="impText($('#iTxt').value)">Analizar</button>${close}</div>`;
-  else if (m === 'pick') h += `<p>Resultados de CrossRef para «${esc(IMP.q)}». Elige el que buscas:</p><div class="ilist">${IMP.refs.map((r, i) => `<div class="irow"><span><b>${esc(r.title)}</b>${r.dup ? ' <span class="tag-dup">Duplicado</span>' : ''}<br><small>${esc(r.authors.slice(0, 3).join('; '))}${r.authors.length > 3 ? ' et al.' : ''}${r.year ? ' (' + esc(r.year) + ')' : ''}${r.venue ? ' · ' + esc(r.venue) : ''}</small></span><button class="sm" style="margin-left:auto" data-onclick="impPick(${i})">Elegir</button></div>`).join('')}</div><div class="row" style="margin-top:10px"><button data-onclick="openImport('doi')">← Buscar otra cosa</button>${close}</div>`;
+  else if (m === 'pick') h += `<p>Resultados de CrossRef para «${esc(IMP.q)}». Elige el que buscas:</p><div class="ilist">${IMP.refs.map((r, i) => `<div class="irow"><span><b>${esc(r.title)}</b>${r.dup ? ' <span class="tag-dup">Duplicado</span>' : r.near ? ` <span class="tag-dup" title="Parecido a «${esc(r.near)}»">Parecido</span>` : ''}<br><small>${esc(r.authors.slice(0, 3).join('; '))}${r.authors.length > 3 ? ' et al.' : ''}${r.year ? ' (' + esc(r.year) + ')' : ''}${r.venue ? ' · ' + esc(r.venue) : ''}</small></span><button class="sm" style="margin-left:auto" data-onclick="impPick(${i})">Elegir</button></div>`).join('')}</div><div class="row" style="margin-top:10px"><button data-onclick="openImport('doi')">← Buscar otra cosa</button>${close}</div>`;
   else if (m === 'doi') h += `<p class="empty" style="margin-top:0">Escribe un DOI, un ISBN (libros, en Open Library) o el título (CrossRef te propone varios resultados).</p><div class="row"><input id="iDoi" style="flex:1" placeholder="DOI, ISBN o título" aria-label="DOI, ISBN o título" data-onkeydown="onEnter(event,impDoi)"><button class="pri" data-onclick="impDoi()">Buscar</button></div><p id="iMsg" class="empty"></p>${close}`;
   else if (m === 'fill') {
     const j = v => Array.isArray(v) ? v.join('; ') : String(v ?? ''), r = IMP.ref, cur = k => j(D[k]), nw = k => j(r[k]), L = FLD.filter(([k]) => nw(k) && nw(k) !== cur(k) && (!FLD_T[k] || shows(k, r.type)));
     h += (L.length ? '<p>Marca los datos que quieras aplicar (por defecto, solo los campos vacíos):</p>' + L.map(([k, t]) => `<label class="irow"><input type="checkbox" id="f_${k}" ${cur(k) ? '' : 'checked'}><span><b>${t}</b><br><small>Ahora: ${esc(cur(k)) || '—'}</small><br><small>CrossRef: ${esc(nw(k))}</small></span></label>`).join('') : '<p>CrossRef no aporta datos nuevos.</p>')
       + `<div class="row" style="margin-top:12px"><button class="pri" data-onclick="fillGo()">Aplicar</button>${close}</div>`;
   } else {
-    const R = IMP.refs, nd = R.filter(r => r.dup).length;
-    h += `<p>${R.length} encontrados${nd ? ` · ${nd} posibles duplicados (desmarcados)` : ''}</p><div class="ilist">${R.map((r, i) => `<label class="irow"><input type="checkbox" ${r.on ? 'checked' : ''} ${r.bad ? 'disabled' : ''} data-onchange="impOn(${i},this.checked)"><span><b>${esc(r.title || '(sin título)')}</b>${r.dup ? ' <span class="tag-dup">Duplicado</span>' : ''}${r.bad ? ' <span class="tag-dup">No legible</span>' : ''}<br><small>${esc(r.authors.join('; '))}${r.year ? ' · ' + esc(r.year) : ''}${r.venue ? ' · ' + esc(r.venue) : ''}</small></span></label>`).join('')}</div>
+    const R = IMP.refs, nd = R.filter(r => r.dup || r.near).length;
+    h += `<p>${R.length} encontrados${nd ? ` · ${nd} posibles duplicados (desmarcados)` : ''}</p><div class="ilist">${R.map((r, i) => `<label class="irow"><input type="checkbox" ${r.on ? 'checked' : ''} ${r.bad ? 'disabled' : ''} data-onchange="impOn(${i},this.checked)"><span><b>${esc(r.title || '(sin título)')}</b>${r.dup ? ' <span class="tag-dup">Duplicado</span>' : r.near ? ` <span class="tag-dup" title="Parecido a «${esc(r.near)}»">Parecido</span>` : ''}${r.bad ? ' <span class="tag-dup">No legible</span>' : ''}<br><small>${esc(r.authors.join('; '))}${r.year ? ' · ' + esc(r.year) : ''}${r.venue ? ' · ' + esc(r.venue) : ''}</small></span></label>`).join('')}</div>
       <div class="grid" style="margin-top:10px"><label>Sección<select id="iSec"><option value="">(ninguna)</option>${db.sections.map(s => `<option value="${s.id}" ${F.sec === s.id ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}</select></label>
       <label>Etiqueta<select id="iTag"><option value="">(ninguna)</option>${db.tags.map(t => `<option value="${t.id}">${esc(t.name)}</option>`).join('')}</select></label>
       <label>Estado de lectura<select id="iRd">${Object.entries(READ).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select></label></div>
@@ -270,14 +298,35 @@ function impDraw() {
 }
 const impCount = () => $('#iGo').textContent = 'Importar ' + IMP.refs.filter(r => r.on).length;
 function impGo() {
-  const L = IMP.refs.filter(r => r.on); if (!L.length) return alert('No hay ninguna referencia marcada.');
+  const L = IMP.refs.filter(r => r.on); if (!L.length) return say('No hay ninguna referencia marcada.');
   const sec = $('#iSec').value, tag = $('#iTag').value, rd = $('#iRd').value, now = new Date().toISOString();
   L.forEach(r => db.papers.push(NEWF({id: uid(), created: now, title: r.title, alias: '', reading: rd, rating: 0, sectionIds: sec ? [sec] : [], authors: r.authors, year: r.year ? +r.year : '', url: r.url || '', type: r.type,
     venue: r.venue || '', doi: r.doi || '', ...Object.fromEntries(IMP_F.filter(k => r[k] != null).map(k => [k, r[k]])), general: r.general || '', tagIds: tag ? [tag] : [], notes: [], cites: {}, related: [], refTo: [], history: [{t: now, s: 'Importado'}]})));
-  markDirty(); $('#imp').close(); render(); alert(`Se añadieron ${L.length} papers.`);   // una sola operación: un único Ctrl+Z la deshace
+  markDirty(); $('#imp').close(); render(); toast(`Se añadieron ${L.length === 1 ? "1 paper" : L.length + " papers"}.`, [{t: "Deshacer", fn: undo}], 6000);   // una sola operación: un único Ctrl+Z la deshace
 }
 async function doiFill() {   // botón «Buscar» junto al DOI en la ventana de editar
-  try { IMP = {mode: 'fill', ref: await fetchDoi(D.doi)}; impDraw(); $('#imp').showModal(); } catch (e) { alert(e.message); }
+  try { IMP = {mode: 'fill', ref: await fetchDoi(D.doi)}; impDraw(); $('#imp').showModal(); } catch (e) { say(e.message); }
+}
+/* ---- Completar con OpenAlex (gratuito, sin clave): resumen, número de citas y PDF en abierto ---- */
+const oaAbstract = ix => { if (!ix || typeof ix !== 'object') return ''; const w = []; for (const [t, ps] of Object.entries(ix)) for (const i of ps) w[i] = t; return cleanText(w.filter(Boolean).join(' ')); };
+async function fetchOpenAlex(doi, title) {
+  const d = normDoi(doi), sel = 'select=id,doi,title,publication_year,cited_by_count,abstract_inverted_index,open_access,best_oa_location';
+  let w;
+  if (d) { try { w = await apiJson(`https://api.openalex.org/works/doi:${encodeURIComponent(d)}?${sel}`, 'OpenAlex'); } catch (e) { if (!/\(404\)/.test(e.message)) throw e; } }
+  if (!w && String(title || '').trim().length > 5) w = (await apiJson(`https://api.openalex.org/works?per-page=1&${sel}&search=${encodeURIComponent(title)}`, 'OpenAlex')).results?.[0];
+  if (!w) throw Error(d ? 'OpenAlex no encuentra ese DOI.' : 'OpenAlex no encuentra ese título.');
+  const pdf = w.best_oa_location?.pdf_url || w.open_access?.oa_url || '';
+  return {title: cleanText(w.title), year: w.publication_year || '', cites: Number.isInteger(w.cited_by_count) ? w.cited_by_count : null, abstract: oaAbstract(w.abstract_inverted_index), pdf: /^https?:/i.test(pdf) ? pdf : '', byDoi: !!d && normDoi(w.doi) === d};
+}
+async function oaFill() {   // botón «OpenAlex» junto al DOI en la ventana de editar
+  try { IMP = {mode: 'oa', oa: await fetchOpenAlex(D.doi, D.title)}; impDraw(); $('#imp').showModal(); } catch (e) { say(e.message); }
+}
+function oaGo() {
+  const o = IMP.oa, add = s => { D.general = D.general ? D.general.replace(/\s+$/, '') + '\n\n' + s : s; };
+  if ($('#oa_abs')?.checked) add('**Resumen:** ' + o.abstract);
+  if ($('#oa_cit')?.checked) add(`**Citas** (OpenAlex, ${new Date().toISOString().slice(0, 10)}): ${o.cites}`);
+  if ($('#oa_pdf')?.checked) { if (!D.url) D.url = o.pdf; else add('**PDF en abierto:** ' + o.pdf); }
+  $('#imp').close(); drawD();
 }
 function fillGo() {
   const r = IMP.ref;
@@ -311,7 +360,7 @@ document.addEventListener('drop', async e => {
   const name = f.name, ext = (name.match(/\.(\w+)$/) || [, ''])[1].toLowerCase();
   if (ext === 'pdf') return toast('Para enlazar un PDF, abre el paper (Editar) y usa «PDF» en Datos.', [], 5000);
   if (!['json', 'bib', 'ris', 'txt'].includes(ext)) return toast('Suelta un archivo .bib, .ris, .txt, CSL-JSON o un proyecto .json.', [], 5000);
-  let text; try { text = await f.text(); } catch (err) { return alert('No se pudo leer el archivo: ' + err.message); }
+  let text; try { text = await f.text(); } catch (err) { return say('No se pudo leer el archivo: ' + err.message); }
   if (ext === 'json' && !isCsl(text)) { let h = null; try { h = FSA ? await hp : null; if (h && h.kind !== 'file') h = null; } catch (err) {} return pjOpenFile(text, name, h); }
   impText(text);
 });

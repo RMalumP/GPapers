@@ -1,4 +1,5 @@
 'use strict';
+try { const t = localStorage.getItem('gp-theme'); if (t === 'dark' || t === 'light') document.documentElement.dataset.theme = t; } catch (e) {}   // tema elegido a mano (ver setTheme en js/config.js): antes de pintar, sin parpadeo
 /* ===== Interfaz para móviles =====
    Solo se activa en pantallas táctiles estrechas (o un móvil en horizontal): pone la clase «mv» en <html> y todo lo de movil.css va detrás de ella.
    En el ordenador (ratón o ventana ancha) no cambia nada: no se crea ningún elemento y no se toca ninguna función.

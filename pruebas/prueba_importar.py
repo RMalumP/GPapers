@@ -28,7 +28,7 @@ PICK = "r => r && {a: r.authors, y: r.year, t: r.title, v: r.venue, ty: r.type, 
 with sync_playwright() as pw:
     kw = {'executable_path': '/opt/pw-browsers/chromium'} if os.path.exists('/opt/pw-browsers/chromium') else {}
     b = pw.chromium.launch(**kw); ctx = b.new_context(viewport={'width': 1200, 'height': 900}, service_workers='block'); pg = ctx.new_page(); errs = []
-    pg.on('pageerror', lambda e: errs.append(str(e))); pg.on('dialog', lambda d: d.accept())
+    pg.on('pageerror', lambda e: errs.append(str(e))); pg.on('dialog', lambda d: d.accept()); pg.add_init_script("window.ASK_AUTO = 'accept'")
     pg.goto('file://' + str(folder / 'index.html')); pg.wait_for_timeout(400)
     # ---- botón «Importar» en la barra principal
     eq('Importar está en la cabecera, a la izquierda de Exportar citas', pg.evaluate("(b => [!!b.closest('header'), b.nextElementSibling?.textContent])([...document.querySelectorAll('button')].find(b => b.textContent === '📥 Importar'))"), [True, 'Exportar citas'])

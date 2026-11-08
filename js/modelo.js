@@ -8,10 +8,29 @@
            cites:{apa:"..."}}]}   <- solo citas editadas a mano; el resto se genera */
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+/* ===== Avisos y confirmaciones propios (en lugar de alert y confirm del navegador, que en la app instalada se ven fuera de estilo y bloquean la página) =====
+   say(texto) avisa; askOk(texto, {ok, danger}) pregunta y devuelve true o false. Si ya hay uno abierto, el siguiente espera su turno.
+   Las pruebas pueden contestar solas con window.ASK_AUTO = 'accept' | 'dismiss'. */
+let ASK_Q = Promise.resolve();
+function askDlg(msg, btns) {   // btns: [{t, v, cls, cancel}] → promesa con el v del botón pulsado (Esc = el de cancelar)
+  const auto = window.ASK_AUTO, cancelV = (btns.find(b => b.cancel) || btns[btns.length - 1]).v;
+  if (auto) return Promise.resolve(auto === 'dismiss' ? cancelV : btns[0].v);
+  const run = () => new Promise(res => {
+    const d = document.createElement('dialog'); d.className = 'ask'; d.setAttribute('role', 'alertdialog');
+    d.innerHTML = `<p>${esc(msg).replace(/\n/g, '<br>')}</p><div class="row">${btns.map((b, i) => `<button data-i="${i}" class="${b.cls || ''}">${esc(b.t)}</button>`).join('')}</div>`;
+    let done = false; const end = v => { if (done) return; done = true; d.close(); d.remove(); res(v); };
+    d.addEventListener('click', e => { const b = e.target.closest('button[data-i]'); if (b) end(btns[+b.dataset.i].v); });
+    d.addEventListener('cancel', e => { e.preventDefault(); end(cancelV); });
+    document.body.appendChild(d); d.showModal(); d.querySelector('button').focus();
+  });
+  return (ASK_Q = ASK_Q.then(run, run));
+}
+const say = msg => askDlg(String(msg), [{t: 'Aceptar', v: true, cls: 'pri'}]);
+const askOk = (msg, o = {}) => askDlg(String(msg), [{t: o.ok || 'Aceptar', v: true, cls: o.danger ? 'pri danger' : 'pri'}, {t: o.no || 'Cancelar', v: false, cancel: true}]);
 const uid = () => Math.random().toString(36).slice(2, 9) + Date.now().toString(36);
-const SC_NAMES = {open: 'Abrir archivo', save: 'Guardar', find: 'Buscar', newPaper: 'Nuevo paper', undo: 'Deshacer', redo: 'Rehacer', exportCites: 'Exportar citas', import: 'Importar referencias', side: 'Plegar o desplegar la barra lateral', bold: 'Negrita (dentro de una nota)', italic: 'Cursiva (dentro de una nota)'};
+const SC_NAMES = {open: 'Abrir archivo', save: 'Guardar', find: 'Buscar', newPaper: 'Nuevo paper', undo: 'Deshacer', redo: 'Rehacer', exportCites: 'Exportar citas', import: 'Importar referencias', side: 'Plegar o desplegar la barra lateral', bold: 'Negrita (dentro de una nota)', italic: 'Cursiva (dentro de una nota)', palette: 'Paleta de órdenes (buscar acciones y papers)'};
 // Alt+N en lugar de Ctrl+N: Chrome reserva Ctrl+N, Ctrl+T y Ctrl+W y no permite cambiarlos
-const SC_DEF = {open: 'Ctrl+O', save: 'Ctrl+S', find: 'Ctrl+F', newPaper: 'Alt+N', undo: 'Ctrl+Z', redo: 'Ctrl+Shift+Z', exportCites: 'Ctrl+Shift+E', import: 'Alt+I', side: 'Alt+M', bold: 'Ctrl+B', italic: 'Ctrl+I'};
+const SC_DEF = {open: 'Ctrl+O', save: 'Ctrl+S', find: 'Ctrl+F', newPaper: 'Alt+N', undo: 'Ctrl+Z', redo: 'Ctrl+Shift+Z', exportCites: 'Ctrl+Shift+E', import: 'Alt+I', side: 'Alt+M', bold: 'Ctrl+B', italic: 'Ctrl+I', palette: 'Ctrl+K'};
 const TRASH_DAYS = 5;   // días que un paper eliminado permanece en la papelera
 const trashLeft = t => Math.max(0, Math.ceil(TRASH_DAYS - (Date.now() - new Date(t.at)) / 864e5));
 const TPL_DEF = [   // plantillas de nota de serie; {fecha} y {paper} se sustituyen al insertarlas

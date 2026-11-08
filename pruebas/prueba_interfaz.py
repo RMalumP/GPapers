@@ -13,7 +13,7 @@ with sync_playwright() as pw:
     b = pw.chromium.launch(**kw); errs = []
     srv = subprocess.Popen([sys.executable, '-I', '-m', 'http.server', '8797', '-d', str(folder)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL); time.sleep(1)
     c = b.new_context(viewport={'width': 1200, 'height': 800}, service_workers='block'); A = c.new_page()
-    A.on('pageerror', lambda e: errs.append(str(e))); A.on('dialog', lambda d: d.accept())
+    A.on('pageerror', lambda e: errs.append(str(e))); A.on('dialog', lambda d: d.accept()); A.add_init_script("window.ASK_AUTO = 'accept'")
     A.goto('http://localhost:8797/index.html'); A.wait_for_timeout(1200)
     # cabecera
     eq('cabecera: Drive, Guardar, Importar, Exportar y Archivo', A.evaluate("[...document.querySelectorAll('header .row > button, header .row > .fm > button')].map(b => b.textContent.trim().replace(/\\s+/g, ' '))"), ['🔄Conectar con Google Drive', '💾', '📥 Importar', 'Exportar citas', 'Archivo ▾'])

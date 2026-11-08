@@ -18,7 +18,10 @@ const idb = (mode, fn) => idbOpen().then(c => new Promise((res, rej) => {   // I
    y el JSON lleva {kind: 'data', ref: huella} (marcado con img: 1). Así guardar la sesión tras cada cambio no reescribe todas las imágenes. */
 const IMG_H = new Map(), IMG_SAVED = new Set();   // imagen → huella (se calcula una vez) · huellas ya escritas en esta sesión
 const imgHash = d => { let h = IMG_H.get(d); if (!h) { h = syHash(d); IMG_H.set(d, h); } return h; };
-function projWire(d) {   // JSON compacto de la copia de trabajo y las imágenes que aún no se han escrito
+function projWire(d, snap) {   // JSON compacto de la copia de trabajo y las imágenes que aún no se han escrito; snap: una copia de snapDb() que ya coincide con d
+  if (snap && d === db) { const json = snapStr(snap), add = new Map();
+    for (const m of json.matchAll(/"ref":"([0-9a-f]+)"/g)) { const h = m[1]; if (!IMG_SAVED.has(h) && IMG_POOL.has(h)) add.set(h, IMG_POOL.get(h)); }
+    return [json, add]; }
   const add = new Map(), json = JSON.stringify(d, (k, v) => {
     if (k === 'history') return undefined;
     if (k === 'image' && v && v.kind === 'data' && typeof v.data === 'string') { const h = imgHash(v.data); if (!IMG_SAVED.has(h)) add.set(h, v.data); return {kind: 'data', ref: h}; }
@@ -75,19 +78,19 @@ const pickFile = (acc = '.json') => new Promise(res => { const i = document.crea
   i.onchange = () => i.files[0] ? i.files[0].text().then(text => res({path: i.files[0].name, text})) : res(null); i.click(); });
 async function loadText(text, name, quiet) {   // text: el JSON, o el objeto ya leído
   try { db = validate(typeof text === 'string' ? JSON.parse(text) : text); path = name; dirty = false; F.tags.clear(); F.exTags.clear(); F.sec = ''; SEL.clear(); UNDO.length = 0; REDO.length = 0; lastSnap = snapDb(); fmtPinned = db.settings.fmtOpen; applySettings(); render(); sessionSoon(); return true; }
-  catch (e) { if (!quiet) alert('Archivo no válido (se mantienen los datos actuales): ' + e.message); return false; }
+  catch (e) { if (!quiet) say('Archivo no válido (se mantienen los datos actuales): ' + e.message); return false; }
 }
 async function doOpen() {   // cada archivo JSON se abre como proyecto (ver Proyectos)
   try {
     if (FSA) { const [h] = await showOpenFilePicker({types: JSON_T}); await pjOpenFile(await (await h.getFile()).text(), h.name, h); }
     else { const r = await pickFile(); if (r) await pjOpenFile(r.text, r.path, null); }
-  } catch (e) { if (e.name !== 'AbortError') alert('No se pudo abrir el archivo: ' + e.message); }
+  } catch (e) { if (e.name !== 'AbortError') say('No se pudo abrir el archivo: ' + e.message); }
 }
 async function pjReload() {   // vuelve a leer el archivo del proyecto (Chrome pide confirmar el acceso en cada sesión)
   ctxClose(); if (!handle) return;
-  try { if (await handle.requestPermission({mode: 'readwrite'}) !== 'granted') return alert('Sin permiso para acceder al archivo.');
+  try { if (await handle.requestPermission({mode: 'readwrite'}) !== 'granted') return say('Sin permiso para acceder al archivo.');
     await pjOpenFile(await (await handle.getFile()).text(), handle.name, handle);
-  } catch (e) { alert('No se pudo leer el archivo: ' + e.message); }
+  } catch (e) { say('No se pudo leer el archivo: ' + e.message); }
 }
 async function writeTo(h, text) { const w = await h.createWritable(); await w.write(text); await w.close(); }   // el archivo solo cambia al cerrar: escritura segura
 function download(text, name, type) { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], {type})); a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000); }
@@ -99,7 +102,7 @@ async function save(asNew) {
       await writeTo(handle, text); }
     else { path = pjFile(pjCur().name); download(text, path, 'application/json'); }
     dirty = false; hdr(); sessionSoon();
-  } catch (e) { if (e.name !== 'AbortError') alert('Error al guardar: ' + e.message); }
+  } catch (e) { if (e.name !== 'AbortError') say('Error al guardar: ' + e.message); }
 }
 async function setAuto(c) {
   if (syOn()) {   // con Google Drive conectado la casilla manda sobre los dos: Drive y, si hay archivo con permiso, también el archivo
@@ -111,20 +114,37 @@ async function setAuto(c) {
   else if (auto) markDirty();
 }
 const UNDO = [], REDO = [], MAXU = 50;
-/* Copias para deshacer: las imágenes incrustadas van una sola vez en IMG_POOL y cada copia lleva solo su clave (sin imágenes, la copia es snapDb()) */
-const IMG_POOL = new Map(), IMG_KEY = new Map();   // clave → data: URL · data: URL → clave
-const snapDb = () => JSON.stringify(db, (k, v) => { if (k !== 'data' || typeof v !== 'string' || !v.startsWith('data:')) return v;
-  let c = IMG_KEY.get(v); if (!c) { c = '\u0001img' + IMG_KEY.size; IMG_KEY.set(v, c); IMG_POOL.set(c, v); } return c; });
-const unsnap = json => JSON.parse(json, (k, v) => k === 'data' && typeof v === 'string' && v.startsWith('\u0001img') ? IMG_POOL.get(v) ?? v : v);
+/* Copias del proyecto por papers (para deshacer y para la copia de trabajo)
+   snapDb() devuelve {head, parts}: head es el proyecto sin los papers y parts, el JSON de cada paper; sin el historial del día y con las imágenes
+   incrustadas como {kind: 'data', ref: huella} (cada imagen, una sola vez en IMG_POOL). Un paper que no cambió desde la copia anterior reutiliza
+   la MISMA cadena, así las 50 copias de deshacer comparten la memoria de todo lo que no cambió (antes eran 50 copias enteras).
+   snapStr(copia) da el JSON entero, que es justo el formato de la copia de trabajo (projData lo lee igual). */
+const IMG_POOL = new Map();   // huella → imagen (data:)
+const snapRep = (k, v) => { if (k === 'history') return undefined; if (k === 'image' && v && v.kind === 'data' && typeof v.data === 'string') { const h = imgHash(v.data); IMG_POOL.set(h, v.data); return {kind: 'data', ref: h}; } return v; };
+let SNAP_P = new Map();   // id → cadena del paper en la última copia
+const SNAP_MARK = '"papers":"\\u0002P"';
+function snapDb() {
+  const P = new Map(), parts = db.papers.map(p => { let s = JSON.stringify(p, snapRep); const o = SNAP_P.get(p.id); if (o === s) s = o; P.set(p.id, s); return s; });
+  SNAP_P = P; return {head: JSON.stringify({...db, papers: '\u0002P'}, snapRep), parts};
+}
+const snapEq = (a, b) => a === b || !!a && !!b && typeof a === 'object' && typeof b === 'object' && a.head === b.head && a.parts.length === b.parts.length && a.parts.every((s, i) => s === b.parts[i]);
+const snapStr = s => typeof s === 'string' ? s : s.head.replace(SNAP_MARK, () => '"papers":[' + s.parts.join(',') + ']');
+function unsnap(s) {   // copia → proyecto, con sus imágenes (y el historial del día de cada paper, que no va en las copias)
+  const hist = new Map(db.papers.map(p => [p.id, p.history]));
+  const d = JSON.parse(snapStr(s), (k, v) => k === 'image' && v && v.kind === 'data' && typeof v.ref === 'string' ? (IMG_POOL.has(v.ref) ? {kind: 'data', data: IMG_POOL.get(v.ref)} : null) : v);
+  d.papers.forEach(p => { p.history = p.history || hist.get(p.id) || []; });
+  return d;
+}
 let lastSnap = null, lastRecAt = 0;
 function record() {   // antes de cada cambio guarda el estado anterior; los cambios seguidos (<1,5 s) forman un solo paso
   const cur = snapDb();
-  if (lastSnap === null || cur === lastSnap) { lastSnap = cur; return; }
+  if (lastSnap === null || snapEq(cur, lastSnap)) { lastSnap = cur; return; }
   if (!(Date.now() - lastRecAt < 1500 && UNDO.length)) { UNDO.push(lastSnap); if (UNDO.length > MAXU) UNDO.shift(); }
   lastRecAt = Date.now(); REDO.length = 0; lastSnap = cur;
 }
-function touch() { if (TAB.passive) return; hdr(); sessionSoon(); clearTimeout(timer); if (auto && handle) timer = setTimeout(() => save(false), 1000); if (!SY.applying && syAuto()) sySoon(); }   // con Google Drive conectado, el cambio se sube a los 3 s
-function markDirty() { record(); dirty = true; touch(); }
+function touch() { SNAP_SES = null; if (TAB.passive) return; hdr(); sessionSoon(); clearTimeout(timer); if (auto && handle) timer = setTimeout(() => save(false), 1000); if (!SY.applying && syAuto()) sySoon(); }   // con Google Drive conectado, el cambio se sube a los 3 s
+function markDirty() { record(); dirty = true; touch(); SNAP_SES = lastSnap; }   // la copia de trabajo de dentro de 0,7 s puede usar esta misma copia
+let SNAP_SES = null;   // copia ya hecha que coincide con el proyecto (la invalida cualquier touch() que no venga de markDirty)
 function undo() { if (UNDO.length) { REDO.push(snapDb()); restore(UNDO.pop()); } }
 function redo() { if (REDO.length) { UNDO.push(snapDb()); restore(REDO.pop()); } }
 function restore(json) {

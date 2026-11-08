@@ -478,7 +478,7 @@ async function syConnect() {
   } catch (e) { syDlg('No se ha podido sincronizar', `<p>${esc(syErr(e))}</p>`, [['Cerrar']]); }
 }
 async function syLogout(quiet) {
-  if (!quiet && !confirm('¿Cerrar la sesión de Google Drive en este dispositivo?\nTus datos se quedan aquí y en tu Drive; los demás dispositivos siguen sincronizando.')) return;
+  if (!quiet && !await askOk('¿Cerrar la sesión de Google Drive en este dispositivo?\nTus datos se quedan aquí y en tu Drive; los demás dispositivos siguen sincronizando.')) return;
   if (!quiet && syAuto() && dirty && !SY.busy) await syRun(false);   // sube lo último antes de salir
   clearTimeout(SY.tm); clearTimeout(SY.exp); try { localStorage.removeItem('gp-sync'); } catch (e) {} syTokDel(); await syForget(); SY.st = 'idle';
   PJ.list = PJ.list.filter(p => !p.remote); pjSave(); pjShow();   // los proyectos que solo están en Drive dejan de verse aquí (siguen en tu Drive)
@@ -487,7 +487,7 @@ async function syLogout(quiet) {
 }
 async function syWipe() {
   const only = PJ.list.filter(p => p.remote).map(p => '«' + p.name + '»');
-  if (!confirm(`Se borrará de Google Drive la copia de todos tus proyectos y se cerrará la sesión. Los datos de este dispositivo no se tocan.${only.length ? '\nOJO: ' + only.join(', ') + (only.length === 1 ? ' solo está' : ' solo están') + ' en Google Drive y se perderá' + (only.length === 1 ? '.' : 'n.') : ''}\nSi otro dispositivo sigue conectado, volverá a crearla: cierra allí la sesión antes. ¿Continuar?`)) return;
+  if (!await askOk(`Se borrará de Google Drive la copia de todos tus proyectos y se cerrará la sesión. Los datos de este dispositivo no se tocan.${only.length ? '\nOJO: ' + only.join(', ') + (only.length === 1 ? ' solo está' : ' solo están') + ' en Google Drive y se perderá' + (only.length === 1 ? '.' : 'n.') : ''}\nSi otro dispositivo sigue conectado, volverá a crearla: cierra allí la sesión antes. ¿Continuar?`)) return;
   try { const tok = await syToken(true); for (const f of await syLs(tok)) await syDrive(tok, '/drive/v3/files/' + f.id, {method: 'DELETE'});
     await syLogout(true); toast('Copia de Google Drive borrada y sesión cerrada.', [], 5000); }
   catch (e) { toast(syErr(e)); }

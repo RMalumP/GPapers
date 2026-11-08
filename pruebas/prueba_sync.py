@@ -57,7 +57,7 @@ with sync_playwright() as pw:
         pg.mouse.click(5, 5); res[i] = [dentro, pg.evaluate(f"$('#{i}').open")]
         pg.evaluate(f"$('#{i}').open && $('#{i}').close()")
     eq('cada ventana sigue abierta con un clic dentro y se cierra con uno fuera', {k: v for k, v in res.items() if v != [True, False]}, {})
-    eq('se comprueban todas las ventanas', len(ids), 18)
+    eq('se comprueban todas las ventanas', len(ids), 19)
     pg.evaluate("openCfg()"); pg.mouse.click(5, 5)
     eq('Configuración también, con su contenido real', pg.evaluate("$('#cfg').open"), False)
     # Relaciones: sin ninguna, explicación atenuada que desaparece con la primera
@@ -84,7 +84,7 @@ with sync_playwright() as pw:
     def device(sw='block', init=None):
         c = b.new_context(viewport={'width': 1200, 'height': 800}, service_workers=sw); c.add_init_script(GOOGLE); c.route('https://www.googleapis.com/**', drive)
         if init: c.add_init_script(init)
-        p = c.new_page(); p.on('pageerror', lambda e: errs.append(str(e))); p.on('console', lambda m: errs.append(m.text) if m.type == 'error' and 'favicon' not in m.text else None); p.on('dialog', lambda d: d.accept())
+        p = c.new_page(); p.on('pageerror', lambda e: errs.append(str(e))); p.on('console', lambda m: errs.append(m.text) if m.type == 'error' and 'favicon' not in m.text else None); p.on('dialog', lambda d: d.accept()); p.add_init_script("window.ASK_AUTO = 'accept'")
         p.goto('http://localhost:8792/index.html'); p.wait_for_timeout(1200); return c, p
     cR, RD = device()   # lector: reconstruye lo que hay en Drive (copia + cambios + imágenes) sin iniciar sesión
     remote = lambda: {'db': RD.evaluate("(async () => { const t = await syToken(false), f = await syLs(t), N = syNames('main'), R = await syRemote(t, f, N); return R.w ? syNorm(await syUnwire(t, R.w, f, N)) : null; })()")}

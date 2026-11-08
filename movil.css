@@ -147,3 +147,4 @@ html.mv dialog>.mvdx{display:flex;position:sticky;top:0;float:right;z-index:5;ma
 html.mv dialog>.dh+.mvdx,html.mv dialog>.dh~.mvdx{display:none}
 html.mv .sgh{display:flex}html.mv #sg-search .sgh{display:flex}html.mv #sg-search .sgh .sh::after{content:"Buscar y ordenar"}
 html.mv #sg-search .sgh .sh{width:100%}
+html.mv dialog.ask{width:auto;max-width:calc(100vw - 32px);height:auto;max-height:80dvh;margin:auto;border:1px solid var(--bd);border-radius:14px;padding:18px 20px}

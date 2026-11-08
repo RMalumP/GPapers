@@ -220,9 +220,9 @@ function imgOpen() {
   hydrateImgs(); $('#img').showModal();
 }
 function imgSet(v) { D.image = v; imgBox(); if ($('#img').open) imgOpen(); }
-function imgSetUrl() { const u = $('#imgUrl').value.trim(); if (!u) return imgClear(); if (!/^https?:\/\//i.test(u)) return alert('La URL debe empezar por http:// o https://'); PEND.delete(D.id); imgSet({kind: 'url', url: u}); }
+function imgSetUrl() { const u = $('#imgUrl').value.trim(); if (!u) return imgClear(); if (!/^https?:\/\//i.test(u)) return say('La URL debe empezar por http:// o https://'); PEND.delete(D.id); imgSet({kind: 'url', url: u}); }
 function imgClear() { PEND.delete(D.id); imgSet(null); }
-async function imgPickLinked() { try { const [h] = await showOpenFilePicker({types: FILE_IMG_T}); PEND.set(D.id, h); imgSet({kind: 'file', name: h.name}); } catch (e) { if (e.name !== 'AbortError') alert('No se pudo elegir el archivo: ' + e.message); } }
+async function imgPickLinked() { try { const [h] = await showOpenFilePicker({types: FILE_IMG_T}); PEND.set(D.id, h); imgSet({kind: 'file', name: h.name}); } catch (e) { if (e.name !== 'AbortError') say('No se pudo elegir el archivo: ' + e.message); } }
 async function imgEmbedBlob(f) {   // copia reducida (máx. 480 px, JPEG) para guardarla dentro del JSON
   const b = await createImageBitmap(f), k = Math.min(1, 480 / Math.max(b.width, b.height)), c = document.createElement('canvas');
   c.width = Math.max(1, Math.round(b.width * k)); c.height = Math.max(1, Math.round(b.height * k)); c.getContext('2d').drawImage(b, 0, 0, c.width, c.height);
@@ -230,7 +230,7 @@ async function imgEmbedBlob(f) {   // copia reducida (máx. 480 px, JPEG) para g
 }
 function imgPickEmbed() {
   const i = document.createElement('input'); i.type = 'file'; i.accept = 'image/*';
-  i.onchange = async () => { const f = i.files[0]; if (f) try { await imgEmbedBlob(f); } catch (e) { alert('No se pudo leer la imagen: ' + e.message); } };
+  i.onchange = async () => { const f = i.files[0]; if (f) try { await imgEmbedBlob(f); } catch (e) { say('No se pudo leer la imagen: ' + e.message); } };
   i.click();
 }
 function imgFromClipboard(e, inField) {   // imagen copiada (p. ej. «Copiar imagen» en Google Imágenes): archivo, <img> en el HTML o, fuera de un campo, una URL suelta
@@ -240,8 +240,8 @@ function imgFromClipboard(e, inField) {   // imagen copiada (p. ej. «Copiar ima
   const u = m ? m[1].replace(/&amp;/g, '&') : !inField && /^https?:\/\/\S+$/i.test(txt) ? txt : '';
   if (!file && !/^(https?:|data:image\/)/i.test(u)) return false;
   e.preventDefault();
-  if (file) imgEmbedBlob(file).catch(err => alert('No se pudo leer la imagen: ' + err.message));
-  else if (u.startsWith('data:')) fetch(u).then(r => r.blob()).then(imgEmbedBlob).catch(err => alert('No se pudo leer la imagen: ' + err.message));
+  if (file) imgEmbedBlob(file).catch(err => say('No se pudo leer la imagen: ' + err.message));
+  else if (u.startsWith('data:')) fetch(u).then(r => r.blob()).then(imgEmbedBlob).catch(err => say('No se pudo leer la imagen: ' + err.message));
   else { PEND.delete(D.id); imgSet({kind: 'url', url: u}); }
   return true;
 }
@@ -303,7 +303,7 @@ function render() {
   const L = visible(), part = !F.group && L.length > LIST.step;   // sin agrupar, las listas largas se pintan por partes
   LIST.L = L; LIST.shown = part ? LIST.step : L.length;
   $('#list').innerHTML = (listHTML(part ? L.slice(0, LIST.step) : L) + (part ? moreHTML() : '')) || '<p class="empty">No hay papers que mostrar. Crea uno con «Nuevo paper» o ajusta los filtros.</p>';
-  fitTags(); hydrateImgs(); moreWatch(); uiSoon();
+  fitTags(); hydrateImgs(); moreWatch(); uiSoon(); kMark();
   LIST.n = L.length; countDraw(); progDraw();
 }
 const LIST = {L: [], n: 0, shown: 0, get step() { return document.documentElement.classList.contains('mv') ? 40 : 150; }};   // lo que se ve en la lista y cuántos papers lleva pintados (en el móvil caben pocas tarjetas: se pintan de 40 en 40)
@@ -615,12 +615,12 @@ async function exCopyRich() {   // con sangría francesa, para pegar en Word o D
   $('#exMsg').textContent = 'Copiado con formato ✓';
 }
 async function exSave() {
-  const o = ex(), L = exList(), [lbl, mime] = EXF[o.fmt]; if (!L.length) return alert('No hay nada que exportar.');
+  const o = ex(), L = exList(), [lbl, mime] = EXF[o.fmt]; if (!L.length) return say('No hay nada que exportar.');
   const text = o.fmt === 'doc' ? wordDoc(L, o) : o.fmt === 'docx' ? exDocx(L, o) : $('#exText').value;
   const ext = o.fmt === 'csl' ? 'json' : o.fmt;
   try { if (FSA) { const h = await showSaveFilePicker({suggestedName: 'citas.' + ext, types: [{description: lbl, accept: {[mime]: ['.' + ext]}}]}); await writeTo(h, text); }
     else download(text, 'citas.' + ext, mime); }
-  catch (e) { if (e.name !== 'AbortError') alert('Error al guardar: ' + e.message); }
+  catch (e) { if (e.name !== 'AbortError') say('Error al guardar: ' + e.message); }
 }
 document.querySelectorAll('dialog:not(#dlg)').forEach(d => {   // todas las ventanas se cierran con un clic fuera (sin tocar la de edición que haya debajo); la de editar paper guarda al salir, más abajo
   d.addEventListener('mousedown', e => bdDown = outside(e, d));
@@ -628,6 +628,58 @@ document.querySelectorAll('dialog:not(#dlg)').forEach(d => {   // todas las vent
 });
 function delPaper(id) {
   const p = db.papers.find(x => x.id === id); if (!p) return;
-  if (!confirm(`¿Mover «${p.title}» a la papelera? Podrás restaurarlo durante ${TRASH_DAYS} días.`)) return;
-  trashPaper(id); markDirty(); render();
+  lastRecAt = 0; trashPaper(id); SEL.delete(id); markDirty(); render();   // sin preguntar: se puede deshacer desde el aviso o la papelera
+  toast(`«${shortTxt(p.alias || p.title)}» a la papelera (se guarda ${TRASH_DAYS} días).`, [{t: 'Deshacer', fn: undo}], 6000);
 }
+/* ---- Teclado en la lista: ↑/↓ (o j/k) para moverse, Intro para abrir, Espacio para seleccionar, Supr para la papelera, Esc para soltar ---- */
+let KCUR = '';   // paper con el cursor del teclado
+const kItems = () => [...document.querySelectorAll('#list [data-id]')].filter(e => e.matches('.card, tr.rw'));
+function kMark(scroll) {
+  document.querySelectorAll('#list .kcur').forEach(e => e.classList.remove('kcur'));
+  const el = KCUR && $(`#list [data-id="${KCUR}"]`); if (!el) return;
+  el.classList.add('kcur'); if (scroll) el.scrollIntoView({block: 'nearest'});
+}
+function kMove(d) {
+  let L = kItems(); if (!L.length) return;
+  let i = L.findIndex(e => e.dataset.id === KCUR);
+  if (d > 0 && i === L.length - 1 && $('#list > .more')) { listMore(); L = kItems(); }   // al llegar al final se añade la siguiente parte
+  i = i < 0 ? (d > 0 ? 0 : L.length - 1) : Math.max(0, Math.min(L.length - 1, i + d));
+  KCUR = L[i].dataset.id; kMark(true);
+}
+document.addEventListener('keydown', e => {
+  if (e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey || document.querySelector('dialog[open]') || TAB.passive) return;
+  const t = e.target; if (/^(INPUT|TEXTAREA|SELECT|BUTTON|A)$/.test(t.tagName) && !(t.type === 'checkbox' && t.closest('#list')) || t.isContentEditable) return;
+  const k = e.key, has = KCUR && db.papers.some(p => p.id === KCUR);
+  if (k === 'ArrowDown' || k === 'j') { e.preventDefault(); kMove(1); }
+  else if (k === 'ArrowUp' || k === 'k') { e.preventDefault(); kMove(-1); }
+  else if (!has) return;
+  else if (k === 'Enter' || k === 'o') { e.preventDefault(); openPaper(KCUR); }
+  else if (k === ' ' || k === 'x') { e.preventDefault(); toggleSel(KCUR); const c = $(`#list [data-id="${KCUR}"] input[type=checkbox]`); if (c) c.checked = SEL.has(KCUR); }
+  else if (k === 'Delete') { e.preventDefault(); const L = kItems(), i = L.findIndex(x => x.dataset.id === KCUR), nx = L[i + 1] || L[i - 1]; const id = KCUR; delPaper(id); if (!db.papers.some(p => p.id === id)) { KCUR = nx ? nx.dataset.id : ''; kMark(true); } }
+  else if (k === 'Escape') { KCUR = ''; kMark(); }
+});
+/* ---- Paleta de órdenes (Ctrl+K): busca acciones y papers por nombre ---- */
+const CMDS = () => [
+  ['＋ Nuevo paper', () => openPaper()], ['📥 Importar: buscar por DOI, ISBN o título', () => openImport('doi')], ['📄 Importar desde archivo', () => openImport('file')], ['📋 Importar: pegar BibTeX, RIS o citas', () => openImport('text')],
+  ['📤 Exportar citas', () => openEx()], ['💾 Guardar', () => save(false)], ['💾 Guardar como…', () => save(true)], ['📂 Abrir un archivo JSON', () => doOpen()],
+  ['⚙️ Configuración', () => openCfg()], ['❓ Ayuda', () => openHelp()], ['🗑️ Papelera', () => trOpen()], ['🕸️ Relaciones', () => grOpen()], ['🧬 Buscar duplicados', () => dpOpen()], ['🛟 Copias de seguridad', () => bkOpen()],
+  [db.settings.view === 'table' ? '▦ Ver como tarjetas' : '☰ Ver como tabla', () => viewToggle()], ['☰ Plegar o desplegar la barra lateral', () => sbToggle()], ['☑ Seleccionar los visibles', () => selVisible()],
+  ['✕ Quitar la selección', () => selNone()], ['🧹 Limpiar todos los filtros', () => fClrAll()], ['🔄 Sincronizar con Google Drive', () => syOn() ? syNow() : syConnect()], ['🔍 Buscar en la lista', () => SC_ACT.find()]];
+let CMD = {q: '', i: 0, L: []};
+function cmdOpen() { CMD = {q: '', i: 0, L: []}; const d = $('#cmdk');
+  d.innerHTML = `<input id="cmdQ" type="search" placeholder="Escribe una acción o el título de un paper…" aria-label="Buscar acción o paper" autocomplete="off" data-oninput="cmdSet(this.value)" data-onkeydown="cmdKey(event)"><div id="cmdL" role="listbox"></div><small class="cmdh">↑/↓ para elegir · Intro para ejecutar · Esc para cerrar</small>`;
+  cmdDraw(); d.showModal(); $('#cmdQ').focus(); }
+function cmdSet(v) { CMD.q = v; CMD.i = 0; cmdDraw(); }
+function cmdDraw() {
+  const q = norm(CMD.q).trim(), w = q.split(/\s+/).filter(Boolean), ok = s => w.every(x => norm(s).includes(x));
+  const A = CMDS().filter(([t]) => ok(t)).map(([t, fn]) => ({t, fn}));
+  const P = w.length ? db.papers.filter(p => ok([p.alias, p.title, ...p.authors, p.year].join(' '))).slice(0, 8).map(p => ({t: '📄 ' + (p.alias || p.title) + (p.year ? ` (${p.year})` : ''), fn: () => openPaper(p.id)})) : [];
+  CMD.L = [...A, ...P]; CMD.i = Math.min(CMD.i, Math.max(0, CMD.L.length - 1));
+  $('#cmdL').innerHTML = CMD.L.length ? CMD.L.map((c, i) => `<button role="option" class="${i === CMD.i ? 'on' : ''}" aria-selected="${i === CMD.i}" data-onclick="cmdRun(${i})">${esc(c.t)}</button>`).join('') : '<p class="empty">Nada coincide.</p>';
+  $('#cmdL .on')?.scrollIntoView({block: 'nearest'});
+}
+function cmdKey(e) {
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); CMD.i = (CMD.i + (e.key === 'ArrowDown' ? 1 : -1) + CMD.L.length) % (CMD.L.length || 1); cmdDraw(); }
+  else if (e.key === 'Enter') { e.preventDefault(); cmdRun(CMD.i); }
+}
+function cmdRun(i) { const c = CMD.L[i]; if (!c) return; $('#cmdk').close(); c.fn(); }
