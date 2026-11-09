@@ -39,7 +39,8 @@ function sortOpts() {   // criterios de Ordenar: los de siempre y las clasificac
   return {...SORTS, ...Object.fromEntries((db.orders || []).map(o => ['o:' + o.id, `${o.of === 'tags' ? '🏷️' : '📁'} ${o.name}`]))};
 }
 function sortList(L) {   // ordena por todos los criterios, en cascada; d = 1 ascendente, -1 descendente
-  const S = F.sorts, fs = S.map(s => sortFn(s.k)), K = L.map(p => ({p, k: fs.map(f => f(p))}));   // cada clave se calcula una vez por paper, no en cada comparación
+  // «Etiquetas» o «Secciones»: primero sus clasificaciones (la de más arriba manda; las de debajo desempatan) y al final el orden de su lista
+  const S = F.sorts.flatMap(s => s.k === 'tags' || s.k === 'sections' ? [...ordOf(s.k).map(o => ({k: 'o:' + o.id, d: s.d})), s] : [s]), fs = S.map(s => sortFn(s.k)), K = L.map(p => ({p, k: fs.map(f => f(p))}));   // cada clave se calcula una vez por paper, no en cada comparación
   return K.sort((a, b) => { for (let i = 0; i < S.length; i++) { const {k, d} = S[i], x = a.k[i], y = b.k[i];
     if (k === 'rating' && !x !== !y) return x ? -1 : 1;   // sin valorar: siempre al final, en ambos sentidos
     if ((x == null) !== (y == null)) return x == null ? 1 : -1; if (x == null) continue;   // sin valor en la clasificación: al final, en ambos sentidos

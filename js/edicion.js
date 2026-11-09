@@ -595,8 +595,8 @@ function mgOrdHTML() {   // barra de clasificaciones del gestor: elegir, crear, 
     <label>Nombre<input id="mgoName" value="${esc(MGO_FORM.name)}" placeholder="p. ej. Días de la semana" data-onkeydown="mgoKey(event)"></label>
     <label>Valores<select id="mgoFmt">${Object.entries(ORD_FMT).map(([k, v]) => `<option value="${k}" ${MGO_FORM.fmt === k ? 'selected' : ''}>${v}</option>`).join('')}</select></label>
     <div class="row"><button class="pri" data-onclick="mgOrdSave()">Guardar</button><button data-onclick="mgOrdCancel()">Cancelar</button></div></div>`;
-  return `<div class="mgo"><label>Clasificación para ordenar<select data-onchange="mgOrdSel(this.value)"><option value="">Ninguna (solo el orden de esta lista)</option>${L.map(x => `<option value="${x.id}" ${x.id === MGO ? 'selected' : ''}>${esc(x.name)} · ${ORD_FMT[x.fmt].split(' (')[0].toLowerCase()}</option>`).join('')}</select></label>
-    <div class="row"><button data-onclick="mgOrdNew()">＋ Nueva clasificación</button>${o ? `<button data-onclick="mgOrdEdit()">✎ Editar</button><button class="danger" data-onclick="mgOrdDel()">🗑 Borrar</button>` : ''}</div>
+  return `<div class="mgo"><label>Clasificación para ordenar<select data-onchange="mgOrdSel(this.value)"><option value="">Ninguna (solo el orden de esta lista)</option>${L.map((x, j) => `<option value="${x.id}" ${x.id === MGO ? 'selected' : ''}>${L.length > 1 ? j + 1 + '. ' : ''}${esc(x.name)} · ${ORD_FMT[x.fmt].split(' (')[0].toLowerCase()}</option>`).join('')}</select></label>
+    <div class="row"><button data-onclick="mgOrdNew()">＋ Nueva clasificación</button>${o ? `${L.indexOf(o) > 0 ? `<button data-onclick="mgOrdUp()" title="Al ordenar por la columna ${MG === 'tags' ? 'Etiquetas' : 'Secciones'}, la clasificación de más arriba manda y las de debajo desempatan">⬆ Subir</button>` : ''}<button data-onclick="mgOrdEdit()">✎ Editar</button><button class="danger" data-onclick="mgOrdDel()">🗑 Borrar</button>` : ''}</div>
     ${o ? `<small>Pon a cada ${w} su valor (${ORD_FMT[o.fmt].replace(/^[^(]*\(|\)$/g, '')}). En «Ordenar», elige «${MG === 'tags' ? '🏷️' : '📁'} ${esc(o.name)}» para ordenar los papers así; los que no tengan ninguna ${w} con valor van al final.</small>
     <div class="row"><button data-onclick="mgOrdSortPapers()">⇅ Ordenar los papers por «${esc(o.name)}»</button><button data-onclick="mgOrdSortList()">Ordenar también esta lista</button></div>` : ''}</div>`;
 }
@@ -604,6 +604,10 @@ function mgoKey(e) { if (e.key === 'Enter') { e.preventDefault(); mgOrdSave(); }
 function mgOrdSel(id) { MGO = id; drawMg(); }
 function mgOrdNew() { MGO_FORM = {id: '', name: '', fmt: 'num'}; drawMg(); $('#mgoName')?.focus(); }
 function mgOrdEdit() { const o = ordOf(MG).find(x => x.id === MGO); if (o) { MGO_FORM = {id: o.id, name: o.name, fmt: o.fmt}; drawMg(); $('#mgoName')?.focus(); } }
+function mgOrdUp() {   // sube la clasificación elegida un puesto entre las de su tipo (la de arriba manda al ordenar por la columna)
+  const L = ordOf(MG), i = L.findIndex(x => x.id === MGO); if (i < 1) return;
+  const a = db.orders.indexOf(L[i]), b = db.orders.indexOf(L[i - 1]); [db.orders[a], db.orders[b]] = [db.orders[b], db.orders[a]]; markDirty(); drawMg(); render();
+}
 function mgOrdCancel() { MGO_FORM = null; drawMg(); }
 function mgOrdSave() {
   const name = $('#mgoName').value.trim(), fmt = $('#mgoFmt').value; if (!name) return $('#mgoName').focus();
