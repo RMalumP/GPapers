@@ -61,8 +61,25 @@ with sync_playwright() as pw:
         if i < 2: eq(f'Drive ({i + 1}): tocar fuera cierra el submenú', pg.evaluate("$('#ctx').hidden"), True)
     eq('Drive: una opción del submenú se ejecuta', pg.evaluate("[$('#sy').open, $('#ctx').hidden]"), [True, True])
     pg.evaluate("$('#sy').close(); sySet({on: false}); $('#syncBtn').hidden = true")
-    eq('la barra inferior no repite Filtros: lleva Configuración', pg.evaluate("[...document.querySelectorAll('#mvNav button')].map(b => b.dataset.mv)"), ['top', 'cfg', 'new', 'exp', 'more'])
-    eq('la etiqueta «Configuración» cabe en su botón', pg.evaluate("(b => b.lastElementChild.scrollWidth <= b.clientWidth)($('#mvNav [data-mv=cfg]'))"), True)
+    NAVJ = "[...document.querySelectorAll('#mvNav button')].filter(b => !b.hidden).map(b => b.dataset.mv)"
+    CUT = "[...document.querySelectorAll('#mvNav button')].filter(b => !b.hidden && b.lastElementChild.scrollWidth > b.lastElementChild.clientWidth).map(b => b.dataset.mv)"
+    MID = "(r => Math.abs(r.left + r.width / 2 - innerWidth / 2) < 1)($('#mvNav .mvnew').getBoundingClientRect())"
+    eq('barra inferior sin bandeja: Papers, Configuración | ＋ | Exportar, Importar, Más', pg.evaluate(NAVJ), ['top', 'cfg', 'new', 'exp', 'imp', 'more'])
+    eq('los nombres de la barra inferior caben y ＋ queda en el centro', pg.evaluate(f"[{CUT}, {MID}]"), [[], True])
+    pg.evaluate("db.inbox = [{id: 'i1', name: 'sin_cita.pdf', at: Date.now()}, {id: 'i2', name: 'otro.pdf', at: Date.now()}]; inboxDraw()"); pg.wait_for_timeout(100)
+    eq('con PDF por citar, 🗃️ sale entre Papers y Configuración (y ＋ sigue en el centro)', pg.evaluate(f"[{NAVJ}, $('#mvIb b').textContent, {CUT}, {MID}, getComputedStyle($('#ibBtn')).display]"), [['top', 'ib', 'cfg', 'new', 'exp', 'imp', 'more'], '2', [], True, 'none'])
+    pg.evaluate("ibFoldSet(true)"); pg.click('#mvIb'); pg.wait_for_timeout(200)
+    eq('🗃️ despliega la bandeja', pg.evaluate("[ibFold(), !$('#inbox').hidden, $('#mvIb').classList.contains('on')]"), [False, True, True])
+    pg.evaluate("setCfg('inboxBtn', true); IB.shown = false; inboxDraw()"); pg.click('#mvIb'); pg.wait_for_timeout(200)
+    eq('con la bandeja como botón, 🗃️ la muestra y la oculta', pg.evaluate("$('#inbox').hidden"), False); pg.click('#mvIb'); pg.wait_for_timeout(200)
+    eq('…y la vuelve a ocultar', pg.evaluate("$('#inbox').hidden"), True)
+    pg.evaluate("setCfg('inboxBtn', false); db.inbox = []; inboxDraw()"); pg.wait_for_timeout(100)
+    eq('sin PDF por citar, 🗃️ desaparece', pg.evaluate("$('#mvIb').hidden"), True)
+    pg.click('#mvNav [data-mv=imp]'); pg.wait_for_timeout(200)
+    eq('📥 abre el menú Importar encima de la barra, entero y tocable', pg.evaluate("""[!$('#ctx').hidden, $('#ctx').textContent.includes('Desde archivo'), $('#ctx').getBoundingClientRect().bottom <= $('#mvNav').getBoundingClientRect().top, $('#ctx').getBoundingClientRect().top >= 0,
+      [...$('#ctx').querySelectorAll('button')].every(b => { const r = b.getBoundingClientRect(); return b.contains(document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2)); })]"""), [True, True, True, True, True])
+    pg.tap('#ctx button:has-text("Pegar")'); pg.wait_for_timeout(300)
+    eq('una opción de Importar abre su ventana', pg.evaluate("[!!$('dialog[open]'), $('#ctx').hidden]"), [True, True]); pg.evaluate("document.querySelectorAll('dialog[open]').forEach(d => d.close())")
     pg.click('#mvNav [data-mv=cfg]'); pg.wait_for_timeout(300)
     eq('Configuración (barra inferior) abre la configuración', pg.evaluate(f"[$('#cfg').open, {cls}('mv-dr'), {cls}('mv-mo')]"), [True, False, False]); pg.evaluate("$('#cfg').close()")
     pg.click('#mvSearch [data-mv=filt]'); pg.wait_for_timeout(300)

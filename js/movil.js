@@ -32,6 +32,15 @@ function mvDots() {   // punto en el botón de filtros del buscador si hay algú
   const on = !!mv$('#d-filt:not([hidden])') || !!mv$('#d-adv:not([hidden])') || !mv$('#actF')?.hidden;
   document.querySelectorAll('.mvfd').forEach(d => { if (d.hidden === on) d.hidden = !on; });   // solo si cambia: si no, los observadores se llamarían sin fin
 }
+function mvImport() {   // 📥 de la barra inferior: el mismo menú «Importar referencias» de la cabecera, encima de la barra
+  mvClose(); const b = mv$('#mvNav [data-mv=imp]').getBoundingClientRect();
+  openMenu({preventDefault() {}, stopPropagation() {}, clientX: b.right, clientY: 0});
+  const m = mv$('#ctx'); m.style.top = Math.max(8, mv$('#mvNav').getBoundingClientRect().top - m.offsetHeight - 6) + 'px';
+}
+function mvInbox() {   // 🗃️ de la barra inferior: con la bandeja como botón la muestra u oculta; si no, la despliega y la enseña
+  mvClose(); if (db.settings.inboxBtn) return ibToggle();
+  if (ibFold()) ibFoldSet(false); setTimeout(() => mv$('#inbox')?.scrollIntoView({block: 'nearest', behavior: 'smooth'}), 30);
+}
 function mvSearchDock() { const q = mv$('#q'), box = mv$('#mvSearch'); if (mvOn() && q && box && q.parentElement !== box) box.prepend(q); }
 
 function mvBuild() {
@@ -49,14 +58,16 @@ function mvBuild() {
   main.insertAdjacentHTML('afterbegin', '<div id="mvTop"><div id="mvSearch"><button class="mvib" data-mv="filt" aria-label="Filtros">🎚️<span class="dot mvfd" hidden></span></button></div></div>');
   // Barra inferior
   document.body.insertAdjacentHTML('beforeend', `<nav id="mvNav" aria-label="Navegación principal">
-    <button data-mv="top"><span class="ic">📚</span><span>Papers</span></button>
-    <button data-mv="cfg" aria-label="Configuración"><span class="ic">⚙️</span><span>Configuración</span></button>
+    <div class="mvns"><button data-mv="top"><span class="ic">📚</span><span>Papers</span></button>
+    <button id="mvIb" data-mv="ib" aria-label="PDF por citar" aria-pressed="false" hidden><span class="ic">🗃️<b></b></span><span>PDF</span></button>
+    <button data-mv="cfg" aria-label="Configuración"><span class="ic">⚙️</span><span class="mvl"></span></button></div>
     <button class="mvnew" data-mv="new" aria-label="Nuevo paper"><span class="ic">＋</span><span>Nuevo</span></button>
-    <button data-mv="exp"><span class="ic">📤</span><span>Exportar</span></button>
-    <button data-mv="more"><span class="ic">⋯</span><span>Más</span></button></nav>`);
+    <div class="mvns"><button data-mv="exp"><span class="ic">📤</span><span>Exportar</span></button>
+    <button data-mv="imp" aria-label="Importar"><span class="ic">📥</span><span>Importar</span></button>
+    <button data-mv="more"><span class="ic">⋯</span><span>Más</span></button></div></nav>`);
   mvSearchDock();
 
-  const act = {dx: () => { const d = [...document.querySelectorAll('dialog[open]')].pop(); if (d && d.dispatchEvent(new Event('cancel', {cancelable: true}))) d.close(); }, close: mvClose, filt: mvFilters, cfg: () => { mvClose(); openCfg(); }, more: () => mvMore(), new: () => { mvClose(); openPaper(); }, exp: () => { mvClose(); openEx(); }, top: () => { mvClose(); scrollTo({top: 0, behavior: 'smooth'}); }};
+  const act = {dx: () => { const d = [...document.querySelectorAll('dialog[open]')].pop(); if (d && d.dispatchEvent(new Event('cancel', {cancelable: true}))) d.close(); }, close: mvClose, filt: mvFilters, cfg: () => { mvClose(); openCfg(); }, more: () => mvMore(), new: () => { mvClose(); openPaper(); }, exp: () => { mvClose(); openEx(); }, imp: mvImport, ib: mvInbox, top: () => { mvClose(); scrollTo({top: 0, behavior: 'smooth'}); }};
   document.addEventListener('click', e => {
     if (!mvOn()) return;
     const b = e.target.closest('[data-mv]'); if (b) { act[b.dataset.mv]?.(); return; }
