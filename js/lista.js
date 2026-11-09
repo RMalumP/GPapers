@@ -677,7 +677,7 @@ document.addEventListener('keydown', e => {
 });
 /* ---- Paleta de órdenes (Ctrl+K): busca acciones y papers por nombre ---- */
 const CMDS = () => [
-  ['＋ Nuevo paper', () => openPaper()], ['📥 Importar: buscar por DOI, ISBN o título', () => openImport('doi')], ['📄 Importar desde archivo', () => openImport('file')], ['📋 Importar: pegar BibTeX, RIS o citas', () => openImport('text')], ['📥 PDF sin cita a la bandeja «PDF por citar»', () => inboxPick()],
+  ['＋ Nuevo paper', () => openPaper()], ['📥 Importar: buscar por DOI, ISBN o título', () => openImport('doi')], ['📄 Importar desde archivo', () => openImport('file')], ['📋 Importar: pegar BibTeX, RIS o citas', () => openImport('text')], ['🗃️ PDF sin cita a la bandeja «PDF por citar»', () => inboxPick()],
   ['📤 Exportar citas', () => openEx()], ['💾 Guardar', () => save(false)], ['💾 Guardar como…', () => save(true)], ['📂 Abrir un archivo JSON', () => doOpen()],
   ['⚙️ Configuración', () => openCfg()], ['❓ Ayuda', () => openHelp()], ['🗑️ Papelera', () => trOpen()], ['🕸️ Relaciones', () => grOpen()], ['🧬 Buscar duplicados', () => dpOpen()], ['🛟 Copias de seguridad', () => bkOpen()],
   [db.settings.view === 'table' ? '▦ Ver como tarjetas' : '☰ Ver como tabla', () => viewToggle()], ['☰ Plegar o desplegar la barra lateral', () => sbToggle()], ['☑ Seleccionar los visibles', () => selVisible()],

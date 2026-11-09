@@ -33,7 +33,7 @@ with sync_playwright() as pw:
     # ---- botón «Importar» en la barra principal
     eq('Importar está en la cabecera, a la izquierda de Exportar citas', pg.evaluate("(b => [!!b.closest('header'), b.nextElementSibling?.textContent])([...document.querySelectorAll('button')].find(b => b.textContent === '📥 Importar'))"), [True, 'Exportar citas'])
     pg.click('button:has-text("📥 Importar")')
-    eq('el botón Importar abre el menú con las tres formas y la bandeja', pg.evaluate("[...document.querySelectorAll('#ctx button')].map(b => b.textContent)"), ['📄 Desde archivo (.bib, .ris, .txt o CSL-JSON)', '📋 Pegar BibTeX, RIS o citas de Google Scholar', '🔎 Buscar por DOI, ISBN o título', '📥 PDF sin cita (bandeja «PDF por citar»)'])
+    eq('el botón Importar abre el menú con las tres formas y la bandeja', pg.evaluate("[...document.querySelectorAll('#ctx button')].map(b => b.textContent)"), ['📄 Desde archivo (.bib, .ris, .txt o CSL-JSON)', '📋 Pegar BibTeX, RIS o citas de Google Scholar', '🔎 Buscar por DOI, ISBN o título', '🗃️ PDF sin cita (bandeja «PDF por citar»)'])
     pg.click('#ctx button:has-text("Pegar")')
     eq('pegar texto: el cuadro explica qué admite', 'Google Scholar' in pg.get_attribute('#iTxt', 'placeholder'), True)
     if shots: pg.screenshot(path=os.path.join(shots, '4_importar_pegar.png'))

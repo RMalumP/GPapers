@@ -18,13 +18,15 @@ async function inboxDraw() {
   const off = !L.length || s.showInbox === false;
   if (btn) { btn.hidden = off || !s.inboxBtn; btn.querySelector('b').textContent = L.length; btn.setAttribute('aria-expanded', String(!!IB.shown)); btn.classList.toggle('on', !!IB.shown); }
   box.hidden = off || s.inboxBtn && !IB.shown; if (box.hidden) { box.innerHTML = ''; return; }
-  IB.i = Math.max(0, Math.min(IB.i, L.length - 1)); const it = L[IB.i], a = annN(it), fold = ibFold();
-  box.innerHTML = `<div class="ibh"><button class="ibf" data-onclick="ibFoldSet(${!fold})" aria-expanded="${!fold}" title="Plegar o desplegar"><span class="car">${fold ? '▸' : '▾'}</span><b>📥 PDF por citar</b><span class="ibn">${L.length}</span></button>
+  IB.i = Math.max(0, Math.min(IB.i, L.length - 1)); const it = L[IB.i], a = annN(it), fold = ibFold(), dup = ibDup(it);
+  box.innerHTML = `<div class="ibh"><button class="ibf" data-onclick="ibFoldSet(${!fold})" aria-expanded="${!fold}" title="Plegar o desplegar"><span class="car">${fold ? '▸' : '▾'}</span><b>🗃️ PDF por citar</b><span class="ibn">${L.length}</span></button>
     ${fold ? '' : `<span class="ibnav"><button data-onclick="inboxGo(-1)" aria-label="Anterior" ${L.length < 2 ? 'disabled' : ''}>‹</button><span>${IB.i + 1} de ${L.length}</span><button data-onclick="inboxGo(1)" aria-label="Siguiente" ${L.length < 2 ? 'disabled' : ''}>›</button></span>`}
+    ${!fold && L.filter(x => x.doi && !ibDup(x)).length > 1 ? `<button class="sm ibadd" data-onclick="inboxCiteAll()" title="Crea a la vez la cita de cada PDF con DOI (con los datos de CrossRef); los que fallen se quedan en la bandeja">＋ Crear todas las citas</button>` : ''}
     <button class="sm ibadd" data-onclick="inboxPick()" title="Añadir PDF a la bandeja (también puedes soltarlos en la ventana)">＋ PDF</button></div>
     ${fold ? '' : `<div class="ibc" data-id="${it.id}"><button class="ibt" data-onclick="inboxOpen('${it.id}',event)" title="Abrir en el visor"><span class="ibi">📄</span></button>
       <div class="ibd"><b class="ibname" title="${esc(it.name)}">${esc(it.name)}</b>
         ${it.guess ? `<small title="Título que se ha leído del PDF">${esc(it.guess)}</small>` : ''}${it.doi ? `<small>DOI: ${esc(it.doi)}</small>` : '<small class="ibno">Sin DOI en la primera página: la cita se crea con el título y la completas tú.</small>'}
+        ${dup ? `<div class="ibdup">⚠ Ya tienes este paper: <b>${esc(shortTxt(dup.alias || dup.title) || '(sin título)')}</b>${dup.pdf && dup.pdf2 ? ' (ya tiene dos PDF)' : ` <button class="sm" data-onclick="ibpGo('${it.id}','${dup.id}')" title="El PDF (y sus anotaciones) pasa a ese paper">🔗 Enlazar a ese paper</button>`}</div>` : ''}
         ${a ? `<button class="ibann" data-onclick="inboxOpenSide('${it.id}',event)" title="Abrir el PDF con la lista de subrayados y comentarios">🖍 ${a} ${a === 1 ? 'anotación' : 'anotaciones'} · ver</button>` : ''}
         <div class="row ibb"><button class="pri" data-onclick="inboxCite('${it.id}')" title="${it.doi ? 'Crea la cita con los datos de CrossRef y abre su ficha para revisarla' : 'Crea la cita con el título y abre su ficha para completarla'}">＋ Crear cita</button>
           <button data-onclick="inboxAssign('${it.id}')" title="La cita ya existe: el PDF pasa a ese paper">🔗 Asignar a un paper</button>
@@ -89,17 +91,32 @@ async function ibMove(it, pid, n) {   // el archivo de la bandeja pasa al hueco 
   await idb('readwrite', st => { for (const pre of ['pdf:', 'pdfb:', 'pdft:']) { const q = st.get(pre + from); q.onsuccess = () => { if (q.result != null) { st.put(q.result, pre + to); st.delete(pre + from); } }; } return null; }).catch(() => {});
   return {name: it.name, ...(it.page ? {page: it.page} : {}), ...(it.ann?.length ? {ann: structuredClone(it.ann)} : {}), ...(it.vis ? {vis: it.vis} : {}), ...(it.vid ? {vid: it.vid} : {}), from};   // from: la copia de Drive sigue con el nombre de la bandeja
 }
+const ibDup = it => { const d = it && normDoi(it.doi); return d ? db.papers.find(p => normDoi(p.doi) === d) || null : null; };   // ese DOI ya es un paper de la biblioteca
 async function inboxCite(id) {
   const it = (db.inbox || []).find(x => x.id === id); if (!it) return;
+  const dup = ibDup(it);
+  if (dup && !await askOk(`Ya tienes este paper: «${shortTxt(dup.alias || dup.title)}». ¿Crear otra cita igualmente? (Con «🔗 Enlazar a ese paper» el PDF pasa al que ya tienes.)`, {ok: 'Crear otra'})) return;
   let r = null;
   if (it.doi) { toast('Buscando los datos del DOI en CrossRef…', [], 2500); try { r = await fetchDoi(it.doi); } catch (e) { toast(e.message + ' Se crea con el título.', [], 5000); } }
   r ||= {title: it.guess || it.name.replace(/\.pdf$/i, '').replace(/[_]+/g, ' '), authors: [], year: '', type: 'articulo', doi: it.doi || '', url: it.doi ? 'https://doi.org/' + it.doi : ''};
+  const p = await ibMake(it, r); render();
+  toast(`Cita creada${r.authors?.length ? '' : ': complétala en su ficha'}.`, [{t: 'Deshacer', fn: undo}], 6000); openPaper(p.id);
+}
+async function inboxCiteAll() {   // todas las de la bandeja con DOI, a la vez; las que ya tienes o que CrossRef no encuentra se quedan
+  const L = (db.inbox || []).filter(x => x.doi), dup = L.filter(ibDup), todo = L.filter(x => !ibDup(x)); if (!todo.length) return;
+  toast(`Buscando ${todo.length} DOI en CrossRef…`, [], 0); const bad = [];
+  const got = []; await syPool(todo, async it => { try { got.push([it, await fetchDoi(it.doi)]); } catch (e) { bad.push(it); } }, 4);
+  for (const [it, r] of todo.map(it => got.find(g => g[0] === it)).filter(Boolean)) await ibMake(it, r, true);
+  if (got.length) markDirty(); render(); inboxDraw();
+  const why = [bad.length ? `${bad.length} sin datos en CrossRef (${bad.map(x => shortTxt(x.name)).join(', ')})` : '', dup.length ? `${dup.length} ya ${dup.length === 1 ? 'estaba' : 'estaban'} en la biblioteca` : '', (db.inbox || []).some(x => !x.doi) ? 'los que no tienen DOI' : ''].filter(Boolean);
+  toast(`${got.length} ${got.length === 1 ? 'cita creada' : 'citas creadas'}.${why.length ? ' Siguen en la bandeja: ' + why.join('; ') + '.' : ''}`, got.length ? [{t: 'Deshacer', fn: undo}] : [], why.length ? 0 : 6000);
+}
+async function ibMake(it, r, batch) {   // crea el paper de un PDF de la bandeja (sin abrir su ficha); batch: el deshacer va al final, una vez
   const now = new Date().toISOString(), pid = uid();
   const p = NEWF({id: pid, created: now, title: r.title || it.name, alias: '', reading: 'por_leer', rating: 0, sectionIds: F.sec ? [F.sec] : [], authors: r.authors || [], year: r.year ? +r.year : '', url: r.url || '', type: r.type || 'articulo',
     venue: r.venue || '', doi: r.doi || '', ...Object.fromEntries(IMP_F.filter(k => r[k] != null).map(k => [k, r[k]])), general: '', tagIds: [], notes: [], cites: {}, related: [], refTo: [], history: [{t: now, s: 'Creado desde la bandeja «PDF por citar»'}]});
   p.pdf = await ibMove(it, pid, 1);
-  db.inbox = db.inbox.filter(x => x !== it); db.papers.push(p); markDirty(); render();
-  toast(`Cita creada${r.authors?.length ? '' : ': complétala en su ficha'}.`, [{t: 'Deshacer', fn: undo}], 6000); openPaper(pid);
+  db.inbox = db.inbox.filter(x => x !== it); db.papers.push(p); if (!batch) markDirty(); return p;
 }
 function inboxAssign(id) {
   const it = (db.inbox || []).find(x => x.id === id); if (!it) return;
