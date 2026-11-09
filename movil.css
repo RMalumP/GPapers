@@ -63,6 +63,7 @@ html.mv main>.row>#selAll{order:1;flex:0 0 auto}html.mv main>.row>#selAll .bl{di
 html.mv main>.row>#count{order:2;flex:1 0 100%;text-align:right;margin-top:-2px}   /* la cuenta, en su propia línea pequeña: así los botones caben enteros */
 html.mv main>.row>#tbCols{order:1;flex:0 0 auto}html.mv main>.row>#tbCols .bl{display:none}   /* «Columnas» (solo en la tabla): pequeño, en la barra de Tarjetas */
 html.mv main>.row #secF2{order:3}html.mv main>.row #tagF2{order:4}
+html.mv main>.row .chips>small:only-child{font-size:12px;line-height:1.15;opacity:.65;margin:-4px 0 -3px}   /* «Aún no hay etiquetas.»: una línea fina, sin hueco */
 html.mv main>.row .chips{flex:1 0 100%;flex-wrap:wrap;gap:6px;min-width:0;overflow:visible;margin:0}
 html.mv main>.row .chips[hidden]{display:none}
 html.mv main>.row .chip{white-space:nowrap;padding:4px 12px;margin:0;max-width:100%;overflow:hidden;text-overflow:ellipsis}
