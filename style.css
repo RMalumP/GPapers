@@ -89,9 +89,11 @@ a.nl{color:var(--pri);cursor:pointer;text-decoration:underline dotted}a.nl:hover
 /* filas de altura fija: al estrechar la ventana el texto se recorta con «…» (el texto entero sale al pasar el ratón) en vez de partirse en varias líneas; por debajo del ancho mínimo, la tabla se desplaza en horizontal */
 .tbl{table-layout:fixed;min-width:980px}.tbl tr.rw td{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.tbl .tt{min-width:0}
 .tbl thead th{overflow:hidden;text-overflow:ellipsis}
-.tbl thead th:nth-child(1){width:32px}.tbl thead th:nth-child(2){width:48px}.tbl.noimg thead th:nth-child(2){width:0;padding:0}.tbl.noimg td.timg{padding:0}
-.tbl thead th:nth-child(4){width:13%}.tbl thead th:nth-child(5){width:50px}.tbl thead th:nth-child(6){width:10%}.tbl thead th:nth-child(7){width:86px}.tbl thead th:nth-child(8){width:100px}
-.tbl thead th:nth-child(9){width:8%}.tbl thead th:nth-child(10){width:9%}.tbl thead th:nth-child(11){width:132px}.tbl thead th:nth-child(12){width:48px}
+.tbl thead th.c-sel{width:32px}.tbl thead th.c-img{width:48px}.tbl.noimg thead th.c-img{width:0;padding:0}.tbl.noimg td.timg{padding:0}
+.tbl thead th.c-author{width:13%}.tbl thead th.c-year{width:50px}.tbl thead th.c-venue{width:10%}.tbl thead th.c-reading{width:86px}.tbl thead th.c-rating{width:100px}
+.tbl thead th.c-sections{width:8%}.tbl thead th.c-tags{width:9%}.tbl thead th.c-notes{width:132px}.tbl thead th.c-del{width:48px}
+.tbl thead th[draggable=true]{user-select:none}.tbl thead th.drag{opacity:.45}.tbl thead th.colL{box-shadow:inset 3px 0 0 var(--pri)}.tbl thead th.colR{box-shadow:inset -3px 0 0 var(--pri)}   /* mover columnas: dónde caerá */
+#tbCols[hidden],.mvbr{display:none}#ctx .colr{display:flex;align-items:center}#ctx .colr .colck{flex:1}#ctx .colr .colmv{flex:0 0 auto;padding:2px 8px;opacity:.75}#ctx.colm{max-height:calc(100vh - 16px);overflow-y:auto}#ctx.colm button:disabled{opacity:.45;cursor:default;background:none}
 .tbl tr.rn td{background:var(--bg)}.tbl .chip{font-size:11px;padding:0 7px;margin:1px 3px 1px 0}.tbl .x{border:1px solid var(--red);color:var(--red);border-radius:6px;background:none;padding:0 7px}
 .rw.over{background:color-mix(in srgb,var(--pri) 10%,transparent)}.rw.drag{opacity:.45}.rw[draggable=true]{cursor:grab}
 #gr{width:min(920px,96vw)}.grhelp.on{opacity:.95}.grhelp{margin-top:8px;padding:14px 18px;border:1px dashed var(--bd);border-radius:8px;font-size:14px;opacity:.6}.grhelp h3{font-size:15px;margin:12px 0 4px}.grhelp h3:first-child{margin-top:0}.grhelp p{margin:4px 0}.grhelp ul,.grhelp ol{margin:4px 0;padding-left:22px}.grhelp li{margin:2px 0}.grtmp{margin-top:10px!important;font-style:italic;font-size:13px}   /* explicación provisional (sin relaciones) */

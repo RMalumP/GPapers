@@ -227,3 +227,10 @@ En **Gestionar etiquetas** o **Gestionar secciones**, «＋ Nueva clasificación
 - Con una clasificación elegida, cada etiqueta o sección tiene una casilla para su valor (en rojo si no se entiende, p. ej. «IIII»).
 - **Ordenar**: cada clasificación sale como criterio (🏷️ o 📁 + su nombre). Cada paper usa el valor más bajo de sus etiquetas o secciones; los que no tienen ninguna con valor van al final, en ambos sentidos. «⇅ Ordenar los papers por…» lo aplica directamente y «Ordenar también esta lista» reordena las propias etiquetas o secciones.
 - Se guardan en el JSON del proyecto (`orders`: `{id, name, of: 'tags'|'sections', fmt: 'num'|'alpha'|'roman'|'text'}`; cada etiqueta o sección, en `rk: {idClasificación: valor}`) y se sincronizan con Google Drive valor a valor. Las vistas ⭐ las recuerdan.
+
+## Columnas de la tabla (v39.17)
+- **Ordenar desde la cabecera**: un clic en cualquier cabecera ordena por esa columna (otro clic invierte el sentido), también **Secciones** y **Etiquetas** (por sus nombres en orden alfabético; los papers sin ninguna, siempre al final). Ambas están también en «Ordenar».
+- **Mover columnas**: en el ordenador, arrastra una cabecera y suéltala sobre otra (a su izquierda o derecha), o usa el clic derecho → «Mover a la izquierda/derecha». En la lista de columnas, ↑ y ↓ las mueven también.
+- **Ocultar columnas**: clic derecho en una cabecera → «Ocultar esta columna», o desmárcala en la lista «Columnas que se ven». El título siempre se ve. «Restablecer las columnas» vuelve a lo de siempre.
+- **En el móvil**: botón **⚙ Columnas** (junto a la cuenta de papers, solo en la vista de tabla), con toques normales: nada se abre por una pulsación larga ni por tocar la cabecera.
+- Las columnas se guardan en el JSON, pero son de cada dispositivo (no se sincronizan), como la vista de tarjetas o tabla.

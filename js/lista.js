@@ -284,19 +284,79 @@ const card = (p, from) => `<article class="card" data-id="${p.id}" draggable="tr
     ${/^https?:/i.test(p.url) ? `<a href="${esc(p.url)}" target="_blank" rel="noopener noreferrer">${esc(p.url)}</a>` : ''}
     
     <div class="row"><button class="sm" data-onclick="toggleNotes('${p.id}')" data-oncontextmenu="viewNotes(event,'${p.id}')" title="Clic: desplegar notas · Clic derecho: abrir el visor de notas">Notas (${pNotes(p).length}) ${EXP.has(p.id) ? '▾' : '▸'}</button>${relCount(p) ? `<button class="sm" data-onclick="viewRel('${p.id}')" title="Relaciones: relacionados, cita a y citado por">🔗 ${relCount(p)}</button>` : ''}</div>${EXP.has(p.id) ? notesHTML(p) : ''}</article>`;
-const TH = [[null, ''], ['title', 'Título'], ['author', 'Autores'], ['year', 'Año'], ['venue', 'Revista / editorial'], ['reading', 'Lectura'], ['rating', '★'], [null, 'Secciones'], [null, 'Etiquetas'], [null, 'Notas'], [null, '']];
+/* ---- Columnas de la tabla: se pueden mover (arrastrando la cabecera o con su clic derecho) y ocultar.
+   La casilla, la miniatura y ✕ son fijas; el título siempre se ve. Se guardan en db.settings.tblCols, propio de cada dispositivo (no se sincroniza). */
+const COLS = {title: 'Título', author: 'Autores', year: 'Año', venue: 'Revista / editorial', reading: 'Lectura', rating: '★', sections: 'Secciones', tags: 'Etiquetas', notes: 'Notas'};
+const COL_SORT = {title: 1, author: 1, year: 1, venue: 1, reading: 1, rating: 1, sections: 1, tags: 1};
+const COL_PX = {author: 120, year: 50, venue: 100, reading: 86, rating: 100, sections: 80, tags: 90, notes: 132};   // lo que deja de ocupar la tabla al ocultarla
+const COL_NAME = {rating: 'Valoración (★)'};
+function tblCols() {   // orden de las columnas visibles y conjunto de las ocultas
+  const c = db.settings.tblCols || {}, ks = Object.keys(COLS), o = (Array.isArray(c.order) ? c.order : []).filter((k, i, a) => COLS[k] && a.indexOf(k) === i);
+  ks.forEach(k => { if (!o.includes(k)) o.splice(ks.indexOf(k) <= o.length ? ks.indexOf(k) : o.length, 0, k); });   // las que falten, en su sitio de siempre
+  const hid = new Set((Array.isArray(c.hidden) ? c.hidden : []).filter(k => COLS[k] && k !== 'title'));
+  return {order: o, hidden: hid, vis: o.filter(k => !hid.has(k))};
+}
+function setTblCols(order, hidden) {   // como la vista: se recuerda en el JSON sin crear pasos de deshacer
+  const def = Object.keys(COLS), o = order.join() === def.join() ? undefined : order, h = [...hidden];
+  db.settings.tblCols = o || h.length ? {...(o ? {order: o} : {}), ...(h.length ? {hidden: h} : {})} : undefined;
+  if (!db.settings.tblCols) delete db.settings.tblCols;
+  lastSnap = snapDb(); dirty = true; touch(); render();
+}
+const tdSecs = p => p.sectionIds.map(secById).filter(Boolean);
+const CELL = {
+  title: p => `<td class="c-title tt"><a class="tl2" data-onclick="openPaper('${p.id}')" title="${esc(p.alias || p.title)} · Clic: editar">${hl(p.alias || p.title, HL.t)}</a></td>`,
+  author: p => `<td class="c-author" title="${esc(p.authors.join('; '))}">${hl(p.authors.join('; '), HL.a)}</td>`,
+  year: p => `<td class="c-year">${esc(p.year)}</td>`,
+  venue: p => `<td class="c-venue" title="${esc(p.venue)}">${esc(p.venue)}</td>`,
+  reading: p => `<td class="c-reading"><button class="rst" style="--c:${READ_C[p.reading]}" title="Clic: cambiar el estado de lectura" data-onclick="cycleRead('${p.id}')">${READ[p.reading]}</button></td>`,
+  rating: p => `<td class="c-rating">${starsHTML(p)}</td>`,
+  sections: p => `<td class="c-sections" title="${esc(tdSecs(p).map(s => s.name).join(', '))}">${tdSecs(p).map(s => chip(s, 1)).join('')}</td>`,
+  tags: p => `<td class="c-tags" title="${esc(p.tagIds.map(tagById).filter(Boolean).map(t => t.name).join(', '))}">${tagsOf(p)}</td>`,
+  notes: p => `<td class="c-notes nw"><button class="sm cpb" data-onclick="copyCardCite('${p.id}',this)" title="Copiar la cita (estilo elegido en Exportar), con cursiva al pegar en Word">📋</button>${pdfBtns(p)}<button class="sm" data-onclick="toggleNotes('${p.id}')" data-oncontextmenu="viewNotes(event,'${p.id}')" title="Clic: desplegar · Clic derecho: visor de notas">${pNotes(p).length} ${EXP.has(p.id) ? '▾' : '▸'}</button>${relCount(p) ? `<button class="sm" data-onclick="viewRel('${p.id}')" title="Relaciones">🔗 ${relCount(p)}</button>` : ''}</td>`};
 function thSort(k) {   // clic en una cabecera: ese criterio pasa a ser el principal; otro clic invierte el sentido
   F.sorts = F.sorts[0]?.k === k ? [{k, d: -F.sorts[0].d}, ...F.sorts.slice(1)] : [{k, d: 1}, ...F.sorts.filter(x => x.k !== k).slice(0, 2)]; render();
 }
-const rowHTML = (p, from) => `<tr class="rw" data-id="${p.id}" draggable="true" ${F.group ? `data-from="${from || ''}"` : ''}>
-  <td><input type="checkbox" aria-label="Seleccionar" ${SEL.has(p.id) ? 'checked' : ''} data-onchange="toggleSel('${p.id}')"></td>
-  <td class="timg">${thumbHTML(p, 'xs')}</td>
-  <td class="tt"><a class="tl2" data-onclick="openPaper('${p.id}')" title="${esc(p.alias || p.title)} · Clic: editar">${hl(p.alias || p.title, HL.t)}</a></td><td title="${esc(p.authors.join('; '))}">${hl(p.authors.join('; '), HL.a)}</td><td>${esc(p.year)}</td><td title="${esc(p.venue)}">${esc(p.venue)}</td>
-  <td><button class="rst" style="--c:${READ_C[p.reading]}" title="Clic: cambiar el estado de lectura" data-onclick="cycleRead('${p.id}')">${READ[p.reading]}</button></td><td>${starsHTML(p)}</td>
-  <td title="${esc(p.sectionIds.map(secById).filter(Boolean).map(s => s.name).join(', '))}">${p.sectionIds.map(secById).filter(Boolean).map(s => chip(s, 1)).join('')}</td><td title="${esc(p.tagIds.map(tagById).filter(Boolean).map(t => t.name).join(', '))}">${tagsOf(p)}</td>
-  <td class="nw"><button class="sm cpb" data-onclick="copyCardCite('${p.id}',this)" title="Copiar la cita (estilo elegido en Exportar), con cursiva al pegar en Word">📋</button>${pdfBtns(p)}<button class="sm" data-onclick="toggleNotes('${p.id}')" data-oncontextmenu="viewNotes(event,'${p.id}')" title="Clic: desplegar · Clic derecho: visor de notas">${pNotes(p).length} ${EXP.has(p.id) ? '▾' : '▸'}</button>${relCount(p) ? `<button class="sm" data-onclick="viewRel('${p.id}')" title="Relaciones">🔗 ${relCount(p)}</button>` : ''}</td>
-  <td><button class="x" title="Eliminar" data-onclick="delPaper('${p.id}')">✕</button></td></tr>${EXP.has(p.id) ? `<tr class="rn"><td></td><td colspan="11">${notesHTML(p)}</td></tr>` : ''}`;
-const tableHTML = (L, from) => `<div class="twrap"><table class="tbl${db.settings.showImg !== false && db.papers.some(p => p.image) ? '' : ' noimg'}"><thead><tr><th></th>${TH.map(([k, t]) => k ? `<th class="sortable" data-onclick="thSort('${k}')">${t}${F.sorts[0]?.k === k ? (F.sorts[0].d > 0 ? ' ▲' : ' ▼') : ''}</th>` : `<th>${t}</th>`).join('')}</tr></thead><tbody>${L.map(p => rowHTML(p, from)).join('')}</tbody></table></div>`;
+function thSortD(k, d) { ctxClose(); F.sorts = [{k, d}, ...F.sorts.filter(x => x.k !== k).slice(0, 2)]; render(); }   // desde el menú: el sentido elegido
+const rowHTML = (p, from, C = tblCols().vis) => `<tr class="rw" data-id="${p.id}" draggable="true" ${F.group ? `data-from="${from || ''}"` : ''}>
+  <td class="c-sel"><input type="checkbox" aria-label="Seleccionar" ${SEL.has(p.id) ? 'checked' : ''} data-onchange="toggleSel('${p.id}')"></td>
+  <td class="c-img timg">${thumbHTML(p, 'xs')}</td>${C.map(k => CELL[k](p)).join('')}
+  <td class="c-del"><button class="x" title="Eliminar" data-onclick="delPaper('${p.id}')">✕</button></td></tr>${EXP.has(p.id) ? `<tr class="rn"><td></td><td colspan="${C.length + 2}">${notesHTML(p)}</td></tr>` : ''}`;
+const thHTML = k => `<th class="c-${k}${COL_SORT[k] ? ' sortable' : ''}" draggable="true" data-col="${k}"${COL_SORT[k] ? ` data-onclick="thSort('${k}')"` : ''} data-oncontextmenu="colMenu(event,'${k}')" title="${COL_SORT[k] ? 'Clic: ordenar (otro clic invierte el sentido) · ' : ''}Arrastrar: mover la columna · Clic derecho: ordenar, mover u ocultar columnas">${COLS[k]}${F.sorts[0]?.k === k ? (F.sorts[0].d > 0 ? ' ▲' : ' ▼') : ''}</th>`;
+const tableHTML = (L, from) => { const {vis, hidden} = tblCols(), w = 980 - [...hidden].reduce((s, k) => s + (COL_PX[k] || 0), 0);
+  return `<div class="twrap"><table class="tbl${db.settings.showImg !== false && db.papers.some(p => p.image) ? '' : ' noimg'}"${hidden.size ? ` style="min-width:${Math.max(420, w)}px"` : ''}><thead><tr><th class="c-sel" data-oncontextmenu="colMenu(event,'')"></th><th class="c-img" data-oncontextmenu="colMenu(event,'')"></th>${vis.map(thHTML).join('')}<th class="c-del" data-oncontextmenu="colMenu(event,'')"></th></tr></thead><tbody>${L.map(p => rowHTML(p, from, vis)).join('')}</tbody></table></div>`; };
+/* menú de columnas: clic derecho en la cabecera (ordenador) o el botón «Columnas» (también en el móvil, sin pulsaciones largas) */
+let COLM = null;   // dónde se abrió, para volver a pintarlo abierto tras cada cambio
+function colMenu(e, k) {
+  COLM = {x: e.clientX, y: e.clientY, k};
+  const {order, hidden} = tblCols(), i = order.indexOf(k), mv = document.documentElement.classList.contains('mv');
+  let h = '';
+  if (k) {
+    h += `<div class="ctxh">Columna «${COL_NAME[k] || COLS[k]}»</div>`;
+    if (COL_SORT[k]) h += `<button data-onclick="thSortD('${k}',1)">▲ Ordenar de menor a mayor</button><button data-onclick="thSortD('${k}',-1)">▼ Ordenar de mayor a menor</button>`;
+    h += `<button data-onclick="colAct('move','${k}',-1)"${i > 0 ? '' : ' disabled'}>◀ Mover a la izquierda</button><button data-onclick="colAct('move','${k}',1)"${i < order.length - 1 ? '' : ' disabled'}>▶ Mover a la derecha</button>`;
+    if (k !== 'title') h += `<button data-onclick="colAct('hide','${k}')">🚫 Ocultar esta columna</button>`;
+    h += '<hr>';
+  }
+  h += `<div class="ctxh">Columnas que se ven${mv ? '' : ' (↑↓ o arrastrando la cabecera: moverla)'}</div>` + order.map((c, j) => `<div class="colr"><button class="colck" data-col="${c}" data-onclick="colAct('toggle','${c}')"${c === 'title' ? ' disabled title="El título siempre se ve"' : ''}>${tick(!hidden.has(c))}${COL_NAME[c] || COLS[c]}</button><button class="colmv" data-onclick="colAct('move','${c}',-1)" title="Mover antes (a la izquierda)" aria-label="Mover antes"${j ? '' : ' disabled'}>↑</button><button class="colmv" data-onclick="colAct('move','${c}',1)" title="Mover después (a la derecha)" aria-label="Mover después"${j < order.length - 1 ? '' : ' disabled'}>↓</button></div>`).join('')
+    + `<hr><button data-onclick="colAct('reset')">↺ Restablecer las columnas</button>`;
+  ctxShow(e, h); $('#ctx').classList.add('colm');
+}
+function colBtn() { const r = $('#tbCols').getBoundingClientRect(); setTimeout(() => colMenu({preventDefault() {}, stopPropagation() {}, clientX: r.left, clientY: r.bottom + 4}, '')); }   // tras el clic: si no, el aviso de «clic fuera del menú» lo cerraría
+function colAct(a, k, d) {
+  const {order, hidden} = tblCols();
+  if (a === 'move') { const i = order.indexOf(k), j = i + d; if (j < 0 || j >= order.length) return; order.splice(i, 1); order.splice(j, 0, k); }
+  else if (a === 'hide') hidden.add(k);
+  else if (a === 'toggle') { if (k === 'title') return; hidden.has(k) ? hidden.delete(k) : hidden.add(k); }
+  else if (a === 'reset') { setTblCols(Object.keys(COLS), []); return ctxClose(); }
+  setTblCols(order, hidden);
+  if (a === 'hide') return ctxClose();
+  const st = $('#ctx')?.scrollTop || 0, M = COLM;   // vuelve a abrir el menú tras el clic (el botón pulsado ya no existe)
+  setTimeout(() => { colMenu({preventDefault() {}, stopPropagation() {}, clientX: M.x, clientY: M.y}, M.k); $('#ctx').scrollTop = st; });
+}
+function colMove(k, to, after) {   // arrastrar una cabecera sobre otra
+  const {order, hidden} = tblCols(); if (k === to || !order.includes(k) || !order.includes(to)) return;
+  order.splice(order.indexOf(k), 1); order.splice(order.indexOf(to) + (after ? 1 : 0), 0, k); setTblCols(order, hidden);
+}
 const items = (l, from) => db.settings.view === 'table' ? (l.length ? tableHTML(l, from) : '') : l.map(p => card(p, from)).join('');
 function listHTML(L) {
   if (!F.group) return items(L, '');
@@ -321,7 +381,7 @@ function render() {
   tg('#tbSec', F.tbSec, 'Sección', F.sec || F.noSec); tg('#tbTag', F.tbTag, 'Etiquetas', F.tags.size || F.exTags.size || F.noTag);
   $('#secF2').hidden = !F.tbSec; $('#tagF2').hidden = !F.tbTag; $('#grpChk').checked = F.group;
   selDraw(0);
-  $('#d-search').hidden = !F.q && !advRules().length; advDraw(); $('#d-tr').hidden = !db.trash.length; $('#trLbl').textContent = 'Papelera' + (db.trash.length ? ` (${db.trash.length})` : ''); $('#tbView').innerHTML = db.settings.view === 'table' ? '▦<span class="bl"> Tarjetas</span>' : '☰<span class="bl"> Tabla</span>';
+  $('#d-search').hidden = !F.q && !advRules().length; advDraw(); $('#d-tr').hidden = !db.trash.length; $('#trLbl').textContent = 'Papelera' + (db.trash.length ? ` (${db.trash.length})` : ''); $('#tbView').innerHTML = db.settings.view === 'table' ? '▦<span class="bl"> Tarjetas</span>' : '☰<span class="bl"> Tabla</span>'; $('#tbCols').hidden = db.settings.view !== 'table';
   F.sorts = F.sorts.filter(s => Object.hasOwn(sortOpts(), s.k)); if (!F.sorts.length) F.sorts = [{k: 'title', d: 1}];   // una clasificación borrada deja de ordenar
   const nextKey = Object.keys(SORTS).find(k => !F.sorts.some(s => s.k === k)) || 'title';
   $('#sortUI').innerHTML = F.sorts.map((s, i) => `<div class="row"><select data-onchange="sortSet(${i},this.value)">${Object.entries(sortOpts()).map(([k, v]) => `<option value="${k}" ${s.k === k ? 'selected' : ''}>${v}</option>`).join('')}</select>
@@ -715,3 +775,10 @@ function cmdKey(e) {
   else if (e.key === 'Enter') { e.preventDefault(); cmdRun(CMD.i); }
 }
 function cmdRun(i) { const c = CMD.L[i]; if (!c) return; $('#cmdk').close(); c.fn(); }
+/* arrastrar una cabecera de la tabla a otra posición (ordenador) */
+document.addEventListener('dragstart', e => { const th = e.target.closest?.('.tbl th[data-col]'); if (!th) return; e.dataTransfer.setData('application/x-col', th.dataset.col); e.dataTransfer.effectAllowed = 'move'; th.classList.add('drag'); });
+const colDropT = e => [...e.dataTransfer.types].includes('application/x-col') && e.target.closest?.('.tbl th[data-col]');
+const colAfter = (e, th) => { const r = th.getBoundingClientRect(); return e.clientX > r.left + r.width / 2; };
+document.addEventListener('dragover', e => { const th = colDropT(e); if (!th) return; e.preventDefault(); e.dataTransfer.dropEffect = 'move'; document.querySelectorAll('.colL,.colR').forEach(x => x.classList.remove('colL', 'colR')); th.classList.add(colAfter(e, th) ? 'colR' : 'colL'); });
+document.addEventListener('drop', e => { const th = colDropT(e); document.querySelectorAll('.colL,.colR').forEach(x => x.classList.remove('colL', 'colR')); if (!th) return; e.preventDefault(); colMove(e.dataTransfer.getData('application/x-col'), th.dataset.col, colAfter(e, th)); });
+document.addEventListener('dragend', () => document.querySelectorAll('.colL,.colR').forEach(x => x.classList.remove('colL', 'colR')));
