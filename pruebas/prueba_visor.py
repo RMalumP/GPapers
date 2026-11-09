@@ -221,8 +221,8 @@ with sync_playwright() as pw:
     z = zipfile.ZipFile(dl.value.path()); dx = z.read('word/document.xml').decode()
     eq('Word (.docx): un documento válido con la cita y las anotaciones', (dl.value.suggested_filename.endswith('.docx'), 'Resumen de anotaciones' in dx, 'Paper con PDF' in dx, 'p. 1' in dx), (True, True, True, True))
     with A.expect_download() as dl: A.click('#sum button:has-text("PDF")')
-    import pypdf
-    tx = ' '.join(pg.extract_text() for pg in pypdf.PdfReader(dl.value.path()).pages)
+    pdfb = open(dl.value.path(), 'rb').read()
+    tx = A.evaluate("async b => { const L = await vwLib(), d = await L.getDocument({data: new Uint8Array(b)}).promise; let t = ''; for (let i = 1; i <= d.numPages; i++) t += (await (await d.getPage(i)).getTextContent()).items.map(x => x.str).join(' ') + ' '; return t; }", list(pdfb))   # con el pdf.js de la aplicación (sin dependencias en Python)
     eq('PDF: se descarga con el resumen dentro', ('Resumen de anotaciones' in tx, 'Paper con PDF' in tx, 'p. 1' in tx), (True, True, True))
     A.evaluate("$('#sum').close(); $('#ex').close()")
     # ---- desde file:// se abre el visor del navegador, como antes
