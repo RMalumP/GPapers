@@ -585,10 +585,10 @@ function commit() {
 /* ===== Gestor de etiquetas y secciones ===== */
 function openMg(k) { MG = k; drawMg(); $('#mg').showModal(); }
 function drawMg() {
-  $('#mg').innerHTML = `<h2>${MG === 'tags' ? 'Etiquetas' : 'Secciones'}</h2>` + db[MG].map(x => `<div class="row" style="margin-bottom:6px">
-    <input type="color" value="${x.color || '#888888'}" data-oninput="upd('${x.id}','color',this.value)"><input value="${esc(x.name)}" data-oninput="upd('${x.id}','name',this.value)">
-    ${MG === 'sections' ? `<input placeholder="Descripción" value="${esc(x.description || '')}" data-oninput="upd('${x.id}','description',this.value)">` : ''}
-    <button title="Subir" data-onclick="moveM('${x.id}',-1)">↑</button><button title="Bajar" data-onclick="moveM('${x.id}',1)">↓</button><button class="danger" data-onclick="delM('${x.id}')">Eliminar</button></div>`).join('') +
+  $('#mg').innerHTML = `<h2>${MG === 'tags' ? 'Etiquetas' : 'Secciones'}</h2>` + db[MG].map(x => `<div class="row mgr ${MG === 'sections' ? 'mgs' : 'mgt'}" style="margin-bottom:6px">
+    <input class="mgc" type="color" value="${x.color || '#888888'}" aria-label="Color" data-oninput="upd('${x.id}','color',this.value)"><input class="mgn" value="${esc(x.name)}" aria-label="Nombre" data-oninput="upd('${x.id}','name',this.value)">
+    ${MG === 'sections' ? `<input class="mgd" placeholder="Descripción" aria-label="Descripción" value="${esc(x.description || '')}" data-oninput="upd('${x.id}','description',this.value)">` : ''}
+    <button class="mgu" title="Subir" aria-label="Subir" data-onclick="moveM('${x.id}',-1)">↑</button><button class="mgw" title="Bajar" aria-label="Bajar" data-onclick="moveM('${x.id}',1)">↓</button><button class="danger mgx" title="Eliminar" aria-label="Eliminar" data-onclick="delM('${x.id}')"><span class="mgxl">Eliminar</span><span class="mgxi" hidden>🗑</span></button></div>`).join('') +
     `<div class="row"><button class="pri" data-onclick="mgAdd('${uid()}')">+ Añadir</button><button data-onclick="$('#mg').close();render()">Cerrar</button></div>`;
 }
 function upd(id, k, v) { db[MG].find(x => x.id === id)[k] = v; markDirty(); }
