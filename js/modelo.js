@@ -62,8 +62,8 @@ function ordVal(o, raw) {   // número para comparar (o texto, en «texto libre�
 }
 const KEY = {created: p => p.created || '', modified: p => p.modified || p.created || '', title: p => p.alias || p.title, author: p => p.authors[0] || '',
   year: p => +p.year || 0, venue: p => p.venue || '', accessed: p => p.accessed || '', reading: p => READ_N[p.reading] ?? 0, rating: p => p.rating || 0,
-  sections: p => namesKey(p.sectionIds, secById), tags: p => namesKey(p.tagIds, tagById)};   // por sus nombres en orden alfabético; sin ninguna, al final
-function namesKey(ids, by) { const n = ids.map(by).filter(Boolean).map(x => x.name); return n.length ? n.sort(COLL.compare).join('\u0001') : null; }
+  sections: p => listKey(p.sectionIds, db.sections), tags: p => listKey(p.tagIds, db.tags)};   // por su puesto en la lista de Gestionar (la primera que tenga, luego la siguiente…); sin ninguna, al final
+function listKey(ids, L) { const n = ids.map(i => L.findIndex(x => x.id === i)).filter(i => i >= 0); return n.length ? n.sort((a, b) => a - b).map(i => String(i).padStart(5, '0')).join(' ') : null; }
 const TYPES = {articulo: 'Artículo de revista', libro: 'Libro', capitulo: 'Capítulo', congreso: 'Congreso', tesis: 'Tesis', web: 'Página web', prensa: 'Artículo de prensa', blog: 'Entrada de blog',
   informe: 'Informe', norma: 'Norma técnica', patente: 'Patente', mapa: 'Mapa', dataset: 'Conjunto de datos', software: 'Software o videojuego', basedatos: 'Base de datos', audiovisual: 'Audiovisual (película, serie, vídeo)',
   audio: 'Audio (podcast, canción)', redsocial: 'Publicación en red social', ia: 'IA generativa', diccionario: 'Entrada de diccionario o enciclopedia', presentacion: 'Presentación', personal: 'Comunicación personal', legislacion: 'Legislación', jurisprudencia: 'Jurisprudencia (sentencia, auto…)'};
