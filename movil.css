@@ -159,11 +159,11 @@ html.mv #sg-search .sgh .sh{width:100%}
 html.mv dialog.ask{width:auto;max-width:calc(100vw - 32px);height:auto;max-height:80dvh;margin:auto;border:1px solid var(--bd);border-radius:14px;padding:18px 20px}
 
 /* --- Menú de Sección y Etiquetas (al tocar su botón): mostrar debajo, agrupar o combinar, y elegir --- */
-html.mv #ctx.mvfm{max-height:min(70dvh,560px);overflow-y:auto;overscroll-behavior:contain}
-html.mv #ctx .mvsw{display:inline-block;width:12px;height:12px;border-radius:50%;margin-right:8px;vertical-align:-1px;flex-shrink:0}
-html.mv #ctx .mvn{margin-left:auto;padding-left:12px;opacity:.6;font-size:13px}
-html.mv #ctx.mvfm button{display:flex;align-items:center}
-html.mv #ctx button.ex{text-decoration:line-through;opacity:.75}
+html.tb #ctx.mvfm{max-height:min(70dvh,560px);min-width:240px;overflow-y:auto;overscroll-behavior:contain}
+html.tb #ctx .mvsw{display:inline-block;width:12px;height:12px;border-radius:50%;margin-right:8px;vertical-align:-1px;flex-shrink:0}
+html.tb #ctx .mvn{margin-left:auto;padding-left:12px;opacity:.6;font-size:13px}
+html.tb #ctx.mvfm button{display:flex;align-items:center}
+html.tb #ctx button.ex{text-decoration:line-through;opacity:.75}
 
 /* --- Gestionar secciones y etiquetas: dos líneas por sección (color, nombre, ↑ ↓ · descripción, eliminar); una por etiqueta --- */
 html.mv #mg .mgr{display:grid;gap:6px;align-items:center;margin:0 0 8px!important;padding-bottom:8px;border-bottom:1px solid var(--bd)}
@@ -203,3 +203,11 @@ html.mv .tbl tr.rw>td.mvx>:is(.c-tags,.c-sections){flex:0 1000 auto}   /* se rec
 html.mv .tbl tr.rw>td.mvx>.c-notes{margin-left:0}html.mv .tbl tr.rw>td.mvx>.c-notes .sm{padding:0 4px}
 html.mv .tbl tr.rw>td.mvx{min-height:22px}html.mv .tbl tr.rw>td.timg{width:34px}html.mv .tbl tr.rw>td.timg .pimg.xs{width:34px;height:34px;font-size:15px}
 html.mv #list .card.insB{box-shadow:0 -4px 0 var(--pri)}html.mv #list .card.insA{box-shadow:0 4px 0 var(--pri)}
+
+/* --- Pantallas táctiles grandes (tablet en horizontal): las filas de secciones y etiquetas van debajo de la barra, en varias líneas, como en el móvil --- */
+html.tb:not(.mv) main>.row{flex-wrap:wrap;overflow:visible}
+html.tb:not(.mv) main>.row #secF2{order:3}html.tb:not(.mv) main>.row #tagF2{order:4}
+html.tb:not(.mv) main>.row .chips{flex:1 0 100%;flex-wrap:wrap;gap:6px;min-width:0;overflow:visible;margin:0}
+html.tb:not(.mv) main>.row .chips[hidden]{display:none}
+html.tb:not(.mv) main>.row .chip{white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis}
+html.tb:not(.mv) #ctx.mvfm button{min-height:40px;padding:6px 12px}
