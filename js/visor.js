@@ -575,7 +575,18 @@ async function vwForeign(gen) {
     } catch (e) {}
     if (p.i % 10 === 9) await new Promise(r => setTimeout(r, 0));
   }
-  if (gen !== VW.gen) return; VW.foreign = out; vwHideDups(); if (VW.side) vwSideDraw();
+  if (gen !== VW.gen) return; VW.foreign = out; vwHideDups(); if (VW.side) vwSideDraw(); vwForeignAsk();
+}
+const vwSeenK = () => VW.src ? 'gp-vw-fseen:' + vwSrcKey(VW.src) : '';
+const vwSeen = () => { try { return new Set(JSON.parse(localStorage.getItem(vwSeenK()) || '[]')); } catch (e) { return new Set(); } };
+function vwSeenAdd(ids) { const S = vwSeen(); ids.forEach(i => S.add(String(i))); try { localStorage.setItem(vwSeenK(), JSON.stringify([...S].slice(-500))); } catch (e) {} }
+function vwForeignNew() {   // las que hizo otro programa (Acrobat, Foxit…) y aún no se trajeron ni se descartaron; las que escribió GPapers no cuentan
+  const mine = vwAnns(), S = vwSeen();
+  return (VW.foreign || []).filter(f => !f.dup && f.who !== VW_AUTHOR && !mine.some(a => a.src === f.id) && !S.has(String(f.id)));
+}
+function vwForeignAsk() {
+  const L = vwForeignNew(), n = L.length; if (!n) return; const ids = L.map(f => f.id);
+  toast(`${n === 1 ? 'Hay 1 anotación nueva hecha' : `Hay ${n} anotaciones nuevas hechas`} en otro programa (Acrobat, Foxit…): ¿traerla${n === 1 ? '' : 's'}?`, [{t: 'Traer', fn: () => { vwImport(ids); vwSeenAdd(ids); }}, {t: 'Ahora no', fn: () => vwSeenAdd(ids)}], 0);
 }
 function vwHideDups() {   // las ya importadas, y las que escribió GPapers en un PDF anotado que vuelve a abrirse, no se pintan dos veces
   if (!VW.doc || !VW.foreign) return; const mine = vwAnns(), st = VW.doc.annotationStorage, near = (a, b) => a.every((v, k) => Math.abs(v - b[k]) < 1.5);
@@ -592,8 +603,8 @@ function vwNear(hex) {   // el color de la paleta más parecido
   const h = s => [1, 3, 5].map(k => parseInt(s.slice(k, k + 2), 16)), a = h(hex);
   return VW_COLORS.map(([c]) => c).sort((x, y) => h(x).reduce((s, v, k) => s + (v - a[k]) ** 2, 0) - h(y).reduce((s, v, k) => s + (v - a[k]) ** 2, 0))[0];
 }
-function vwImport() {
-  const mine = vwAnns(), L = (VW.foreign || []).filter(f => !f.dup && !mine.some(a => a.src === f.id)); if (!L.length) return;
+function vwImport(ids) {   // ids: solo esas (si no, todas las que traía el PDF)
+  const mine = vwAnns(), L = (VW.foreign || []).filter(f => !f.dup && !mine.some(a => a.src === f.id) && (!ids || ids.includes(f.id))); if (!L.length) return;
   const now = vwNow(); vwMut(l => { for (const f of L) l.push({id: uid(), k: f.k, p: f.p, q: f.q.map(v => Math.round(v * 100) / 100), c: vwNear(f.c), ...(f.m ? {m: f.m} : {}), src: String(f.id).slice(0, 60), at: now, up: now}); });
   vwHideDups(); toast(`${L.length} ${L.length === 1 ? 'anotación ahora es editable' : 'anotaciones ahora son editables'}.`, [], 3000);
 }
