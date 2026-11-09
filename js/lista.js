@@ -494,10 +494,16 @@ function toggleSel(id) { SEL.has(id) ? SEL.delete(id) : SEL.add(id);   // solo c
 function selVisible() { visible().forEach(p => SEL.add(p.id)); render(); }
 function selNone() { SEL.clear(); render(); }
 function selAllP() { db.papers.forEach(p => SEL.add(p.id)); render(); }
-function selMenu(e) {   // clic derecho (o mantener pulsado en el móvil) en ☑
-  const v = visible().length, n = db.papers.length;
-  ctxShow(e, `<div class="ctxh">Selección${SEL.size ? ` (${SEL.size} elegidos)` : ''}</div><button data-onclick="ctxClose();selVisible()">☑ Seleccionar los que se ven (${v})</button><button data-onclick="ctxClose();selAllP()">☑ Seleccionar todos los del proyecto (${n})</button>${SEL.size ? '<button data-onclick="ctxClose();selNone()">☐ Quitar la selección</button>' : ''}`);
+let SELM = null;   // dónde se abrió el menú de ☑ (para sus submenús)
+function selMenu(e) {   // clic derecho (o mantener pulsado en el móvil) en ☑: elegir y, con algo elegido, lo mismo que el grupo «Selección»
+  SELM = {x: e.clientX, y: e.clientY};
+  const v = visible().length, n = db.papers.length, k = SEL.size, b = (on, t, c) => `<button${c ? ` class="${c}"` : ''} data-onclick="${on}">${t}</button>`;
+  ctxShow(e, `<div class="ctxh">Selección${k ? ` (${k} elegidos)` : ''}</div>${b('ctxClose();selVisible()', `☑ Seleccionar los que se ven (${v})`)}${b('ctxClose();selAllP()', `☑ Seleccionar todos los del proyecto (${n})`)}`
+    + (k ? '<hr>' + b("selSub('read')", '📖 Lectura ▸') + b("selSub('rate')", '⭐ Valoración ▸') + b("selSub('tag')", '🏷️ Etiqueta ▸') + b("selSub('sec')", '📁 Sección ▸')
+      + b('ctxClose();openEx()', '📤 Exportar citas…') + b('ctxClose();psOpen()', '↪ Mover o copiar a otro proyecto…') + b('ctxClose();bulkTrash()', `🗑 Enviar a la papelera (${k})`, 'danger') + '<hr>' + b('ctxClose();selNone()', '☐ Quitar la selección') : '')); $('#ctx').classList.add('selm');
 }
+function selSub(k) { const M = SELM || {x: 40, y: 120}; setTimeout(() => bulkMenu({preventDefault() {}, stopPropagation() {}, clientX: M.x, clientY: M.y}, k)); }   // tras el clic: si no, el aviso de «clic fuera del menú» lo cerraría
+
 /* ---- Acciones en lote sobre la selección: lectura, valoración, etiquetas, secciones y papelera (un solo Ctrl+Z las deshace) ---- */
 const selPapers = () => db.papers.filter(p => SEL.has(p.id));
 const nPap = n => n === 1 ? '1 paper' : n + ' papers';

@@ -243,4 +243,5 @@ En **Gestionar etiquetas** o **Gestionar secciones**, «＋ Nueva clasificación
 
 ## Móvil: arrastrar entre secciones y menú de ☑ (v39.21)
 - **Arrastrar con el dedo** (vista agrupada por sección, tarjetas o tabla): mantén pulsado un paper medio segundo sin mover el dedo, sale su etiqueta y luego lo llevas a otra sección (o a «Sin sección»). Cerca del borde, la lista se desplaza sola. Si mueves el dedo enseguida, solo desplazas la lista.
-- **☑ con menú**: clic derecho (en el móvil, mantener pulsado) en ☑ para elegir: los que se ven, todos los del proyecto o quitar la selección. Un toque normal sigue eligiendo los que se ven.
+- **☑ con menú**: clic derecho (en el móvil, mantener pulsado) en ☑ para elegir: los que se ven o todos los del proyecto. Con algo elegido, también lo del grupo «Selección»: lectura, valoración, etiqueta, sección, exportar citas, mover o copiar a otro proyecto, enviar a la papelera y quitar la selección (v39.22). Un toque normal sigue eligiendo los que se ven.
+- **Tabla del móvil más compacta** (v39.22): menos aire y letra y botones algo más pequeños; cada ficha ocupa ~20 % menos.
