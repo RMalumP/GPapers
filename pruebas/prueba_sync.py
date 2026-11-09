@@ -81,8 +81,8 @@ with sync_playwright() as pw:
 
     # ---- Con servidor y Google simulado
     srv = subprocess.Popen([sys.executable, '-I', '-m', 'http.server', '8792', '-d', str(folder)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL); time.sleep(1)
-    def device(sw='block', init=None):
-        c = b.new_context(viewport={'width': 1200, 'height': 800}, service_workers=sw); c.add_init_script(GOOGLE); c.route('https://www.googleapis.com/**', drive)
+    def device(sw='block', init=None, touch=False):
+        c = b.new_context(**({'viewport': {'width': 412, 'height': 900}, 'has_touch': True, 'is_mobile': True} if touch else {'viewport': {'width': 1200, 'height': 800}}), service_workers=sw); c.add_init_script(GOOGLE); c.route('https://www.googleapis.com/**', drive)
         if init: c.add_init_script(init)
         p = c.new_page(); p.on('pageerror', lambda e: errs.append(str(e))); p.on('console', lambda m: errs.append(m.text) if m.type == 'error' and 'favicon' not in m.text else None); p.on('dialog', lambda d: d.accept()); p.add_init_script("window.ASK_AUTO = 'accept'")
         p.goto('http://localhost:8792/index.html'); p.wait_for_timeout(1200); return c, p
@@ -257,6 +257,14 @@ with sync_playwright() as pw:
     eq('y el aviso de conectar desaparece', E.evaluate("$('#toast').hidden"), True)
     E.evaluate("toast('Hay que volver a conectar con Google.', [{t: 'Conectar', fn: () => {}}], 0, 'sy'); syRun(false)"); E.wait_for_timeout(800)
     eq('si vuelve el acceso (sin pulsar el aviso), el aviso de reconectar también se quita', E.evaluate("[$('#toast').hidden, $('#syncBtn').dataset.st]"), [True, 'ok'])
+    # móvil: el toque que reconecta tiene que poder abrir la ventana de Google (el navegador solo lo deja al levantar el dedo y dentro del propio toque)
+    cT, T = device(touch=True); T.evaluate("syConnect()"); T.wait_for_timeout(1000); T.evaluate("$('#sy').close()")
+    T.evaluate("window.__needGesture = true; window.__tok = 0; syTokDel(); localStorage.setItem(SY_TRY, '0'); SY.st = 'reconnect'; syGesture(); syIcon()")
+    tch = cT.new_cdp_session(T)   # un toque de verdad: el dedo se apoya y se levanta un poco después
+    tch.send('Input.dispatchTouchEvent', {'type': 'touchStart', 'touchPoints': [{'x': 200, 'y': 600}]}); T.wait_for_timeout(200)
+    tch.send('Input.dispatchTouchEvent', {'type': 'touchEnd', 'touchPoints': []}); T.wait_for_timeout(800)
+    eq('móvil: un toque en cualquier parte reconecta sin que el navegador bloquee la ventana', T.evaluate("[window.__tok, window.__blocked || 0, $('#syncBtn').dataset.st, !!SY.consent]"), [1, 0, 'ok', False])
+    cT.close()
     eq('verificación de Google: archivo de Search Console publicado', E.evaluate("fetch('google415a4e3d6145dca0.html').then(r => r.text())").strip(), 'google-site-verification: google415a4e3d6145dca0.html')
     eq('la página principal dice qué es la app y enlaza la privacidad (lo pide Google)', E.evaluate("(a => [!!a && !!a.offsetParent, $('.sbinfo').textContent.includes('Gestor papers'), !!document.querySelector('meta[name=description]')])(document.querySelector('.sbinfo a[href=\"privacidad.html\"]'))"), [True, True, True])
     eq('sin errores', errs, [])
