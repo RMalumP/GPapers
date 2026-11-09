@@ -43,8 +43,11 @@ def drive(route, req):
         md = json.loads(parts[0].strip()); i = 'f%d' % next(SEQ); STORE[i] = {'name': md['name'], 'content': parts[1][:-2] if parts[1].endswith('\r\n') else parts[1], 'parents': md['parents'], 'mt': now()}; return ok(meta(i))
     if m == 'DELETE' and p.startswith('/drive/v3/files/'): STORE.pop(p.split('/')[-1], None); return route.fulfill(status=204, headers=CORS)
     return route.fulfill(status=404, headers=CORS, body='{}')
-GOOGLE = """window.google = {accounts: {oauth2: {initTokenClient: c => ({requestAccessToken: o => { window.__tok = (window.__tok || 0) + 1; window.__cid = c.client_id;
-  setTimeout(() => window.__deny ? c.error_callback({type: 'popup_failed_to_open'}) : c.callback({access_token: 'tok', expires_in: 3600, scope: c.scope}), 5); }}), revoke: (t, cb) => cb && cb()}}};"""
+GOOGLE = """// permiso del navegador para abrir ventanas, como en un móvil de verdad: lo da levantar el dedo (o pulsar con el ratón, o una tecla), no apoyarlo
+['pointerdown', 'pointerup', 'keydown'].forEach(t => window.addEventListener(t, e => { if (t === 'pointerdown' && e.pointerType !== 'mouse') return; window.__act = true; setTimeout(() => window.__act = false, 1000); }, true));
+window.google = {accounts: {oauth2: {initTokenClient: c => ({requestAccessToken: o => { window.__tok = (window.__tok || 0) + 1; window.__cid = c.client_id;
+  const blocked = window.__needGesture && !window.__act; window.__blocked = (window.__blocked || 0) + (blocked ? 1 : 0);
+  setTimeout(() => window.__deny || blocked ? c.error_callback({type: 'popup_failed_to_open'}) : c.callback({access_token: 'tok', expires_in: 3600, scope: c.scope}), 5); }}), revoke: (t, cb) => cb && cb()}}};"""
 names = lambda pre='gpapers-': sorted(f['name'] for f in STORE.values() if f['name'].startswith(pre))
 deltas = lambda: [f for f in STORE.values() if f['name'].startswith('gpapers-d-')]
 PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='

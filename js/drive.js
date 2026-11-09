@@ -212,15 +212,25 @@ function syTokWatch(exp) {   // al caducar el acceso se intenta renovar enseguid
 }
 function syGesture() {   // sin acceso: el siguiente clic o tecla (en cualquier parte) permite abrir un instante la ventana de Google y reconectar
   if (SY.gest) return; SY.gest = true;
-  const off = () => { SY.gest = false; ['pointerdown', 'keydown'].forEach(t => document.removeEventListener(t, h, true)); };
-  const h = () => { if (!syOn() || SY.consent || !['reconnect', 'error'].includes(SY.st)) return off(); if (SY.busy || Date.now() - syTried() < 15000) return; off(); syRun(false, true); };
-  ['pointerdown', 'keydown'].forEach(t => document.addEventListener(t, h, true));
+  syGis().catch(() => {});   // la librería de Google, ya cargada: si no, la ventana se abriría tarde y el navegador la bloquearía
+  // el navegador solo deja abrir ventanas desde ciertos eventos: al pulsar con el ratón, pero en una pantalla táctil al levantar el dedo
+  // (pointerdown de un toque no cuenta: por eso en el móvil casi nunca funcionaba); un deslizamiento termina en pointercancel y no cuenta
+  const EV = ['pointerdown', 'pointerup', 'keydown'];
+  const off = () => { SY.gest = false; EV.forEach(t => document.removeEventListener(t, h, true)); };
+  const h = e => { if (e.type === 'pointerdown' ? e.pointerType !== 'mouse' : e.type === 'pointerup' && e.pointerType === 'mouse') return;
+    if (e.type === 'keydown' && ['Escape', 'Shift', 'Control', 'Alt', 'Meta'].includes(e.key)) return;   // teclas que no dan permiso para abrir ventanas
+    if (!syOn() || SY.consent || !['reconnect', 'error'].includes(SY.st)) return off(); if (SY.busy || Date.now() - syTried() < 15000) return; off(); syRun(false, true); };
+  EV.forEach(t => document.addEventListener(t, h, true));
 }
 const syGis = () => window.google?.accounts?.oauth2 ? Promise.resolve() : new Promise((ok, ko) => {
   const s = document.createElement('script'); s.src = 'https://accounts.google.com/gsi/client'; s.async = true; s.onload = ok; s.onerror = () => ko(Error('red')); document.head.appendChild(s); });
 const syScopes = file => 'https://www.googleapis.com/auth/drive.appdata' + (file || syP().fileScope ? ' https://www.googleapis.com/auth/drive.file' : '');   // drive.file solo si se activó la copia en el Drive normal (js/bandeja.js)
 function syToken(inter) {   // inter = false: renueva el acceso sin ventana (solo si ya se dio el permiso y sigue abierta la sesión de Google)
   const t = syTokGet(); if (t) return Promise.resolve(t);
+  if (SY.tokP) return SY.tokP;   // ya se está pidiendo (p. ej. desde el clic que reconecta): no se abre otra ventana
+  const p = SY.tokP = syTokAsk(inter); p.finally(() => { if (SY.tokP === p) SY.tokP = null; }).catch(() => {}); return p;
+}
+function syTokAsk(inter) {
   return syGis().then(() => new Promise((ok, ko) => {
     const lim = inter ? 0 : setTimeout(() => ko(Error('silencio')), 15000), fin = () => clearTimeout(lim);
     google.accounts.oauth2.initTokenClient({client_id: SY_CFG.clientId, scope: syScopes(),
@@ -409,6 +419,7 @@ async function syRun(inter, gesture) {   // gesture: viene de un clic o una tecl
     syTry();
   }
   clearTimeout(SY.tm); SY.tm = 0; SY.busy = true; SY.wait = false; SY.st = 'busy'; syIcon(); const t0 = Date.now();
+  if (gesture && !syTokGet()) syToken(false).catch(() => {});   // la ventana de Google se pide ya, dentro del clic; si se esperara a lo demás, el navegador la bloquearía
   try {
     let r; try { r = await syOnce(inter); } catch (e) { if (e.estado !== 401) throw e; syTokDel(); r = await syOnce(inter); }   // el acceso había caducado
     SY.st = SY.wait ? 'wait' : 'idle'; syToastOff(); if (r && r.gone) setTimeout(() => pjGone(r.gone));
