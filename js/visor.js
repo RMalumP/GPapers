@@ -67,6 +67,7 @@ function vwBuild() {
       <button class="vwm" data-m="note" data-onclick="vwMode('note')" title="Nota: toca la página donde quieras dejarla"><span>🗒</span><small>Nota</small></button>
       <span class="vwcs" role="group" aria-label="Color">${sw}</span>
       <button class="vwm vwtc" data-onclick="vwPanel('toc')" title="Índice del PDF y miniaturas de las páginas"><span>📑</span><small>Índice</small></button>
+      <button class="vwm vwnb" data-onclick="vwNotes()" title="Notas del paper (generales y por sección) al lado del PDF, con todas las opciones del editor"><span>📝</span><small>Notas</small></button>
       <button class="vwm vwsb" data-onclick="vwPanel('ann')" title="Subrayados, notas y comentarios"><span>💬</span><small>Anotaciones</small><b id="vwAn"></b></button></div>
     <div class="vwbody"><div id="vwScroll" tabindex="-1"><div id="vwPages"></div><p id="vwLoad" class="vwload">Abriendo el PDF…</p></div><aside id="vwSide" hidden></aside></div>
     <div id="vwSel" class="vwfloat" hidden>${sw.replace(/vwColor/g, 'vwSelColor')}<button class="vwib" data-onclick="vwSelNote()" title="Subrayar y comentar" aria-label="Subrayar y comentar">💬</button><button class="vwib" data-onclick="vwSelCopy()" title="Copiar el texto" aria-label="Copiar">📋</button></div>
@@ -89,6 +90,7 @@ async function vwOpen(src, file) {
   const gen = ++VW.gen; Object.assign(VW, {open: true, src, file, doc: null, pages: [], foreign: null, sel: null, dirty: false, find: {q: '', hits: [], i: -1, txt: new Map()}});
   const d = $('#vw'); vw$('.vwt').textContent = vwTitle(); vw$('.vwt').title = vwTitle(); $('#vwPages').innerHTML = ''; $('#vwLoad').hidden = false; $('#vwLoad').textContent = 'Abriendo el PDF…';
   $('#vwQ').value = ''; $('#vwQn').textContent = ''; vwPopClose(); $('#vwSel').hidden = true; if (VW.sideNext) VW.tab = 'ann'; VW.side = VW.sideNext || !document.documentElement.classList.contains('mv') && innerWidth > 1100 && vwSideOn(); VW.sideNext = false; vwSideShow();
+  vw$('.vwnb').hidden = src?.kind !== 'paper';
   VW.night = vwNightOn(); d.classList.toggle('night', VW.night); VW.toc = null; VW.thIo?.disconnect();
   if (!d.open) d.showModal(); vwModeShow(); vwColorShow(); vwCount();
   if (!VW.pushed && !VW_TAB) { try { history.pushState({vw: 1}, ''); VW.pushed = true; } catch (e) {} }   // el botón «atrás» del móvil cierra el visor
@@ -122,7 +124,7 @@ function vwAskPass(wrong) {   // contraseña de un PDF protegido
   });
 }
 async function vwClose(fromPop, keepHist) {
-  if (!VW.open) return; vwSaveComment();
+  if (!VW.open) return; vwSaveComment(); vwNotesClose(true);
   const src = VW.src, page = VW.cur + 1, pf = vwHolders()[0];
   VW.open = false; VW.gen++; VW.io?.disconnect(); VW.queue.clear();
   for (const p of VW.pages) { try { p.task?.cancel(); } catch (e) {} p.proxy?.cleanup(); }
@@ -160,6 +162,7 @@ async function vwOther(ann) {   // abrir en otra app: el menú «Compartir» del
   pdfNative(f, VW.cur + 1);
 }
 function vwEsc() {
+  if (vwDocked()) return vwNotesClose();
   if (!$('#vwPop').hidden) return vwPopClose();
   if (!$('#vwSel').hidden) { getSelection().removeAllRanges(); $('#vwSel').hidden = true; return; }
   if (VW.findOpen) return vwFindToggle(false);
@@ -665,6 +668,26 @@ function vwMenu(r, html) {   // menú desplegable dentro del visor (el de la apl
   m.innerHTML = html; m.hidden = false; const w = m.offsetWidth; m.style.left = Math.max(8, Math.min(r.right - w, innerWidth - w - 8)) + 'px'; m.style.top = (r.bottom + 4) + 'px';
   setTimeout(() => document.addEventListener('pointerdown', ev => { if (!m.contains(ev.target)) m.hidden = true; }, {once: true, capture: true}));
 }
+/* ---- Notas del paper al lado del PDF: el mismo editor de la ficha (#dlg), metido en el visor como panel.
+   Ordenador y tablet: la mitad derecha (el PDF sigue a la izquierda y se puede leer y subrayar). Móvil: pantalla completa, con «📄 Ver el PDF» para ir y volver sin perder lo escrito. */
+const vwDocked = () => $('#dlg').open && $('#dlg').classList.contains('vwdock');
+function vwNotes() {
+  const d = $('#dlg');
+  if (vwDocked()) { if (d.classList.contains('vwhide')) { d.classList.remove('vwhide'); return d.querySelector('.ned')?.focus(); } return vwMv() ? vwNotesHide() : vwNotesClose(); }
+  const p = vwPaper(); if (!p || d.open) return;
+  VW.dlgNext = d.nextSibling; d.classList.add('vwdock'); vw$('.vwbody').insertBefore(d, $('#vwSide'));
+  if (VW.side && !vwMv() && innerWidth < 1500) { VW.side = false; vwSideShow(); }   // sin el panel de anotaciones: el PDF necesita su mitad
+  vw$('.vwnb').classList.add('on'); openPaper(p.id, true);
+}
+function vwNotesHide() { $('#dlg').classList.add('vwhide'); }
+function vwNotesClose(force) { if (!vwDocked()) return; commit(); if (force && vwDocked()) $('#dlg').close(); }   // se guarda al cerrar (como al pulsar fuera de la ficha); si falta el título, avisa y sigue abierto
+function vwUndock() {
+  const d = $('#dlg'); if (!d.classList.contains('vwdock')) return;
+  d.classList.remove('vwdock', 'vwhide'); document.body.insertBefore(d, VW.dlgNext?.parentNode === document.body ? VW.dlgNext : null); vw$('.vwnb')?.classList.remove('on');
+}
+$('#dlg').addEventListener('close', vwUndock);
+$('#dlg').addEventListener('keydown', e => {   // Esc en las notas del visor: guarda y cierra el panel (el navegador no se lo pasa al visor); con un menú abierto, solo cierra el menú
+  if (e.key !== 'Escape' || !vwDocked() || e.defaultPrevented || ($('#ctx') && !$('#ctx').hidden)) return; e.preventDefault(); e.stopPropagation(); vwNotesClose(); });
 function vwFicha() { const p = vwPaper(); if (p) openPaper(p.id); }
 function vwCite() { const s = VW.src; vwClose(); setTimeout(() => inboxCite(s.id), 50); }
 function vwVis() {

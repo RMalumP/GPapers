@@ -234,3 +234,9 @@ En **Gestionar etiquetas** o **Gestionar secciones**, «＋ Nueva clasificación
 - **Ocultar columnas**: clic derecho en una cabecera → «Ocultar esta columna», o desmárcala en la lista «Columnas que se ven». El título siempre se ve. «Restablecer las columnas» vuelve a lo de siempre.
 - **En el móvil**: botón **⚙ Columnas** (junto a la cuenta de papers, solo en la vista de tabla), con toques normales: nada se abre por una pulsación larga ni por tocar la cabecera.
 - Las columnas se guardan en el JSON, pero son de cada dispositivo (no se sincronizan), como la vista de tarjetas o tabla.
+
+## Notas del paper dentro del visor de PDF (v39.19)
+- En la barra del visor, **📝 Notas** abre la ficha del paper en «Notas» (nota general y notas por sección), con todo el editor: formato, listas, plantillas, enlaces, añadir o quitar notas, cambiar su sección y «Traer anotaciones del PDF». También están las demás pestañas de la ficha.
+- **En el ordenador y la tablet**, las notas ocupan la mitad derecha y el PDF sigue a la izquierda: se puede leer, desplazar y subrayar mientras escribes.
+- **En el móvil** ocupan toda la pantalla, menos la barra del visor. **📄 Ver el PDF** (o 📝) va al PDF y vuelve a las notas sin perder lo escrito.
+- Al cerrar el panel (otro toque en 📝, Esc o «Guardar paper»), o al salir del visor, se guarda. «Cancelar» descarta los cambios.
