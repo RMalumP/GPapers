@@ -232,7 +232,7 @@ En **Gestionar etiquetas** o **Gestionar secciones**, «＋ Nueva clasificación
 - **Ordenar desde la cabecera**: un clic en cualquier cabecera ordena por esa columna (otro clic invierte el sentido), también **Secciones** y **Etiquetas**. Estas dos usan tus **clasificaciones** (Gestionar etiquetas/secciones): la de más arriba manda y las de debajo desempatan; «⬆ Subir» cambia cuál va primero. Después, el orden de la lista de Gestionar. Los papers sin ninguna, siempre al final. Ambas están también en «Ordenar» (v39.18).
 - **Mover columnas**: en el ordenador, arrastra una cabecera y suéltala sobre otra (a su izquierda o derecha), o usa el clic derecho → «Mover a la izquierda/derecha». En la lista de columnas, ↑ y ↓ las mueven también.
 - **Ocultar columnas**: clic derecho en una cabecera → «Ocultar esta columna», o desmárcala en la lista «Columnas que se ven». El título siempre se ve. «Restablecer las columnas» vuelve a lo de siempre.
-- **En el móvil**: botón **⚙ Columnas** (junto a la cuenta de papers, solo en la vista de tabla), con toques normales: nada se abre por una pulsación larga ni por tocar la cabecera.
+- **En el móvil**: botón **⚙** pequeño en la barra de Tarjetas (solo en la vista de tabla), con toques normales: nada se abre por una pulsación larga ni por tocar la cabecera. Cada fila es una ficha de tres líneas: título; autores · año · revista; y el resto de columnas. Muestra solo las columnas visibles, en tu orden (v39.20).
 - Las columnas se guardan en el JSON, pero son de cada dispositivo (no se sincronizan), como la vista de tarjetas o tabla.
 
 ## Notas del paper dentro del visor de PDF (v39.19)

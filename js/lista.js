@@ -318,7 +318,12 @@ function thSort(k) {   // clic en una cabecera: ese criterio pasa a ser el princ
   F.sorts = F.sorts[0]?.k === k ? [{k, d: -F.sorts[0].d}, ...F.sorts.slice(1)] : [{k, d: 1}, ...F.sorts.filter(x => x.k !== k).slice(0, 2)]; render();
 }
 function thSortD(k, d) { ctxClose(); F.sorts = [{k, d}, ...F.sorts.filter(x => x.k !== k).slice(0, 2)]; render(); }   // desde el menú: el sentido elegido
-const rowHTML = (p, from, C = tblCols().vis) => `<tr class="rw" data-id="${p.id}" draggable="true" ${F.group ? `data-from="${from || ''}"` : ''}>
+const MV_META = {author: p => hl(p.authors.join('; '), HL.a), year: p => esc(p.year), venue: p => esc(p.venue)};
+const rowMv = (p, from, C) => {   // móvil: la fila es una ficha de tres líneas (rejilla en movil.css); cada línea muestra las columnas visibles en su orden
+  const meta = C.filter(k => MV_META[k]).map(k => MV_META[k](p)).filter(Boolean), rest = C.filter(k => !MV_META[k] && k !== 'title').map(k => CELL[k](p).replace(/^<td/, '<div').replace(/<\/td>$/, '</div>'));
+  return `<tr class="rw" data-id="${p.id}" draggable="true" ${F.group ? `data-from="${from || ''}"` : ''}><td class="c-sel"><input type="checkbox" aria-label="Seleccionar" ${SEL.has(p.id) ? 'checked' : ''} data-onchange="toggleSel('${p.id}')"></td><td class="c-img timg">${thumbHTML(p, 'xs')}</td>${CELL.title(p)}<td class="c-del"><button class="x" title="Eliminar" data-onclick="delPaper('${p.id}')">✕</button></td>${meta.length ? `<td class="mvm">${meta.join('<i>·</i>')}</td>` : ''}${rest.length ? `<td class="mvx">${rest.join('')}</td>` : ''}</tr>${EXP.has(p.id) ? `<tr class="rn"><td></td><td>${notesHTML(p)}</td></tr>` : ''}`;
+};
+const rowHTML = (p, from, C = tblCols().vis) => document.documentElement.classList.contains('mv') ? rowMv(p, from, C) : `<tr class="rw" data-id="${p.id}" draggable="true" ${F.group ? `data-from="${from || ''}"` : ''}>
   <td class="c-sel"><input type="checkbox" aria-label="Seleccionar" ${SEL.has(p.id) ? 'checked' : ''} data-onchange="toggleSel('${p.id}')"></td>
   <td class="c-img timg">${thumbHTML(p, 'xs')}</td>${C.map(k => CELL[k](p)).join('')}
   <td class="c-del"><button class="x" title="Eliminar" data-onclick="delPaper('${p.id}')">✕</button></td></tr>${EXP.has(p.id) ? `<tr class="rn"><td></td><td colspan="${C.length + 2}">${notesHTML(p)}</td></tr>` : ''}`;

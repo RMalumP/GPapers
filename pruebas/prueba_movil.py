@@ -123,7 +123,7 @@ with sync_playwright() as pw:
     pg.click('#ex > .mvdx'); pg.wait_for_timeout(200)
     eq('el ✕ cierra la ventana', pg.evaluate("$('#ex').open"), False)
     pg.evaluate("setView('table')"); pg.wait_for_timeout(200)
-    eq('tabla: cada fila es una ficha (sin cabecera)', pg.evaluate("[getComputedStyle($('.tbl thead')).display, getComputedStyle($('.tbl tr.rw')).display, document.documentElement.scrollWidth <= innerWidth]"), ['none', 'flex', True])
+    eq('tabla: cada fila es una ficha (sin cabecera)', pg.evaluate("[getComputedStyle($('.tbl thead')).display, getComputedStyle($('.tbl tr.rw')).display, document.documentElement.scrollWidth <= innerWidth]"), ['none', 'grid', True])
     alto = "Math.round($('.tbl tr.rw').getBoundingClientRect().height)"; h0 = pg.evaluate(alto)
     pg.evaluate("db.tags.push(...Array.from({length: 6}, (_, i) => ({id: 'm' + i, name: 'Etiqueta larga ' + i, color: '#888888'}))); db.papers[0].tagIds = db.tags.map(t => t.id); render()"); pg.wait_for_timeout(100)
     eq('tabla: muchas etiquetas no añaden líneas a la ficha', pg.evaluate(alto), h0)
