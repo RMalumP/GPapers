@@ -457,7 +457,10 @@ function syIcon() {
 function syClick(e) {
   e.stopPropagation(); if (!syOn()) return syIntro();
   const p = syP(), st = syState(), r = e.currentTarget.getBoundingClientRect();
-  ctxShow({preventDefault() {}, stopPropagation() {}, clientX: r.left, clientY: r.bottom + 4}, `<div class="ctxh">Google Drive${p.who ? ' · ' + esc(p.who) : ''}<br>${esc(SY_TXT[st])}${p.last ? ' · ' + syAgo(p.last) : ''}${SY.ms ? `<br><small>Última vuelta: ${(SY.ms / 1000).toLocaleString('es', {maximumFractionDigits: 1})} s</small>` : ''}</div>`
+  // en el móvil el botón vive en el menú ⋯: se cierra ese menú y el de Drive sale bajo la cabecera, a la derecha (donde estaba el ⋯)
+  const mv = typeof mvOn === 'function' && mvOn(); if (mv) mvMore(false);
+  const at = mv ? {clientX: innerWidth, clientY: document.querySelector('header').getBoundingClientRect().bottom + 4} : {clientX: r.left, clientY: r.bottom + 4};
+  ctxShow({preventDefault() {}, stopPropagation() {}, ...at}, `<div class="ctxh">Google Drive${p.who ? ' · ' + esc(p.who) : ''}<br>${esc(SY_TXT[st])}${p.last ? ' · ' + syAgo(p.last) : ''}${SY.ms ? `<br><small>Última vuelta: ${(SY.ms / 1000).toLocaleString('es', {maximumFractionDigits: 1})} s</small>` : ''}</div>`
     + (st === 'reconnect' ? '<button data-onclick="ctxClose();syConnect()">🔑 Volver a conectar</button>' : '')
     + `<button data-onclick="ctxClose();syNow()">🔄 Sincronizar ahora</button><button data-onclick="ctxClose();syAutoSet(!syAuto())">${tick(syAuto())}Autoguardado en Drive</button>`
     + '<button data-onclick="ctxClose();syIntro()">❔ ¿Cómo funciona?</button><button data-onclick="ctxClose();syLogout()">🚪 Cerrar sesión</button><button class="danger" data-onclick="ctxClose();syWipe()">🗑 Borrar mis datos de Google Drive</button>');
