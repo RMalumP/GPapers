@@ -17,6 +17,7 @@ async function inboxDraw() {
   if (list && (s.inboxPos === 'top' ? box.nextElementSibling !== list : list.nextElementSibling !== box)) s.inboxPos === 'top' ? list.before(box) : list.after(box);   // abajo (por defecto) o arriba de la lista
   const off = !L.length || s.showInbox === false;
   if (btn) { btn.hidden = off || !s.inboxBtn; btn.querySelector('b').textContent = L.length; btn.setAttribute('aria-expanded', String(!!IB.shown)); btn.classList.toggle('on', !!IB.shown); }
+  const mb = $('#mvIb'); if (mb) { mb.hidden = off; mb.querySelector('b').textContent = L.length; const on = s.inboxBtn ? !!IB.shown : !ibFold(); mb.setAttribute('aria-pressed', String(on)); mb.classList.toggle('on', on); }   // móvil: 🗃️ en la barra inferior siempre que haya PDF por citar
   box.hidden = off || s.inboxBtn && !IB.shown; if (box.hidden) { box.innerHTML = ''; return; }
   IB.i = Math.max(0, Math.min(IB.i, L.length - 1)); const it = L[IB.i], a = annN(it), fold = ibFold(), dup = ibDup(it);
   box.innerHTML = `<div class="ibh"><button class="ibf" data-onclick="ibFoldSet(${!fold})" aria-expanded="${!fold}" title="Plegar o desplegar"><span class="car">${fold ? '▸' : '▾'}</span><b>🗃️ PDF por citar</b><span class="ibn">${L.length}</span></button>
