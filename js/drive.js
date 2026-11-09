@@ -14,7 +14,7 @@
    índice y el proyecto abierto; los demás se descargan al abrirlos. */
 const SY_CFG = {clientId: '143923429984-45e8m3bmn1315r9ceet2sb19iuq4f9qj.apps.googleusercontent.com',   // ID de cliente OAuth del proyecto «Gestor de papers» (público, no es un secreto); vacío = sin sincronización
   file: 'gpapers-snap.json', legacy: 'gpapers-sync.json', big: 4 * 1024 * 1024, maxDeltas: 25, pdfMax: 100 * 1048576};   // big: a partir de aquí, subida reanudable · maxDeltas: cambios sueltos antes de rehacer la copia completa
-const SY_LOCALSET = ['view'];   // ajustes propios de cada dispositivo: no se sincronizan
+const SY_LOCALSET = ['view', 'tblCols'];   // ajustes propios de cada dispositivo: no se sincronizan
 const SY_IDX = 'gpapers-projects.json';   // índice: lista de proyectos y ajustes comunes
 const syNames = id => id === 'main' ? {snap: SY_CFG.file, legacy: SY_CFG.legacy, d: 'gpapers-d-', img: 'gpapers-img-', pdf: 'gpapers-pdf-', key: ''}   // el primer proyecto conserva los nombres de antes (las versiones anteriores lo siguen viendo)
   : {snap: `gpapers-p-${id}-snap.json`, legacy: null, d: `gpapers-p-${id}-d-`, img: `gpapers-p-${id}-img-`, pdf: `gpapers-p-${id}-pdf-`, key: ':' + id};
