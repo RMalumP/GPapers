@@ -253,3 +253,11 @@ html:not(.mv) main>.row.cmp .bl{display:none}
 #mg .mgo{display:flex;flex-direction:column;gap:6px;margin:0 0 12px;padding:10px;border:1px solid var(--bd);border-radius:10px;background:var(--bg)}
 #mg .mgo label{display:flex;flex-direction:column;gap:2px;font-size:13px}#mg .mgo small{opacity:.8}
 #mg .mgk{width:4.5em;text-align:center;font-weight:600}#mg .mgk.bad{border-color:#c0392b;background:#c0392b22}
+/* orden manual: dónde caerá el paper arrastrado · secciones plegables · posiciones guardadas */
+#list .card.insB{box-shadow:-4px 0 0 var(--pri)}#list .card.insA{box-shadow:4px 0 0 var(--pri)}
+#list tr.rw.insB{box-shadow:inset 0 3px 0 var(--pri)}#list tr.rw.insA{box-shadow:inset 0 -3px 0 var(--pri)}
+#list .card.over.insB,#list .card.over.insA,#list tr.rw.over{background:inherit}
+.gbox>h2.grp{cursor:pointer;user-select:none}.gbox .gcar{display:inline-block;width:1.1em;opacity:.6;font-size:.8em}
+.gbox.fold>h2.grp{margin-bottom:4px;opacity:.85}
+.posb{margin-top:6px;font-size:13px}
+#ctx.posm{width:min(330px,calc(100vw - 16px))}#ctx .posn{display:flex;gap:6px;padding:4px 6px}#ctx .posn input{flex:1;min-width:0}#ctx .posh{display:block;padding:2px 8px 4px;opacity:.7;font-size:12px}

@@ -524,21 +524,30 @@ function movePaper(id, from, to) {   // arrastrar un paper de una sección a otr
   markDirty(); render();
 }
 function addTag(id, tid) { const p = db.papers.find(x => x.id === id); if (p && !p.tagIds.includes(tid)) { p.tagIds.push(tid); logChange(p, 'Etiqueta añadida: ' + (db.tags.find(t => t.id === tid)?.name || '?')); markDirty(); } render(); }
-const clearOver = () => document.querySelectorAll('.over').forEach(x => x.classList.remove('over'));
+const clearOver = () => document.querySelectorAll('.over,.insA,.insB').forEach(x => x.classList.remove('over', 'insA', 'insB'));
 document.addEventListener('dragstart', e => {
   const t = e.target.closest?.('.chip[data-tag], .card[draggable=true], .rw[draggable=true]'); if (!t) return;
   if (t.dataset.tag) { e.dataTransfer.setData('application/x-tag', t.dataset.tag); e.dataTransfer.effectAllowed = 'copy'; }
   else { e.dataTransfer.setData('application/x-paper', JSON.stringify({id: t.dataset.id, from: t.dataset.from || ''})); e.dataTransfer.effectAllowed = 'move'; t.classList.add('drag'); }
 });
 document.addEventListener('dragend', () => { clearOver(); document.querySelectorAll('.drag').forEach(x => x.classList.remove('drag')); });
-$('#list').addEventListener('dragover', e => {   // etiqueta -> tarjeta; paper -> grupo de sección
-  const ty = [...e.dataTransfer.types], tgt = ty.includes('application/x-tag') ? e.target.closest('.card, .rw') : ty.includes('application/x-paper') ? e.target.closest('.gbox') : null;
+const insAfter = (e, el) => { const r = el.getBoundingClientRect(), wide = el.tagName === 'TR' || r.width > el.parentElement.getBoundingClientRect().width * .6; return wide ? e.clientY > r.top + r.height / 2 : e.clientX > r.left + r.width / 2; };   // ¿antes o después? (en fila: arriba/abajo; en rejilla: izquierda/derecha)
+$('#list').addEventListener('dragover', e => {   // etiqueta -> tarjeta; paper -> otro paper (colocarlo antes o después: orden manual) o grupo de sección
+  const ty = [...e.dataTransfer.types];
+  if (ty.includes('application/x-paper')) {
+    const c = e.target.closest('.card[data-id], .rw[data-id]'), g = e.target.closest('.gbox'); if (!c && !g) return;
+    e.preventDefault(); clearOver();
+    if (c && !c.classList.contains('drag')) c.classList.add('over', insAfter(e, c) ? 'insA' : 'insB'); else if (g && !c) g.classList.add('over');
+    return;
+  }
+  const tgt = ty.includes('application/x-tag') ? e.target.closest('.card, .rw') : null;
   if (!tgt) return; e.preventDefault(); clearOver(); tgt.classList.add('over');
 });
 $('#list').addEventListener('drop', e => {
-  const tag = e.dataTransfer.getData('application/x-tag'), pap = e.dataTransfer.getData('application/x-paper'), c = e.target.closest('.card, .rw'), g = e.target.closest('.gbox');
+  const tag = e.dataTransfer.getData('application/x-tag'), pap = e.dataTransfer.getData('application/x-paper'), c = e.target.closest('.card[data-id], .rw[data-id]'), g = e.target.closest('.gbox');
   clearOver();
   if (tag && c) { e.preventDefault(); addTag(c.dataset.id, tag); }
+  else if (pap && c) { e.preventDefault(); const d = JSON.parse(pap); if (c.dataset.id !== d.id) paperPlace(d.id, d.from, g ? g.dataset.sec : null, c.dataset.id, insAfter(e, c)); }
   else if (pap && g) { e.preventDefault(); const d = JSON.parse(pap); movePaper(d.id, d.from, g.dataset.sec); }
 });
 const sbDropT = e => [...e.dataTransfer.types].includes('application/x-paper') && e.target.closest?.('#secF .cw[data-sec], #tagF .chip[data-tag]');

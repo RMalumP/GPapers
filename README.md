@@ -250,3 +250,9 @@ En **Gestionar etiquetas** o **Gestionar secciones**, «＋ Nueva clasificación
 - **Tabla del móvil en dos líneas**: título; y debajo autores · año · revista seguidos de lectura, estrellas, etiquetas y notas (las etiquetas se recortan primero).
 - **Visor + notas: divisor arrastrable** entre el PDF y las notas para repartir el espacio (del 20 % al 80 %; se recuerda en el dispositivo). Doble clic: mitad y mitad. También con las flechas del teclado.
 - **Tablet en vertical**: vista partida con el PDF arriba y las notas abajo, con el mismo divisor (arrastrar arriba o abajo). Desde v39.24 depende del tamaño de la pantalla (lado corto de unos 600 px o más, ≈ 7″): también en tablets que usan el modo móvil de la app. En un teléfono las notas siguen a pantalla completa.
+
+## Orden manual, posiciones guardadas y secciones plegables (v39.25)
+- **Colocar papers a mano**: arrastra un paper sobre otro (mitad de arriba: delante; de abajo: detrás). En el móvil, mantén pulsado medio segundo y mueve el dedo; una línea marca dónde caerá. Funciona en tarjetas y tabla, agrupado por sección (cada sección tiene su propio orden) o sin agrupar. Soltarlo sobre un paper de otra sección lo cambia de sección y lo deja en ese sitio.
+- Al colocar uno, el orden pasa a **«Orden manual (arrastrando)»**, que parte del orden que se veía. Se puede elegir otro orden y volver a éste sin perderlo. Los papers nuevos van al final de su sección.
+- **📌 Posiciones guardadas…** (un solo botón bajo «Ordenar», en la barra lateral): guarda con un nombre cómo están colocados ahora los papers, para volver a ese orden después, o borrarlo con ✕. Se sincroniza con Drive.
+- **Secciones plegables** (vista agrupada): clic o toque en el título de la sección la pliega o despliega (▾/▸, sigue mostrando cuántos papers tiene). «Plegar todas» y «Desplegar todas» en el menú de Secciones. Se recuerda en cada dispositivo.

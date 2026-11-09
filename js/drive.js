@@ -75,7 +75,7 @@ function sySettings(x, y, z) {
   return o;
 }
 function syMerge(L, R, B) {   // L = este dispositivo, R = Google Drive, B = última versión sincronizada (null la primera vez: se unen)
-  const o = syObj(L, R, B, true, {sections: syLst(syTS), tags: syLst(syTS), orders: syLst(syGen), papers: syLst(syPaper), trash: syLst(syGen, t => t.paper.id), inbox: syLst(syInbox),
+  const o = syObj(L, R, B, true, {sections: syLst(syTS), tags: syLst(syTS), orders: syLst(syGen), posSaves: syLst(syGen), papers: syLst(syPaper), trash: syLst(syGen, t => t.paper.id), inbox: syLst(syInbox),
     settings: (x, y, z, h) => sySettings(x || {}, y || {}, h ? z || {} : null)});
   o.papers ||= []; o.trash ||= []; o.inbox ||= []; o.tags ||= []; o.sections ||= [];
   const live = new Map(o.papers.map(p => [p.id, p]));   // en la lista y en la papelera a la vez (un lado lo borró y el otro lo editó): gana lo último
@@ -86,7 +86,7 @@ function syMerge(L, R, B) {   // L = este dispositivo, R = Google Drive, B = úl
   return o;
 }
 /* ---- Solo lo que cambió: parches campo a campo ---- */
-const SY_KEY = {papers: e => e.id, ann: e => e.id, inbox: e => e.id, tags: e => e.id, sections: e => e.id, orders: e => e.id, notes: e => e.id, customTypes: e => e.id, customStyles: e => e.id, templates: e => e.id, trash: t => t.paper && t.paper.id};   // listas que se comparan elemento a elemento
+const SY_KEY = {papers: e => e.id, ann: e => e.id, inbox: e => e.id, tags: e => e.id, sections: e => e.id, orders: e => e.id, posSaves: e => e.id, notes: e => e.id, customTypes: e => e.id, customStyles: e => e.id, templates: e => e.id, trash: t => t.paper && t.paper.id};   // listas que se comparan elemento a elemento
 const syIsObj = v => !!v && typeof v === 'object' && !Array.isArray(v);
 function syDiff(a, b, f) {   // parche de a → b: {$: valor} sustituye · {o: {campo: parche}} objeto · {l: {id: parche}, ord: [ids]} lista por id · {x: 1} borra
   if (syS(a) === syS(b)) return undefined;

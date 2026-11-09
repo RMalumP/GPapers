@@ -43,7 +43,7 @@ const F = {q: '', sorts: [{k: 'title', d: 1}], group: false, sec: '', tags: new 
 const SEL = new Set();   // ids de papers seleccionados
 const READ = {por_leer: 'Por leer', leyendo: 'Leyendo', leido: 'Leído'};   // estado de lectura (único por paper)
 const READ_N = {por_leer: 0, leyendo: 1, leido: 2}, READ_C = {por_leer: '#888888', leyendo: '#2457c5', leido: '#27ae60'};
-const SORTS = {created: 'Fecha de creación', modified: 'Última modificación', title: 'Título', author: 'Autor', year: 'Año', venue: 'Revista/editorial', accessed: 'Fecha de consulta', reading: 'Estado de lectura', rating: 'Valoración', sections: 'Secciones', tags: 'Etiquetas'};
+const SORTS = {created: 'Fecha de creación', modified: 'Última modificación', title: 'Título', author: 'Autor', year: 'Año', venue: 'Revista/editorial', accessed: 'Fecha de consulta', reading: 'Estado de lectura', rating: 'Valoración', sections: 'Secciones', tags: 'Etiquetas', manual: 'Orden manual (arrastrando)'};
 /* Clasificaciones para ordenar (db.orders): varias por proyecto, cada una de etiquetas o de secciones, con su forma de escribir los valores.
    Cada etiqueta o sección guarda su valor en rk[idClasificación] (texto tal cual se escribió: «3», «C», «III»…). */
 const ORD_FMT = {num: 'Números (1, 2, 3…)', alpha: 'Letras (A, B, C…)', roman: 'Números romanos (I, II, III…)', text: 'Texto libre (orden alfabético)'};

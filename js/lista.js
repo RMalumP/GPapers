@@ -34,7 +34,12 @@ function ordKey(id) {   // clave de un paper según una clasificación: el valor
   const m = new Map(db[o.of].map(x => [x.id, ordVal(o, x.rk?.[id])])), lt = (a, b) => typeof a === 'number' ? a < b : COLL.compare(a, b) < 0;
   return p => { let best = null; for (const i of o.of === 'tags' ? p.tagIds : p.sectionIds) { const v = m.get(i); if (v != null && (best == null || lt(v, best))) best = v; } return best; };
 }
-const sortFn = k => KEY[k] || (k.startsWith('o:') ? ordKey(k.slice(2)) : () => '');
+const sortFn = k => k === 'manual' ? manIdx(MAN_ALL) : KEY[k] || (k.startsWith('o:') ? ordKey(k.slice(2)) : () => '');
+/* ---- Orden manual: arrastrando, cada paper se coloca donde quieras dentro de su sección (o de la lista, sin agrupar).
+   db.manual = {clave: [ids en orden]}; clave = id de la sección, '_' = Sin sección, '*' = toda la lista sin agrupar. Los que no estén, al final. */
+const MAN_ALL = '*';
+function manIdx(key) { const m = new Map((db.manual?.[key] || []).map((id, i) => [id, i])); return p => m.has(p.id) ? m.get(p.id) : null; }
+function manSort(l, key) { const f = manIdx(key), d = F.sorts[0]?.d || 1; return l.map((p, i) => ({p, i, k: f(p)})).sort((a, b) => (a.k == null) - (b.k == null) || (a.k == null ? a.i - b.i : (a.k - b.k) * d)).map(e => e.p); }
 function sortOpts() {   // criterios de Ordenar: los de siempre y las clasificaciones del proyecto
   return {...SORTS, ...Object.fromEntries((db.orders || []).map(o => ['o:' + o.id, `${o.of === 'tags' ? '🏷️' : '📁'} ${o.name}`]))};
 }
@@ -364,12 +369,45 @@ function colMove(k, to, after) {   // arrastrar una cabecera sobre otra
   order.splice(order.indexOf(k), 1); order.splice(order.indexOf(to) + (after ? 1 : 0), 0, k); setTblCols(order, hidden);
 }
 const items = (l, from) => db.settings.view === 'table' ? (l.length ? tableHTML(l, from) : '') : l.map(p => card(p, from)).join('');
-function listHTML(L) {
-  if (!F.group) return items(L, '');
+function groupsOf(L) {   // [sección, sus papers] en el orden en que se ven (con el orden manual de cada sección, si es el criterio principal)
   const G = F.noSec ? [] : db.sections.filter(s => !F.sec || s.id === F.sec).map(s => [s, L.filter(p => p.sectionIds.includes(s.id))]);
   if (!F.sec) G.push([{id: '', name: 'Sin sección', color: '#888888'}, L.filter(p => !p.sectionIds.some(secById))]);
-  return G.map(([s, l]) => `<section class="gbox" data-sec="${s.id || ''}"><h2 class="grp" style="border-color:${esc(s.color || '#888888')}" ${s.id ? `data-oncontextmenu="svOpen('${s.id}',event)"` : ''}>${esc(s.name)} <small>(${l.length})</small></h2>${items(l, s.id || '') || '<p class="empty drop">Arrastra papers aquí</p>'}</section>`).join('');
+  return F.sorts[0]?.k === 'manual' ? G.map(([s, l]) => [s, manSort(l, s.id || '_')]) : G;
 }
+const FOLD = new Set((() => { try { return JSON.parse(localStorage.getItem('gp-fold') || '[]'); } catch (e) { return []; } })());   // secciones plegadas en la vista agrupada (de cada dispositivo)
+function gFold(k) { FOLD.has(k) ? FOLD.delete(k) : FOLD.add(k); try { localStorage.setItem('gp-fold', JSON.stringify([...FOLD])); } catch (e) {} render(); }
+function gFoldAll(on) { ctxClose(); FOLD.clear(); if (on) groupsOf(visible()).forEach(([s]) => FOLD.add(s.id || '_')); try { localStorage.setItem('gp-fold', JSON.stringify([...FOLD])); } catch (e) {} render(); }
+function listHTML(L) {
+  if (!F.group) return items(L, '');
+  return groupsOf(L).map(([s, l]) => { const k = s.id || '_', fo = FOLD.has(k);
+    return `<section class="gbox${fo ? ' fold' : ''}" data-sec="${s.id || ''}"><h2 class="grp" style="border-color:${esc(s.color || '#888888')}" data-onclick="gFold('${k}')" title="Clic: plegar o desplegar${s.id ? ' · Clic derecho: notas de la sección' : ''}" ${s.id ? `data-oncontextmenu="svOpen('${s.id}',event)"` : ''}><span class="gcar">${fo ? '▸' : '▾'}</span>${esc(s.name)} <small>(${l.length})</small></h2>${fo ? '' : items(l, s.id || '') || '<p class="empty drop">Arrastra papers aquí</p>'}</section>`; }).join('');
+}
+function paperPlace(id, from, to, ref, after) {   // coloca un paper (arrastrado) antes o después de otro; to: sección de destino ('' = Sin sección) o null sin agrupar
+  const grouped = F.group && to != null;
+  if (grouped && to !== from) { movePaper(id, from, to); if (!db.papers.some(p => p.id === id && (to ? p.sectionIds.includes(to) : !p.sectionIds.some(secById)))) return; }
+  const shown = () => { const L = visible(); return grouped ? groupsOf(L).map(([s, l]) => [s.id || '_', l.map(p => p.id)]) : [[MAN_ALL, L.map(p => p.id)]]; };
+  db.manual = db.manual && typeof db.manual === 'object' ? db.manual : {};
+  if (F.sorts[0]?.k !== 'manual' || F.sorts[0].d < 0) {   // al empezar a colocar a mano: cada lista parte del orden que se ve ahora
+    for (const [k, ids] of shown()) db.manual[k] = [...ids, ...(db.manual[k] || []).filter(i => !ids.includes(i))];
+    F.sorts = [{k: 'manual', d: 1}, ...F.sorts.filter(x => x.k !== 'manual').slice(0, 2)];
+  }
+  const key = grouped ? to || '_' : MAN_ALL, cur = shown().find(([k]) => k === key)?.[1] || [];
+  const ids = [...cur, ...(db.manual[key] || []).filter(i => !cur.includes(i))].filter(i => i !== id);
+  const at = ref && ref !== id && ids.includes(ref) ? ids.indexOf(ref) + (after ? 1 : 0) : ids.length; ids.splice(at, 0, id);
+  db.manual[key] = ids; markDirty(); render();
+}
+/* posiciones guardadas: el orden de cada sección (y de la lista sin agrupar) con un nombre, para volver a él */
+function posSnap() { const L = visible(), o = {...(db.manual || {})}; groupsOf(L).forEach(([s, l]) => o[s.id || '_'] = l.map(p => p.id)); o[MAN_ALL] = (F.group ? sortList(L) : L).map(p => p.id); return o; }
+function posMenu(e) {
+  const P = db.posSaves || [];
+  ctxShow(e, `<div class="ctxh">📌 Posiciones guardadas</div><div class="posn"><input id="posName" maxlength="40" placeholder="Nombre (p. ej. Para el capítulo 2)" aria-label="Nombre" data-onkeydown="posKey(event)"><button class="pri" data-onclick="posSave()">Guardar</button></div><small class="posh">Guarda cómo están colocados ahora los papers (en cada sección) para volver a ese orden.</small>`
+    + (P.length ? '<hr>' + P.map(x => `<div class="colr"><button class="colck" data-onclick="posLoad('${x.id}')" title="Volver a este orden">📌 ${esc(x.name)}</button><button class="colmv" data-onclick="posDel('${x.id}')" title="Borrar" aria-label="Borrar">✕</button></div>`).join('') : ''));
+  $('#ctx').classList.add('posm');
+}
+function posKey(e) { if (e.key === 'Enter') { e.preventDefault(); posSave(); } }
+function posSave() { const n = $('#posName').value.trim(); if (!n) return $('#posName').focus(); db.posSaves ||= []; db.posSaves.push({id: uid(), name: n, manual: posSnap()}); ctxClose(); markDirty(); toast(`Posiciones guardadas: «${n}».`, [], 2500); }
+function posLoad(id) { const x = (db.posSaves || []).find(y => y.id === id); ctxClose(); if (!x) return; db.manual = structuredClone(x.manual); F.sorts = [{k: 'manual', d: 1}, ...F.sorts.filter(y => y.k !== 'manual').slice(0, 2)]; markDirty(); render(); toast(`Orden «${x.name}».`, [], 2000); }
+function posDel(id) { const M = {x: +($('#ctx').style.left || '0').replace('px', ''), y: +($('#ctx').style.top || '0').replace('px', '')}; db.posSaves = (db.posSaves || []).filter(y => y.id !== id); markDirty(); setTimeout(() => posMenu({preventDefault() {}, stopPropagation() {}, clientX: M.x, clientY: M.y})); }
 function fitTags(only) {   // las etiquetas van en la barra superior de la tarjeta; si no caben, pasan a su propia línea entre esa barra y el título
   (only ? [only] : document.querySelectorAll('#list article.card')).forEach(c => { const ct = c.querySelector('.ct'), tl = ct.querySelector('.tl') || c.querySelector(':scope > .tl'); if (!tl) return;
     if (tl.parentElement !== ct) ct.insertBefore(tl, ct.querySelector('.rd'));
@@ -436,7 +474,7 @@ function ctxShow(e, html) {   // menú contextual genérico
 }
 const tick = on => on ? '✓ ' : '\u2003';
 function modeMenu(e) { ctxShow(e, '<div class="ctxh">Combinar varias etiquetas</div>' + [['any', 'Al menos una'], ['all', 'Todas']].map(([k, v]) => `<button data-onclick="ctxClose();put(F,'mode','${k}',render)">${tick(F.mode === k)}${v}</button>`).join('')); }
-function groupMenu(e) { ctxShow(e, `<div class="ctxh">Secciones</div><button data-onclick="ctxClose();put(F,'group',!F.group,render)">${tick(F.group)}Agrupar por sección</button>`); }
+function groupMenu(e) { ctxShow(e, `<div class="ctxh">Secciones</div><button data-onclick="ctxClose();put(F,'group',!F.group,render)">${tick(F.group)}Agrupar por sección</button>${F.group ? '<button data-onclick="gFoldAll(1)">▸ Plegar todas</button><button data-onclick="gFoldAll(0)">▾ Desplegar todas</button>' : ''}`); }
 function tagMenu(e, pid, tid) { ctxShow(e, `<div class="ctxh">Etiqueta «${esc(db.tags.find(t => t.id === tid)?.name)}»</div><button data-onclick="delTagFrom('${pid}','${tid}')">🗑 Borrar de este paper</button>`); }
 function delTagFrom(pid, tid) { const p = db.papers.find(x => x.id === pid); if (p) { p.tagIds = p.tagIds.filter(x => x !== tid); logChange(p, 'Etiqueta quitada: ' + (db.tags.find(t => t.id === tid)?.name || '?')); } ctxClose(); markDirty(); F.tags.size ? render() : renderPaper(pid); }
 const ctxClose = () => { const m = $('#ctx'); if (m) { m.hidden = true; document.body.appendChild(m); } };

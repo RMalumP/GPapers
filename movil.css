@@ -202,3 +202,4 @@ html.mv .tbl tr.rw>td.mvx>.mvm{flex:1 1 auto;min-width:40px;max-width:none;opaci
 html.mv .tbl tr.rw>td.mvx>:is(.c-tags,.c-sections){flex:0 1000 auto}   /* se recortan antes que los autores */
 html.mv .tbl tr.rw>td.mvx>.c-notes{margin-left:0}html.mv .tbl tr.rw>td.mvx>.c-notes .sm{padding:0 4px}
 html.mv .tbl tr.rw>td.mvx{min-height:22px}html.mv .tbl tr.rw>td.timg{width:34px}html.mv .tbl tr.rw>td.timg .pimg.xs{width:34px;height:34px;font-size:15px}
+html.mv #list .card.insB{box-shadow:0 -4px 0 var(--pri)}html.mv #list .card.insA{box-shadow:0 4px 0 var(--pri)}
