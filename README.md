@@ -45,7 +45,8 @@ Los ajustes son comunes a todos: nombre de la aplicación, colores, atajos, tipo
 ## Interfaz para móviles
 En pantallas táctiles estrechas (móvil en vertical, o en horizontal con poca altura) la aplicación cambia sola a una interfaz adaptada; en el ordenador no cambia nada, aunque la ventana sea pequeña.
 - **Cabecera de una fila**: ☰ (menú), nombre del proyecto con su estado y ⋯ (Google Drive, Guardar, Importar, Exportar y todo lo de Archivo).
-- **Buscador fijo** encima de la lista, con acceso directo a los filtros; la fila de Tabla, Sección, Etiquetas y Visibles se desliza en horizontal.
+- **Buscador fijo** encima de la lista, con acceso directo a los filtros. La fila de Tabla/Tarjetas, Sección ▾, Etiquetas ▾ y ☑ cabe en el ancho; las secciones y etiquetas salen debajo, en líneas (sin desplazar). Sección ▾ abre un menú con «Mostrarlas debajo», «Agrupar por sección» y la lista de secciones (con cuántos papers tiene cada una); Etiquetas ▾, con «Mostrarlas debajo», cómo combinarlas y la lista de etiquetas (se pueden marcar varias).
+- **Gestionar secciones**: dos líneas por sección (color, nombre, ↑ ↓ · descripción, Eliminar); las etiquetas, una línea.
 - **Barra lateral como panel** que entra desde la izquierda, con «Ver resultados» para volver a la lista.
 - **Barra inferior**: Papers, Configuración, ＋ Nuevo (siempre en el centro), Exportar, Importar y Más. Con PDF por citar aparece 🗃️ entre Papers y Configuración (muestra o despliega la bandeja). Los filtros se abren desde 🎚️ junto al buscador o desde el menú ☰.
 - **Ventanas a pantalla completa**, con pestañas deslizables y ✕ arriba; la vista Tabla se muestra como fichas.

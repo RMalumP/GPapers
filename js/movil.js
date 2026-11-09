@@ -41,6 +41,42 @@ function mvInbox() {   // 🗃️ de la barra inferior: con la bandeja como bot�
   mvClose(); if (db.settings.inboxBtn) return ibToggle();
   if (ibFold()) ibFoldSet(false); setTimeout(() => mv$('#inbox')?.scrollIntoView({block: 'nearest', behavior: 'smooth'}), 30);
 }
+/* Sección ▾ y Etiquetas ▾ de la fila de la lista: en el móvil abren un menú con mostrarlas debajo, agrupar (o cómo combinar) y la lista para elegir.
+   El menú se queda abierto al elegir etiquetas (se pueden marcar varias) y se cierra al elegir una sección (solo hay una a la vez). */
+function mvFMenu(k) {
+  const b = mv$(k === 'sec' ? '#tbSec' : '#tbTag').getBoundingClientRect(), m0 = mv$('#ctx'), keep = m0 && !m0.hidden && m0.dataset.mvf === k ? m0.scrollTop : -1;
+  const cnt = new Map(); let none = 0;
+  db.papers.forEach(p => { let n = 0; (k === 'sec' ? p.sectionIds : p.tagIds).forEach(i => { if ((k === 'sec' ? secById : tagById)(i)) { n = 1; cnt.set(i, (cnt.get(i) || 0) + 1); } }); none += !n; });
+  const sw = c => `<span class="mvsw" style="background:${esc(c || '#888888')}"></span>`, num = n => `<span class="mvn">${n}</span>`, N = db.papers.length;
+  const it = (on, label, fn, n, c, ex) => `<button${ex ? ' class="ex"' : ''} data-onclick="${fn}">${tick(on)}${c ? sw(c) : ''}<span>${label}</span>${n != null ? num(n) : ''}</button>`;
+  let h;
+  if (k === 'sec') {
+    h = '<div class="ctxh">Secciones</div>' + it(F.tbSec, 'Mostrarlas debajo', "mvFAct('sec','show')") + it(F.group, 'Agrupar por sección', "mvFAct('sec','group')")
+      + '<hr>' + it(!F.sec && !F.noSec, 'Todas', "mvFAct('sec','pick','')", N, '#888888')
+      + db.sections.map(x => it(F.sec === x.id, esc(x.name), `mvFAct('sec','pick','${x.id}')`, cnt.get(x.id) || 0, x.color)).join('')
+      + (db.sections.length ? it(F.noSec, 'Sin sección', "mvFAct('sec','none')", none, '#888888') : '<div class="ctxh">Aún no hay secciones.</div>')
+      + `<hr><button data-onclick="ctxClose();openMg('sections')">✎ Gestionar secciones</button>`;
+  } else {
+    h = '<div class="ctxh">Etiquetas</div>' + it(F.tbTag, 'Mostrarlas debajo', "mvFAct('tag','show')")
+      + '<hr><div class="ctxh">Si eliges varias, mostrar los papers con…</div>' + [['any', 'Al menos una'], ['all', 'Todas']].map(([v, l]) => it(F.mode === v, l, `mvFAct('tag','mode','${v}')`)).join('')
+      + '<hr>' + (db.tags.length ? it(!F.tags.size && !F.exTags.size && !F.noTag, 'Todas', "mvFAct('tag','all')", N, '#888888')
+        + db.tags.map(t => it(F.tags.has(t.id), esc(t.name), `mvFAct('tag','pick','${t.id}')`, cnt.get(t.id) || 0, t.color, F.exTags.has(t.id))).join('')
+        + it(F.noTag, 'Sin etiquetas', "mvFAct('tag','none')", none, '#888888') : '<div class="ctxh">Aún no hay etiquetas.</div>')
+      + `<hr><button data-onclick="ctxClose();openMg('tags')">✎ Gestionar etiquetas</button>`;
+  }
+  ctxShow({preventDefault() {}, stopPropagation() {}, clientX: b.left, clientY: b.bottom + 4}, h);
+  const m = mv$('#ctx'); m.classList.add('mvfm'); m.dataset.mvf = k;
+  m.style.top = Math.max(8, Math.min(b.bottom + 4, innerHeight - m.offsetHeight - 8)) + 'px';
+  if (keep >= 0) m.scrollTop = keep;
+}
+function mvFAct(k, a, v) {   // una opción del menú; al elegir una sección se cierra, lo demás se vuelve a pintar abierto
+  if (k === 'sec') { if (a === 'show') F.tbSec = !F.tbSec; else if (a === 'group') F.group = !F.group; else if (a === 'pick') setSecF(v); else if (a === 'none') noSecF(); }
+  else { if (a === 'show') F.tbTag = !F.tbTag; else if (a === 'mode') F.mode = v; else if (a === 'all') tagsAll(); else if (a === 'pick') toggleF(v); else if (a === 'none') noTagF(); }
+  if (a === 'show' || a === 'group' || a === 'mode') render();
+  if (k === 'sec' && (a === 'pick' || a === 'none')) return ctxClose();
+  const st = mv$('#ctx')?.scrollTop || 0;   // después del clic: si no, el aviso de «clic fuera del menú» (el botón pulsado ya no existe) lo cerraría
+  setTimeout(() => { mvFMenu(k); mv$('#ctx').scrollTop = st; });
+}
 function mvSearchDock() { const q = mv$('#q'), box = mv$('#mvSearch'); if (mvOn() && q && box && q.parentElement !== box) box.prepend(q); }
 
 function mvBuild() {
@@ -78,6 +114,12 @@ function mvBuild() {
     // en el panel lateral, lo que abre una ventana cierra el panel
     if (e.target.closest('#side')) setTimeout(() => { if (mv$('dialog[open]')) mvDrawer(false); mvCount(); });
   });
+  // Sección ▾ y Etiquetas ▾: en el móvil, menú en vez de solo mostrar u ocultar la fila (va antes que los data-onclick de siempre)
+  document.addEventListener('click', e => {
+    if (!mvOn()) return; const b = e.target.closest('#tbSec, #tbTag'); if (!b) return;
+    e.stopPropagation(); e.preventDefault(); const k = b.id === 'tbSec' ? 'sec' : 'tag', m = mv$('#ctx');
+    if (m && !m.hidden && m.dataset.mvf === k) return ctxClose(); mvFMenu(k);
+  }, true);
   document.addEventListener('keydown', e => { if (e.key === 'Escape' && mvOn()) mvClose(); });
   // tocar la miniatura de un paper la amplía en una ventana emergente; un toque en cualquier sitio la cierra
   const zoomClose = () => { document.getElementById('mvZoom')?.remove(); };

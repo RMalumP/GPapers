@@ -354,7 +354,7 @@ function noTagF() { F.noTag = !F.noTag; if (F.noTag) F.tags.clear(); render(); }
 function ctxShow(e, html) {   // menú contextual genérico
   e.preventDefault(); e.stopPropagation(); let m = $('#ctx'); if (!m) { m = document.createElement('div'); m.id = 'ctx'; }
   (document.querySelector('dialog[open]') || document.body).appendChild(m);   // dentro de una ventana abierta, para que se vea por encima
-  m.innerHTML = html; m.hidden = false;
+  m.className = ''; m.removeAttribute('data-mvf'); m.innerHTML = html; m.hidden = false;
   m.style.left = Math.max(0, Math.min(e.clientX, innerWidth - m.offsetWidth - 8)) + 'px'; m.style.top = Math.max(0, Math.min(e.clientY, innerHeight - m.offsetHeight - 8)) + 'px';
 }
 const tick = on => on ? '✓ ' : '\u2003';

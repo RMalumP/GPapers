@@ -54,14 +54,20 @@ html.mv #mvSearch{display:flex;gap:6px;align-items:center}
 html.mv #mvSearch #q{flex:1;min-width:0;min-height:40px;border-radius:22px;padding:8px 16px}
 html.mv #mvSearch .mvib{border:1px solid var(--bd);border-radius:50%;background:var(--card);font-size:19px}
 html.mv .mvfd{position:absolute;top:6px;right:6px;margin:0}
-html.mv main>.row{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;margin:0 -10px;padding:2px 10px 6px;gap:6px;-webkit-overflow-scrolling:touch}
-html.mv main>.row::-webkit-scrollbar{display:none}
-html.mv main>.row>*{flex-shrink:0}
+/* fila de Tarjetas, Sección, Etiquetas y ☑: ocupa solo el ancho de la pantalla (sin desplazar); las secciones y etiquetas, debajo, en líneas que bajan */
+html.mv main>.row{flex-wrap:wrap;margin:0;padding:2px 0 6px;gap:6px;align-items:center}
 html.mv main>.row>.pri:first-child{display:none}   /* «Nuevo paper» está en la barra inferior */
-html.mv main>.row .bar,html.mv main>.row .chips{flex-wrap:nowrap}
-html.mv main>.row .chip{white-space:nowrap;padding:4px 12px}
-html.mv main>.row button{border-radius:18px;padding:4px 12px;min-height:34px;font-size:14px}
-html.mv #count{font-size:13px;opacity:.75;white-space:nowrap;padding-right:10px}
+html.mv main>.row .bar{display:contents}
+html.mv main>.row>#tbView,html.mv main>.row #tbSec,html.mv main>.row #tbTag{flex:1 1 auto;white-space:nowrap;order:1}
+html.mv main>.row>#selAll{order:1;flex:0 0 auto}html.mv main>.row>#selAll .bl{display:none}
+html.mv main>.row>#count{order:2;flex:1 0 100%;text-align:right;margin-top:-2px}   /* la cuenta, en su propia línea pequeña: así los botones caben enteros */
+html.mv main>.row #secF2{order:3}html.mv main>.row #tagF2{order:4}
+html.mv main>.row .chips{flex:1 0 100%;flex-wrap:wrap;gap:6px;min-width:0;overflow:visible;margin:0}
+html.mv main>.row .chips[hidden]{display:none}
+html.mv main>.row .chip{white-space:nowrap;padding:4px 12px;margin:0;max-width:100%;overflow:hidden;text-overflow:ellipsis}
+html.mv main>.row button{border-radius:18px;padding:4px 10px;min-height:34px;font-size:14px}
+@media (max-width:349px){html.mv main>.row button{padding:4px 7px;font-size:13px}html.mv main>.row{gap:4px}}
+html.mv #count{font-size:12px;opacity:.75;white-space:nowrap}
 html.mv #actF{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}html.mv #actF .af,html.mv #actF .afx{white-space:nowrap;flex-shrink:0;min-height:34px}
 
 /* --- Tarjetas --- */
@@ -154,3 +160,20 @@ html.mv dialog>.dh+.mvdx,html.mv dialog>.dh~.mvdx{display:none}
 html.mv .sgh{display:flex}html.mv #sg-search .sgh{display:flex}html.mv #sg-search .sgh .sh::after{content:"Buscar y ordenar"}
 html.mv #sg-search .sgh .sh{width:100%}
 html.mv dialog.ask{width:auto;max-width:calc(100vw - 32px);height:auto;max-height:80dvh;margin:auto;border:1px solid var(--bd);border-radius:14px;padding:18px 20px}
+
+/* --- Menú de Sección y Etiquetas (al tocar su botón): mostrar debajo, agrupar o combinar, y elegir --- */
+html.mv #ctx.mvfm{max-height:min(70dvh,560px);overflow-y:auto;overscroll-behavior:contain}
+html.mv #ctx .mvsw{display:inline-block;width:12px;height:12px;border-radius:50%;margin-right:8px;vertical-align:-1px;flex-shrink:0}
+html.mv #ctx .mvn{margin-left:auto;padding-left:12px;opacity:.6;font-size:13px}
+html.mv #ctx.mvfm button{display:flex;align-items:center}
+html.mv #ctx button.ex{text-decoration:line-through;opacity:.75}
+
+/* --- Gestionar secciones y etiquetas: dos líneas por sección (color, nombre, ↑ ↓ · descripción, eliminar); una por etiqueta --- */
+html.mv #mg .mgr{display:grid;gap:6px;align-items:center;margin:0 0 8px!important;padding-bottom:8px;border-bottom:1px solid var(--bd)}
+html.mv #mg .mgr>*{margin:0;min-width:0;width:100%}
+html.mv #mg .mgr input[type=color]{width:44px;height:40px;padding:2px}
+html.mv #mg .mgr button{min-height:40px;padding:4px 0}
+html.mv #mg .mgr.mgs{grid-template-columns:44px minmax(0,1fr) 44px 44px;grid-template-areas:"c n u d" "s s x x"}
+html.mv #mg .mgr.mgt{grid-template-columns:44px minmax(0,1fr) 44px 44px 44px;grid-template-areas:"c n u d x"}
+html.mv #mg .mgc{grid-area:c}html.mv #mg .mgn{grid-area:n}html.mv #mg .mgd{grid-area:s}html.mv #mg .mgu{grid-area:u}html.mv #mg .mgw{grid-area:d}html.mv #mg .mgx{grid-area:x}
+html.mv #mg .mgt .mgx .mgxl{display:none}html.mv #mg .mgx .mgxi{display:none}html.mv #mg .mgt .mgx .mgxi{display:inline}
