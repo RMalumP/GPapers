@@ -210,6 +210,21 @@ with sync_playwright() as pw:
     px = A.evaluate("(() => { const c = VW.pages[0].cv, x = c.getContext('2d').getImageData(5, 5, 1, 1).data; return [x[0], x[1], x[2]]; })()")
     eq('y se quita', (A.evaluate("$('#vw').classList.contains('night')"), min(px) > 200), (False, True))
     A.evaluate("vwNight('auto')"); eq('se recuerda (también «como el sistema»)', A.evaluate("localStorage.getItem('gp-vw-night')"), 'auto'); A.evaluate("vwNight('off'); vwSide(false); vwClose()"); A.wait_for_timeout(300)
+    # ---- v39.7: resumen de anotaciones (Exportar)
+    A.evaluate("SEL.clear(); render(); openEx()"); A.click('#ex button:has-text("Resumen de anotaciones")'); A.wait_for_timeout(300)
+    eq('Exportar → «Resumen de anotaciones»: cuenta los papers con anotaciones', 'papers con anotaciones' in A.inner_text('#sum .sumn'), True)
+    import zipfile, io
+    with A.expect_download() as dl: A.click('#sum button:has-text("Markdown")')
+    md = open(dl.value.path(), encoding='utf-8').read()
+    eq('Markdown: título, cita completa y anotaciones por página', (md.startswith('# Resumen de anotaciones'), '## Pérez, J. (2024).' in md, '- **p. 1** · Subrayado: «' in md, 'Con índice' in md), (True, True, True, True))
+    with A.expect_download() as dl: A.click('#sum button:has-text("Word")')
+    z = zipfile.ZipFile(dl.value.path()); dx = z.read('word/document.xml').decode()
+    eq('Word (.docx): un documento válido con la cita y las anotaciones', (dl.value.suggested_filename.endswith('.docx'), 'Resumen de anotaciones' in dx, 'Paper con PDF' in dx, 'p. 1' in dx), (True, True, True, True))
+    with A.expect_download() as dl: A.click('#sum button:has-text("PDF")')
+    import pypdf
+    tx = ' '.join(pg.extract_text() for pg in pypdf.PdfReader(dl.value.path()).pages)
+    eq('PDF: se descarga con el resumen dentro', ('Resumen de anotaciones' in tx, 'Paper con PDF' in tx, 'p. 1' in tx), (True, True, True))
+    A.evaluate("$('#sum').close(); $('#ex').close()")
     # ---- desde file:// se abre el visor del navegador, como antes
     cF = b.new_context(service_workers='block'); F = cF.new_page(); F.goto('file://' + str(folder / 'index.html')); F.wait_for_timeout(500)
     eq('desde file:// no se usa el visor propio', F.evaluate("vwCan()"), False); cF.close()
