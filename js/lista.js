@@ -162,7 +162,11 @@ function fClr(k, id) {
 function fClrAll() { F.q = ''; $('#q').value = ''; F.sec = ''; F.tags.clear(); F.exTags.clear(); F.noSec = F.noTag = false; F.read = ''; F.minRating = 0; F.yFrom = F.yTo = 0; F.adv.rules = []; render(); }
 function actDraw() {
   const A = actList(), el = $('#actF'); el.hidden = !A.length;
+  const cn = $('#count'), row = $('main>.row');   // en el móvil, con filtros, la cuenta va a la derecha de su fila en vez de ocupar una línea propia
+  if (cn.parentElement !== row) row.append(cn);
   el.innerHTML = A.length ? `<small>Filtros:</small>${A.map(([t, c]) => `<button class="af" data-onclick="${c}" title="Quitar este filtro">${esc(t)} <b>✕</b></button>`).join('')}<button class="afx" data-onclick="fClrAll()">Limpiar todo</button>` : '';
+  if (A.length && document.documentElement.classList.contains('mv')) el.append(cn);
+
   $('#d-filt').hidden = !A.some(([, c]) => c !== "fClr('q')" && c !== "fClr('adv')");
 }
 const fExtra = () => ({exTags: [...F.exTags], noTag: F.noTag, noSec: F.noSec, yFrom: F.yFrom, yTo: F.yTo, adv: {mode: F.adv.mode, rules: F.adv.rules.map(r => ({...r}))}});   // lo que guardan el estado de la interfaz y los filtros guardados
