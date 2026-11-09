@@ -254,7 +254,7 @@ En **Gestionar etiquetas** o **Gestionar secciones**, «＋ Nueva clasificación
 ## Orden manual, posiciones guardadas y secciones plegables (v39.25)
 - **Colocar papers a mano**: arrastra un paper sobre otro (mitad de arriba: delante; de abajo: detrás). En el móvil, mantén pulsado medio segundo y mueve el dedo; una línea marca dónde caerá. Funciona en tarjetas y tabla, agrupado por sección (cada sección tiene su propio orden) o sin agrupar. Soltarlo sobre un paper de otra sección lo cambia de sección y lo deja en ese sitio.
 - Al colocar uno, el orden pasa a **«Orden manual (arrastrando)»**, que parte del orden que se veía. Se puede elegir otro orden y volver a éste sin perderlo. Los papers nuevos van al final de su sección.
-- **📌 Posiciones guardadas…** (un solo botón bajo «Ordenar», en la barra lateral): guarda con un nombre cómo están colocados ahora los papers, para volver a ese orden después, o borrarlo con ✕. Se sincroniza con Drive.
+- **📌 Posiciones guardadas…** (un solo botón en «Vistas ⭐», en la barra lateral; hasta v39.26 estaba bajo «Ordenar»): guarda con un nombre cómo están colocados ahora los papers, para volver a ese orden después, o borrarlo con ✕. Se sincroniza con Drive.
 - **Secciones plegables** (vista agrupada): clic o toque en el título de la sección la pliega o despliega (▾/▸, sigue mostrando cuántos papers tiene). «Plegar todas» y «Desplegar todas» en el menú de Secciones. Se recuerda en cada dispositivo.
 
 ## Tablet en horizontal: Sección y Etiquetas como en el móvil (v39.26)
@@ -262,3 +262,6 @@ En **Gestionar etiquetas** o **Gestionar secciones**, «＋ Nueva clasificación
 - Las filas de secciones y de etiquetas van **debajo de la barra**, en varias líneas, en vez de una sola fila que se desplaza de lado.
 - En el ordenador con ratón todo sigue igual (clic: mostrar u ocultar la fila; clic derecho: su menú).
 - Arreglo: el botón «Guardar» de 📌 Posiciones guardadas no se veía.
+
+## Posiciones guardadas, dentro de Vistas (v39.27)
+- El botón **📌 Posiciones guardadas…** pasa de «Ordenar» a la sección **Vistas ⭐** de la barra lateral, debajo de la lista de vistas: las dos cosas sirven para volver a algo guardado.
