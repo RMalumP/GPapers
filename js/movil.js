@@ -51,7 +51,7 @@ function mvFMenu(k) {
   const it = (on, label, fn, n, c, ex) => `<button${ex ? ' class="ex"' : ''} data-onclick="${fn}">${tick(on)}${c ? sw(c) : ''}<span>${label}</span>${n != null ? num(n) : ''}</button>`;
   let h;
   if (k === 'sec') {
-    h = '<div class="ctxh">Secciones</div>' + it(F.tbSec, 'Mostrarlas debajo', "mvFAct('sec','show')") + it(F.group, 'Agrupar por sección', "mvFAct('sec','group')")
+    h = '<div class="ctxh">Secciones</div>' + it(F.tbSec, 'Mostrarlas debajo', "mvFAct('sec','show')") + it(F.group, 'Agrupar por sección', "mvFAct('sec','group')") + (F.group ? it(false, '▸ Plegar todas', 'gFoldAll(1)') + it(false, '▾ Desplegar todas', 'gFoldAll(0)') : '')
       + '<hr>' + it(!F.sec && !F.noSec, 'Todas', "mvFAct('sec','pick','')", N, '#888888')
       + db.sections.map(x => it(F.sec === x.id, esc(x.name), `mvFAct('sec','pick','${x.id}')`, cnt.get(x.id) || 0, x.color)).join('')
       + (db.sections.length ? it(F.noSec, 'Sin sección', "mvFAct('sec','none')", none, '#888888') : '<div class="ctxh">Aún no hay secciones.</div>')
@@ -160,14 +160,15 @@ function mvApply() {
 MV_Q.addEventListener('change', mvApply);
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', mvApply); else mvApply();
 
-/* ---- Móvil: arrastrar un paper a otra sección con el dedo (agrupado por sección)
+/* ---- Móvil: arrastrar un paper con el dedo: a otra sección (agrupado) o a otra posición (orden manual)
    El arrastre del navegador está apagado en el móvil (si no, al desplazar se arrastraría sin querer). Aquí: mantener pulsado la tarjeta o la fila
-   ~0,45 s sin mover el dedo, y luego moverlo hasta otra sección; si el dedo se mueve antes, es un desplazamiento normal. */
+   ~0,45 s sin mover el dedo, y luego moverlo: sobre otro paper se coloca antes o después de él; sobre el título de una sección, pasa a ella. */
 (() => {
-  let T = 0, S = null;   // S: {el, id, from, x, y, on, ghost, over}
-  const end = () => { clearTimeout(T); if (!S) return; S.el.classList.remove('drag'); S.ghost?.remove(); S.over?.classList.remove('over'); document.documentElement.classList.remove('mvdrag'); S = null; };
+  let T = 0, S = null;   // S: {el, id, from, x, y, on, ghost, over, ins}
+  const clr = () => { S?.over?.classList.remove('over'); S?.ins?.el.classList.remove('insB', 'insA'); };
+  const end = () => { clearTimeout(T); if (!S) return; clr(); S.el.classList.remove('drag'); S.ghost?.remove(); document.documentElement.classList.remove('mvdrag'); S = null; };
   document.addEventListener('touchstart', e => {
-    end(); if (!mvOn() || e.touches.length !== 1 || !document.querySelector('#list .gbox')) return;
+    end(); if (!mvOn() || e.touches.length !== 1) return;
     const el = e.target.closest?.('#list .card[data-id], #list tr.rw[data-id]');
     if (!el || e.target.closest('button, a, input, select, textarea, label, .pimg, [contenteditable], [data-oncontextmenu]')) return;
     const t = e.touches[0]; S = {el, id: el.dataset.id, from: el.dataset.from || '', x: t.clientX, y: t.clientY, on: false};
@@ -181,14 +182,19 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
     if (!S) return; const t = e.touches[0];
     if (!S.on) { if (Math.hypot(t.clientX - S.x, t.clientY - S.y) > 10) end(); return; }   // se movió antes: es desplazar la lista
     e.preventDefault(); S.ghost.style.left = t.clientX + 'px'; S.ghost.style.top = t.clientY + 'px';
-    const g = document.elementFromPoint(t.clientX, t.clientY)?.closest('#list .gbox');
-    if (g !== S.over) { S.over?.classList.remove('over'); S.over = g; g?.classList.add('over'); }
+    const u = document.elementFromPoint(t.clientX, t.clientY), c = u?.closest('#list .card[data-id], #list tr.rw[data-id]'), g = u?.closest('#list .gbox');
+    clr(); S.over = null; S.ins = null;
+    if (c && c !== S.el) { const r = c.getBoundingClientRect(), after = t.clientY > r.top + r.height / 2; c.classList.add(after ? 'insA' : 'insB'); S.ins = {el: c, after}; }
+    else if (g && !c) { S.over = g; g.classList.add('over'); }
     const m = 70, h = innerHeight; if (t.clientY < m) scrollBy(0, -12); else if (t.clientY > h - m - 60) scrollBy(0, 12);   // cerca del borde: la lista se desplaza
   }, {passive: false});
   document.addEventListener('touchend', e => {
-    if (!S) return; clearTimeout(T); const {on, over, id, from} = S;
-    if (on) { e.preventDefault(); const to = over ? over.dataset.sec : null; end(); if (to != null && to !== from) movePaper(id, from, to); } else end();
+    if (!S) return; clearTimeout(T); const {on, over, ins, id, from} = S;
+    if (!on) return end();
+    e.preventDefault(); end();
+    if (ins) { const g = ins.el.closest('.gbox'); paperPlace(id, from, g ? g.dataset.sec : null, ins.el.dataset.id, ins.after); }
+    else if (over && over.dataset.sec !== from) movePaper(id, from, over.dataset.sec);
   }, {passive: false});
   document.addEventListener('touchcancel', end, {passive: true});
-  document.addEventListener('contextmenu', e => { if (S?.on || (S && mvOn())) e.preventDefault(); }, true);   // la pulsación larga no abre el menú del sistema
+  document.addEventListener('contextmenu', e => { if (S && mvOn()) e.preventDefault(); }, true);   // la pulsación larga no abre el menú del sistema
 })();

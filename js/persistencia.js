@@ -63,6 +63,9 @@ function validate(d) {
   d.sections.forEach(s => s.tagIds ??= []);  // compatibilidad con archivos antiguos
   d.orders = (Array.isArray(d.orders) ? d.orders : []).filter(o => o && typeof o.id === 'string' && o.id && typeof o.name === 'string' && ['tags', 'sections'].includes(o.of))
     .map(o => ({id: o.id, name: o.name, of: o.of, fmt: Object.hasOwn(ORD_FMT, o.fmt) ? o.fmt : 'num'}));   // clasificaciones para ordenar
+  const manOk = m => m && typeof m === 'object' && !Array.isArray(m) ? Object.fromEntries(Object.entries(m).filter(([k, v]) => k && Array.isArray(v)).map(([k, v]) => [k, [...new Set(v.filter(i => typeof i === 'string' && i))]])) : {};   // orden manual: {sección: [ids]}
+  d.manual = manOk(d.manual); if (!Object.keys(d.manual).length) delete d.manual;
+  d.posSaves = (Array.isArray(d.posSaves) ? d.posSaves : []).filter(x => x && typeof x.id === 'string' && x.id && typeof x.name === 'string').map(x => ({id: x.id, name: x.name, manual: manOk(x.manual)})); if (!d.posSaves.length) delete d.posSaves;
   [...d.tags, ...d.sections].forEach(x => { if (x.rk == null) return; x.rk = x.rk && typeof x.rk === 'object' && !Array.isArray(x.rk) ? Object.fromEntries(Object.entries(x.rk).filter(([, v]) => typeof v === 'string' && v)) : {}; if (!Object.keys(x.rk).length) delete x.rk; });
   const sIn = d.settings && typeof d.settings === 'object' ? d.settings : {};
   d.settings = {...defSettings(), ...sIn, shortcuts: {...SC_DEF}};

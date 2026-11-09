@@ -46,7 +46,7 @@ with sync_playwright() as pw:
     eq('en la vista de tabla también', pg.evaluate(secs), ['p1:sb', 'p2:sb', 'p3:'])
     pg.evaluate("setView('cards'); F.group = false; render()"); pg.wait_for_timeout(100)
     x, y = center('#list .card[data-id=p2] h3'); touch('touchStart', x, y); pg.wait_for_timeout(600)
-    eq('sin agrupar por sección no hay arrastre', pg.evaluate("!!document.querySelector('.mvghost')"), False); touch('touchEnd')
+    eq('sin agrupar también se arrastra (para colocar a mano)', pg.evaluate("!!document.querySelector('.mvghost')"), True); touch('touchEnd'); pg.wait_for_timeout(200)
     # ---- menú de ☑
     x, y = center('#selAll'); touch('touchStart', x, y); pg.wait_for_timeout(750); touch('touchEnd'); pg.wait_for_timeout(200)
     eq('mantener pulsado ☑ abre su menú', pg.evaluate("[!$('#ctx').hidden, [...document.querySelectorAll('#ctx button')].map(b => b.textContent)]"), [True, ['☑ Seleccionar los que se ven (3)', '☑ Seleccionar todos los del proyecto (3)']])

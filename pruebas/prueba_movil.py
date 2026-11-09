@@ -54,7 +54,7 @@ with sync_playwright() as pw:
     eq('elegir una sección filtra y cierra el menú', pg.evaluate("[F.sec, $('#ctx').hidden]"), ['x1', True])
     pg.tap('#tbSec'); pg.wait_for_timeout(200); pg.tap('#ctx button:has-text("Agrupar")'); pg.wait_for_timeout(200)
     eq('«Agrupar por sección» se marca y el menú sigue abierto', pg.evaluate("[F.group, !$('#ctx').hidden, $('#ctx').textContent.includes('✓ Agrupar')]"), [True, True, True])
-    pg.tap('#ctx button:has-text("Todas")'); pg.wait_for_timeout(200); pg.evaluate("F.group = false; render()")
+    pg.tap('#ctx button:has(span:text-is("Todas"))'); pg.wait_for_timeout(200); pg.evaluate("F.group = false; render()")
     pg.tap('#tbTag'); pg.wait_for_timeout(200)
     eq('Etiquetas ▾: mostrar debajo, cómo combinarlas y las etiquetas', pg.evaluate("[!$('#ctx').hidden, ['Mostrarlas debajo', 'Al menos una', 'Método', 'Democracia', 'Sin etiquetas'].every(t => $('#ctx').textContent.includes(t))]"), [True, True])
     pg.tap('#ctx button:has-text("Método")'); pg.wait_for_timeout(200); pg.tap('#ctx button:has-text("Europa")'); pg.wait_for_timeout(200)
