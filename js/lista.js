@@ -493,6 +493,11 @@ function toggleSel(id) { SEL.has(id) ? SEL.delete(id) : SEL.add(id);   // solo c
   const c = $(`#list [data-id="${id}"] input[type=checkbox]`); if (c) c.checked = SEL.has(id); selDraw(); }
 function selVisible() { visible().forEach(p => SEL.add(p.id)); render(); }
 function selNone() { SEL.clear(); render(); }
+function selAllP() { db.papers.forEach(p => SEL.add(p.id)); render(); }
+function selMenu(e) {   // clic derecho (o mantener pulsado en el móvil) en ☑
+  const v = visible().length, n = db.papers.length;
+  ctxShow(e, `<div class="ctxh">Selección${SEL.size ? ` (${SEL.size} elegidos)` : ''}</div><button data-onclick="ctxClose();selVisible()">☑ Seleccionar los que se ven (${v})</button><button data-onclick="ctxClose();selAllP()">☑ Seleccionar todos los del proyecto (${n})</button>${SEL.size ? '<button data-onclick="ctxClose();selNone()">☐ Quitar la selección</button>' : ''}`);
+}
 /* ---- Acciones en lote sobre la selección: lectura, valoración, etiquetas, secciones y papelera (un solo Ctrl+Z las deshace) ---- */
 const selPapers = () => db.papers.filter(p => SEL.has(p.id));
 const nPap = n => n === 1 ? '1 paper' : n + ' papers';
