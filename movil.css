@@ -179,3 +179,8 @@ html.mv #mg .mgr.mgt.mgkon{grid-template-columns:52px 44px minmax(0,1fr) 44px 44
 html.mv #mg .mgk{grid-area:k;text-align:center}
 html.mv #mg .mgo select{width:100%}
 html.mv #ctx.colm{max-height:min(75dvh,600px);overflow-y:auto;overscroll-behavior:contain}html.mv #ctx .colr .colmv{min-width:44px;padding:8px 0;text-align:center}   /* columnas de la tabla: casillas grandes, sin pulsaciones largas */
+/* arrastrar un paper con el dedo a otra sección */
+html.mvdrag,html.mvdrag body{user-select:none;-webkit-user-select:none}
+html.mv #list .card,html.mv #list tr.rw{-webkit-touch-callout:none}
+.mvghost{position:fixed;z-index:300;transform:translate(-50%,-130%);max-width:70vw;padding:6px 12px;border-radius:16px;background:var(--pri);color:#fff;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none;box-shadow:0 4px 14px #0004}
+html.mv #list .gbox.over{outline:2px dashed var(--pri);outline-offset:2px;border-radius:10px}

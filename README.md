@@ -240,3 +240,7 @@ En **Gestionar etiquetas** o **Gestionar secciones**, «＋ Nueva clasificación
 - **En el ordenador y la tablet**, las notas ocupan la mitad derecha y el PDF sigue a la izquierda: se puede leer, desplazar y subrayar mientras escribes.
 - **En el móvil** ocupan toda la pantalla, menos la barra del visor. **📄 Ver el PDF** (o 📝) va al PDF y vuelve a las notas sin perder lo escrito.
 - Al cerrar el panel (otro toque en 📝, Esc o «Guardar paper»), o al salir del visor, se guarda. «Cancelar» descarta los cambios.
+
+## Móvil: arrastrar entre secciones y menú de ☑ (v39.21)
+- **Arrastrar con el dedo** (vista agrupada por sección, tarjetas o tabla): mantén pulsado un paper medio segundo sin mover el dedo, sale su etiqueta y luego lo llevas a otra sección (o a «Sin sección»). Cerca del borde, la lista se desplaza sola. Si mueves el dedo enseguida, solo desplazas la lista.
+- **☑ con menú**: clic derecho (en el móvil, mantener pulsado) en ☑ para elegir: los que se ven, todos los del proyecto o quitar la selección. Un toque normal sigue eligiendo los que se ven.

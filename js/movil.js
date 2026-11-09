@@ -159,3 +159,36 @@ function mvApply() {
 }
 MV_Q.addEventListener('change', mvApply);
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', mvApply); else mvApply();
+
+/* ---- Móvil: arrastrar un paper a otra sección con el dedo (agrupado por sección)
+   El arrastre del navegador está apagado en el móvil (si no, al desplazar se arrastraría sin querer). Aquí: mantener pulsado la tarjeta o la fila
+   ~0,45 s sin mover el dedo, y luego moverlo hasta otra sección; si el dedo se mueve antes, es un desplazamiento normal. */
+(() => {
+  let T = 0, S = null;   // S: {el, id, from, x, y, on, ghost, over}
+  const end = () => { clearTimeout(T); if (!S) return; S.el.classList.remove('drag'); S.ghost?.remove(); S.over?.classList.remove('over'); document.documentElement.classList.remove('mvdrag'); S = null; };
+  document.addEventListener('touchstart', e => {
+    end(); if (!mvOn() || e.touches.length !== 1 || !document.querySelector('#list .gbox')) return;
+    const el = e.target.closest?.('#list .card[data-id], #list tr.rw[data-id]');
+    if (!el || e.target.closest('button, a, input, select, textarea, label, .pimg, [contenteditable], [data-oncontextmenu]')) return;
+    const t = e.touches[0]; S = {el, id: el.dataset.id, from: el.dataset.from || '', x: t.clientX, y: t.clientY, on: false};
+    T = setTimeout(() => {
+      if (!S) return; S.on = true; el.classList.add('drag'); document.documentElement.classList.add('mvdrag'); navigator.vibrate?.(20);
+      const p = db.papers.find(q => q.id === S.id), g = document.createElement('div'); g.className = 'mvghost'; g.textContent = '📄 ' + (p ? p.alias || p.title : ''); document.body.append(g); S.ghost = g;
+      g.style.left = S.x + 'px'; g.style.top = S.y + 'px';
+    }, 450);
+  }, {passive: true});
+  document.addEventListener('touchmove', e => {
+    if (!S) return; const t = e.touches[0];
+    if (!S.on) { if (Math.hypot(t.clientX - S.x, t.clientY - S.y) > 10) end(); return; }   // se movió antes: es desplazar la lista
+    e.preventDefault(); S.ghost.style.left = t.clientX + 'px'; S.ghost.style.top = t.clientY + 'px';
+    const g = document.elementFromPoint(t.clientX, t.clientY)?.closest('#list .gbox');
+    if (g !== S.over) { S.over?.classList.remove('over'); S.over = g; g?.classList.add('over'); }
+    const m = 70, h = innerHeight; if (t.clientY < m) scrollBy(0, -12); else if (t.clientY > h - m - 60) scrollBy(0, 12);   // cerca del borde: la lista se desplaza
+  }, {passive: false});
+  document.addEventListener('touchend', e => {
+    if (!S) return; clearTimeout(T); const {on, over, id, from} = S;
+    if (on) { e.preventDefault(); const to = over ? over.dataset.sec : null; end(); if (to != null && to !== from) movePaper(id, from, to); } else end();
+  }, {passive: false});
+  document.addEventListener('touchcancel', end, {passive: true});
+  document.addEventListener('contextmenu', e => { if (S?.on || (S && mvOn())) e.preventDefault(); }, true);   // la pulsación larga no abre el menú del sistema
+})();
