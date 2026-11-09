@@ -9,7 +9,7 @@
    Desde file:// el navegador no deja cargar PDF.js (módulos): se abre el visor del navegador, como antes. */
 const VW_COLORS = [['#ffd400', 'Amarillo'], ['#5fd068', 'Verde'], ['#4dabf7', 'Azul'], ['#ff6b6b', 'Rojo'], ['#b197fc', 'Morado']];
 const VW_LIB = 'lib/pdfjs/', VW_GAP = 12;
-const VW = {open: false, src: null, file: null, doc: null, pages: [], scale: 1, fit: true, mode: 'sel', color: 0, cur: 0, io: null, queue: new Set(), busy: false,
+const VW = {open: false, tab: 'ann', kind: '', src: null, file: null, doc: null, pages: [], scale: 1, fit: true, mode: 'sel', color: 0, cur: 0, io: null, queue: new Set(), busy: false,
   sel: null, pop: null, foreign: null, filt: '', pushed: false, gen: 0, find: {q: '', hits: [], i: -1, txt: new Map()}, side: false, dirty: false, startPage: 0};
 let PDFJS = null, PDFLIBP = null;
 const vwCan = () => !window.VW_NATIVE && /^https?:$/.test(location.protocol);   // desde file:// no se pueden cargar módulos (VW_NATIVE: pruebas del visor del navegador)
@@ -66,7 +66,8 @@ function vwBuild() {
       <button class="vwm" data-m="area" data-onclick="vwMode('area')" title="Zona: arrastra para marcar un recuadro (PDF escaneados, figuras)"><span>▭</span><small>Zona</small></button>
       <button class="vwm" data-m="note" data-onclick="vwMode('note')" title="Nota: toca la página donde quieras dejarla"><span>🗒</span><small>Nota</small></button>
       <span class="vwcs" role="group" aria-label="Color">${sw}</span>
-      <button class="vwm vwsb" data-onclick="vwSide()" title="Subrayados y comentarios"><span>💬</span><small>Anotaciones</small><b id="vwAn"></b></button></div>
+      <button class="vwm vwtc" data-onclick="vwPanel('toc')" title="Índice del PDF y miniaturas de las páginas"><span>📑</span><small>Índice</small></button>
+      <button class="vwm vwsb" data-onclick="vwPanel('ann')" title="Subrayados, notas y comentarios"><span>💬</span><small>Anotaciones</small><b id="vwAn"></b></button></div>
     <div class="vwbody"><div id="vwScroll" tabindex="-1"><div id="vwPages"></div><p id="vwLoad" class="vwload">Abriendo el PDF…</p></div><aside id="vwSide" hidden></aside></div>
     <div id="vwSel" class="vwfloat" hidden>${sw.replace(/vwColor/g, 'vwSelColor')}<button class="vwib" data-onclick="vwSelNote()" title="Subrayar y comentar" aria-label="Subrayar y comentar">💬</button><button class="vwib" data-onclick="vwSelCopy()" title="Copiar el texto" aria-label="Copiar">📋</button></div>
     <div id="vwPop" class="vwfloat vwpop" hidden></div></dialog>`);
@@ -87,7 +88,8 @@ async function vwOpen(src, file) {
   vwBuild(); if (VW.open) await vwClose(false, true);
   const gen = ++VW.gen; Object.assign(VW, {open: true, src, file, doc: null, pages: [], foreign: null, sel: null, dirty: false, find: {q: '', hits: [], i: -1, txt: new Map()}});
   const d = $('#vw'); vw$('.vwt').textContent = vwTitle(); vw$('.vwt').title = vwTitle(); $('#vwPages').innerHTML = ''; $('#vwLoad').hidden = false; $('#vwLoad').textContent = 'Abriendo el PDF…';
-  $('#vwQ').value = ''; $('#vwQn').textContent = ''; vwPopClose(); $('#vwSel').hidden = true; VW.side = VW.sideNext || !document.documentElement.classList.contains('mv') && innerWidth > 1100 && vwSideOn(); VW.sideNext = false; vwSideShow();
+  $('#vwQ').value = ''; $('#vwQn').textContent = ''; vwPopClose(); $('#vwSel').hidden = true; if (VW.sideNext) VW.tab = 'ann'; VW.side = VW.sideNext || !document.documentElement.classList.contains('mv') && innerWidth > 1100 && vwSideOn(); VW.sideNext = false; vwSideShow();
+  VW.night = vwNightOn(); d.classList.toggle('night', VW.night); VW.toc = null; VW.thIo?.disconnect();
   if (!d.open) d.showModal(); vwModeShow(); vwColorShow(); vwCount();
   if (!VW.pushed && !VW_TAB) { try { history.pushState({vw: 1}, ''); VW.pushed = true; } catch (e) {} }   // el botón «atrás» del móvil cierra el visor
   try {
@@ -241,7 +243,7 @@ async function vwRender(p, gen) {
     let os = Math.min(devicePixelRatio || 1, 3); if (vp.width * vp.height * os * os > max) os = Math.sqrt(max / (vp.width * vp.height));
     const cv = document.createElement('canvas'); cv.width = Math.floor(vp.width * os); cv.height = Math.floor(vp.height * os); cv.className = 'vwcv';
     const L = PDFJS, task = p.task = p.proxy.render({canvasContext: cv.getContext('2d', {alpha: false}), viewport: vp, transform: os !== 1 ? [os, 0, 0, os, 0, 0] : null,
-      annotationMode: L.AnnotationMode.ENABLE_STORAGE});
+      annotationMode: L.AnnotationMode.ENABLE_STORAGE, pageColors: vwPC()});
     await task.promise; p.task = null; if (gen !== VW.gen) return;
     if (p.cv) p.cv.replaceWith(cv); else p.el.prepend(cv); p.cv = cv; p.rs = s; p.os = os; p.det?.remove(); p.det = null; vwDetailSoon();
     if (!p.tl) {
@@ -263,7 +265,7 @@ function vwOnScroll() {
   vwDetailSoon();
   const sc = $('#vwScroll'), y = sc.scrollTop + sc.clientHeight / 3; let lo = 0, hi = VW.pages.length - 1;
   while (lo < hi) { const m = (lo + hi + 1) >> 1; if (VW.pages[m].el.offsetTop <= y) lo = m; else hi = m - 1; }
-  if (VW.pages.length && lo !== VW.cur) { VW.cur = lo; }
+  if (VW.pages.length && lo !== VW.cur) { VW.cur = lo; vwThCur(); }
   const inp = $('#vwPg'); if (VW.pages.length && document.activeElement !== inp) inp.value = VW.cur + 1;
   if (!$('#vwSel').hidden) vwSelShow();
   if (VW.pop) vwPopPlace();
@@ -460,22 +462,94 @@ async function vwPopCopy() { const a = vwAnns().find(x => x.id === VW.pop); if (
 /* ---- Panel de anotaciones: lista por página, filtros, ir a cada una ---- */
 const vwSideOn = () => { try { return localStorage.getItem('gp-vw-side') !== '0'; } catch (e) { return true; } };
 function vwSide(on) { VW.side = on ?? !VW.side; try { localStorage.setItem('gp-vw-side', VW.side ? '1' : '0'); } catch (e) {} vwSideShow(); }
-function vwSideShow() { const s = $('#vwSide'); s.hidden = !VW.side; $('#vw').classList.toggle('side', VW.side); document.querySelector('#vw .vwsb')?.classList.toggle('on', VW.side); if (VW.side) vwSideDraw(); }
+function vwSideShow() { const s = $('#vwSide'); s.hidden = !VW.side; $('#vw').classList.toggle('side', VW.side); document.querySelector('#vw .vwsb')?.classList.toggle('on', VW.side && VW.tab === 'ann'); document.querySelector('#vw .vwtc')?.classList.toggle('on', VW.side && VW.tab !== 'ann'); if (VW.side) vwSideDraw(); else VW.thIo?.disconnect(); }
+const VW_TABS = [['ann', '💬 Anotaciones'], ['toc', '📑 Índice'], ['th', '▦ Páginas']];
+function vwPanel(t) { if (VW.side && VW.tab === t) return vwSide(false); VW.tab = t; VW.side ? vwSideShow() : vwSide(true); }
+function vwTab(t) { VW.tab = t; vwSideShow(); }
+const vwKindOf = a => a.k === 'note' ? 'note' : 'hl';   // las notas 🗒, aparte de los subrayados y zonas
+const vwSideList = () => { const f = VW.filt, k = VW.kind; return vwAnns().filter(a => (!f || (f === 'cm' ? a.m : a.c === f)) && (!k || vwKindOf(a) === k)).sort((a, b) => a.p - b.p || vwTop(a) - vwTop(b)); };
 function vwSideDraw() {
-  const s = $('#vwSide'), all = vwAnns(), f = VW.filt, L = all.filter(a => !f || (f === 'cm' ? a.m : a.c === f)).sort((a, b) => a.p - b.p || vwTop(a) - vwTop(b));
+  const s = $('#vwSide'), t = VW.tab || 'ann';
+  const head = `<div class="vwst" role="tablist">${VW_TABS.map(([k, n]) => `<button role="tab" aria-selected="${t === k}" class="${t === k ? 'on' : ''}" data-onclick="vwTab('${k}')">${n}</button>`).join('')}<button class="vwib" data-onclick="vwSide(false)" aria-label="Cerrar el panel">✕</button></div>`;
+  if (t === 'toc') return vwTocDraw(s, head);
+  if (t === 'th') return vwThDraw(s, head);
+  vwAnnDraw(s, head);
+}
+function vwAnnDraw(s, head) {
+  const all = vwAnns(), f = VW.filt, k = VW.kind || '', L = vwSideList(), nH = all.filter(a => vwKindOf(a) === 'hl').length, nN = all.length - nH;
   const fr = VW.foreign || [], frV = fr.filter(x => !x.dup && !all.some(a => a.src === x.id));
   const pk = VW.pick, n = pk?.size || 0;
-  s.innerHTML = `<div class="vwsh"><b>Anotaciones${all.length ? ` (${all.length})` : ''}</b>${all.length ? `<button class="vwpk${pk ? ' on' : ''}" data-onclick="vwPickToggle()" title="Elegir varias para copiarlas o llevarlas a las notas">${pk ? '✓ Elegir' : '☐ Elegir'}</button>` : ''}<button class="vwib" data-onclick="vwSide(false)" aria-label="Cerrar el panel">✕</button></div>
+  const item = a => `<button class="vwi${VW.pop === a.id || pk?.has(a.id) ? ' on' : ''}" style="--c:${a.c}" data-onclick="vwPick('${a.id}')"${pk ? ` aria-pressed="${pk.has(a.id)}"` : ''}><small>${pk ? (pk.has(a.id) ? '☑ ' : '☐ ') : ''}p. ${a.p + 1} · ${a.k === 'note' ? '🗒 Nota' : a.k === 'area' ? '▭ Zona' : '🖍'}</small>${a.t ? `<span class="vwit">${esc(a.t.length > 220 ? a.t.slice(0, 220) + '…' : a.t)}</span>` : ''}${a.m ? `<span class="vwim">💬 ${esc(a.m.length > 300 ? a.m.slice(0, 300) + '…' : a.m)}</span>` : ''}</button>`;
+  const grp = !k && nH && nN ? [['hl', '🖍 Subrayados'], ['note', '🗒 Notas']].map(([g, n]) => { const G = L.filter(a => vwKindOf(a) === g); return G.length ? `<h4 class="vwgh">${n} (${G.length})</h4>${G.map(item).join('')}` : ''; }).join('') : L.map(item).join('');
+  s.innerHTML = `${head}<div class="vwsh">${all.length ? `<span class="vwkd" role="group" aria-label="Tipo"><button class="${k ? '' : 'on'}" data-onclick="vwKind('')">Todas ${all.length}</button><button class="${k === 'hl' ? 'on' : ''}" data-onclick="vwKind('hl')" title="Subrayados y zonas">🖍 Subrayados ${nH}</button><button class="${k === 'note' ? 'on' : ''}" data-onclick="vwKind('note')" title="Notas adhesivas">🗒 Notas ${nN}</button></span><button class="vwpk${pk ? ' on' : ''}" data-onclick="vwPickToggle()" title="Elegir varias para borrarlas, copiarlas o llevarlas a las notas">${pk ? '✓ Elegir' : '☐ Elegir'}</button>` : '<b>Anotaciones</b>'}</div>
+    ${pk ? `<div class="vwpkb"><button data-onclick="vwPickAll()">${L.length && L.every(a => pk.has(a.id)) ? '☐ Ninguna' : '☑ Todas las de la lista'}</button><button class="danger" data-onclick="vwPickDel()" ${n ? '' : 'disabled'}>🗑 Borrar${n ? ` (${n})` : ''}</button></div>` : ''}
     <div class="vwsf"><button class="${f ? '' : 'on'}" data-onclick="vwFilt('')">Todas</button>${VW_COLORS.filter(([c]) => all.some(a => a.c === c)).map(([c, t]) => `<button class="vwc${f === c ? ' on' : ''}" style="--c:${c}" title="Solo ${t.toLowerCase()}" data-onclick="vwFilt('${c}')"></button>`).join('')}<button class="${f === 'cm' ? 'on' : ''}" data-onclick="vwFilt('cm')" title="Solo las que tienen comentario">💬</button></div>
-    <div class="vwsl">${L.length ? L.map(a => `<button class="vwi${VW.pop === a.id || pk?.has(a.id) ? ' on' : ''}" style="--c:${a.c}" data-onclick="vwPick('${a.id}')"${pk ? ` aria-pressed="${pk.has(a.id)}"` : ''}><small>${pk ? (pk.has(a.id) ? '☑ ' : '☐ ') : ''}p. ${a.p + 1} · ${a.k === 'note' ? '🗒 Nota' : a.k === 'area' ? '▭ Zona' : '🖍'}</small>${a.t ? `<span class="vwit">${esc(a.t.length > 220 ? a.t.slice(0, 220) + '…' : a.t)}</span>` : ''}${a.m ? `<span class="vwim">💬 ${esc(a.m.length > 300 ? a.m.slice(0, 300) + '…' : a.m)}</span>` : ''}</button>`).join('')
+    <div class="vwsl">${L.length ? grp
       : `<p class="empty">${all.length ? 'Ninguna con este filtro.' : 'Aún no hay anotaciones. Selecciona texto y elige un color, o usa 🖍 Subrayar, ▭ Zona o 🗒 Nota.'}</p>`}</div>
     ${frV.length ? `<details class="vwfr"><summary>${frV.length} ${frV.length === 1 ? 'anotación que ya traía' : 'anotaciones que ya traía'} el PDF</summary>${frV.slice(0, 300).map(x => `<button class="vwi" style="--c:${x.c}" data-onclick="vwGoForeign('${x.id}')"><small>p. ${x.p + 1} · ${esc(x.sub)}${x.who ? ' · ' + esc(x.who) : ''}</small>${x.m ? `<span class="vwim">${esc(x.m.slice(0, 300))}</span>` : ''}</button>`).join('')}<button class="pri" data-onclick="vwImport()" title="Pasan a ser tuyas: se pueden cambiar, comentar y sincronizar">Hacerlas editables</button></details>` : ''}
-    ${all.length ? `<div class="vwsx vwexp"><small>${n ? `${n} ${n === 1 ? 'elegida' : 'elegidas'}` : f ? 'Las del filtro' : 'Todas'}:</small><select data-onchange="vwExpFmt(this.value)" aria-label="Formato" title="Formato al copiar o llevar a las notas">${ANN_FMTS.map(([k, t]) => `<option value="${k}" ${db.settings.annFmt === k ? 'selected' : ''}>${t}</option>`).join('')}</select>
-      <button data-onclick="vwExpCopy()" title="Copiar al portapapeles, para pegarlas en otro sitio">📋 Copiar</button><button data-onclick="vwExpNotes()" title="${n || f ? 'Añadirlas como nota nueva del paper' : 'Una nota «Anotaciones del PDF» en el paper: si ya existe, se actualiza'}">📝 A las notas</button><button data-onclick="vwExpMd()" title="Descargar como resumen en Markdown">⬇ .md</button></div>` : ''}
+    ${all.length ? `<div class="vwsx vwexp"><small>${n ? `${n} ${n === 1 ? 'elegida' : 'elegidas'}` : f || k ? 'Las del filtro' : 'Todas'}:</small><select data-onchange="vwExpFmt(this.value)" aria-label="Formato" title="Formato al copiar o llevar a las notas">${ANN_FMTS.map(([k, t]) => `<option value="${k}" ${db.settings.annFmt === k ? 'selected' : ''}>${t}</option>`).join('')}</select>
+      <button data-onclick="vwExpCopy()" title="Copiar al portapapeles, para pegarlas en otro sitio">📋 Copiar</button><button data-onclick="vwExpNotes()" title="${n || f || k ? 'Añadirlas como nota nueva del paper' : 'Una nota «Anotaciones del PDF» en el paper: si ya existe, se actualiza'}">📝 A las notas</button><button data-onclick="vwExpMd()" title="Descargar como resumen en Markdown">⬇ .md</button></div>` : ''}
     <div class="vwsx"><button data-onclick="vwOut()" title="Descargar el PDF con los subrayados y comentarios dentro (se ven en Acrobat, Foxit y otros lectores)">⬇ PDF anotado</button></div>`;
 }
 const vwTop = a => { const p = VW.pages[a.p], b = p && vwBoxes(p, a.q)[0]; return b ? b.y : 0; };
 function vwFilt(f) { VW.filt = f; vwSideDraw(); }
+function vwKind(k) { VW.kind = k; vwSideDraw(); }
+function vwPickAll() { const L = vwSideList(), pk = VW.pick; if (!pk) return; if (L.length && L.every(a => pk.has(a.id))) L.forEach(a => pk.delete(a.id)); else L.forEach(a => pk.add(a.id)); vwSideDraw(); }
+async function vwPickDel() {   // borra de una vez las elegidas (un solo «Deshacer»)
+  const ids = new Set(VW.pick || []), n = ids.size; if (!n) return;
+  if (!await askOk(`¿Borrar ${n} ${n === 1 ? 'anotación' : 'anotaciones'}?`, {ok: 'Borrar', danger: true})) return;
+  VW.pop = null; $('#vwPop').hidden = true; VW.pick = new Set();
+  vwMut(l => { for (let i = l.length - 1; i >= 0; i--) if (ids.has(l[i].id)) l.splice(i, 1); });
+  toast(`${n} ${n === 1 ? 'anotación borrada' : 'anotaciones borradas'}.`, [{t: 'Deshacer', fn: () => undo()}], 5000);
+}
+
+/* ---- Índice del PDF y miniaturas de las páginas ---- */
+const vwMv = () => document.documentElement.classList.contains('mv');
+function vwGoSide(i) { if (!VW.pages[i]) return; vwGo(i); if (vwMv()) vwSide(false); }   // en el móvil el panel tapa la página: se cierra
+async function vwTocGet() {
+  const doc = VW.doc; if (!doc) return null; if (VW.toc && VW.toc.doc === doc) return VW.toc.L;
+  const ol = await doc.getOutline().catch(() => null);
+  const walk = L => Promise.all((L || []).map(async it => { let pg = null;
+    try { let d = it.dest; if (typeof d === 'string') d = await doc.getDestination(d); const r = Array.isArray(d) && d[0]; if (r && typeof r === 'object') pg = await doc.getPageIndex(r); else if (Number.isInteger(r)) pg = r; } catch (e) {}
+    return {t: String(it.title || '').trim() || '(sin título)', pg, items: await walk(it.items)}; }));
+  const L = await walk(ol); VW.toc = {doc, L}; return L;
+}
+async function vwTocDraw(s, head) {
+  s.innerHTML = `${head}<div class="vwsl vwtoc"><p class="empty">${VW.doc ? 'Leyendo el índice…' : 'Abriendo el PDF…'}</p></div>`;
+  const L = await vwTocGet(); if (!VW.side || VW.tab !== 'toc' || !s.querySelector('.vwtoc')) return;
+  const tree = (L, d) => `<ul>${L.map(x => `<li><button class="vwtl${x.pg == null ? ' no' : ''}" style="--d:${d}" ${x.pg == null ? 'disabled' : `data-onclick="vwGoSide(${x.pg})"`}><span>${esc(x.t)}</span>${x.pg != null ? `<small>${x.pg + 1}</small>` : ''}</button>${x.items.length ? tree(x.items, d + 1) : ''}</li>`).join('')}</ul>`;
+  s.querySelector('.vwtoc').innerHTML = L && L.length ? tree(L, 0) : `<p class="empty">Este PDF no trae índice. <button data-onclick="vwTab('th')">▦ Ver las páginas</button></p>`;
+}
+function vwThDraw(s, head) {
+  VW.thIo?.disconnect(); const N = VW.pages.length;
+  s.innerHTML = `${head}<div class="vwsl vwth">${N ? VW.pages.map(p => `<button class="vwtp${p.i === VW.cur ? ' on' : ''}" data-i="${p.i}" data-onclick="vwGoSide(${p.i})" aria-label="Página ${p.i + 1}"><span class="vwtc0" style="aspect-ratio:${p.w} / ${p.h}"></span><small>${p.i + 1}</small></button>`).join('') : '<p class="empty">Abriendo el PDF…</p>'}</div>`;
+  const box = s.querySelector('.vwth'); if (!N) return;
+  VW.thIo = new IntersectionObserver(es => { for (const e of es) if (e.isIntersecting) { VW.thIo.unobserve(e.target); vwThumb(e.target); } }, {root: box, rootMargin: '300px'});
+  box.querySelectorAll('.vwtp').forEach(b => VW.thIo.observe(b));
+  box.querySelector('.vwtp.on')?.scrollIntoView({block: 'center'});
+}
+async function vwThumb(b) {   // miniatura de una página (pequeña: poca memoria)
+  const i = +b.dataset.i, p = VW.pages[i], gen = VW.gen; if (!p) return;
+  try {
+    p.proxy ||= await VW.doc.getPage(i + 1); if (gen !== VW.gen) return;
+    const W = 110 * Math.min(devicePixelRatio || 1, 2), vp = p.proxy.getViewport({scale: W / p.proxy.getViewport({scale: 1}).width});
+    const cv = document.createElement('canvas'); cv.width = Math.floor(vp.width); cv.height = Math.floor(vp.height);
+    await p.proxy.render({canvasContext: cv.getContext('2d', {alpha: false}), viewport: vp, pageColors: vwPC()}).promise; if (gen !== VW.gen) return;
+    b.querySelector('.vwtc0')?.replaceWith(cv);
+  } catch (e) {}
+}
+function vwThCur() { const b = document.querySelector('#vwSide .vwth'); if (!b) return; b.querySelector('.vwtp.on')?.classList.remove('on'); b.querySelector(`.vwtp[data-i="${VW.cur}"]`)?.classList.add('on'); }
+
+/* ---- Modo noche: fondo oscuro y letra clara; las imágenes del PDF no se tocan ---- */
+const vwNightPref = () => { try { return localStorage.getItem('gp-vw-night') || 'off'; } catch (e) { return 'off'; } };
+const vwNightOn = () => { const p = vwNightPref(); return p === 'on' || p === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches; };
+const vwPC = () => VW.night ? {background: '#1c1e23', foreground: '#dcdde1'} : null;
+function vwNight(v) { try { localStorage.setItem('gp-vw-night', v); } catch (e) {} vwNightApply(); }
+function vwNightApply() {
+  const on = vwNightOn(); if (!VW.open || VW.night === on) return; VW.night = on; $('#vw').classList.toggle('night', on);
+  VW.pages.forEach(p => { if (p.cv) { p.rs = 0; VW.queue.add(p.i); } }); vwPump(); if (VW.side && VW.tab === 'th') vwSideDraw();
+}
+try { matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => vwNightApply()); } catch (e) {}
 function vwJump(id) {
   const a = vwAnns().find(x => x.id === id); if (!a) return; const p = VW.pages[a.p]; if (!p) return;
   const b = vwBoxes(p, a.q)[0], sc = $('#vwScroll');
@@ -572,6 +646,7 @@ function vwMore(e) {
     ${vwCanShare() ? `<button data-onclick="vwOther(false)">📲 Abrir en otra app…</button>${vwAnns().length ? '<button data-onclick="vwOther(true)">📲 Abrir en otra app, con las anotaciones…</button>' : ''}` : ''}
     <button data-onclick="vwNative()">↗ Abrir con el visor del navegador</button>${vwAnns().length && !vwCanShare() ? '<button data-onclick="vwOther(true)">↗ Abrir con el visor del navegador, con las anotaciones</button>' : ''}
     ${P && !$('#dlg').open ? '<button data-onclick="vwFicha()">📝 Ficha del paper</button>' : ''}${VW.src?.kind === 'inbox' ? '<button data-onclick="vwCite()">＋ Crear la cita de este PDF</button>' : ''}
+    <hr><div class="ctxh">🌙 Modo noche</div>${[['off', 'No'], ['on', 'Sí'], ['auto', 'Como el sistema (modo oscuro)']].map(([v, t]) => `<button data-onclick="vwNight('${v}')">${tick(vwNightPref() === v)}${t}</button>`).join('')}
     ${pf ? `<hr><button data-onclick="vwVis()">${tick(vis)}Guardar también en mi Drive normal (con los subrayados)</button>` : ''}`);
 }
 function vwMenu(r, html) {   // menú desplegable dentro del visor (el de la aplicación queda debajo del visor)
@@ -740,7 +815,7 @@ async function vwDetail() {
     try { p.dtask?.cancel(); } catch (e) {}
     const cv = document.createElement('canvas'); cv.width = Math.floor(w * os); cv.height = Math.floor(h * os); cv.className = 'vwdet'; cv.dataset.k = k;
     cv.style.cssText = `left:${Math.floor(x0)}px;top:${Math.floor(y0)}px;width:${w}px;height:${h}px`;
-    const vp = p.proxy.getViewport({scale: s}), task = p.dtask = p.proxy.render({canvasContext: cv.getContext('2d', {alpha: false}), viewport: vp, transform: [os, 0, 0, os, -Math.floor(x0) * os, -Math.floor(y0) * os], annotationMode: PDFJS.AnnotationMode.ENABLE_STORAGE});
+    const vp = p.proxy.getViewport({scale: s}), task = p.dtask = p.proxy.render({canvasContext: cv.getContext('2d', {alpha: false}), viewport: vp, transform: [os, 0, 0, os, -Math.floor(x0) * os, -Math.floor(y0) * os], annotationMode: PDFJS.AnnotationMode.ENABLE_STORAGE, pageColors: vwPC()});
     try { await task.promise; } catch (e) { continue; } p.dtask = null;
     if (gen !== VW.gen || Math.abs(VW.scale - s) > .001 || !p.cv) return;
     p.det?.remove(); p.cv.after(cv); p.det = cv;

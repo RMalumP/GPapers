@@ -169,6 +169,12 @@ El HTML no lleva `onclick` ni otros manejadores en línea: `index.html` tiene un
 - Desde `file://` el visor propio no puede cargar sus módulos: el PDF se abre en el visor del navegador.
 - Archivos nuevos: `js/visor.js`, `js/bandeja.js`, `visor.css`, `lib/`. Pruebas: `pruebas/prueba_visor.py` (con `pruebas/prueba.pdf`).
 
+## Visor: índice, páginas, modo noche (v39.5)
+- **Panel con pestañas**: 💬 Anotaciones, 📑 Índice (el marcador o «outline» del PDF, con niveles; en el móvil, hoja desde abajo que se cierra al saltar) y ▦ Páginas (miniaturas pequeñas, pintadas al verlas). Botón 📑 en la barra de herramientas.
+- **Notas aparte**: la lista separa 🖍 Subrayados (y zonas) de 🗒 Notas, con filtro por tipo.
+- **Borrar varias**: con «☐ Elegir», «☑ Todas las de la lista» y «🗑 Borrar (N)», con un solo «Deshacer».
+- **🌙 Modo noche** (⋯): PDF.js pinta el texto y los trazos con colores oscuros (`pageColors`) y deja las imágenes como son. Se recuerda en este dispositivo; también «como el sistema».
+
 ## Bandeja 🗃️ (v39.4)
 - La bandeja «PDF por citar» lleva el icono 🗃️ (sección, botón de la cabecera y menús).
 - **Crear todas las citas**: con varios PDF con DOI, las busca a la vez en CrossRef y crea los papers; las que fallan (o ya estaban, o sin DOI) se quedan en la bandeja y se dice cuáles. Un solo «Deshacer».
