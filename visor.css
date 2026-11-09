@@ -112,3 +112,9 @@ html.mv .vwnote{width:32px;height:32px;font-size:18px;transform:translate(-7px,-
 .vwtoc ul{list-style:none;margin:0;padding:0}.vwtl{display:flex;width:100%;gap:8px;align-items:baseline;text-align:left;border:0;background:none;padding:5px 6px 5px calc(6px + var(--d) * 14px);border-radius:6px;font-size:13px}.vwtl:hover{background:color-mix(in srgb,var(--pri) 10%,transparent)}.vwtl span{flex:1}.vwtl small{opacity:.6}.vwtl.no{opacity:.6;cursor:default}
 .vwth{display:grid!important;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:10px;align-content:start}.vwtp{display:flex;flex-direction:column;align-items:center;gap:3px;border:2px solid transparent;background:none;padding:3px;border-radius:6px}.vwtp.on{border-color:var(--pri)}.vwtp canvas,.vwtc0{width:100%;height:auto;background:#fff;box-shadow:0 1px 3px #0003;display:block}.vwtp small{font-size:11px;opacity:.75}
 #vw.night #vwScroll{background:#0e0f12}#vw.night .vwp,#vw.night .vwtc0{background:#1c1e23}#vw.night .vwhl{mix-blend-mode:screen;opacity:.45}#vw.night .textLayer ::selection{background:#4a7bd088}
+/* notas del paper al lado del PDF (la ficha, metida en el visor): mitad derecha en ordenador y tablet; pantalla completa en el móvil */
+#vw .vwbody>#dlg.vwdock{position:relative;inset:auto;margin:0;flex:0 0 50%;width:50%;max-width:none;height:auto;max-height:none;min-width:0;border:0;border-left:1px solid var(--bd);border-radius:0;overflow:auto;box-shadow:-4px 0 14px #0002;z-index:5}
+#vw .vwbody>#dlg.vwdock.vwhide{display:none}#dlg .vwdpdf{display:none}
+#vw .vwnb.on{background:color-mix(in srgb,var(--pri) 16%,transparent)}
+@media(max-width:700px){#vw .vwbody>#dlg.vwdock{position:absolute;inset:0;width:auto}#dlg.vwdock .vwdpdf{display:inline-flex}}
+html.mv #vw .vwbody>#dlg.vwdock{position:absolute;inset:0;width:auto;height:auto;padding-bottom:calc(16px + env(safe-area-inset-bottom,0px))}html.mv #dlg.vwdock .vwdpdf{display:inline-flex}

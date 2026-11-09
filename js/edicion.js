@@ -1,8 +1,8 @@
 'use strict';
 /* ===== Edición de paper (trabaja sobre un borrador D) ===== */
-function openPaper(id) {
+function openPaper(id, dock) {   // dock: dentro del visor de PDF, en un panel al lado del PDF (se abre en «Notas»)
   D = id ? structuredClone(db.papers.find(p => p.id === id)) : {id: uid(), created: new Date().toISOString(), title: '', alias: '', sortKey: '', related: [], refTo: [], history: [], reading: 'por_leer', rating: 0, sectionIds: F.sec ? [F.sec] : [], authors: [], year: '', url: '', type: 'articulo', venue: '', doi: '', accessed: '', general: '', tagIds: [], notes: [], cites: {}}; if (!id) NEWF(D);
-  tab = 'all'; CITE_ALL = false; drawD(); $('#dlg').showModal(); if (id) recPush(id);
+  tab = dock ? 'notes' : 'all'; CITE_ALL = false; drawD(); dock ? $('#dlg').show() : $('#dlg').showModal(); if (id) recPush(id);
 }
 const lbl = (k, def) => (CTYPES.has(D.type) ? CTYPES.get(D.type).labels[k] : null) || FLBL[k]?.[baseT(D.type)] || def;   // un tipo propio usa sus etiquetas y, si no tiene, las del tipo en que se basa   // etiqueta del campo según el tipo del borrador
 const inp = (k, lbl, type = 'text', cls = '') => `<label class="${cls}">${lbl}<input type="${type}" data-k="${k}" value="${esc(D[k])}" data-oninput="put(D,'${k}',this.value)"></label>`;
@@ -15,7 +15,7 @@ function drawD() {
   const T = {all: 'Ver todo', data: 'Datos', cite: 'Cita', notes: 'Notas', cls: 'Secciones, etiquetas y relacionados', hist: 'Historial'};
   const blk = (id, t, body, always) => tab === 'all' || tab === 'cls' ? `<details class="cs" ${ALL_FOLD.has(id) ? '' : 'open'} data-ontoggle="setHas(ALL_FOLD,'${id}',!this.open)"><summary>${t}</summary><div class="csb">${body}</div></details>`   // en «Ver todo» cada bloque lleva su título y se pliega
     : (always ? `<h2 class="grp">${t}</h2>` : '') + body;
-  let h = `<div class="dh"><h2>${esc(D.alias || D.title) || 'Nuevo paper'}</h2><div class="dbtn"><button class="pri" data-onclick="commit()">Guardar paper</button><button data-onclick="$('#dlg').close()">Cancelar</button></div></div><div class="tabs">${Object.entries(T).map(([k, v]) => `<button class="${tab === k ? 'on' : ''}" data-onclick="tabSet('${k}')">${v}</button>`).join('')}</div>`;
+  let h = `<div class="dh"><h2>${esc(D.alias || D.title) || 'Nuevo paper'}</h2><div class="dbtn"><button class="pri" data-onclick="commit()">Guardar paper</button><button data-onclick="$('#dlg').close()">Cancelar</button>${$('#dlg').classList.contains('vwdock') ? `<button data-onclick="vwNotesHide()" title="Ver el PDF; lo escrito se queda aquí sin guardar hasta que vuelvas con «📝 Notas»" class="vwdpdf">📄 Ver el PDF</button>` : ''}</div></div><div class="tabs">${Object.entries(T).map(([k, v]) => `<button class="${tab === k ? 'on' : ''}" data-onclick="tabSet('${k}')">${v}</button>`).join('')}</div>`;
   if (tab === 'data' || tab === 'all') {   // vista simplificada (por defecto): lo básico + los campos que usa el estilo principal + los que ya tienen datos
     const R = relFields(D), top = [], rest = [], has = k => Array.isArray(D[k]) ? D[k].length > 0 : D[k] != null && D[k] !== '';
     const put = (on, html) => html && (on ? top : rest).push(html), rel = k => put(R.has(k) || has(k), ALWAYS_F.includes(k) || shows(k, D.type) ? fh(k) : '');
