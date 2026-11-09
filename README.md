@@ -256,3 +256,9 @@ En **Gestionar etiquetas** o **Gestionar secciones**, «＋ Nueva clasificación
 - Al colocar uno, el orden pasa a **«Orden manual (arrastrando)»**, que parte del orden que se veía. Se puede elegir otro orden y volver a éste sin perderlo. Los papers nuevos van al final de su sección.
 - **📌 Posiciones guardadas…** (un solo botón bajo «Ordenar», en la barra lateral): guarda con un nombre cómo están colocados ahora los papers, para volver a ese orden después, o borrarlo con ✕. Se sincroniza con Drive.
 - **Secciones plegables** (vista agrupada): clic o toque en el título de la sección la pliega o despliega (▾/▸, sigue mostrando cuántos papers tiene). «Plegar todas» y «Desplegar todas» en el menú de Secciones. Se recuerda en cada dispositivo.
+
+## Tablet en horizontal: Sección y Etiquetas como en el móvil (v39.26)
+- En **cualquier pantalla táctil** (también una tablet en horizontal, que no usa el modo móvil), tocar **Sección** o **Etiquetas** abre el mismo menú que en el móvil: mostrarlas debajo, agrupar (y plegar o desplegar todas), cómo combinar etiquetas, elegir con el número de papers de cada una, y gestionar.
+- Las filas de secciones y de etiquetas van **debajo de la barra**, en varias líneas, en vez de una sola fila que se desplaza de lado.
+- En el ordenador con ratón todo sigue igual (clic: mostrar u ocultar la fila; clic derecho: su menú).
+- Arreglo: el botón «Guardar» de 📌 Posiciones guardadas no se veía.

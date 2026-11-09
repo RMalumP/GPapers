@@ -7,6 +7,10 @@ try { const t = localStorage.getItem('gp-theme'); if (t === 'dark' || t === 'lig
 const MV_Q = matchMedia('(pointer: coarse) and (max-width: 760px), (pointer: coarse) and (max-height: 500px)');
 const mvOn = () => MV_Q.matches;
 document.documentElement.classList.toggle('mv', mvOn());   // antes de pintar: sin parpadeo del diseño de escritorio
+// pantallas táctiles de cualquier tamaño (p. ej. tablet en horizontal): Sección ▾ y Etiquetas ▾ abren su menú y sus filas van debajo, como en el móvil
+const TB_Q = matchMedia('(pointer: coarse)'), tbOn = () => mvOn() || TB_Q.matches;
+document.documentElement.classList.toggle('tb', tbOn());
+TB_Q.addEventListener('change', () => document.documentElement.classList.toggle('tb', tbOn()));
 
 let MV_BUILT = false;
 const mv$ = s => document.querySelector(s);
@@ -114,12 +118,6 @@ function mvBuild() {
     // en el panel lateral, lo que abre una ventana cierra el panel
     if (e.target.closest('#side')) setTimeout(() => { if (mv$('dialog[open]')) mvDrawer(false); mvCount(); });
   });
-  // Sección ▾ y Etiquetas ▾: en el móvil, menú en vez de solo mostrar u ocultar la fila (va antes que los data-onclick de siempre)
-  document.addEventListener('click', e => {
-    if (!mvOn()) return; const b = e.target.closest('#tbSec, #tbTag'); if (!b) return;
-    e.stopPropagation(); e.preventDefault(); const k = b.id === 'tbSec' ? 'sec' : 'tag', m = mv$('#ctx');
-    if (m && !m.hidden && m.dataset.mvf === k) return ctxClose(); mvFMenu(k);
-  }, true);
   document.addEventListener('keydown', e => { if (e.key === 'Escape' && mvOn()) mvClose(); });
   // tocar la miniatura de un paper la amplía en una ventana emergente; un toque en cualquier sitio la cierra
   const zoomClose = () => { document.getElementById('mvZoom')?.remove(); };
@@ -157,6 +155,12 @@ function mvApply() {
   if (on) mvBuild(); else { mvClose(); if (MV_BUILT && typeof sbSearchDock === 'function') sbSearchDock(); }   // al salir, la búsqueda vuelve a su sitio de siempre
   try { if (db.settings.view === 'table') render(); } catch (e) {}   // la tabla se pinta distinta en el móvil (fichas) y en el ordenador
 }
+// Sección ▾ y Etiquetas ▾: en el móvil y en pantallas táctiles, menú en vez de solo mostrar u ocultar la fila (va antes que los data-onclick de siempre)
+document.addEventListener('click', e => {
+  if (!tbOn()) return; const b = e.target.closest('#tbSec, #tbTag'); if (!b) return;
+  e.stopPropagation(); e.preventDefault(); const k = b.id === 'tbSec' ? 'sec' : 'tag', m = mv$('#ctx');
+  if (m && !m.hidden && m.dataset.mvf === k) return ctxClose(); mvFMenu(k);
+}, true);
 MV_Q.addEventListener('change', mvApply);
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', mvApply); else mvApply();
 
