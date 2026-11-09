@@ -676,14 +676,33 @@ function vwNotes() {
   if (vwDocked()) { if (d.classList.contains('vwhide')) { d.classList.remove('vwhide'); return d.querySelector('.ned')?.focus(); } return vwMv() ? vwNotesHide() : vwNotesClose(); }
   const p = vwPaper(); if (!p || d.open) return;
   VW.dlgNext = d.nextSibling; d.classList.add('vwdock'); vw$('.vwbody').insertBefore(d, $('#vwSide'));
+  vw$('.vwbody').insertBefore(vwSplitEl(), d); vwSplitSet(vwSplitGet()); $('#vw').classList.add('vwdk');
   if (VW.side && !vwMv() && innerWidth < 1500) { VW.side = false; vwSideShow(); }   // sin el panel de anotaciones: el PDF necesita su mitad
   vw$('.vwnb').classList.add('on'); openPaper(p.id, true);
+}
+/* divisor entre el PDF y las notas: se arrastra para repartir el espacio (en horizontal, el ancho; en una tablet en vertical, el alto). Doble clic: mitad y mitad */
+const vwSplitGet = () => { try { const v = +localStorage.getItem('gp-vw-split'); return v >= 20 && v <= 80 ? v : 50; } catch (e) { return 50; } };
+function vwSplitSet(v, save) { v = Math.round(Math.max(20, Math.min(80, v)) * 10) / 10; $('#vw').style.setProperty('--vwn', v); if (save) try { localStorage.setItem('gp-vw-split', v); } catch (e) {} return v; }
+const vwSplitCol = () => getComputedStyle(vw$('.vwbody')).flexDirection === 'column';
+function vwSplitEl() {
+  let s = $('#vwSplit'); if (s) return s;
+  s = document.createElement('div'); s.id = 'vwSplit'; s.className = 'vwsplit'; s.setAttribute('role', 'separator'); s.tabIndex = 0; s.title = 'Arrastra para cambiar el tamaño del PDF y de las notas · Doble clic: mitad y mitad';
+  s.addEventListener('pointerdown', e => {
+    e.preventDefault(); s.setPointerCapture(e.pointerId); s.classList.add('on'); const col = vwSplitCol(), r = vw$('.vwbody').getBoundingClientRect();
+    const mv = ev => vwSplitSet(col ? (r.bottom - ev.clientY) / r.height * 100 : (r.right - ev.clientX) / r.width * 100);
+    const up = ev => { s.classList.remove('on'); s.removeEventListener('pointermove', mv); s.removeEventListener('pointerup', up); s.removeEventListener('pointercancel', up); vwSplitSet(+$('#vw').style.getPropertyValue('--vwn') || 50, true); };
+    s.addEventListener('pointermove', mv); s.addEventListener('pointerup', up); s.addEventListener('pointercancel', up);
+  });
+  s.addEventListener('dblclick', () => vwSplitSet(50, true));
+  s.addEventListener('keydown', e => { const k = {ArrowLeft: 2, ArrowUp: 2, ArrowRight: -2, ArrowDown: -2}[e.key]; if (!k) return; e.preventDefault(); vwSplitSet((+$('#vw').style.getPropertyValue('--vwn') || 50) + k, true); });   // con el teclado: más o menos notas
+  return s;
 }
 function vwNotesHide() { $('#dlg').classList.add('vwhide'); }
 function vwNotesClose(force) { if (!vwDocked()) return; commit(); if (force && vwDocked()) $('#dlg').close(); }   // se guarda al cerrar (como al pulsar fuera de la ficha); si falta el título, avisa y sigue abierto
 function vwUndock() {
   const d = $('#dlg'); if (!d.classList.contains('vwdock')) return;
   d.classList.remove('vwdock', 'vwhide'); document.body.insertBefore(d, VW.dlgNext?.parentNode === document.body ? VW.dlgNext : null); vw$('.vwnb')?.classList.remove('on');
+  $('#vwSplit')?.remove(); $('#vw')?.classList.remove('vwdk');
 }
 $('#dlg').addEventListener('close', vwUndock);
 $('#dlg').addEventListener('keydown', e => {   // Esc en las notas del visor: guarda y cierra el panel (el navegador no se lo pasa al visor); con un menú abierto, solo cierra el menú
