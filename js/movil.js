@@ -155,6 +155,7 @@ function mvBuild() {
 function mvApply() {
   const on = mvOn(); document.documentElement.classList.toggle('mv', on);
   if (on) mvBuild(); else { mvClose(); if (MV_BUILT && typeof sbSearchDock === 'function') sbSearchDock(); }   // al salir, la búsqueda vuelve a su sitio de siempre
+  try { if (db.settings.view === 'table') render(); } catch (e) {}   // la tabla se pinta distinta en el móvil (fichas) y en el ordenador
 }
 MV_Q.addEventListener('change', mvApply);
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', mvApply); else mvApply();

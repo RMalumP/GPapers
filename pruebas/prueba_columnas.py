@@ -95,7 +95,7 @@ with sync_playwright() as pw:
     ctx = b.new_context(viewport={'width': 390, 'height': 800}, is_mobile=True, has_touch=True, service_workers='block'); pg = ctx.new_page(); errs = []
     pg.on('pageerror', lambda e: errs.append(str(e))); pg.add_init_script("window.ASK_AUTO = 'accept'")
     pg.goto('file://' + str(folder / 'index.html')); pg.wait_for_timeout(400); pg.evaluate(SEED); pg.wait_for_timeout(100)
-    eq('móvil: el botón «Columnas» se ve, en la línea de la cuenta', pg.evaluate("(() => { const a = $('#tbCols').getBoundingClientRect(), c = $('#count').getBoundingClientRect(), v = $('#tbView').getBoundingClientRect(); return [a.width > 0, Math.abs(a.top - c.top) < 12, a.top > v.bottom]; })()"), [True, True, True])
+    eq('móvil: el botón ⚙ «Columnas», pequeño, en la barra de Tarjetas', pg.evaluate("(() => { const a = $('#tbCols').getBoundingClientRect(), v = $('#tbView').getBoundingClientRect(); return [a.width > 0, a.width < 60, Math.abs(a.top - v.top) < 3, a.left > v.left]; })()"), [True, True, True, True])
     pg.tap('#tbCols'); pg.wait_for_timeout(80)
     eq('móvil: abre la lista de columnas', pg.evaluate("[!$('#ctx').hidden, document.querySelectorAll('#ctx .colck').length]"), [True, 9])
     pg.tap('#ctx .colck[data-col=year]'); pg.wait_for_timeout(120)
@@ -103,7 +103,12 @@ with sync_playwright() as pw:
     pg.tap('#ctx .colck[data-col=year]'); pg.wait_for_timeout(120)
     pg.tap('#ctx .colr:has([data-col=tags]) .colmv >> nth=0'); pg.wait_for_timeout(120)
     eq('móvil: ↑ mueve la columna antes', pg.evaluate("tblCols().order.slice(5, 8)"), ['rating', 'tags', 'sections'])
-    eq('móvil: autores, año y revista siguen en la 2.ª línea con «·»', pg.evaluate("(() => { const r = $('.tbl tr.rw'), y = s => r.querySelector(s).getBoundingClientRect().top; return [Math.abs(y('.c-author') - y('.c-venue')) < 3, y('.c-author') > y('.c-title') + 5, getComputedStyle(r.querySelector('.c-year'), '::before').content]; })()"), [True, True, '"· "'])
+    eq('móvil: 2.ª línea autores · año · revista', pg.evaluate("$('.tbl tr.rw .mvm').textContent"), 'Pérez, Juan·2004·Rev')
+    eq('móvil: 3.ª línea, el resto en su orden (etiquetas antes que secciones tras ↑)', pg.evaluate("[...$('.tbl tr.rw .mvx').children].map(e => e.className.split(' ')[0])"), ['c-reading', 'c-rating', 'c-tags', 'c-sections', 'c-notes'])
+    pg.evaluate("ctxClose(); setTblCols(['year', 'tags', 'title', 'author', 'venue', 'reading', 'rating', 'sections', 'notes'], ['venue', 'rating'])"); pg.wait_for_timeout(100)
+    eq('móvil: con columnas ocultas y movidas la ficha sigue cabiendo en la pantalla (✕ y notas a la vista)', pg.evaluate("(() => { const r = $('.tbl tr.rw'), w = innerWidth, R = s => r.querySelector(s).getBoundingClientRect(); return [r.getBoundingClientRect().width <= w, R('.c-del').right <= w, R('.c-notes').right <= w, $('.tbl tr.rw .mvm').textContent, [...$('.tbl tr.rw .mvx').children].map(e => e.className.split(' ')[0])]; })()"),
+       [True, True, True, '2004·Pérez, Juan', ['c-tags', 'c-reading', 'c-sections', 'c-notes']])
+    eq('móvil: la 2.ª y 3.ª línea van debajo del título', pg.evaluate("(() => { const r = $('.tbl tr.rw'), y = s => r.querySelector(s).getBoundingClientRect().top; return [y('.mvm') > y('.c-title') + 5, y('.mvx') > y('.mvm') + 5]; })()"), [True, True])
     eq('móvil: las cabeceras no están (no hay toques falsos sobre ellas)', pg.is_visible('.tbl thead'), False)
     eq('sin errores (móvil)', errs, [])
     b.close()
