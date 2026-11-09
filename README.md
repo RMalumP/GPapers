@@ -270,3 +270,6 @@ En **Gestionar etiquetas** o **Gestionar secciones**, «＋ Nueva clasificación
 - En el móvil, la fila «Filtros: … ✕ · Limpiar todo» es más baja (botones de 26 px en vez de 34 px, letra algo menor) y casi sin margen arriba y abajo.
 - En el móvil, el aviso «Aún no hay etiquetas.» (o secciones) de la fila de arriba es una línea fina, más pequeña y sin hueco alrededor.
 - Con filtros aplicados, la primera sección de la lista queda pegada a esa fila (sin el hueco de 20 px de encima del título), también en el ordenador.
+
+## Fila de filtros aún más fina en el móvil (v39.29)
+- Los botones de «Filtros: … ✕ · Limpiar todo» miden 20 px de alto (antes 26 px) con letra de 11,5 px, y la fila casi no tiene margen.
