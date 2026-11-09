@@ -169,6 +169,10 @@ El HTML no lleva `onclick` ni otros manejadores en línea: `index.html` tiene un
 - Desde `file://` el visor propio no puede cargar sus módulos: el PDF se abre en el visor del navegador.
 - Archivos nuevos: `js/visor.js`, `js/bandeja.js`, `visor.css`, `lib/`. Pruebas: `pruebas/prueba_visor.py` (con `pruebas/prueba.pdf`).
 
+## Anotaciones de otros programas (v39.6)
+- Al abrir un PDF con anotaciones nuevas hechas en Acrobat, Foxit u otro lector, avisa: «Hay N anotaciones nuevas hechas en otro programa: ¿traerlas?». «Traer» las hace editables; «Ahora no» no vuelve a preguntar por esas (se recuerda en el dispositivo). No cuentan las que escribió GPapers (autor «GPapers») ni las ya traídas.
+- Los avisos con botones («Deshacer», «Traer»…) se ven y se pueden pulsar también con el visor o una ficha abiertos.
+
 ## Visor: índice, páginas, modo noche (v39.5)
 - **Panel con pestañas**: 💬 Anotaciones, 📑 Índice (el marcador o «outline» del PDF, con niveles; en el móvil, hoja desde abajo que se cierra al saltar) y ▦ Páginas (miniaturas pequeñas, pintadas al verlas). Botón 📑 en la barra de herramientas.
 - **Notas aparte**: la lista separa 🖍 Subrayados (y zonas) de 🗒 Notas, con filtro por tipo.

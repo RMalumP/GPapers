@@ -127,8 +127,13 @@ with sync_playwright() as pw:
     # ---- reabrir: página recordada, «Hacerlas editables» y sin duplicados
     A.evaluate("pdfOpen('p1')"); A.wait_for_timeout(1800)
     eq('vuelve a abrir en la página donde lo dejaste', A.evaluate("[VW.cur, $('#vwPg').value]"), [2, '3'])
-    A.wait_for_timeout(800); A.evaluate("vwImport()"); A.wait_for_timeout(300)
+    A.wait_for_timeout(800)
+    eq('al abrir pregunta si traer las anotaciones hechas en otro programa', 'Hay 1 anotación nueva hecha en otro programa (Acrobat, Foxit…): ¿traerla?' in A.inner_text('#toast'), True)
+    A.click('#toast button:has-text("Traer")'); A.wait_for_timeout(300)
     eq('«Hacerlas editables» copia la de Acrobat como propia (color más parecido) y deja de pintarse dos veces', A.evaluate("(() => { const a = db.papers[0].pdf.ann.find(x => x.src); return [a.p, a.c, a.m, VW.foreign[0].dup, VW.doc.annotationStorage.getValue(VW.foreign[0].id, {}).noView]; })()"), [1, '#5fd068', 'Comentario de Acrobat', True, True])
+    eq('las que escribió GPapers no cuentan como de otro programa', A.evaluate("VW.foreign.push({id: 'zz', p: 0, q: [1, 1, 2, 2], c: '#ffd400', m: '', who: 'GPapers'}); const n = vwForeignNew().length; VW.foreign.pop(); n"), 0)
+    A.evaluate("vwClose()"); A.wait_for_timeout(300); A.evaluate("toast('otro')"); A.evaluate("pdfOpen('p1')"); A.wait_for_timeout(2600)
+    eq('ya traídas: al volver a abrir no pregunta otra vez', 'otro programa' in A.inner_text('#toast'), False)
     A.evaluate("vwClose()"); A.wait_for_timeout(300)
     # ---- desde la ficha del paper: lo que se anota va también al borrador
     A.evaluate("openPaper('p1'); tab = 'data'; drawD()"); A.click('#dlg .pdfrow button:has-text("Abrir")'); A.wait_for_timeout(1500)

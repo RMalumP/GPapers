@@ -39,7 +39,7 @@ function mgAdd(id) { db[MG].push({id, name: 'Nueva', color: '#2457c5', tagIds: [
    Aparte del JSON, la app guarda (1) una copia de trabajo, para reabrir justo donde lo dejaste aunque no hayas guardado, y
    (2) el estado de la interfaz (filtros, orden, barra lateral, bloques plegados). Viven fuera de la caché de la aplicación,
    así que las actualizaciones no los tocan y no hace falta borrar datos para recibir una versión nueva. */
-const APP_V = '39.5';   // debe coincidir con la versión de sw.js
+const APP_V = '39.6';   // debe coincidir con la versión de sw.js
 let BOOTED = false, RELOADING = false, SWREG = null, tSes = 0, tUi = 0, lastUi = '';
 const sessionNow = fast => { clearTimeout(tSes); if (!BOOTED || TAB.passive) return Promise.resolve();   // fast (desde sessionSoon): si acaba de hacerse la copia para deshacer, se usa esa (un JSON entero menos por cambio)   // copia de trabajo del proyecto abierto (y la lista de proyectos)
   const p = pjCur(); if (p) { Object.assign(p, {n: db.papers.length, file: path, dirty}); delete p.remote; }
@@ -60,8 +60,13 @@ function applyUI(u) {   // lo guardado nunca se fía: cada dato se valida contra
   CITE_SEL = typeof u.cite === 'string' && STYLES[u.cite] ? u.cite : ''; DATA_ALL = u.dataAll === true; strs(u.citeOpen).filter(g => STY_G.some(([x]) => (x || 'gen') === g)).forEach(g => CITE_OPEN.add(g)); strs(u.allFold).forEach(x => ALL_FOLD.add(x)); strs(u.cfg).forEach(x => CFG_OPEN.add(x)); strs(u.help).forEach(x => HELP_OPEN.add(x));
   $('#grpChk').checked = F.group; render();
 }
+function toastHome(t) {   // el aviso va dentro de la ventana abierta encima (el visor, la ficha…): si no, no se podría pulsar «Deshacer»
+  const top = [...document.querySelectorAll('dialog[open]')].filter(d => d.matches(':modal')).pop() || document.body; if (t.parentNode !== top) top.appendChild(t);
+}
+document.addEventListener('close', e => { const t = $('#toast'); if (t && e.target.contains?.(t)) toastHome(t); }, true);   // se cierra la ventana: el aviso sigue a la vista
 function toast(msg, acts = [], ms = 8000, tag = '') {   // tag: 'sy' = aviso de reconectar con Google (se quita solo al reconectar)
-  let t = $('#toast'); if (!t) { t = document.createElement('div'); t.id = 'toast'; t.setAttribute('role', 'status'); document.body.appendChild(t); }
+  let t = $('#toast'); if (!t) { t = document.createElement('div'); t.id = 'toast'; t.setAttribute('role', 'status'); }
+  toastHome(t);
   t.innerHTML = `<span>${esc(msg)}</span>${acts.map((a, i) => `<button data-i="${i}">${esc(a.t)}</button>`).join('')}<button data-x aria-label="Cerrar">✕</button>`; t.hidden = false; clearTimeout(t.tm);
   t.dataset.tag = tag; t.onclick = e => { const b = e.target.closest('button'); if (!b) return; t.hidden = true; if (b.dataset.x == null) acts[+b.dataset.i].fn(); };   // un botón del aviso lo cierra
   if (ms) t.tm = setTimeout(() => t.hidden = true, ms);
