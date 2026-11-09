@@ -17,8 +17,8 @@ with sync_playwright() as pw:
     kw = {'executable_path': '/opt/pw-browsers/chromium'} if os.path.exists('/opt/pw-browsers/chromium') else {}
     b = pw.chromium.launch(**kw); errs = []
     srv = subprocess.Popen([sys.executable, '-I', '-m', 'http.server', str(PORT), '-d', str(folder)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL); time.sleep(1)
-    def device(mobile=False, w=1280, h=800):
-        c = b.new_context(**pw.devices['Pixel 7'], service_workers='block') if mobile else b.new_context(viewport={'width': w, 'height': h}, service_workers='block', device_scale_factor=2 if SHOTS else 1)
+    def device(mobile=False, w=1280, h=800, touch=False):
+        c = b.new_context(**pw.devices['Pixel 7'], service_workers='block') if mobile else b.new_context(viewport={'width': w, 'height': h}, service_workers='block', device_scale_factor=2 if SHOTS else 1, is_mobile=touch, has_touch=touch)
         p = c.new_page(); p.on('pageerror', lambda e: errs.append(str(e))); p.on('console', lambda m: errs.append(m.text) if m.type == 'error' and 'favicon' not in m.text else None); p.add_init_script("window.ASK_AUTO = 'accept'")
         p.goto(f'http://localhost:{PORT}/index.html'); p.wait_for_timeout(1000); p.evaluate(f"window.P = {PAPER}; 0")
         p.evaluate(f"""(async () => {{ db.settings.pdfTab = 'app'; db.papers.length = 0; db.sections.length = 0; db.sections.push({{id: 's1', name: 'Método', color: '#2457c5', tagIds: []}});
@@ -84,6 +84,14 @@ with sync_playwright() as pw:
     V.mouse.move(sp[0], sp[1]); V.mouse.down(); V.mouse.move(sp[0], sp[1] + 200, steps=6); V.mouse.up(); V.wait_for_timeout(300)
     eq('tablet vertical: el divisor se arrastra hacia abajo (más PDF)', V.evaluate("$('#dlg').getBoundingClientRect().height < $('#vwScroll').getBoundingClientRect().height"), True)
     if SHOTS: V.screenshot(path=SHOTS + '/visor_notas_tablet_vertical.png')
+    c.close()
+    # ---- tablet de 7-8″ en vertical: la app va en modo móvil, pero el visor sí parte la pantalla
+    c, W = device(w=700, h=1100, touch=True); W.tap('#vw .vwnb'); W.wait_for_timeout(500)
+    eq('tablet pequeña vertical: modo móvil en la app', W.evaluate("document.documentElement.classList.contains('mv')"), True)
+    eq('tablet pequeña vertical: aun así, PDF arriba y notas abajo', W.evaluate("(() => { const d = $('#dlg').getBoundingClientRect(), s = $('#vwScroll').getBoundingClientRect(), b = $('#vw .vwbody').getBoundingClientRect(); return [Math.round(d.width) === Math.round(b.width), s.bottom <= d.top + 1, Math.abs(d.height - b.height / 2) < 3, getComputedStyle($('#vwSplit')).display !== 'none', $('#dlg .vwdpdf') ? getComputedStyle($('#dlg .vwdpdf')).display : 'none']; })()"), [True, True, True, True, 'none'])
+    if SHOTS: W.screenshot(path=SHOTS + '/visor_notas_tablet7_vertical.png')
+    W.tap('#vw .vwnb'); W.wait_for_timeout(300)
+    eq('tablet pequeña: 📝 otra vez guarda y cierra (no solo oculta)', W.evaluate("$('#dlg').open"), False)
     eq('sin errores (tablet)', errs, []); c.close()
     # ---- móvil: pantalla completa e ida y vuelta al PDF
     c, M = device(mobile=True)

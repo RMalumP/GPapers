@@ -673,13 +673,18 @@ function vwMenu(r, html) {   // menú desplegable dentro del visor (el de la apl
 const vwDocked = () => $('#dlg').open && $('#dlg').classList.contains('vwdock');
 function vwNotes() {
   const d = $('#dlg');
-  if (vwDocked()) { if (d.classList.contains('vwhide')) { d.classList.remove('vwhide'); return d.querySelector('.ned')?.focus(); } return vwMv() ? vwNotesHide() : vwNotesClose(); }
+  if (vwDocked()) { if (d.classList.contains('vwhide')) { d.classList.remove('vwhide'); return d.querySelector('.ned')?.focus(); } return vwSplitOk() ? vwNotesClose() : vwNotesHide(); }
   const p = vwPaper(); if (!p || d.open) return;
   VW.dlgNext = d.nextSibling; d.classList.add('vwdock'); vw$('.vwbody').insertBefore(d, $('#vwSide'));
-  vw$('.vwbody').insertBefore(vwSplitEl(), d); vwSplitSet(vwSplitGet()); $('#vw').classList.add('vwdk');
-  if (VW.side && !vwMv() && innerWidth < 1500) { VW.side = false; vwSideShow(); }   // sin el panel de anotaciones: el PDF necesita su mitad
+  vw$('.vwbody').insertBefore(vwSplitEl(), d); vwSplitSet(vwSplitGet()); $('#vw').classList.add('vwdk'); vwSplitMode();
+  if (VW.side && (vwMv() || innerWidth < 1500)) { VW.side = false; vwSideShow(); }   // sin el panel de anotaciones: el PDF necesita su mitad
   vw$('.vwnb').classList.add('on'); openPaper(p.id, true);
 }
+/* ¿Se parte la pantalla? Sí si el lado corto de la pantalla es de unos 600 px CSS o más (≈ 7″ o más: tablets) y la ventana no es estrecha;
+   en un teléfono, no: las notas ocupan la pantalla. Con la pantalla en vertical, el PDF va arriba y las notas abajo. */
+const vwSplitOk = () => Math.min(screen.width, screen.height) >= 600 && innerWidth >= 560;
+function vwSplitMode() { const v = $('#vw'); if (!v) return; v.classList.toggle('vwsp', vwSplitOk()); v.classList.toggle('vwcol', innerHeight > innerWidth); if (vwSplitOk()) $('#dlg').classList.remove('vwhide'); }
+window.addEventListener('resize', () => { if (vwDocked()) vwSplitMode(); });
 /* divisor entre el PDF y las notas: se arrastra para repartir el espacio (en horizontal, el ancho; en una tablet en vertical, el alto). Doble clic: mitad y mitad */
 const vwSplitGet = () => { try { const v = +localStorage.getItem('gp-vw-split'); return v >= 20 && v <= 80 ? v : 50; } catch (e) { return 50; } };
 function vwSplitSet(v, save) { v = Math.round(Math.max(20, Math.min(80, v)) * 10) / 10; $('#vw').style.setProperty('--vwn', v); if (save) try { localStorage.setItem('gp-vw-split', v); } catch (e) {} return v; }
