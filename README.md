@@ -249,4 +249,4 @@ En **Gestionar etiquetas** o **Gestionar secciones**, «＋ Nueva clasificación
 ## Más apretado y vista partida ajustable (v39.23)
 - **Tabla del móvil en dos líneas**: título; y debajo autores · año · revista seguidos de lectura, estrellas, etiquetas y notas (las etiquetas se recortan primero).
 - **Visor + notas: divisor arrastrable** entre el PDF y las notas para repartir el espacio (del 20 % al 80 %; se recuerda en el dispositivo). Doble clic: mitad y mitad. También con las flechas del teclado.
-- **Tablet en vertical**: vista partida con el PDF arriba y las notas abajo, con el mismo divisor (arrastrar arriba o abajo).
+- **Tablet en vertical**: vista partida con el PDF arriba y las notas abajo, con el mismo divisor (arrastrar arriba o abajo). Desde v39.24 depende del tamaño de la pantalla (lado corto de unos 600 px o más, ≈ 7″): también en tablets que usan el modo móvil de la app. En un teléfono las notas siguen a pantalla completa.

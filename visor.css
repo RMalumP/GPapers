@@ -116,17 +116,16 @@ html.mv .vwnote{width:32px;height:32px;font-size:18px;transform:translate(-7px,-
 #vw .vwbody>#dlg.vwdock{position:relative;inset:auto;margin:0;flex:0 0 calc(var(--vwn,50) * 1%);width:auto;max-width:none;height:auto;max-height:none;min-width:0;border:0;border-left:1px solid var(--bd);border-radius:0;overflow:auto;box-shadow:-4px 0 14px #0002;z-index:5}
 #vw .vwbody>#dlg.vwdock.vwhide{display:none}#dlg .vwdpdf{display:none}
 #vw .vwnb.on{background:color-mix(in srgb,var(--pri) 16%,transparent)}
-@media(max-width:700px){#vw .vwbody>#dlg.vwdock{position:absolute;inset:0;width:auto}#dlg.vwdock .vwdpdf{display:inline-flex}}
-html.mv #vw .vwbody>#dlg.vwdock{position:absolute;inset:0;width:auto;height:auto;padding-bottom:calc(16px + env(safe-area-inset-bottom,0px))}html.mv #dlg.vwdock .vwdpdf{display:inline-flex}
+/* sin sitio para partir (teléfono o ventana estrecha): las notas tapan el PDF y «📄 Ver el PDF» va y vuelve */
+#vw.vwdk:not(.vwsp) .vwbody>#dlg.vwdock{position:absolute;inset:0;width:auto;height:auto;padding-bottom:calc(16px + env(safe-area-inset-bottom,0px))}#vw.vwdk:not(.vwsp) #dlg.vwdock .vwdpdf{display:inline-flex}#vw.vwdk:not(.vwsp) .vwsplit{display:none}
 /* divisor arrastrable entre el PDF y las notas */
 .vwsplit{flex:none;width:10px;margin:0 -5px;z-index:6;cursor:col-resize;touch-action:none;position:relative;background:transparent}
 .vwsplit::after{content:"";position:absolute;left:3px;right:3px;top:50%;height:44px;transform:translateY(-50%);border-radius:3px;background:var(--bd)}
 .vwsplit:hover::after,.vwsplit.on::after,.vwsplit:focus-visible::after{background:var(--pri)}
 #vw .vwbody>#dlg.vwdock{border-left:0}
-/* tablet en vertical: vista partida con el PDF arriba y las notas abajo */
-@media (orientation:portrait) and (min-width:701px){html:not(.mv) #vw.vwdk .vwbody{flex-direction:column}
-  html:not(.mv) #vw.vwdk .vwsplit{width:auto;height:12px;margin:-6px 0;cursor:row-resize}
-  html:not(.mv) #vw.vwdk .vwsplit::after{top:4px;bottom:4px;left:50%;right:auto;width:52px;height:auto;transform:translateX(-50%)}
-  html:not(.mv) #vw.vwdk .vwbody>#dlg.vwdock{border-top:1px solid var(--bd);box-shadow:0 -4px 14px #0002;min-height:0}
-  html:not(.mv) #vw.vwdk #vwScroll{min-height:0}}
-@media(max-width:700px){.vwsplit{display:none}}html.mv .vwsplit{display:none}
+/* pantalla en vertical (tablet): vista partida con el PDF arriba y las notas abajo */
+#vw.vwdk.vwsp.vwcol .vwbody{flex-direction:column}
+#vw.vwdk.vwsp.vwcol .vwsplit{width:auto;height:14px;margin:-7px 0;cursor:row-resize}
+#vw.vwdk.vwsp.vwcol .vwsplit::after{top:5px;bottom:5px;left:50%;right:auto;width:56px;height:auto;transform:translateX(-50%)}
+#vw.vwdk.vwsp.vwcol .vwbody>#dlg.vwdock{border-top:1px solid var(--bd);box-shadow:0 -4px 14px #0002;min-height:0}
+#vw.vwdk.vwsp.vwcol #vwScroll{min-height:0}
