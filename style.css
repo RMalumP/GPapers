@@ -246,3 +246,8 @@ html:not(.mv) main>.row .chip{flex:0 0 auto;white-space:nowrap}html:not(.mv) mai
 html:not(.mv) main>.row>#q{flex:1 1 220px;max-width:220px;min-width:70px}
 html:not(.mv) #count{flex:0 0 auto;white-space:nowrap}
 html:not(.mv) main>.row.cmp .bl{display:none}
+
+/* Clasificaciones para ordenar (Gestionar secciones / etiquetas) */
+#mg .mgo{display:flex;flex-direction:column;gap:6px;margin:0 0 12px;padding:10px;border:1px solid var(--bd);border-radius:10px;background:var(--bg)}
+#mg .mgo label{display:flex;flex-direction:column;gap:2px;font-size:13px}#mg .mgo small{opacity:.8}
+#mg .mgk{width:4.5em;text-align:center;font-weight:600}#mg .mgk.bad{border-color:#c0392b;background:#c0392b22}

@@ -177,3 +177,7 @@ html.mv #mg .mgr.mgs{grid-template-columns:44px minmax(0,1fr) 44px 44px;grid-tem
 html.mv #mg .mgr.mgt{grid-template-columns:44px minmax(0,1fr) 44px 44px 44px;grid-template-areas:"c n u d x"}
 html.mv #mg .mgc{grid-area:c}html.mv #mg .mgn{grid-area:n}html.mv #mg .mgd{grid-area:s}html.mv #mg .mgu{grid-area:u}html.mv #mg .mgw{grid-area:d}html.mv #mg .mgx{grid-area:x}
 html.mv #mg .mgt .mgx .mgxl{display:none}html.mv #mg .mgx .mgxi{display:none}html.mv #mg .mgt .mgx .mgxi{display:inline}
+html.mv #mg .mgr.mgs.mgkon{grid-template-columns:52px 44px minmax(0,1fr) 44px 44px;grid-template-areas:"k c n u d" "s s s x x"}
+html.mv #mg .mgr.mgt.mgkon{grid-template-columns:52px 44px minmax(0,1fr) 44px 44px 44px;grid-template-areas:"k c n u d x"}
+html.mv #mg .mgk{grid-area:k;text-align:center}
+html.mv #mg .mgo select{width:100%}

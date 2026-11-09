@@ -221,3 +221,9 @@ El HTML no lleva `onclick` ni otros manejadores en línea: `index.html` tiene un
 
 ## Licencia
 [Creative Commons Reconocimiento-CompartirIgual 4.0 Internacional (CC BY-SA 4.0)](https://creativecommons.org/licenses/by-sa/4.0/deed.es): texto completo en `LICENSE`. Dirección: R.M.P. · Desarrollo: Vibe Coding con Claude.
+
+## Clasificaciones para ordenar (v39.16)
+En **Gestionar etiquetas** o **Gestionar secciones**, «＋ Nueva clasificación» crea un criterio de orden propio (p. ej. «Días»), con valores en **números** (1, 2, 3…), **letras** (A, B, C…; AA va tras Z), **números romanos** (I, II, III…; solo bien escritos) o **texto libre**. Puede haber varias a la vez, de etiquetas y de secciones.
+- Con una clasificación elegida, cada etiqueta o sección tiene una casilla para su valor (en rojo si no se entiende, p. ej. «IIII»).
+- **Ordenar**: cada clasificación sale como criterio (🏷️ o 📁 + su nombre). Cada paper usa el valor más bajo de sus etiquetas o secciones; los que no tienen ninguna con valor van al final, en ambos sentidos. «⇅ Ordenar los papers por…» lo aplica directamente y «Ordenar también esta lista» reordena las propias etiquetas o secciones.
+- Se guardan en el JSON del proyecto (`orders`: `{id, name, of: 'tags'|'sections', fmt: 'num'|'alpha'|'roman'|'text'}`; cada etiqueta o sección, en `rk: {idClasificación: valor}`) y se sincronizan con Google Drive valor a valor. Las vistas ⭐ las recuerdan.

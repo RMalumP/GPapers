@@ -587,9 +587,50 @@ function commit() {
 }
 
 /* ===== Gestor de etiquetas y secciones ===== */
-function openMg(k) { MG = k; drawMg(); $('#mg').showModal(); }
+function openMg(k) { MG = k; MGO_FORM = null; if (!ordOf(k).some(o => o.id === MGO)) MGO = ''; drawMg(); $('#mg').showModal(); }
+let MGO = '', MGO_FORM = null;   // clasificación elegida en el gestor · formulario de crear o editar una ({id, name, fmt})
+function mgOrdHTML() {   // barra de clasificaciones del gestor: elegir, crear, editar, borrar y aplicar
+  const L = ordOf(MG), o = L.find(x => x.id === MGO), w = MG === 'tags' ? 'etiqueta' : 'sección';
+  if (MGO_FORM) return `<div class="mgo mgof"><b>${MGO_FORM.id ? 'Editar la clasificación' : 'Nueva clasificación'}</b>
+    <label>Nombre<input id="mgoName" value="${esc(MGO_FORM.name)}" placeholder="p. ej. Días de la semana" data-onkeydown="mgoKey(event)"></label>
+    <label>Valores<select id="mgoFmt">${Object.entries(ORD_FMT).map(([k, v]) => `<option value="${k}" ${MGO_FORM.fmt === k ? 'selected' : ''}>${v}</option>`).join('')}</select></label>
+    <div class="row"><button class="pri" data-onclick="mgOrdSave()">Guardar</button><button data-onclick="mgOrdCancel()">Cancelar</button></div></div>`;
+  return `<div class="mgo"><label>Clasificación para ordenar<select data-onchange="mgOrdSel(this.value)"><option value="">Ninguna (solo el orden de esta lista)</option>${L.map(x => `<option value="${x.id}" ${x.id === MGO ? 'selected' : ''}>${esc(x.name)} · ${ORD_FMT[x.fmt].split(' (')[0].toLowerCase()}</option>`).join('')}</select></label>
+    <div class="row"><button data-onclick="mgOrdNew()">＋ Nueva clasificación</button>${o ? `<button data-onclick="mgOrdEdit()">✎ Editar</button><button class="danger" data-onclick="mgOrdDel()">🗑 Borrar</button>` : ''}</div>
+    ${o ? `<small>Pon a cada ${w} su valor (${ORD_FMT[o.fmt].replace(/^[^(]*\(|\)$/g, '')}). En «Ordenar», elige «${MG === 'tags' ? '🏷️' : '📁'} ${esc(o.name)}» para ordenar los papers así; los que no tengan ninguna ${w} con valor van al final.</small>
+    <div class="row"><button data-onclick="mgOrdSortPapers()">⇅ Ordenar los papers por «${esc(o.name)}»</button><button data-onclick="mgOrdSortList()">Ordenar también esta lista</button></div>` : ''}</div>`;
+}
+function mgoKey(e) { if (e.key === 'Enter') { e.preventDefault(); mgOrdSave(); } else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); mgOrdCancel(); } }
+function mgOrdSel(id) { MGO = id; drawMg(); }
+function mgOrdNew() { MGO_FORM = {id: '', name: '', fmt: 'num'}; drawMg(); $('#mgoName')?.focus(); }
+function mgOrdEdit() { const o = ordOf(MG).find(x => x.id === MGO); if (o) { MGO_FORM = {id: o.id, name: o.name, fmt: o.fmt}; drawMg(); $('#mgoName')?.focus(); } }
+function mgOrdCancel() { MGO_FORM = null; drawMg(); }
+function mgOrdSave() {
+  const name = $('#mgoName').value.trim(), fmt = $('#mgoFmt').value; if (!name) return $('#mgoName').focus();
+  db.orders ||= []; const o = MGO_FORM.id && db.orders.find(x => x.id === MGO_FORM.id);
+  if (o) Object.assign(o, {name, fmt}); else { const id = uid(); db.orders.push({id, name, of: MG, fmt}); MGO = id; }
+  MGO_FORM = null; markDirty(); drawMg(); render();
+}
+async function mgOrdDel() {
+  const o = ordOf(MG).find(x => x.id === MGO); if (!o || !await askOk(`¿Borrar la clasificación «${o.name}»? Se quitan sus valores de ${MG === 'tags' ? 'las etiquetas' : 'las secciones'}; las ${MG === 'tags' ? 'etiquetas' : 'secciones'} no se tocan.`)) return;
+  db.orders = db.orders.filter(x => x.id !== o.id); db[MG].forEach(x => { if (x.rk) { delete x.rk[o.id]; if (!Object.keys(x.rk).length) delete x.rk; } });
+  MGO = ''; markDirty(); drawMg(); render();
+}
+function mgRk(id, el) {   // valor de una etiqueta o sección en la clasificación elegida; se marca si no se entiende (p. ej. «IIII» no, «IV» sí)
+  const x = db[MG].find(y => y.id === id), o = ordOf(MG).find(y => y.id === MGO), v = el.value.trim(); if (!x || !o) return;
+  if (v) (x.rk ||= {})[o.id] = v; else if (x.rk) { delete x.rk[o.id]; if (!Object.keys(x.rk).length) delete x.rk; }
+  el.classList.toggle('bad', !!v && ordVal(o, v) == null); markDirty();
+}
+function mgOrdSortPapers() { F.sorts = [{k: 'o:' + MGO, d: 1}]; $('#mg').close(); render(); toast('Papers ordenados por la clasificación. Se cambia en «Ordenar».', [], 3000); }
+function mgOrdSortList() {   // reordena las etiquetas o secciones según sus valores (las que no tienen, al final, en su orden)
+  const o = ordOf(MG).find(y => y.id === MGO); if (!o) return; const v = x => ordVal(o, x.rk?.[o.id]);
+  db[MG] = db[MG].map((x, i) => ({x, i, v: v(x)})).sort((a, b) => (a.v == null) - (b.v == null) || (a.v == null ? 0 : typeof a.v === 'number' ? a.v - b.v : COLL.compare(a.v, b.v)) || a.i - b.i).map(e => e.x);
+  markDirty(); drawMg(); render();
+}
 function drawMg() {
-  $('#mg').innerHTML = `<h2>${MG === 'tags' ? 'Etiquetas' : 'Secciones'}</h2>` + db[MG].map(x => `<div class="row mgr ${MG === 'sections' ? 'mgs' : 'mgt'}" style="margin-bottom:6px">
+  const o = !MGO_FORM && ordOf(MG).find(x => x.id === MGO), kv = x => x.rk?.[o.id] || '';
+  $('#mg').innerHTML = `<h2>${MG === 'tags' ? 'Etiquetas' : 'Secciones'}</h2>` + mgOrdHTML() + db[MG].map(x => `<div class="row mgr ${MG === 'sections' ? 'mgs' : 'mgt'}${o ? ' mgkon' : ''}" style="margin-bottom:6px">
+    ${o ? `<input class="mgk${kv(x) && ordVal(o, kv(x)) == null ? ' bad' : ''}" value="${esc(kv(x))}" placeholder="${ORD_PH[o.fmt]}" aria-label="Valor en «${esc(o.name)}»" title="Valor en «${esc(o.name)}»" data-oninput="mgRk('${x.id}',this)">` : ''}
     <input class="mgc" type="color" value="${x.color || '#888888'}" aria-label="Color" data-oninput="upd('${x.id}','color',this.value)"><input class="mgn" value="${esc(x.name)}" aria-label="Nombre" data-oninput="upd('${x.id}','name',this.value)">
     ${MG === 'sections' ? `<input class="mgd" placeholder="Descripción" aria-label="Descripción" value="${esc(x.description || '')}" data-oninput="upd('${x.id}','description',this.value)">` : ''}
     <button class="mgu" title="Subir" aria-label="Subir" data-onclick="moveM('${x.id}',-1)">↑</button><button class="mgw" title="Bajar" aria-label="Bajar" data-onclick="moveM('${x.id}',1)">↓</button><button class="danger mgx" title="Eliminar" aria-label="Eliminar" data-onclick="delM('${x.id}')"><span class="mgxl">Eliminar</span><span class="mgxi" hidden>🗑</span></button></div>`).join('') +

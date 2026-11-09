@@ -44,6 +44,22 @@ const SEL = new Set();   // ids de papers seleccionados
 const READ = {por_leer: 'Por leer', leyendo: 'Leyendo', leido: 'Leído'};   // estado de lectura (único por paper)
 const READ_N = {por_leer: 0, leyendo: 1, leido: 2}, READ_C = {por_leer: '#888888', leyendo: '#2457c5', leido: '#27ae60'};
 const SORTS = {created: 'Fecha de creación', modified: 'Última modificación', title: 'Título', author: 'Autor', year: 'Año', venue: 'Revista/editorial', accessed: 'Fecha de consulta', reading: 'Estado de lectura', rating: 'Valoración'};
+/* Clasificaciones para ordenar (db.orders): varias por proyecto, cada una de etiquetas o de secciones, con su forma de escribir los valores.
+   Cada etiqueta o sección guarda su valor en rk[idClasificación] (texto tal cual se escribió: «3», «C», «III»…). */
+const ORD_FMT = {num: 'Números (1, 2, 3…)', alpha: 'Letras (A, B, C…)', roman: 'Números romanos (I, II, III…)', text: 'Texto libre (orden alfabético)'};
+const ORD_PH = {num: '1', alpha: 'A', roman: 'I', text: 'texto'};
+const ordOf = k => (db.orders || []).filter(o => o.of === k);
+function romanVal(s) {
+  const V = {I: 1, V: 5, X: 10, L: 50, C: 100, D: 500, M: 1000}, u = s.toUpperCase(); if (!u || !/^M{0,4}(CM|CD|D?C{0,3})(XC|XL|L?X{0,3})(IX|IV|V?I{0,3})$/.test(u)) return null;   // solo bien escritos («IIII» no)
+  let n = 0; for (let i = 0; i < u.length; i++) { const a = V[u[i]], b = V[u[i + 1]] || 0; n += a < b ? -a : a; } return n;
+}
+function ordVal(o, raw) {   // número para comparar (o texto, en «texto libre»); null = sin valor o mal escrito
+  const s = String(raw ?? '').trim(); if (!s) return null;
+  if (o.fmt === 'text') return s;
+  if (o.fmt === 'roman') return romanVal(s);
+  if (o.fmt === 'alpha') { if (!/^\p{L}+$/u.test(s)) return null; let n = 0; for (const c of norm(s).toUpperCase()) { const k = c.charCodeAt(0) - 64; if (k < 1 || k > 26) return null; n = n * 26 + k; } return n; }   // A=1 … Z=26, AA=27
+  const n = Number(s.replace(',', '.')); return Number.isFinite(n) ? n : null;
+}
 const KEY = {created: p => p.created || '', modified: p => p.modified || p.created || '', title: p => p.alias || p.title, author: p => p.authors[0] || '',
   year: p => +p.year || 0, venue: p => p.venue || '', accessed: p => p.accessed || '', reading: p => READ_N[p.reading] ?? 0, rating: p => p.rating || 0};
 const TYPES = {articulo: 'Artículo de revista', libro: 'Libro', capitulo: 'Capítulo', congreso: 'Congreso', tesis: 'Tesis', web: 'Página web', prensa: 'Artículo de prensa', blog: 'Entrada de blog',
