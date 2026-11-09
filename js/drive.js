@@ -219,7 +219,7 @@ function syGesture() {   // sin acceso: el siguiente clic o tecla (en cualquier 
   const off = () => { SY.gest = false; EV.forEach(t => document.removeEventListener(t, h, true)); };
   const h = e => { if (e.type === 'pointerdown' ? e.pointerType !== 'mouse' : e.type === 'pointerup' && e.pointerType === 'mouse') return;
     if (e.type === 'keydown' && ['Escape', 'Shift', 'Control', 'Alt', 'Meta'].includes(e.key)) return;   // teclas que no dan permiso para abrir ventanas
-    if (!syOn() || SY.consent || !['reconnect', 'error'].includes(SY.st)) return off(); if (SY.busy || Date.now() - syTried() < 15000) return; off(); syRun(false, true); };
+    if (!syOn() || SY.consent || !['reconnect', 'error'].includes(SY.st)) return off(); if (SY.busy) return; off(); syRun(false, true); };
   EV.forEach(t => document.addEventListener(t, h, true));
 }
 const syGis = () => window.google?.accounts?.oauth2 ? Promise.resolve() : new Promise((ok, ko) => {
@@ -233,7 +233,7 @@ function syToken(inter) {   // inter = false: renueva el acceso sin ventana (sol
 function syTokAsk(inter) {
   return syGis().then(() => new Promise((ok, ko) => {
     const lim = inter ? 0 : setTimeout(() => ko(Error('silencio')), 15000), fin = () => clearTimeout(lim);
-    google.accounts.oauth2.initTokenClient({client_id: SY_CFG.clientId, scope: syScopes(),
+    google.accounts.oauth2.initTokenClient({client_id: SY_CFG.clientId, scope: syScopes(), ...(syP().who ? {hint: syP().who} : {}),   // con varias cuentas de Google abiertas, sin la pista no sabe cuál usar y pide elegir
       callback: r => { fin(); if (r && r.access_token) { syTokPut(r.access_token, +r.expires_in); ok(r.access_token); } else ko(Error(r && r.error || 'denegado')); },
       error_callback: e => { fin(); ko(Error(e && e.type || 'cerrada')); }}).requestAccessToken({prompt: inter ? '' : 'none'});
   }));
@@ -415,7 +415,9 @@ async function syRun(inter, gesture) {   // gesture: viene de un clic o una tecl
   if (!inter && !syOn()) return null;
   if (SY.busy) { SY.again = true; return null; }
   if (!inter && !syTokGet()) {   // sin acceso: renovarlo sin ventana se intenta una sola vez (no a cada cambio ni desde cada pestaña); luego, con el siguiente clic
-    if (SY.consent || !gesture && (SY.st === 'reconnect' || Date.now() - syTried() < 6e4)) { SY.st = 'reconnect'; if (!SY.consent) syGesture(); syIcon(); return null; }   // consent: hace falta «Conectar»
+    // sin un clic o una tecla el navegador bloquea siempre la ventana de Google (en el ordenador, al abrir la app, fallaba siempre y acababa en «Conectar»):
+    // no se intenta; se espera al siguiente clic o tecla en cualquier parte, que reconecta solo. consent: hace falta «Conectar»
+    if (SY.consent || !gesture) { SY.st = 'reconnect'; if (!SY.consent) { syGesture(); syWarn(); } syIcon(); return null; }
     syTry();
   }
   clearTimeout(SY.tm); SY.tm = 0; SY.busy = true; SY.wait = false; SY.st = 'busy'; syIcon(); const t0 = Date.now();
@@ -431,11 +433,12 @@ async function syRun(inter, gesture) {   // gesture: viene de un clic o una tecl
     if (SY.st === 'reconnect' && gesture) { SY.consent = true; toast('Google necesita que vuelvas a dar permiso a la aplicación. Tus datos siguen aquí.', [{t: 'Conectar', fn: syConnect}], 0, 'sy'); }   // ni con un clic se pudo sin su ventana de permiso
     else {
       if (SY.st === 'reconnect' || SY.st === 'error') syGesture();
-      if (SY.st === 'reconnect' && !SY.warned) { SY.warned = true; toast('Google corta el acceso cada hora: se reconectará con tu próximo clic. No pierdes nada.', [], 6000, 'sy'); }
+      if (SY.st === 'reconnect') syWarn();
     }
     return null;
   } finally { SY.busy = false; syIcon(); if (SY.again) { SY.again = false; sySoon(1500); } }
 }
+function syWarn() { if (!SY.warned) { SY.warned = true; toast('Google corta el acceso cada hora: se reconectará con tu próximo clic. No pierdes nada.', [], 6000, 'sy'); } }
 const syToastOff = () => { const t = $('#toast'); if (t && t.dataset.tag === 'sy') t.hidden = true; };   // ya hay acceso: fuera el aviso de reconectar
 const sySoon = (ms = 3000) => { clearTimeout(SY.tm); SY.tm = setTimeout(() => { SY.tm = 0; syRun(false); }, ms); };
 const syAuto = () => syOn() && syP().auto !== false;

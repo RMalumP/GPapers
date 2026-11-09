@@ -45,7 +45,7 @@ def drive(route, req):
     return route.fulfill(status=404, headers=CORS, body='{}')
 GOOGLE = """// permiso del navegador para abrir ventanas, como en un móvil de verdad: lo da levantar el dedo (o pulsar con el ratón, o una tecla), no apoyarlo
 ['pointerdown', 'pointerup', 'keydown'].forEach(t => window.addEventListener(t, e => { if (t === 'pointerdown' && e.pointerType !== 'mouse') return; window.__act = true; setTimeout(() => window.__act = false, 1000); }, true));
-window.google = {accounts: {oauth2: {initTokenClient: c => ({requestAccessToken: o => { window.__tok = (window.__tok || 0) + 1; window.__cid = c.client_id;
+window.google = {accounts: {oauth2: {initTokenClient: c => ({requestAccessToken: o => { window.__tok = (window.__tok || 0) + 1; window.__cid = c.client_id; window.__hint = c.hint;
   const blocked = window.__needGesture && !window.__act; window.__blocked = (window.__blocked || 0) + (blocked ? 1 : 0);
   setTimeout(() => window.__deny || blocked ? c.error_callback({type: 'popup_failed_to_open'}) : c.callback({access_token: 'tok', expires_in: 3600, scope: c.scope}), 5); }}), revoke: (t, cb) => cb && cb()}}};"""
 names = lambda pre='gpapers-': sorted(f['name'] for f in STORE.values() if f['name'].startswith(pre))
