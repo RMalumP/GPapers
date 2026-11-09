@@ -103,3 +103,12 @@ html.mv .vwnote{width:32px;height:32px;font-size:18px;transform:translate(-7px,-
 .ibdup{font-size:12px;padding:4px 6px;border-radius:6px;background:color-mix(in srgb,#e8a33a 18%,transparent);display:flex;flex-wrap:wrap;gap:4px;align-items:center}.ibdup .sm{padding:1px 6px}
 .ibann{background:none;border:0;padding:0;color:var(--pri);font-size:12px;text-align:left;cursor:pointer;text-decoration:underline}
 .ibbtn{display:inline-flex;align-items:center;gap:3px}.ibbtn b{font-size:11px;background:var(--pri);color:#fff;border-radius:9px;padding:0 6px;line-height:16px}.ibbtn.on{outline:2px solid var(--pri)}.ibbtn[hidden]{display:none}
+
+/* v39.5: pestañas del panel (anotaciones, índice, páginas), notas aparte, borrar varias, modo noche */
+.vwst{display:flex;gap:2px;align-items:center;padding:6px 6px 0;border-bottom:1px solid var(--bd)}.vwst button[role=tab]{flex:1;border:0;border-bottom:2px solid transparent;border-radius:6px 6px 0 0;background:none;padding:6px 4px;font-size:13px;white-space:nowrap}.vwst button.on{border-bottom-color:var(--pri);color:var(--pri);font-weight:600}.vwst .vwib{flex:none}
+.vwkd{display:flex;flex-wrap:wrap;gap:4px}.vwkd button{font-size:12px;padding:2px 8px;border-radius:99px}.vwkd button.on{background:var(--pri);color:#fff;border-color:var(--pri)}
+.vwpkb{display:flex;gap:6px;padding:0 10px 6px}.vwpkb button{font-size:12px;padding:3px 8px}
+.vwgh{margin:6px 2px 0;font-size:12px;opacity:.75;font-weight:600}
+.vwtoc ul{list-style:none;margin:0;padding:0}.vwtl{display:flex;width:100%;gap:8px;align-items:baseline;text-align:left;border:0;background:none;padding:5px 6px 5px calc(6px + var(--d) * 14px);border-radius:6px;font-size:13px}.vwtl:hover{background:color-mix(in srgb,var(--pri) 10%,transparent)}.vwtl span{flex:1}.vwtl small{opacity:.6}.vwtl.no{opacity:.6;cursor:default}
+.vwth{display:grid!important;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:10px;align-content:start}.vwtp{display:flex;flex-direction:column;align-items:center;gap:3px;border:2px solid transparent;background:none;padding:3px;border-radius:6px}.vwtp.on{border-color:var(--pri)}.vwtp canvas,.vwtc0{width:100%;height:auto;background:#fff;box-shadow:0 1px 3px #0003;display:block}.vwtp small{font-size:11px;opacity:.75}
+#vw.night #vwScroll{background:#0e0f12}#vw.night .vwp,#vw.night .vwtc0{background:#1c1e23}#vw.night .vwhl{mix-blend-mode:screen;opacity:.45}#vw.night .textLayer ::selection{background:#4a7bd088}
