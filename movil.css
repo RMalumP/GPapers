@@ -196,3 +196,9 @@ html.mv .tbl tr.rw>td.c-del .x{min-height:22px;min-width:26px}
 html.mv .tbl tr.rw td input[type=checkbox]{width:16px;height:16px}
 html.mv .tbl tr.rw>td.timg{width:38px}html.mv .tbl tr.rw>td.timg .pimg.xs{width:38px;height:38px;font-size:17px}
 html.mv #ctx.selm{max-height:min(80dvh,640px);overflow-y:auto;overscroll-behavior:contain}
+/* aún más apretada: dos líneas por paper (título · y debajo autores/año/revista seguidos del resto de columnas) */
+html.mv .tbl tr.rw>td.mvx,html.mv .tbl tr.rw:has(td.timg .pimg)>td.mvx{grid-area:2/3/3/5}
+html.mv .tbl tr.rw>td.mvx>.mvm{flex:1 1 auto;min-width:40px;max-width:none;opacity:.75;overflow:hidden;text-overflow:ellipsis;font-size:12px}html.mv .tbl tr.rw>td.mvx>.mvm i{font-style:normal;opacity:.6;margin:0 4px}
+html.mv .tbl tr.rw>td.mvx>:is(.c-tags,.c-sections){flex:0 1000 auto}   /* se recortan antes que los autores */
+html.mv .tbl tr.rw>td.mvx>.c-notes{margin-left:0}html.mv .tbl tr.rw>td.mvx>.c-notes .sm{padding:0 4px}
+html.mv .tbl tr.rw>td.mvx{min-height:22px}html.mv .tbl tr.rw>td.timg{width:34px}html.mv .tbl tr.rw>td.timg .pimg.xs{width:34px;height:34px;font-size:15px}

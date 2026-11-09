@@ -131,7 +131,7 @@ with sync_playwright() as pw:
     IMG = "{kind:'data',data:'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=='}"
     pg.evaluate("db.papers[0].tagIds = []; render()"); h0 = pg.evaluate(alto)
     pg.evaluate(f"db.papers[0].image = {IMG}; render()"); pg.wait_for_timeout(100)
-    eq('tabla: la miniatura es visible', pg.evaluate("(() => { const r = $('.tbl tr.rw .pimg').getBoundingClientRect(); return r.width >= 36 && r.height >= 36 && r.right <= innerWidth; })()"), True)
+    eq('tabla: la miniatura es visible', pg.evaluate("(() => { const r = $('.tbl tr.rw .pimg').getBoundingClientRect(); return r.width >= 32 && r.height >= 32 && r.right <= innerWidth; })()"), True)
     eq('tabla: la miniatura no cambia el alto de la fila', pg.evaluate(alto), h0)
     pg.evaluate("setView('cards')"); pg.wait_for_timeout(100)
     altoC = "Math.round($('.card').getBoundingClientRect().height)"; hc = pg.evaluate(altoC)

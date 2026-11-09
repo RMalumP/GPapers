@@ -245,3 +245,8 @@ En **Gestionar etiquetas** o **Gestionar secciones**, «＋ Nueva clasificación
 - **Arrastrar con el dedo** (vista agrupada por sección, tarjetas o tabla): mantén pulsado un paper medio segundo sin mover el dedo, sale su etiqueta y luego lo llevas a otra sección (o a «Sin sección»). Cerca del borde, la lista se desplaza sola. Si mueves el dedo enseguida, solo desplazas la lista.
 - **☑ con menú**: clic derecho (en el móvil, mantener pulsado) en ☑ para elegir: los que se ven o todos los del proyecto. Con algo elegido, también lo del grupo «Selección»: lectura, valoración, etiqueta, sección, exportar citas, mover o copiar a otro proyecto, enviar a la papelera y quitar la selección (v39.22). Un toque normal sigue eligiendo los que se ven.
 - **Tabla del móvil más compacta** (v39.22): menos aire y letra y botones algo más pequeños; cada ficha ocupa ~20 % menos.
+
+## Más apretado y vista partida ajustable (v39.23)
+- **Tabla del móvil en dos líneas**: título; y debajo autores · año · revista seguidos de lectura, estrellas, etiquetas y notas (las etiquetas se recortan primero).
+- **Visor + notas: divisor arrastrable** entre el PDF y las notas para repartir el espacio (del 20 % al 80 %; se recuerda en el dispositivo). Doble clic: mitad y mitad. También con las flechas del teclado.
+- **Tablet en vertical**: vista partida con el PDF arriba y las notas abajo, con el mismo divisor (arrastrar arriba o abajo).
