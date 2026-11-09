@@ -273,3 +273,4 @@ En **Gestionar etiquetas** o **Gestionar secciones**, «＋ Nueva clasificación
 
 ## Fila de filtros aún más fina en el móvil (v39.29)
 - Los botones de «Filtros: … ✕ · Limpiar todo» miden 20 px de alto (antes 26 px) con letra de 11,5 px, y la fila casi no tiene margen.
+- Con filtros aplicados, la cuenta «4 de 6 · 0 sel.» pasa a la derecha de la fila de filtros, en vez de ocupar una línea propia debajo de los botones.

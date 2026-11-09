@@ -149,6 +149,7 @@ with sync_playwright() as pw:
     pg.evaluate("db.papers[0].tagIds = []; setView('cards')")
     eq('pulsación larga = clic derecho (valoración)', pg.evaluate("""() => new Promise(r => { const s = $('#list .stv'), o = s.getBoundingClientRect(), t = new Touch({identifier: 1, target: s, clientX: o.x + 5, clientY: o.y + 5});
         s.dispatchEvent(new TouchEvent('touchstart', {bubbles: true, touches: [t]})); setTimeout(() => r(!$('#ctx').hidden && $('#ctx').textContent.includes('Valoración')), 700); })"""), True)
+    eq('móvil: con filtros, la cuenta va en la fila de filtros; sin ellos, vuelve a su línea', pg.evaluate("(() => { F.read = 'leido'; render(); const a = $('#count').parentElement.id; fClrAll(); const b = $('#count').parentElement.matches('main>.row'); return [a, b, $('#count').textContent.includes(' de ')]; })()"), ['actF', True, True])
     eq('móvil: sin errores', errs, [])
     ctx.close(); b.close()
 print(f'{n - fail}/{n} pruebas correctas'); sys.exit(1 if fail else 0)
