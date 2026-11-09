@@ -29,10 +29,20 @@ function fnameDraw() {   // un único indicador de guardado, junto al nombre del
   el.dataset.st = T[0]; el.textContent = T[1] + (db.settings.showFile && f && T[1] !== '(sin archivo)' ? ' · ' + f : '');
 }
 const COLL = new Intl.Collator('es');   // igual que localeCompare(…, 'es'), pero sin crear el comparador en cada llamada
+function ordKey(id) {   // clave de un paper según una clasificación: el valor más bajo entre sus etiquetas o secciones (null si ninguna tiene)
+  const o = (db.orders || []).find(x => x.id === id); if (!o) return () => null;
+  const m = new Map(db[o.of].map(x => [x.id, ordVal(o, x.rk?.[id])])), lt = (a, b) => typeof a === 'number' ? a < b : COLL.compare(a, b) < 0;
+  return p => { let best = null; for (const i of o.of === 'tags' ? p.tagIds : p.sectionIds) { const v = m.get(i); if (v != null && (best == null || lt(v, best))) best = v; } return best; };
+}
+const sortFn = k => KEY[k] || (k.startsWith('o:') ? ordKey(k.slice(2)) : () => '');
+function sortOpts() {   // criterios de Ordenar: los de siempre y las clasificaciones del proyecto
+  return {...SORTS, ...Object.fromEntries((db.orders || []).map(o => ['o:' + o.id, `${o.of === 'tags' ? '🏷️' : '📁'} ${o.name}`]))};
+}
 function sortList(L) {   // ordena por todos los criterios, en cascada; d = 1 ascendente, -1 descendente
-  const S = F.sorts, K = L.map(p => ({p, k: S.map(s => KEY[s.k](p))}));   // cada clave se calcula una vez por paper, no en cada comparación
+  const S = F.sorts, fs = S.map(s => sortFn(s.k)), K = L.map(p => ({p, k: fs.map(f => f(p))}));   // cada clave se calcula una vez por paper, no en cada comparación
   return K.sort((a, b) => { for (let i = 0; i < S.length; i++) { const {k, d} = S[i], x = a.k[i], y = b.k[i];
     if (k === 'rating' && !x !== !y) return x ? -1 : 1;   // sin valorar: siempre al final, en ambos sentidos
+    if ((x == null) !== (y == null)) return x == null ? 1 : -1; if (x == null) continue;   // sin valor en la clasificación: al final, en ambos sentidos
     const c = typeof x === 'number' ? x - y : COLL.compare(x, y); if (c) return c * d; } return 0; }).map(e => e.p);
 }
 const has = (p, t) => p.tagIds.includes(t);   // las etiquetas son independientes de las secciones
@@ -312,8 +322,9 @@ function render() {
   $('#secF2').hidden = !F.tbSec; $('#tagF2').hidden = !F.tbTag; $('#grpChk').checked = F.group;
   selDraw(0);
   $('#d-search').hidden = !F.q && !advRules().length; advDraw(); $('#d-tr').hidden = !db.trash.length; $('#trLbl').textContent = 'Papelera' + (db.trash.length ? ` (${db.trash.length})` : ''); $('#tbView').innerHTML = db.settings.view === 'table' ? '▦<span class="bl"> Tarjetas</span>' : '☰<span class="bl"> Tabla</span>';
+  F.sorts = F.sorts.filter(s => Object.hasOwn(sortOpts(), s.k)); if (!F.sorts.length) F.sorts = [{k: 'title', d: 1}];   // una clasificación borrada deja de ordenar
   const nextKey = Object.keys(SORTS).find(k => !F.sorts.some(s => s.k === k)) || 'title';
-  $('#sortUI').innerHTML = F.sorts.map((s, i) => `<div class="row"><select data-onchange="sortSet(${i},this.value)">${Object.entries(SORTS).map(([k, v]) => `<option value="${k}" ${s.k === k ? 'selected' : ''}>${v}</option>`).join('')}</select>
+  $('#sortUI').innerHTML = F.sorts.map((s, i) => `<div class="row"><select data-onchange="sortSet(${i},this.value)">${Object.entries(sortOpts()).map(([k, v]) => `<option value="${k}" ${s.k === k ? 'selected' : ''}>${v}</option>`).join('')}</select>
     <button title="${s.d > 0 ? 'Ascendente (A→Z, antiguo→reciente)' : 'Descendente (Z→A, reciente→antiguo)'}" data-onclick="sortFlip(${i})">${s.d > 0 ? '▲' : '▼'}</button>
     ${F.sorts.length > 1 ? `<button data-onclick="sortDel(${i})">✕</button>` : ''}</div>`).join('')
     + `<button data-onclick="sortAdd('${nextKey}')">+ Añadir criterio</button>`;
