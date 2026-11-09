@@ -265,3 +265,7 @@ En **Gestionar etiquetas** o **Gestionar secciones**, «＋ Nueva clasificación
 
 ## Posiciones guardadas, dentro de Vistas (v39.27)
 - El botón **📌 Posiciones guardadas…** pasa de «Ordenar» a la sección **Vistas ⭐** de la barra lateral, debajo de la lista de vistas: las dos cosas sirven para volver a algo guardado.
+
+## Fila de filtros aplicados más compacta (v39.28)
+- En el móvil, la fila «Filtros: … ✕ · Limpiar todo» es más baja (botones de 26 px en vez de 34 px, letra algo menor) y casi sin margen arriba y abajo.
+- Con filtros aplicados, la primera sección de la lista queda pegada a esa fila (sin el hueco de 20 px de encima del título), también en el ordenador.
