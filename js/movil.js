@@ -28,7 +28,7 @@ function mvFilters() {   // botón «Filtros»: abre el panel con el grupo de fi
   g?.scrollIntoView({block: 'start'});
 }
 function mvCount() { const c = mv$('#count'), b = mv$('#mvSeeBtn'); if (!c || !b) return; const t = 'Ver resultados · ' + c.textContent.split('·')[0].trim(); if (b.textContent !== t) b.textContent = t; }
-function mvDots() {   // punto en «Filtros» si hay algún filtro activo (el mismo aviso que ya da la barra)
+function mvDots() {   // punto en el botón de filtros del buscador si hay algún filtro activo (el mismo aviso que ya da la barra)
   const on = !!mv$('#d-filt:not([hidden])') || !!mv$('#d-adv:not([hidden])') || !mv$('#actF')?.hidden;
   document.querySelectorAll('.mvfd').forEach(d => { if (d.hidden === on) d.hidden = !on; });   // solo si cambia: si no, los observadores se llamarían sin fin
 }
@@ -50,13 +50,13 @@ function mvBuild() {
   // Barra inferior
   document.body.insertAdjacentHTML('beforeend', `<nav id="mvNav" aria-label="Navegación principal">
     <button data-mv="top"><span class="ic">📚</span><span>Papers</span></button>
-    <button data-mv="filt"><span class="ic">🎚️<span class="dot mvfd" hidden></span></span><span>Filtros</span></button>
+    <button data-mv="cfg" aria-label="Configuración"><span class="ic">⚙️</span><span>Configuración</span></button>
     <button class="mvnew" data-mv="new" aria-label="Nuevo paper"><span class="ic">＋</span><span>Nuevo</span></button>
     <button data-mv="exp"><span class="ic">📤</span><span>Exportar</span></button>
     <button data-mv="more"><span class="ic">⋯</span><span>Más</span></button></nav>`);
   mvSearchDock();
 
-  const act = {dx: () => { const d = [...document.querySelectorAll('dialog[open]')].pop(); if (d && d.dispatchEvent(new Event('cancel', {cancelable: true}))) d.close(); }, close: mvClose, filt: mvFilters, more: () => mvMore(), new: () => { mvClose(); openPaper(); }, exp: () => { mvClose(); openEx(); }, top: () => { mvClose(); scrollTo({top: 0, behavior: 'smooth'}); }};
+  const act = {dx: () => { const d = [...document.querySelectorAll('dialog[open]')].pop(); if (d && d.dispatchEvent(new Event('cancel', {cancelable: true}))) d.close(); }, close: mvClose, filt: mvFilters, cfg: () => { mvClose(); openCfg(); }, more: () => mvMore(), new: () => { mvClose(); openPaper(); }, exp: () => { mvClose(); openEx(); }, top: () => { mvClose(); scrollTo({top: 0, behavior: 'smooth'}); }};
   document.addEventListener('click', e => {
     if (!mvOn()) return;
     const b = e.target.closest('[data-mv]'); if (b) { act[b.dataset.mv]?.(); return; }

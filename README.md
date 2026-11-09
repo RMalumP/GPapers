@@ -47,7 +47,7 @@ En pantallas táctiles estrechas (móvil en vertical, o en horizontal con poca a
 - **Cabecera de una fila**: ☰ (menú), nombre del proyecto con su estado y ⋯ (Google Drive, Guardar, Importar, Exportar y todo lo de Archivo).
 - **Buscador fijo** encima de la lista, con acceso directo a los filtros; la fila de Tabla, Sección, Etiquetas y Visibles se desliza en horizontal.
 - **Barra lateral como panel** que entra desde la izquierda, con «Ver resultados» para volver a la lista.
-- **Barra inferior**: Papers, Filtros, ＋ Nuevo, Exportar y Más.
+- **Barra inferior**: Papers, Configuración, ＋ Nuevo, Exportar y Más (los filtros se abren desde 🎚️ junto al buscador o desde el menú ☰).
 - **Ventanas a pantalla completa**, con pestañas deslizables y ✕ arriba; la vista Tabla se muestra como fichas.
 - **Pulsación larga** = clic derecho (también en iPhone). Los campos usan texto de 16 px para que el iPhone no amplíe la página.
 Todo vive en `movil.css` y `js/movil.js`, detrás de la clase `mv` de `<html>`, y reutiliza las funciones de siempre. Pruebas: `python3 pruebas/prueba_movil.py`.

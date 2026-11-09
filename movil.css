@@ -135,7 +135,7 @@ html.mv dialog .tabs button{white-space:nowrap;flex-shrink:0}
 html.mv dialog .grid,html.mv .cugrid,html.mv .cpick,html.mv .ctr{grid-template-columns:minmax(0,1fr)}
 html.mv dialog .row button{min-height:42px}
 html.mv .scr{flex-wrap:wrap}html.mv .scb button{min-width:0}
-html.mv #ctx{min-width:220px;max-width:calc(100vw - 16px);border-radius:12px}html.mv #ctx button{min-height:44px;padding:8px 14px}
+html.mv #ctx{z-index:90;min-width:220px;max-width:calc(100vw - 16px);border-radius:12px}html.mv #ctx button{min-height:44px;padding:8px 14px}
 html.mv dialog{overflow-x:hidden}
 html.mv dialog :is(input:not([type=checkbox]):not([type=radio]):not([type=color]),select,textarea){max-width:100%;min-width:0}
 html.mv dialog .grid label>*{max-width:100%}
