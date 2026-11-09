@@ -259,5 +259,5 @@ html:not(.mv) main>.row.cmp .bl{display:none}
 #list .card.over.insB,#list .card.over.insA,#list tr.rw.over{background:inherit}
 .gbox>h2.grp{cursor:pointer;user-select:none}.gbox .gcar{display:inline-block;width:1.1em;opacity:.6;font-size:.8em}
 .gbox.fold>h2.grp{margin-bottom:4px;opacity:.85}
-.posb{margin-top:6px;font-size:13px}
+.posb{margin-top:8px;font-size:13px;width:100%;text-align:left}
 #ctx.posm{width:min(330px,calc(100vw - 16px))}#ctx .posn{display:flex;gap:6px;padding:4px 6px}#ctx .posn input{flex:1;min-width:0}#ctx .posh{display:block;padding:2px 8px 4px;opacity:.7;font-size:12px}#ctx .posn button.pri{background:var(--pri);color:#fff;border:1px solid var(--pri);border-radius:6px;padding:4px 10px}#ctx .posn button.pri:hover{filter:brightness(1.1)}

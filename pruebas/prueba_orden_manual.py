@@ -1,5 +1,5 @@
 # Pruebas del orden manual (v39.25): arrastrar papers para colocarlos dentro de su sección (ordenador y móvil), sin agrupar,
-# posiciones guardadas (📌 en la barra lateral), plegar y desplegar secciones, y que lo guardado se valide al cargar.
+# posiciones guardadas (📌 en Vistas, en la barra lateral), plegar y desplegar secciones, y que lo guardado se valide al cargar.
 import sys, json, os, pathlib
 from playwright.sync_api import sync_playwright
 folder = pathlib.Path(sys.argv[1] if len(sys.argv) > 1 else '.').resolve()
@@ -42,6 +42,7 @@ with sync_playwright() as pw:
     eq('y al volver a «Orden manual» se recupera', pg.evaluate(order)[0], 'sa:p1,p3,p5')
     # ---- posiciones guardadas
     eq('botón 📌 en la barra lateral', pg.evaluate("$('#posB').textContent.trim()"), '📌 Posiciones guardadas…')
+    eq('el botón 📌 está en Vistas, no en Ordenar', pg.evaluate("[!!$('#posB').closest('#sg-fav'), !!$('#posB').closest('#fs-sort')]"), [True, False])
     pg.click('#posB'); pg.fill('#posName', 'Capítulo 2'); pg.press('#posName', 'Enter'); pg.wait_for_timeout(100)
     eq('guardar con Intro', pg.evaluate("[db.posSaves.length, db.posSaves[0].name, db.posSaves[0].manual.sa, $('#ctx').hidden]"), [1, 'Capítulo 2', ['p1', 'p3', 'p5'], True])
     ddrop('#list .card[data-id=p5]', '#list .card[data-id=p1]', False)
