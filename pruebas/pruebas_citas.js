@@ -115,7 +115,7 @@ eq('VAN web omitir consultado', V(P({type:'web', title:'AMA', venue:'AMA', year:
 
 // F1a: authorType
 eq('authorType entidad con coma', A(P({type:'libro', authors:['Naciones, Unidas'], authorType:'entidad', year:2020, title:'Informe', venue:'ONU'})), 'Naciones, Unidas. (2020). *Informe*. ONU.');
-eq('authorType persona fuerza persona', A(P({type:'libro', authors:['Real Academia Española'], authorType:'persona', year:2020, title:'Obra', venue:'E'})), 'Española, R. A. (2020). *Obra*. E.');
+eq('authorType persona fuerza persona', A(P({type:'libro', authors:['Real Academia Española'], authorType:'persona', year:2020, title:'Obra', venue:'E'})), 'Academia Española, R. (2020). *Obra*. E.');   // sin coma, la primera palabra es el nombre
 eq('authorType sin_autor ignora autores', A(P({type:'libro', authors:['Ruiz, Ana'], authorType:'sin_autor', year:2015, title:'Gilgamesh', venue:'Anaya'})), '*Gilgamesh*. (2015). Anaya.');
 eq('authorType sin_autor VAN', V(P({authors:['Ruiz, Ana'], authorType:'sin_autor', title:'T', venue:'R', year:2020})), 'T. R. 2020.');
 eq('authorType auto = heurística', A(P({type:'libro', authors:['OMS'], authorType:'auto', year:2020, title:'I', venue:'OMS'})), 'OMS. (2020). *I*. OMS.');

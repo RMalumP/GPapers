@@ -2,7 +2,7 @@
 // Cada versión (V) se descarga entera al instalarse y no se mezcla con otra: una versión nueva llega por detrás y la app avisa con «Recargar ahora».
 // Por eso hay que subir la versión (aquí y APP_V en app.js) en cada publicación: si no cambia, el navegador no ve nada nuevo.
 // Solo toca sus cachés: los datos de la aplicación (copia de sesión, estado de la interfaz) viven en IndexedDB y sobreviven a las actualizaciones.
-const V = 'papers-v39.14', FILES = ['./', 'index.html', 'style.css', 'movil.css', 'visor.css', 'js/movil.js', 'js/modelo.js', 'js/citas.js', 'js/persistencia.js', 'js/importar.js', 'js/config.js', 'js/lista.js', 'js/edicion.js', 'js/drive.js', 'js/extras.js', 'js/visor.js', 'js/bandeja.js', 'js/resumen.js', 'app.js', 'manifest.json', 'icon-192.png', 'icon-512.png', 'ejemplo_papers.json', 'privacidad.html'];
+const V = 'papers-v39.15', FILES = ['./', 'index.html', 'style.css', 'movil.css', 'visor.css', 'js/movil.js', 'js/modelo.js', 'js/citas.js', 'js/persistencia.js', 'js/importar.js', 'js/config.js', 'js/lista.js', 'js/edicion.js', 'js/drive.js', 'js/extras.js', 'js/visor.js', 'js/bandeja.js', 'js/resumen.js', 'app.js', 'manifest.json', 'icon-192.png', 'icon-512.png', 'ejemplo_papers.json', 'privacidad.html'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(V).then(c => c.addAll(FILES.map(f => new Request(f, {cache: 'reload'}))))); self.skipWaiting(); });
 // Las librerías del visor de PDF (lib/: PDF.js y pdf-lib, unos 5 MB) no se descargan al instalar: solo la primera vez que se abre un PDF.
 // Van en su propia caché, que no se borra con cada versión de la app (solo cambia si cambian las librerías: subir LIBV).

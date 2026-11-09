@@ -4,7 +4,8 @@
    se escribe \*. txt y vista previa quitan las marcas (citeTxt); Word y «Copiar con formato» las convierten (citeHtml).
    `o` son las opciones de exportación (settings.export): lang, dateFmt, vanAll… */
 const parse = a => a.map(x => { x = x.trim(); const i = x.indexOf(',');
-  return i < 0 ? {l: x.split(' ').pop(), g: x.split(' ').slice(0, -1).join(' ')} : {l: x.slice(0, i).trim(), g: x.slice(i + 1).trim()}; });
+  if (i >= 0) return {l: x.slice(0, i).trim(), g: x.slice(i + 1).trim()};
+  const w = x.split(/\s+/).filter(Boolean); return w.length < 2 ? {l: x, g: ''} : {l: w.slice(1).join(' '), g: w[0]}; });   // sin coma: «Nombre Apellidos» (la primera palabra es el nombre)
 // iniciales: con punto «N. G.» (guion: «S.-Y.»); sin punto «NG» (Vancouver). Acepta nombres ya abreviados («J.C.»)
 const ini = (g, dot) => g.replace(/(\p{Lu})\.(?=\p{L})/gu, '$1. ').split(/\s+/).filter(Boolean)
   .map(w => w.split('-').filter(x => /\p{L}/u.test(x)).map(x => x[0].toUpperCase() + (dot ? '.' : '')).join(dot ? '-' : '')).filter(Boolean).join(dot ? ' ' : '');
