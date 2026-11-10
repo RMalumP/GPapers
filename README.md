@@ -292,3 +292,7 @@ En **Gestionar etiquetas** o **Gestionar secciones**, «＋ Nueva clasificación
 - **Filtros con el mismo diseño**: cabeceras iguales con iconos (📄 notas, ✎ gestionar) y la valoración mínima (⭐) y los años (📅) juntos en una sola línea compacta.
 - **Vistas y posiciones en una lista**: «＋ Guardar» pregunta si guardar una ⭐ Vista (búsqueda, orden y filtros) o unas 📌 Posiciones (cómo están colocados los papers); las dos salen en la misma lista.
 - **Pie fijo** (ordenador): Relaciones, Papelera, Configuración e Información son una fila de iconos que se queda siempre al fondo de la pantalla, aunque la lista sea muy larga; lo de arriba se desplaza por su cuenta. El texto legal va más pequeño debajo.
+
+## Pie de la barra lateral adaptable (v39.33)
+- El pie (Relaciones, Papelera, Configuración e Información) sigue fijo al fondo de la pantalla, pero **se ve como antes, cada uno en su línea y con su nombre, mientras todo cabe**. Solo cuando lo de arriba no cabe (grupos desplegados, muchas etiquetas, la Selección…) se junta en una fila de iconos, y vuelve a la lista al plegarlos. Se mide siempre con el pie normal, así que no parpadea en el límite.
+- Con la barra plegada (☰) sigue la columna de iconos, y en el móvil el cajón va siempre con el pie normal.

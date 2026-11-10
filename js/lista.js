@@ -14,8 +14,16 @@ const hdr = () => { syIcon(); fitBars(); sbFit(); };   // syIcon también redibu
 // no caben enteras, pasan debajo en varias líneas (clase «wrapc»), como en el móvil, en vez de quedar tapadas
 let FIT_RO = null;
 /* Barra lateral (ordenador): fija y del alto de la pantalla; arriba (bajo la cabecera, que se va al bajar) y abajo el pie siempre a la vista */
-function sbFit() { const h = $('header'), a = $('#side'); if (h && a) a.style.setProperty('--sbt', Math.max(0, Math.round(h.getBoundingClientRect().bottom)) + 'px'); }
-addEventListener('scroll', sbFit, {passive: true}); addEventListener('resize', sbFit);
+function sbFit() { const h = $('header'), a = $('#side'); if (!h || !a) return; const v = Math.max(0, Math.round(h.getBoundingClientRect().bottom)) + 'px'; if (a.style.getPropertyValue('--sbt') !== v) { a.style.setProperty('--sbt', v); sbFootFit(); } }
+/* Pie de la barra: con su texto si todo cabe; en fila de iconos solo si lo de arriba no cabe con el pie normal (se mide siempre con el normal: no parpadea) */
+let SBF_RO = null;
+function sbFootFit() {
+  const f = $('#sbFoot'), m = $('#sbMain'), a = $('#side'); if (!f || !m) return;
+  if (document.documentElement.classList.contains('mv') || a.classList.contains('min')) { f.classList.remove('cmp'); return; }
+  if (!SBF_RO && window.ResizeObserver) { SBF_RO = new ResizeObserver(() => sbFootFit()); [a, ...m.children].forEach(e => SBF_RO.observe(e)); }
+  f.classList.remove('cmp'); if (m.scrollHeight > m.clientHeight + 1) f.classList.add('cmp');
+}
+addEventListener('scroll', sbFit, {passive: true}); addEventListener('resize', () => { sbFit(); sbFootFit(); });
 function fitBars() {
   const h = $('header'), t = $('#appName'), r = $('main > .row'); if (!h || !r) return;
   if (document.documentElement.classList.contains('mv')) { h.classList.remove('cmp'); r.classList.remove('cmp'); return; }
@@ -515,7 +523,7 @@ function fmToggle(e) { e.stopPropagation(); const m = $('#fmenu'), open = m.hidd
 document.addEventListener('click', e => { if (!e.target.closest('.fm')) fmClose(); });
 document.addEventListener('contextmenu', e => { if (!e.target.closest('[data-oncontextmenu]')) ctxClose(); });   // clic derecho en otro sitio también cierra
 function setSecF(id) { if (!id) F.secs.clear(); else if (!F.secs.delete(id)) F.secs.add(id); F.noSec = false; render(); }   // '' = Todas; como las etiquetas, cada sección se añade o se quita (se ven los papers de cualquiera de ellas)
-function sbToggle() { $('#side').classList.toggle('min'); uiSoon(); }
+function sbToggle() { $('#side').classList.toggle('min'); sbFootFit(); uiSoon(); }
 function sbAllMenu(e) { ctxShow(e, '<div class="ctxh">Grupos de la barra</div><button data-onclick="ctxClose();sbAll(0)">Desplegar todos</button><button data-onclick="ctxClose();sbAll(1)">Plegar todos</button>'); }
 function sbWidth(w) { const a = $('#side'); if (w) a.style.setProperty('--sbw', Math.max(200, Math.min(480, Math.round(w))) + 'px'); else a.style.removeProperty('--sbw'); }
 function sbWidthReset() { sbWidth(0); uiSoon(); }
@@ -536,7 +544,7 @@ new MutationObserver(sbSearchDock).observe($('#side'), {attributes: true, attrib
 function sbMore() {   // «Información» (Ayuda, Privacidad y Créditos): plegada por defecto; con la barra plegada, la despliega abierta
   const a = $('#side'), el = $('#sg-more'), wasMin = a.classList.contains('min');
   a.classList.remove('min'); wasMin ? el.classList.remove('fold') : el.classList.toggle('fold');
-  $('#side .shm').setAttribute('aria-expanded', !el.classList.contains('fold')); uiSoon();
+  $('#side .shm').setAttribute('aria-expanded', !el.classList.contains('fold')); sbFootFit(); uiSoon();
 }
 function mgFit() {   // «✎ Gestionar» entero si cabe junto al título; si no, solo «✎»
   document.querySelectorAll('#sg-filt .fh2 .mgb').forEach(b => { const l = b.querySelector('.mgl'), t = b.parentElement.querySelector('.fhb b'); if (!l || !t) return;
