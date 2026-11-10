@@ -92,7 +92,12 @@ $('#dlg').addEventListener('click', e => { if (!bdDown || !outside(e, e.currentT
 /* Marcas de las notas: **negrita**, *cursiva*, ~~tachado~~, __subrayado__ (anidables); \* \_ \~ \\ \[ son literales.
    La nota se guarda como texto con marcas; el editor (contenteditable) las muestra ya aplicadas y las vuelve a escribir al guardar. */
 const MK = {'**': 'strong', '__': 'u', '~~': 's', '*': 'em'}, MK_ORDER = ['**', '__', '~~', '*'];
-function mdParse(s, i = 0, stop = '') {   // → [nodos, posición]; null si falta el cierre de `stop`
+function mdParse(s, i = 0, stop = '', memo = new Map()) {   // → [nodos, posición]; null si falta el cierre de `stop`
+  // memo: lo que da cada (posición, marca) se calcula una sola vez; sin esto, una línea con muchas marcas sin cerrar («* * * …» pegado de otro sitio) tardaba el doble por cada una
+  const mk = i + stop; if (memo.has(mk)) return memo.get(mk);
+  const r = mdParse1(s, i, stop, memo); memo.set(mk, r); return r;
+}
+function mdParse1(s, i, stop, memo) {
   const out = [], st = i; let txt = '';
   const flush = () => { if (txt) { out.push({t: 'x', v: txt}); txt = ''; } };
   while (i < s.length) {
@@ -105,7 +110,7 @@ function mdParse(s, i = 0, stop = '') {   // → [nodos, posición]; null si fal
     for (const d of MK_ORDER) {
       const nx = s[i + d.length];
       if (!s.startsWith(d, i) || !nx || /\s/.test(nx) || (d === '*' && nx === '*') || (d !== '~~' && /\w/.test(s[i - 1] || ' '))) continue;
-      const r = mdParse(s, i + d.length, d);
+      const r = mdParse(s, i + d.length, d, memo);
       if (r) { flush(); out.push({t: MK[d], c: r[0]}); i = r[1]; hit = true; break; }
     }
     if (hit) continue;
@@ -120,7 +125,7 @@ const mdInline = (t, edit) => nodesHtml(mdNodes(t), edit);
 const nodesPlain = ns => ns.map(n => n.t === 'x' ? n.v : n.t === 'l' ? '[' + (linkInfo(n.k, n.id)?.label || '⚠ enlace roto') + ']' : nodesPlain(n.c)).join('');
 const mdPlain = t => String(t ?? '').split('\n').map(l => nodesPlain(mdNodes(l))).join('\n');   // sin marcas (exportar a texto)
 const noteRuns = (s, sz) => {   // marcas de nota → runs de Word (orden del esquema: b, i, strike, sz, u)
-  const run = (ns, f) => ns.map(n => n.t === 'x' || n.t === 'l' ? (t => `<w:r><w:rPr>${f.b ? '<w:b/>' : ''}${f.i ? '<w:i/>' : ''}${f.s ? '<w:strike/>' : ''}${sz ? `<w:sz w:val="${sz}"/>` : ''}${f.u ? '<w:u w:val="single"/>' : ''}</w:rPr><w:t xml:space="preserve">${esc(t)}</w:t></w:r>`)(n.t === 'x' ? n.v : nodesPlain([n]))
+  const run = (ns, f) => ns.map(n => n.t === 'x' || n.t === 'l' ? (t => `<w:r><w:rPr>${f.b ? '<w:b/>' : ''}${f.i ? '<w:i/>' : ''}${f.s ? '<w:strike/>' : ''}${sz ? `<w:sz w:val="${sz}"/>` : ''}${f.u ? '<w:u w:val="single"/>' : ''}</w:rPr><w:t xml:space="preserve">${xesc(t)}</w:t></w:r>`)(n.t === 'x' ? n.v : nodesPlain([n]))
     : run(n.c, {...f, [{strong: 'b', em: 'i', s: 's', u: 'u'}[n.t]]: 1})).join('');
   return run(mdNodes(s), {});
 };
@@ -277,7 +282,7 @@ function citeCmd(cmd) {   // Cursiva o negrita en la cita con el foco (o en la p
   if (!el.contains(getSelection().anchorNode)) el.focus();
   document.execCommand('styleWithCSS', false, false); document.execCommand(cmd); el.dispatchEvent(new Event('input'));
 }
-function citeOpt(k, v) { ex()[k] = v; lastSnap = snapDb(); dirty = true; touch(); drawD(); }   // mismo ajuste que en Exportar (sin pasos de deshacer)
+function citeOpt(k, v) { ex()[k] = v; foldSnap(); dirty = true; touch(); drawD(); }   // mismo ajuste que en Exportar (sin pasos de deshacer)
 const tplText = t => t.text.replace(/\{fecha\}/g, new Date().toLocaleDateString('es-ES')).replace(/\{paper\}/g, D?.title || '');
 function tplMenu(e, key) {
   ctxShow(e, '<div class="ctxh">Insertar plantilla</div>' + (db.settings.templates.map(t => `<button data-onclick="tplInsert('${key}','${t.id}')">${esc(t.name)}</button>`).join('') || '<div class="ctxh">No hay plantillas (créalas en Configuración)</div>'));
@@ -382,7 +387,8 @@ const svSave = () => saveText(svMarkdown(), 'notas.md', 'text/markdown', 'md', '
 let GR = {all: false, vis: false, help: false};   // help: explicación desplegada con relaciones (la primera vez que se abre y con el botón ❓)
 function grLayout(n, edges, W, H) {   // disposición de fuerzas determinista: repulsión entre nodos, muelles en las aristas y gravedad al centro
   const P = Array.from({length: n}, (_, i) => ({x: W / 2 + Math.cos(2 * Math.PI * i / Math.max(n, 1)) * W * .35, y: H / 2 + Math.sin(2 * Math.PI * i / Math.max(n, 1)) * H * .35, vx: 0, vy: 0}));
-  for (let it = 0; it < 300; it++) {
+  const its = n <= 200 ? 300 : Math.max(40, Math.round(300 * 4e4 / (n * n)));   // cada pasada compara todos los nodos entre sí: con muchos, menos pasadas (1000 nodos tardaban 2,5 s)
+  for (let it = 0; it < its; it++) {
     for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) { let dx = P[i].x - P[j].x, dy = P[i].y - P[j].y, d2 = Math.max(dx * dx + dy * dy, 1), d = Math.sqrt(d2), f = 40000 / d2; P[i].vx += dx / d * f; P[i].vy += dy / d * f; P[j].vx -= dx / d * f; P[j].vy -= dy / d * f; }
     for (const [a, b] of edges) { const dx = P[b].x - P[a].x, dy = P[b].y - P[a].y, d = Math.max(Math.hypot(dx, dy), 1), f = (d - 170) * .02; P[a].vx += dx / d * f; P[a].vy += dy / d * f; P[b].vx -= dx / d * f; P[b].vy -= dy / d * f; }
     for (const q of P) { q.vx += (W / 2 - q.x) * .004; q.vy += (H / 2 - q.y) * .004; q.x = Math.min(W - 40, Math.max(40, q.x + q.vx * .5)); q.y = Math.min(H - 30, Math.max(30, q.y + q.vy * .5)); q.vx *= .8; q.vy *= .8; }
@@ -456,7 +462,7 @@ function trashRestore(id) {
 }
 async function trashDelete(id) { if (!await askOk('¿Borrar definitivamente este paper? No se podrá recuperar.', {ok: 'Borrar', danger: 1})) return; db.trash = db.trash.filter(t => t.paper.id !== id); markDirty(); render(); trDraw(); }
 async function trashEmpty() { if (!await askOk('¿Vaciar la papelera? Los papers que contiene no se podrán recuperar.', {ok: 'Vaciar', danger: 1})) return; db.trash = []; markDirty(); render(); trDraw(); }
-function setView(v) { db.settings.view = v; lastSnap = snapDb(); dirty = true; touch(); render(); }   // la vista se recuerda en el JSON sin crear pasos de deshacer
+function setView(v) { db.settings.view = v; foldSnap(); dirty = true; touch(); render(); }   // la vista se recuerda en el JSON sin crear pasos de deshacer
 
 /* ===== Historial de cambios y relaciones ===== */
 const shortTxt = v => { v = String(v ?? '').replace(/\s+/g, ' ').trim(); return !v ? '—' : v.length > 60 ? v.slice(0, 57) + '…' : v; };
@@ -504,7 +510,9 @@ function relSearch() {
 function relAdd(id) { (RELT === 'ref' ? D.refTo : D.related).push(id); drawD(); }
 function relDel(id) { D.related = D.related.filter(x => x !== id); drawD(); }
 function refDel(id) { D.refTo = D.refTo.filter(x => x !== id); drawD(); }
-const relCount = p => p.related.length + (p.refTo || []).length + db.papers.filter(q => (q.refTo || []).includes(p.id)).length;
+let CITED = null;   // id → cuántos papers lo citan; se calcula una vez por pintado (antes, cada tarjeta recorría toda la biblioteca) y se tira con cada cambio
+const citedBy = () => { if (!CITED) { CITED = new Map(); for (const q of db.papers) for (const i of new Set(q.refTo || [])) CITED.set(i, (CITED.get(i) || 0) + 1); } return CITED; };
+const relCount = p => p.related.length + (p.refTo || []).length + (citedBy().get(p.id) || 0);
 function viewRel(id) {   // relaciones de un paper: relacionados, cita a y citado por; se cierra con un clic fuera
   const p = db.papers.find(x => x.id === id); if (!p) return;
   const sec = (t, ids) => { const L = ids.map(i => db.papers.find(x => x.id === i)).filter(Boolean);
@@ -651,7 +659,7 @@ function drawMg() {
   const o = !MGO_FORM && ordOf(MG).find(x => x.id === MGO), kv = x => x.rk?.[o.id] || '';
   $('#mg').innerHTML = `<h2>${MG === 'tags' ? 'Etiquetas' : 'Secciones'}</h2>` + mgOrdHTML() + db[MG].map(x => `<div class="row mgr ${MG === 'sections' ? 'mgs' : 'mgt'}${o ? ' mgkon' : ''}" style="margin-bottom:6px">
     ${o ? `<input class="mgk${kv(x) && ordVal(o, kv(x)) == null ? ' bad' : ''}" value="${esc(kv(x))}" placeholder="${ORD_PH[o.fmt]}" aria-label="Valor en «${esc(o.name)}»" title="Valor en «${esc(o.name)}»" data-oninput="mgRk('${x.id}',this)">` : ''}
-    <input class="mgc" type="color" value="${x.color || '#888888'}" aria-label="Color" data-oninput="upd('${x.id}','color',this.value)"><input class="mgn" value="${esc(x.name)}" aria-label="Nombre" data-oninput="upd('${x.id}','name',this.value)">
+    <input class="mgc" type="color" value="${esc(x.color || '#888888')}" aria-label="Color" data-oninput="upd('${x.id}','color',this.value)"><input class="mgn" value="${esc(x.name)}" aria-label="Nombre" data-oninput="upd('${x.id}','name',this.value)">
     ${MG === 'sections' ? `<input class="mgd" placeholder="Descripción" aria-label="Descripción" value="${esc(x.description || '')}" data-oninput="upd('${x.id}','description',this.value)">` : ''}
     <button class="mgu" title="Subir" aria-label="Subir" data-onclick="moveM('${x.id}',-1)">↑</button><button class="mgw" title="Bajar" aria-label="Bajar" data-onclick="moveM('${x.id}',1)">↓</button><button class="danger mgx" title="Eliminar" aria-label="Eliminar" data-onclick="delM('${x.id}')"><span class="mgxl">Eliminar</span><span class="mgxi" hidden>🗑</span></button></div>`).join('') +
     `<div class="row"><button class="pri" data-onclick="mgAdd('${uid()}')">+ Añadir</button><button data-onclick="$('#mg').close();render()">Cerrar</button></div>`;

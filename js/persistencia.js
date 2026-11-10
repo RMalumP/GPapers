@@ -47,10 +47,45 @@ async function imgGc() {   // borra las imágenes que ya no usa ninguna copia de
   gone.forEach(k => IMG_SAVED.delete(k.slice(5)));
   await idb('readwrite', st => { gone.forEach(k => st.delete(k)); return null; }).catch(() => {});
 }
+/* Lo que este navegador guarda de los PDF y de las imágenes enlazadas (copia del PDF «pdfb:», enlace al archivo «pdf:», portada «pdft:», enlace de la imagen «img:»
+   y las marcas de subida a Drive «pdfUp:» y «pdfVis:») solo se borraba al quitar el PDF en la ficha. Un paper que caduca en la papelera, un PDF quitado de la bandeja
+   o un proyecto borrado dejaban ahí su copia (hasta 100 MB cada una) para siempre. Aquí se borra lo que ya no usa ningún proyecto ni ninguna copia de seguridad.
+   Ante cualquier duda (una copia que no se puede leer) no se borra nada. */
+async function pdfGc() {
+  try {
+    const keys = (await idb('readonly', st => st.getAllKeys())).filter(k => typeof k === 'string');
+    const mine = keys.filter(k => /^(pdf|pdfb|pdft|img|pdfUp|pdfVis):/.test(k)); if (!mine.length) return 0;
+    const used = new Set(), pids = new Set(), byPj = new Map();
+    const take = (d, pj) => { if (!d || typeof d !== 'object') throw Error('copia ilegible'); const S = byPj.get(pj) || byPj.set(pj, new Set()).get(pj);
+      pdfSlots(d, true).forEach(({key, pf}) => { for (const k of pf.from ? [key, pf.from] : [key]) { used.add(k); S.add(k); } }); syPapersOf(d).forEach(p => pids.add(String(p.id))); };
+    for (const k of keys.filter(k => /^(proj:|bkd:|bk:|session$)/.test(k))) {
+      const r = await idb('readonly', st => st.get(k)), pj = k.split(':')[1] || '';
+      if (k.startsWith('bk:')) { for (const c of Array.isArray(r) ? r : []) if (typeof c.json === 'string') take(JSON.parse(c.json), pj); }   // copias de seguridad antiguas, con el JSON en el índice
+      else if (r != null) take(JSON.parse(r.json), pj);
+    }
+    take(db, PJ.cur); if (D && D.id) PDF_N.forEach(n => used.add(pdfKey(D.id, n)));   // el proyecto abierto, aunque aún no se haya guardado, y la ficha abierta
+    const pjs = new Set(PJ.list.map(p => p.id));
+    const gone = mine.filter(k => { const i = k.indexOf(':'), pre = k.slice(0, i), rest = k.slice(i + 1);
+      if (pre === 'img') return !pids.has(rest);
+      if (pre === 'pdfUp' || pre === 'pdfVis') { const j = rest.indexOf(':'), pj = rest.slice(0, j); return !pjs.has(pj) || byPj.has(pj) && !byPj.get(pj).has(rest.slice(j + 1)); }
+      return !used.has(rest); });
+    if (gone.length) await idb('readwrite', st => { gone.forEach(k => st.delete(k)); return null; });
+    return gone.length;
+  } catch (e) { return 0; }
+}
+const gcDue = () => { try { return Date.now() - (+localStorage.getItem('gp-gc') || 0) > 864e5; } catch (e) { return true; } };
+async function gcDaily() {   // una vez al día (antes, la limpieza de imágenes releía todas las copias en cada arranque)
+  if (!gcDue() || TAB.passive) return; try { localStorage.setItem('gp-gc', String(Date.now())); } catch (e) {}
+  await imgGc(); await pdfGc();
+}
 const rememberHandle = () => idb('readwrite', st => { st.put(handle, 'h:' + PJ.cur); return st.put(handle, 'last'); }).catch(() => {});   // el archivo de cada proyecto
 function validate(d) {
   if (!d || typeof d !== 'object' || !['papers', 'tags', 'sections'].every(k => Array.isArray(d[k])))
     throw Error('faltan las listas "papers", "tags" o "sections"');
+  const pIds = p => { if (!p || typeof p !== 'object') return; p.id = idFix(p.id); for (const k of ['tagIds', 'sectionIds', 'related', 'refTo']) if (p[k] != null) p[k] = idsFix(p[k]);
+    if (Array.isArray(p.notes)) p.notes.forEach(n => { if (n && typeof n === 'object') { n.id = idFix(n.id); n.sectionId = idFix(n.sectionId); } }); };
+  d.papers.forEach(pIds); if (Array.isArray(d.trash)) d.trash.forEach(t => t && pIds(t.paper));   // ids y referencias: solo caracteres seguros (ver idFix)
+  [...d.tags, ...d.sections].forEach(x => { if (!x || typeof x !== 'object') return; x.id = idFix(x.id); if (x.tagIds != null) x.tagIds = idsFix(x.tagIds); if (x.color != null && !HEX_RX.test(x.color)) x.color = '#888888'; });
   d.papers.forEach((p, i) => { if (!p.id || typeof p.title !== 'string' || !Array.isArray(p.authors)) throw Error(`el paper n.º ${i + 1} no tiene id, título o autores válidos`);
     p.tagIds ??= []; p.notes ??= []; p.cites ??= {}; p.notes.forEach(n => { n.id ??= uid(); n.content ??= ''; }); p.created ??= ''; p.sortKey ??= ''; p.related = Array.isArray(p.related) ? p.related : []; p.history = [];   // el historial es solo de la sesión: no se lee del JSON
     p.reading = Object.hasOwn(READ, p.reading) ? p.reading : 'por_leer'; p.rating = Number.isInteger(p.rating) && p.rating >= 0 && p.rating <= 5 ? p.rating : 0; p.sectionIds ??= [...new Set(p.notes.map(n => n.sectionId).filter(Boolean))]; NEWF(p); });
@@ -62,11 +97,11 @@ function validate(d) {
   [...d.tags, ...d.sections].forEach((x, i) => { if (!x.id || typeof x.name !== 'string') throw Error(`etiqueta/sección n.º ${i + 1} sin id o nombre`); });
   d.sections.forEach(s => s.tagIds ??= []);  // compatibilidad con archivos antiguos
   d.orders = (Array.isArray(d.orders) ? d.orders : []).filter(o => o && typeof o.id === 'string' && o.id && typeof o.name === 'string' && ['tags', 'sections'].includes(o.of))
-    .map(o => ({id: o.id, name: o.name, of: o.of, fmt: Object.hasOwn(ORD_FMT, o.fmt) ? o.fmt : 'num'}));   // clasificaciones para ordenar
-  const manOk = m => m && typeof m === 'object' && !Array.isArray(m) ? Object.fromEntries(Object.entries(m).filter(([k, v]) => k && Array.isArray(v)).map(([k, v]) => [k, [...new Set(v.filter(i => typeof i === 'string' && i))]])) : {};   // orden manual: {sección: [ids]}
+    .map(o => ({id: idFix(o.id), name: o.name, of: o.of, fmt: Object.hasOwn(ORD_FMT, o.fmt) ? o.fmt : 'num'}));   // clasificaciones para ordenar
+  const manOk = m => m && typeof m === 'object' && !Array.isArray(m) ? Object.fromEntries(Object.entries(m).filter(([k, v]) => k && Array.isArray(v)).map(([k, v]) => [k === '_' || k === '*' ? k : idFix(k), [...new Set(v.filter(i => typeof i === 'string' && i).map(idFix))]])) : {};   // orden manual: {sección: [ids]}
   d.manual = manOk(d.manual); if (!Object.keys(d.manual).length) delete d.manual;
-  d.posSaves = (Array.isArray(d.posSaves) ? d.posSaves : []).filter(x => x && typeof x.id === 'string' && x.id && typeof x.name === 'string').map(x => ({id: x.id, name: x.name, manual: manOk(x.manual)})); if (!d.posSaves.length) delete d.posSaves;
-  [...d.tags, ...d.sections].forEach(x => { if (x.rk == null) return; x.rk = x.rk && typeof x.rk === 'object' && !Array.isArray(x.rk) ? Object.fromEntries(Object.entries(x.rk).filter(([, v]) => typeof v === 'string' && v)) : {}; if (!Object.keys(x.rk).length) delete x.rk; });
+  d.posSaves = (Array.isArray(d.posSaves) ? d.posSaves : []).filter(x => x && typeof x.id === 'string' && x.id && typeof x.name === 'string').map(x => ({id: idFix(x.id), name: x.name, manual: manOk(x.manual)})); if (!d.posSaves.length) delete d.posSaves;
+  [...d.tags, ...d.sections].forEach(x => { if (x.rk == null) return; x.rk = x.rk && typeof x.rk === 'object' && !Array.isArray(x.rk) ? Object.fromEntries(Object.entries(x.rk).filter(([, v]) => typeof v === 'string' && v).map(([k, v]) => [idFix(k), v])) : {}; if (!Object.keys(x.rk).length) delete x.rk; });
   const sIn = d.settings && typeof d.settings === 'object' ? d.settings : {};
   d.settings = {...defSettings(), ...sIn, shortcuts: {...SC_DEF}};
   d.settings.export = {...defSettings().export, ...(sIn.export && typeof sIn.export === 'object' ? sIn.export : {})};
@@ -75,7 +110,7 @@ function validate(d) {
   { const c = sIn.tblCols, ok = a => Array.isArray(a) ? [...new Set(a.filter(k => typeof k === 'string' && /^[a-z]+$/.test(k)))] : [];   // columnas de la tabla: orden y ocultas
     delete d.settings.tblCols; if (c && typeof c === 'object') { const o = ok(c.order), h = ok(c.hidden); if (o.length || h.length) d.settings.tblCols = {...(o.length ? {order: o} : {}), ...(h.length ? {hidden: h} : {})}; } }
   if (!Array.isArray(d.settings.templates)) d.settings.templates = defSettings().templates;
-  d.settings.templates = d.settings.templates.filter(t => t && typeof t.name === 'string' && typeof t.text === 'string').map(t => ({id: t.id || uid(), name: t.name, text: t.text}));
+  d.settings.templates = d.settings.templates.filter(t => t && typeof t.name === 'string' && typeof t.text === 'string').map(t => ({id: idFix(t.id) || uid(), name: t.name, text: t.text}));
   d.settings.customTypes = [...new Map((Array.isArray(sIn.customTypes) ? sIn.customTypes : []).map(ctClean).filter(Boolean).map(c => [c.id, c])).values()];
   syncTypes(d.settings.customTypes); d.papers.concat(d.trash.map(t => t.paper)).forEach(p => { if (/^ct_/.test(p.type) && !CTYPES.has(p.type)) p.type = 'articulo'; });
   d.settings.customStyles = [...new Map((Array.isArray(sIn.customStyles) ? sIn.customStyles : []).map(cuClean).filter(Boolean).map(c => [c.id, c])).values()];
@@ -86,7 +121,7 @@ function validate(d) {
 const pickFile = (acc = '.json') => new Promise(res => { const i = document.createElement('input'); i.type = 'file'; i.accept = acc;
   i.onchange = () => i.files[0] ? i.files[0].text().then(text => res({path: i.files[0].name, text})) : res(null); i.click(); });
 async function loadText(text, name, quiet) {   // text: el JSON, o el objeto ya leído
-  try { db = validate(typeof text === 'string' ? JSON.parse(text) : text); path = name; dirty = false; F.tags.clear(); F.exTags.clear(); F.secs.clear(); SEL.clear(); UNDO.length = 0; REDO.length = 0; lastSnap = snapDb(); fmtPinned = db.settings.fmtOpen; applySettings(); render(); sessionSoon(); return true; }
+  try { db = validate(typeof text === 'string' ? JSON.parse(text) : text); DB_REV++; clearTimeout(tRec); tRec = 0; path = name; dirty = false; F.tags.clear(); F.exTags.clear(); F.secs.clear(); SEL.clear(); UNDO.length = 0; REDO.length = 0; lastSnap = snapDb(); fmtPinned = db.settings.fmtOpen; applySettings(); render(); sessionSoon(); return true; }
   catch (e) { if (!quiet) say('Archivo no válido (se mantienen los datos actuales): ' + e.message); return false; }
 }
 async function doOpen() {   // cada archivo JSON se abre como proyecto (ver Proyectos)
@@ -104,13 +139,15 @@ async function pjReload() {   // vuelve a leer el archivo del proyecto (Chrome p
 async function writeTo(h, text) { const w = await h.createWritable(); await w.write(text); await w.close(); }   // el archivo solo cambia al cerrar: escritura segura
 function download(text, name, type) { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], {type})); a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000); }
 async function save(asNew) {
-  const text = dbJSON();
+  const text = dbJSON(), rev = DB_REV;
   try {
     if (FSA && handle && !asNew && handle.queryPermission && await handle.queryPermission({mode: 'readwrite'}) !== 'granted' && await handle.requestPermission({mode: 'readwrite'}) !== 'granted') handle = null;   // enlace recuperado de la sesión anterior: pide permiso o elige archivo
     if (FSA) { if (!handle || asNew) { handle = await showSaveFilePicker({suggestedName: pjFile(pjCur().name), types: JSON_T}); rememberHandle(); path = handle.name; }   // el archivo se llama como el proyecto
       await writeTo(handle, text); }
     else { path = pjFile(pjCur().name); download(text, path, 'application/json'); }
-    dirty = false; hdr(); sessionSoon();
+    if (DB_REV === rev) dirty = false;   // un cambio hecho mientras se escribía el archivo no está en él: sigue pendiente
+    else if (auto && handle) { clearTimeout(timer); timer = setTimeout(() => save(false), 1000); }
+    hdr(); sessionSoon();
   } catch (e) { if (e.name !== 'AbortError') say('Error al guardar: ' + e.message); }
 }
 async function setAuto(c) {
@@ -151,11 +188,22 @@ function record() {   // antes de cada cambio guarda el estado anterior; los cam
   if (!(Date.now() - lastRecAt < 1500 && UNDO.length)) { UNDO.push(lastSnap); if (UNDO.length > MAXU) UNDO.shift(); }
   lastRecAt = Date.now(); REDO.length = 0; lastSnap = cur;
 }
-function touch() { SNAP_SES = null; if (TAB.passive) return; hdr(); sessionSoon(); clearTimeout(timer); if (auto && handle) timer = setTimeout(() => save(false), 1000); if (!SY.applying && syAuto()) sySoon(); }   // con Google Drive conectado, el cambio se sube a los 3 s
-function markDirty() { record(); dirty = true; touch(); SNAP_SES = lastSnap; }   // la copia de trabajo de dentro de 0,7 s puede usar esta misma copia
+function touch() { DB_REV++; SNAP_SES = null; CITED = null; if (TAB.passive) return; hdr(); sessionSoon(); clearTimeout(timer); if (auto && handle) timer = setTimeout(() => save(false), 1000); if (!SY.applying && syAuto()) sySoon(); }   // con Google Drive conectado, el cambio se sube a los 3 s
+/* Mientras se escribe en un campo (TYPING), la copia para deshacer no se hace en cada tecla (recorre toda la biblioteca: 20 ms con 2000 papers, 86 ms con 5000):
+   se hace 0,4 s después de la última. Lo demás (aviso de cambios, copia de trabajo, Drive) sigue igual. Deshacer, o cualquier otro cambio, la hace antes de seguir. */
+let tRec = 0, tFold = 0, DB_REV = 0;   // DB_REV: sube con cada cambio (save() sabe así si hubo cambios mientras escribía el archivo)
+function recFlush() { if (!tRec) return; clearTimeout(tRec); tRec = 0; record(); SNAP_SES = lastSnap; }
+function foldSnap() {   // un cambio que no crea paso de deshacer (opciones de exportar, la vista…): pasa a ser el punto de partida
+  recFlush(); clearTimeout(tFold); tFold = 0;
+  if (TYPING) tFold = setTimeout(() => { tFold = 0; if (!tRec) lastSnap = snapDb(); }, 400); else lastSnap = snapDb();
+}
+function markDirty() {
+  if (TYPING) { dirty = true; touch(); clearTimeout(tRec); tRec = setTimeout(recFlush, 400); return; }
+  clearTimeout(tRec); tRec = 0; record(); dirty = true; touch(); SNAP_SES = lastSnap;
+}   // la copia de trabajo de dentro de 0,7 s puede usar esta misma copia
 let SNAP_SES = null;   // copia ya hecha que coincide con el proyecto (la invalida cualquier touch() que no venga de markDirty)
-function undo() { if (UNDO.length) { REDO.push(snapDb()); restore(UNDO.pop()); } }
-function redo() { if (REDO.length) { UNDO.push(snapDb()); restore(REDO.pop()); } }
+function undo() { recFlush(); if (UNDO.length) { REDO.push(snapDb()); restore(UNDO.pop()); } }
+function redo() { recFlush(); if (REDO.length) { UNDO.push(snapDb()); restore(REDO.pop()); } }
 function restore(json) {
   db = unsnap(json); lastSnap = json; lastRecAt = 0; syncTypes(db.settings.customTypes); syncStyles(db.settings.customStyles, db.settings.export);
   for (const id of [...SEL]) if (!db.papers.some(p => p.id === id)) SEL.delete(id);

@@ -329,7 +329,7 @@ function setTblCols(order, hidden) {   // como la vista: se recuerda en el JSON 
   const def = Object.keys(COLS), o = order.join() === def.join() ? undefined : order, h = [...hidden];
   db.settings.tblCols = o || h.length ? {...(o ? {order: o} : {}), ...(h.length ? {hidden: h} : {})} : undefined;
   if (!db.settings.tblCols) delete db.settings.tblCols;
-  lastSnap = snapDb(); dirty = true; touch(); render();
+  foldSnap(); dirty = true; touch(); render();
 }
 const tdSecs = p => p.sectionIds.map(secById).filter(Boolean);
 const CELL = {
@@ -400,10 +400,20 @@ function groupsOf(L) {   // [sección, sus papers] en el orden en que se ven (co
 const FOLD = new Set((() => { try { return JSON.parse(localStorage.getItem('gp-fold') || '[]'); } catch (e) { return []; } })());   // secciones plegadas en la vista agrupada (de cada dispositivo)
 function gFold(k) { FOLD.has(k) ? FOLD.delete(k) : FOLD.add(k); try { localStorage.setItem('gp-fold', JSON.stringify([...FOLD])); } catch (e) {} render(); }
 function gFoldAll(on) { ctxClose(); FOLD.clear(); if (on) groupsOf(visible()).forEach(([s]) => FOLD.add(s.id || '_')); try { localStorage.setItem('gp-fold', JSON.stringify([...FOLD])); } catch (e) {} render(); }
+const GMORE = new Map();   // vista agrupada: las secciones largas también se pintan por partes (sección → {l: sus papers, shown: cuántos lleva pintados})
+const gMoreHTML = k => { const g = GMORE.get(k), left = g.l.length - g.shown; return `<p class="more"><button data-onclick="secMore('${k}')">Mostrar ${Math.min(LIST.step, left)} más (quedan ${left})</button></p>`; };
+function secMore(k) {   // añade la siguiente parte de una sección sin repintar lo que ya está
+  const g = GMORE.get(k), box = [...document.querySelectorAll('#list > .gbox')].find(b => (b.dataset.sec || '_') === k), m = box && box.querySelector(':scope > .more'); if (!g || !m) return;
+  const add = g.l.slice(g.shown, g.shown += LIST.step), from = k === '_' ? '' : k, tb = box.querySelector('tbody');
+  if (tb) tb.insertAdjacentHTML('beforeend', add.map(p => rowHTML(p, from)).join('')); else m.insertAdjacentHTML('beforebegin', add.map(p => card(p, from)).join(''));
+  m.remove(); if (g.shown < g.l.length) box.insertAdjacentHTML('beforeend', gMoreHTML(k));
+  fitTags(); hydrateImgs(); moreWatch();
+}
 function listHTML(L) {
-  if (!F.group) return items(L, '');
-  return groupsOf(L).map(([s, l]) => { const k = s.id || '_', fo = FOLD.has(k);
-    return `<section class="gbox${fo ? ' fold' : ''}" data-sec="${s.id || ''}"><h2 class="grp" style="border-color:${esc(s.color || '#888888')}" data-onclick="gFold('${k}')" title="Clic: plegar o desplegar${s.id ? ' · Clic derecho: notas de la sección' : ''}" ${s.id ? `data-oncontextmenu="svOpen('${s.id}',event)"` : ''}><span class="gcar">${fo ? '▸' : '▾'}</span>${esc(s.name)} <small>(${l.length})</small></h2>${fo ? '' : items(l, s.id || '') || '<p class="empty drop">Arrastra papers aquí</p>'}</section>`; }).join('');
+  GMORE.clear(); if (!F.group) return items(L, '');
+  return groupsOf(L).map(([s, l]) => { const k = s.id || '_', fo = FOLD.has(k), n = l.length; let more = '';
+    if (!fo && n > LIST.step) { GMORE.set(k, {l, shown: LIST.step}); l = l.slice(0, LIST.step); more = gMoreHTML(k); }
+    return `<section class="gbox${fo ? ' fold' : ''}" data-sec="${s.id || ''}"><h2 class="grp" style="border-color:${esc(s.color || '#888888')}" data-onclick="gFold('${k}')" title="Clic: plegar o desplegar${s.id ? ' · Clic derecho: notas de la sección' : ''}" ${s.id ? `data-oncontextmenu="svOpen('${s.id}',event)"` : ''}><span class="gcar">${fo ? '▸' : '▾'}</span>${esc(s.name)} <small>(${n})</small></h2>${fo ? '' : (items(l, s.id || '') || '<p class="empty drop">Arrastra papers aquí</p>') + more}</section>`; }).join('');
 }
 function paperPlace(id, from, to, ref, after) {   // coloca un paper (arrastrado) antes o después de otro; to: sección de destino ('' = Sin sección) o null sin agrupar
   const grouped = F.group && to != null, mv = dragIds(id);   // si el paper está seleccionado, se colocan todos los seleccionados juntos
@@ -427,13 +437,15 @@ function posSaveAs(n) { db.posSaves ||= []; db.posSaves.push({id: uid(), name: n
 function posLoad(id) { const x = (db.posSaves || []).find(y => y.id === id); ctxClose(); if (!x) return; db.manual = structuredClone(x.manual); F.sorts = [{k: 'manual', d: 1}, ...F.sorts.filter(y => y.k !== 'manual').slice(0, 2)]; markDirty(); render(); toast(`Orden «${x.name}».`, [], 2000); }
 async function posDelAsk(id) { const x = (db.posSaves || []).find(y => y.id === id); if (!x || !await askOk(`¿Borrar las posiciones «${x.name}»?`)) return; db.posSaves = db.posSaves.filter(y => y !== x); markDirty(); favDraw(); }
 function fitTags(only) {   // las etiquetas van en la barra superior de la tarjeta; si no caben, pasan a su propia línea entre esa barra y el título
-  (only ? [only] : document.querySelectorAll('#list article.card')).forEach(c => { const ct = c.querySelector('.ct'), tl = ct.querySelector('.tl') || c.querySelector(':scope > .tl'); if (!tl) return;
-    if (tl.parentElement !== ct) ct.insertBefore(tl, ct.querySelector('.rd'));
-    if (ct.scrollWidth > ct.clientWidth + 1) ct.after(tl); });
+  // en tres pasadas (colocar, medir, mover): medir y mover tarjeta a tarjeta obligaba al navegador a recalcular la página en cada una
+  const C = []; (only ? [only] : document.querySelectorAll('#list article.card')).forEach(c => { const ct = c.querySelector('.ct'), tl = ct.querySelector('.tl') || c.querySelector(':scope > .tl'); if (!tl) return;
+    if (tl.parentElement !== ct) ct.insertBefore(tl, ct.querySelector('.rd')); C.push([ct, tl]); });
+  C.filter(([ct]) => ct.scrollWidth > ct.clientWidth + 1).forEach(([ct, tl]) => ct.after(tl));
 }
 let listW = 0; new ResizeObserver(([e]) => { if (Math.abs(e.contentRect.width - listW) > 1) { listW = e.contentRect.width; fitTags(); } }).observe($('#list'));   // también al plegar la barra o cambiar el tamaño
 let RENDER_HOLD = false, RENDER_HELD = false;   // al arrancar se pinta una sola vez, al final (ver bootApp en app.js)
 function render() {
+  CITED = null;
   if (RENDER_HOLD) { RENDER_HELD = true; return; }
   vwSatNotify();
   if (VW.open) return vwDbChanged();   // con el visor abierto, la lista se repinta al cerrarlo
@@ -465,8 +477,9 @@ function listMore() {   // añade la siguiente parte sin repintar lo que ya est�
   m.remove(); if (LIST.shown < LIST.L.length) $('#list').insertAdjacentHTML('beforeend', moreHTML());
   fitTags(); hydrateImgs(); moreWatch();
 }
-const MORE_IO = 'IntersectionObserver' in window ? new IntersectionObserver(es => { if (es.some(e => e.isIntersecting)) listMore(); }, {rootMargin: '600px'}) : null;
-const moreWatch = () => { if (!MORE_IO) return; MORE_IO.disconnect(); const m = $('#list > .more'); if (m) MORE_IO.observe(m); };   // al acercarte al final, se añade sola
+const moreGo = m => { const box = m.closest('.gbox'); box ? secMore(box.dataset.sec || '_') : listMore(); };
+const MORE_IO = 'IntersectionObserver' in window ? new IntersectionObserver(es => { for (const e of es) if (e.isIntersecting && e.target.isConnected) moreGo(e.target); }, {rootMargin: '600px'}) : null;
+const moreWatch = () => { if (!MORE_IO) return; MORE_IO.disconnect(); document.querySelectorAll('#list .more').forEach(m => MORE_IO.observe(m)); };   // al acercarte al final, se añade sola
 const countDraw = () => { $('#count').textContent = `${LIST.n} de ${db.papers.length} · ${SEL.size} sel.`; };
 function selDraw(count = 1) {   // barra de selección (solo sale con papers marcados) y contador
   const sg = $('#sg-sel'), hadSel = !sg.hidden; sg.hidden = !SEL.size; if (SEL.size && !hadSel) sg.classList.remove('fold');
@@ -474,7 +487,7 @@ function selDraw(count = 1) {   // barra de selección (solo sale con papers mar
 }
 function renderPaper(id) {   // repinta solo la tarjeta o fila de un paper; si el cambio puede moverlo o sacarlo de la lista, todo
   const p = db.papers.find(x => x.id === id), el = $(`#list [data-id="${id}"]`);
-  if (!p || !el || F.minRating || F.read || advRules().length || F.exTags.size || F.noTag || F.noSec || F.yFrom || F.yTo || F.sorts.some(s => ['rating', 'reading', 'modified'].includes(s.k))) return render();
+  if (!p || !el || F.minRating || F.read || advRules().length || F.exTags.size || F.noTag || F.noSec || F.yFrom || F.yTo || F.tags.size || F.q.includes('#') || F.sorts.some(s => ['rating', 'reading', 'modified', 'tags'].includes(s.k) || s.k.startsWith('o:'))) return render();   // también si se filtra, se busca (#etiqueta) o se ordena por etiquetas
   const tr = el.tagName === 'TR', t = document.createElement(tr ? 'tbody' : 'div'); t.innerHTML = (tr ? rowHTML : card)(p, el.dataset.from);
   if (tr && el.nextElementSibling?.classList.contains('rn')) el.nextElementSibling.remove();   // la fila de notas desplegadas va justo detrás
   const nodes = [...t.children]; el.replaceWith(...nodes); hdr(); filtDraw();   // los contadores de los filtros pueden cambiar
@@ -695,13 +708,13 @@ function zipStore(files) {   // [[nombre, texto]] → Uint8Array (método 0 = al
 const docxRuns = (s, sz) => {   // *cursiva* y **negrita** (y \* literal) → runs de Word; sz = tamaño en medios puntos (orden del esquema: b, i, sz)
   const out = []; for (const part of String(s ?? '').replace(/\\\*/g, '\u0001').split(/(\*\*.+?\*\*|\*.+?\*)/)) { if (!part) continue;
     const b = /^\*\*.+\*\*$/.test(part), i = !b && /^\*.+\*$/.test(part), t = (b ? part.slice(2, -2) : i ? part.slice(1, -1) : part).replace(/\u0001/g, '*');
-    out.push(`<w:r>${b || i || sz ? `<w:rPr>${b ? '<w:b/>' : ''}${i ? '<w:i/>' : ''}${sz ? `<w:sz w:val="${sz}"/>` : ''}</w:rPr>` : ''}<w:t xml:space="preserve">${esc(t)}</w:t></w:r>`); }
+    out.push(`<w:r>${b || i || sz ? `<w:rPr>${b ? '<w:b/>' : ''}${i ? '<w:i/>' : ''}${sz ? `<w:sz w:val="${sz}"/>` : ''}</w:rPr>` : ''}<w:t xml:space="preserve">${xesc(t)}</w:t></w:r>`); }
   return out.join(''); };
 function exDocx(L, o) {
   const W = 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"', P = (inner, ppr = '') => `<w:p>${ppr ? `<w:pPr>${ppr}</w:pPr>` : ''}${inner}</w:p>`, H = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
   const body = [];
   for (const S of exSecs(L, o)) {
-    if (S.h) body.push(P(`<w:r><w:t xml:space="preserve">${esc(S.h)}</w:t></w:r>`, '<w:pStyle w:val="Heading1"/>'));
+    if (S.h) body.push(P(`<w:r><w:t xml:space="preserve">${xesc(S.h)}</w:t></w:r>`, '<w:pStyle w:val="Heading1"/>'));
     if (S.lines) { S.lines.forEach(l => body.push(P(docxRuns(l), '<w:spacing w:after="40"/>'))); continue; }
     const sx = yearSuffixes(S.L, o);
     S.L.forEach((p, i) => {
@@ -723,7 +736,10 @@ const wordDoc = (L, o) => `<html xmlns:o="urn:schemas-microsoft-com:office:offic
 const BIBK = {articulo: 'article', libro: 'book', capitulo: 'incollection', congreso: 'inproceedings', tesis: 'phdthesis', web: 'misc', prensa: 'article', blog: 'online', informe: 'techreport', norma: 'standard', patente: 'patent', dataset: 'dataset', software: 'software', audiovisual: 'video', audio: 'audio', legislacion: 'legislation', jurisprudencia: 'jurisdiction', mapa: 'misc', basedatos: 'misc', redsocial: 'misc', ia: 'misc', diccionario: 'misc', presentacion: 'misc', personal: 'misc'};
 const BIBV = {informe: 'institution', norma: 'organization', patente: 'organization', mapa: 'organization', dataset: 'organization', software: 'organization', basedatos: 'organization', audiovisual: 'organization', audio: 'organization', redsocial: 'organization', ia: 'organization', diccionario: 'organization', presentacion: 'organization', personal: 'organization', legislacion: 'organization', jurisprudencia: 'institution', prensa: 'journal', blog: 'journal', articulo: 'journal', capitulo: 'booktitle', congreso: 'booktitle', tesis: 'school', libro: 'publisher'};
 const STOPW = new Set(['the', 'and', 'for', 'del', 'los', 'las', 'una', 'con', 'por', 'que']);
-const texEsc = s => String(s).replace(/([&%$#_])/g, '\\$1');
+const TEX_C = {'\\': '\\textbackslash{}', '~': '\\textasciitilde{}', '^': '\\textasciicircum{}'};
+const texBal = s => { let d = 0; for (const c of s) { if (c === '{') d++; else if (c === '}' && --d < 0) return false; } return !d; };   // llaves bien emparejadas: se respetan (protegen mayúsculas)
+const texEsc = s => { s = String(s); return s.replace(texBal(s) ? /[\\~^&%$#_]/g : /[\\~^&%$#_{}]/g, c => TEX_C[c] || '\\' + c); };   // una llave suelta o una barra invertida rompían el archivo .bib
+const bibSuf = n => { let s = ''; for (; n > 0; n = Math.floor((n - 1) / 26)) s = String.fromCharCode(97 + (n - 1) % 26) + s; return s; };   // a…z, aa, ab… (antes, la 27.ª clave repetida salía con «{»)
 const bibName = (p, x) => { x = x.trim(); return p.authorType === 'entidad' || (p.authorType !== 'persona' && isOrg(x)) ? `{${texEsc(x)}}` : texEsc(x); };   // entidades entre llaves
 /* ---- CSL-JSON (el formato de Zotero, Mendeley, Pandoc y citeproc) ---- */
 const CSLT = {articulo: 'article-journal', libro: 'book', capitulo: 'chapter', congreso: 'paper-conference', tesis: 'thesis', web: 'webpage', prensa: 'article-newspaper', blog: 'post-weblog', informe: 'report',
@@ -760,7 +776,7 @@ function bibtex(L) {
       ['volume', ty === 'articulo' ? texEsc(p.volume || '') : ''], ['number', ty === 'articulo' || ty === 'legislacion' ? texEsc(p.issue || '') : ''], ['pages', shows('pages', ty) ? pg : ''], ['entrysubtype', ty === 'prensa' ? 'newspaper' : ty === 'blog' ? 'blog' : BIBK[ty] === 'misc' && ty !== 'web' ? ty : ''], ...tf,
       ...[['subtype', 'type'], ['authorRole', 'authorrole'], ['userHandle', 'userhandle'], ['seriesNumber', 'seriesnumber'], ['isbn', 'isbn'], ['issn', 'issn'], ['series', 'series'], ['institution', 'institution'], ['docNumber', ty === 'legislacion' ? 'docnumber' : 'number'], ['abbr', 'shorthand'], ['ecli', 'ecli']].filter(([k]) => shows(k, ty) && !(k === 'institution' && ty === 'tesis' && !p.institution)).map(([k, b]) => [b, texEsc(p[k] || '')]),
       ['doi', normDoi(p.doi)], ['url', p.url], ['urldate', p.accessed]].filter(([, v]) => v);
-    return `@${bk}{${n ? base + String.fromCharCode(96 + n) : base},\n${f.map(([k, v]) => `  ${k} = {${v}}`).join(',\n')}\n}`;
+    return `@${bk}{${base + bibSuf(n)},\n${f.map(([k, v]) => `  ${k} = {${v}}`).join(',\n')}\n}`;
   }).join('\n\n');
 }
 const RISK = {articulo: 'JOUR', libro: 'BOOK', capitulo: 'CHAP', congreso: 'CONF', tesis: 'THES', web: 'ELEC', prensa: 'NEWS', blog: 'BLOG', informe: 'RPRT', norma: 'STAND', patente: 'PAT', mapa: 'MAP', dataset: 'DATA', software: 'COMP', basedatos: 'DBASE', audiovisual: 'VIDEO', audio: 'SOUND', redsocial: 'GEN', ia: 'GEN', diccionario: 'DICT', presentacion: 'SLIDE', personal: 'PCOMM', legislacion: 'STAT', jurisprudencia: 'CASE'};
@@ -779,7 +795,7 @@ function openEx() {   // ventana emergente de exportación; se cierra con un cli
   exUI(); drawEx(); $('#ex').showModal();
 }
 function exSet(k, v, quiet) {   // las opciones se recuerdan en el JSON (sin crear pasos de deshacer)
-  ex()[k] = v; lastSnap = snapDb(); dirty = true; touch(); if (!quiet) exUI(); drawEx();
+  ex()[k] = v; foldSnap(); dirty = true; touch(); if (!quiet) exUI(); drawEx();
 }
 function exUI() {
   const o = ex(), tl = isTl(o.fmt);
@@ -846,7 +862,8 @@ function kMark(scroll) {
 function kMove(d) {
   let L = kItems(); if (!L.length) return;
   let i = L.findIndex(e => e.dataset.id === KCUR);
-  if (d > 0 && i === L.length - 1 && $('#list > .more')) { listMore(); L = kItems(); }   // al llegar al final se añade la siguiente parte
+  if (d > 0 && i >= 0) { const box = L[i].closest('.gbox'), m = box ? box.querySelector(':scope > .more') : $('#list > .more');   // al llegar al final (de la lista o de su sección) se añade la siguiente parte
+    if (m && (i === L.length - 1 || L[i + 1].closest('.gbox') !== box)) { moreGo(m); L = kItems(); } }   // al llegar al final se añade la siguiente parte
   i = i < 0 ? (d > 0 ? 0 : L.length - 1) : Math.max(0, Math.min(L.length - 1, i + d));
   KCUR = L[i].dataset.id; kMark(true);
 }

@@ -69,9 +69,11 @@ const dpEmpty = v => v == null || v === '' || v === false || v === 'auto' || (Ar
 const dpScore = p => Object.entries(p).filter(([k, v]) => !['id', 'history', 'created', 'modified', 'notes'].includes(k) && !dpEmpty(v)).length + 3 * p.notes.length;
 function dpMerge(keepId, ids) {
   const k = db.papers.find(p => p.id === keepId), gone = ids.filter(i => i !== keepId).map(i => db.papers.find(p => p.id === i)).filter(Boolean); if (!k) return;
-  const SKIP = new Set(['id', 'history', 'created', 'modified', 'notes', 'tagIds', 'sectionIds', 'related', 'refTo', 'cites', 'general', 'rating', 'reading']), G = new Set(gone.map(q => q.id)), uniq = a => [...new Set(a)];
+  const SKIP = new Set(['id', 'history', 'created', 'modified', 'notes', 'tagIds', 'sectionIds', 'related', 'refTo', 'cites', 'general', 'rating', 'reading']), G = new Set(gone.map(q => q.id)), uniq = a => [...new Set(a)], moved = [];
   for (const q of gone) {
-    for (const key of Object.keys(q)) if (!SKIP.has(key) && dpEmpty(k[key]) && !dpEmpty(q[key])) k[key] = structuredClone(q[key]);
+    for (const key of Object.keys(q)) if (!SKIP.has(key) && dpEmpty(k[key]) && !dpEmpty(q[key])) { k[key] = structuredClone(q[key]);
+      if (key === 'pdf' || key === 'pdf2') { const n = key === 'pdf2' ? 2 : 1, from = pdfKey(q.id, n); k[key].from ||= from; moved.push([from, pdfKey(k.id, n)]); }   // el archivo del PDF va con sus datos (como al citar desde la bandeja)
+      if (key === 'image' && q.image.kind === 'file') moved.push(['img:' + q.id, 'img:' + k.id]); }
     k.tagIds = uniq([...k.tagIds, ...q.tagIds]); k.sectionIds = uniq([...(k.sectionIds || []), ...(q.sectionIds || [])]); k.notes.push(...q.notes.map(n => ({...n})));
     for (const [s, v] of Object.entries(q.cites || {})) if (!(s in k.cites)) k.cites[s] = v;
     if (q.general && q.general.trim() && q.general.trim() !== (k.general || '').trim()) k.general = (k.general ? k.general + '\n\n' : '') + q.general;
@@ -87,6 +89,10 @@ function dpMerge(keepId, ids) {
   k.related.forEach(r => { const q = db.papers.find(x => x.id === r); if (q && !q.related.includes(k.id)) q.related.push(k.id); });
   logChange(k, 'Fusionado con: ' + gone.map(q => '«' + shortTxt(q.title) + '»').join(', ')); k.modified = new Date().toISOString();
   gone.forEach(q => trashPaper(q.id)); markDirty(); render();
+  if (moved.length) {   // se copian (no se mueven: el paper descartado sigue en la papelera con los suyos) el enlace y la portada; la copia de este navegador se encuentra por «from»
+    for (const [a, b] of moved) { if (a.startsWith('img:')) { if (PEND.has(a.slice(4))) PEND.set(b.slice(4), PEND.get(a.slice(4))); } else if (PDF_FILES.has(a)) PDF_FILES.set(b, PDF_FILES.get(a)); }
+    idb('readwrite', st => { for (const [a, b] of moved) for (const pre of a.startsWith('img:') ? [''] : ['pdf:', 'pdft:']) { const g = st.get(pre + a); g.onsuccess = () => { if (g.result != null) st.put(g.result, pre + b); }; } return null; }).catch(() => {});
+  }
 }
 function dpOpen() { dpDraw(); if (!$('#dp').open) $('#dp').showModal(); }
 function dpDraw() {
@@ -333,7 +339,7 @@ const pjFile = n => (String(n).replace(/[\\/:*?"<>|\u0000-\u001f]/g, '-').trim()
 const pjNameFor = f => { const b = String(f || '').split(/[\\/]/).pop().replace(/\.json$/i, '').trim(); return !b ? 'Mi biblioteca' : b === 'ejemplo_papers' ? 'Ejemplo' : b.slice(0, 60); };
 const pjUnique = (n, skip) => { let o = n, i = 2; while (PJ.list.some(p => p.id !== skip && p.name.toLowerCase() === o.toLowerCase())) o = `${n} (${i++})`; return o; };
 const pjSave = () => BOOTED && !TAB.sat ? idb('readwrite', st => st.put({v: 1, cur: PJ.cur, list: PJ.list, gone: PJ.gone}, 'projects')).catch(() => {}) : Promise.resolve();
-const pjDrop = id => { const N = syNames(id); return idb('readwrite', st => { ['proj:' + id, 'h:' + id, 'bk:' + id, 'fav:' + id, 'rec:' + id, 'syncBase' + N.key, 'syncCache' + N.key].forEach(k => st.delete(k)); st.delete(bkRange(id)); return st.count(); }).catch(() => {}); };
+const pjDrop = id => { const N = syNames(id); return idb('readwrite', st => { ['proj:' + id, 'projbad:' + id, 'h:' + id, 'bk:' + id, 'fav:' + id, 'rec:' + id, 'syncBase' + N.key, 'syncCache' + N.key].forEach(k => st.delete(k)); st.delete(bkRange(id)); return st.count(); }).catch(() => {}); };
 function pjShow() {
   const p = pjCur(), i = $('#pjName'); if (!p || !i) return;
   if (document.activeElement !== i) i.value = p.name; i.size = Math.max(6, i.value.length + 1); document.title = p.name + ' · Gestor de papers';
@@ -346,9 +352,11 @@ async function pjLeave() {   // antes de cambiar de proyecto: lo pendiente se gu
   if (VWB.sats.size) { vwBc({t: 'bye', pj: PJ.cur}); VWB.sats.clear(); }   // el visor de otra pestaña pasa a guardar él mismo
 }
 async function pjLoad(id, text, file, h) {   // abre un proyecto: su copia de trabajo (o el texto de un archivo) con los ajustes comunes
-  const r = text == null ? await idb('readonly', st => st.get('proj:' + id)).catch(() => null) : null;
-  let d = null; try { d = text != null ? JSON.parse(text) : await projData(r); } catch (e) {}
-  if (!d || typeof d !== 'object') d = {version: 1, sections: [], tags: [], papers: [], trash: []};
+  let r = null, bad = false; if (text == null) try { r = await idb('readonly', st => st.get('proj:' + id)); } catch (e) { bad = true; }
+  let d = null; try { d = text != null ? JSON.parse(text) : await projData(r); } catch (e) { bad = true; }
+  if (!d || typeof d !== 'object') { d = {version: 1, sections: [], tags: [], papers: [], trash: []}; bad ||= r != null;
+    if (text == null) await syBaseSet(syNames(id), null); }   // sin copia de trabajo (o ilegible): lo que se abre no es lo último sincronizado; así Drive no entiende que se han borrado los papers
+  if (bad && r != null) await idb('readwrite', st => st.put(r, 'projbad:' + id)).catch(() => {});   // la copia ilegible se aparta, no se pisa
   if (text == null || !d.settings) d.settings = structuredClone(db.settings);
   PJ.cur = id; pjShow();
   if (PJ.left && PJ.left !== id) { const l = PJ.left; setTimeout(() => syStoredSoon(l), 50); } PJ.left = null;
@@ -357,7 +365,8 @@ async function pjLoad(id, text, file, h) {   // abre un proyecto: su copia de tr
   handle = h || null; if (text == null) { dirty = !!(r && r.dirty); try { if (FSA) handle = await idb('readonly', st => st.get('h:' + id)) || null; } catch (e) {} }
   if (auto) { try { auto = !!handle && await handle.requestPermission({mode: 'readwrite'}) === 'granted'; } catch (e) { auto = false; } }   // el autoguardado sigue en el archivo de este proyecto
   if (!syOn()) $('#auto').checked = auto;
-  if (h) rememberHandle(); hdr(); await sessionNow();
+  if (h) rememberHandle(); hdr();
+  if (bad) toast('No se pudo leer la copia de trabajo de este proyecto en este navegador. Se abre vacío' + (syOn() ? ' y se vuelve a traer de Google Drive.' : ': abre su archivo JSON o restaura una copia de seguridad.'), [], 0); else await sessionNow();
   if (text != null) syLoaded(); else if (syAuto()) sySoon(300);
   bkDaily(); favLoad(); tabHello();
 }
@@ -411,12 +420,12 @@ async function pjDel() {
   if (!await askOk(`¿Borrar el proyecto «${p.name}» de este navegador${syOn() ? ' y de tu Google Drive' : ''}?\nSus papers, notas, secciones y etiquetas desaparecen de la aplicación.${path ? `\nTu archivo «${path}» no se toca.` : '\nNo tiene archivo JSON: si quieres conservarlo, antes pulsa «Guardar como».'}`)) return;
   clearTimeout(timer); await pjIdle(); clearTimeout(SY.tm); SY.tm = 0;
   const id = p.id; PJ.list = PJ.list.filter(x => x.id !== id); PJ.gone.push(id);
-  await pjLoad(PJ.list[0].id); await pjDrop(id); pjSave(); if (syAuto()) sySoon(300);
+  await pjLoad(PJ.list[0].id); await pjDrop(id); pjSave(); pdfGc(); if (syAuto()) sySoon(300);
   toast(`Proyecto «${p.name}» borrado.`, [], 4000);
 }
 async function pjGone(id) {   // otro dispositivo borró el proyecto abierto
   const p = PJ.list.find(x => x.id === id); if (!p || PJ.cur !== id) return;
-  PJ.list = PJ.list.filter(x => x.id !== id); await pjLoad(PJ.list[0].id); await pjDrop(id); pjSave();
+  PJ.list = PJ.list.filter(x => x.id !== id); await pjLoad(PJ.list[0].id); await pjDrop(id); pjSave(); pdfGc();
   toast(`El proyecto «${p.name}» se borró en otro dispositivo. Ahora estás en «${pjCur().name}».`, [], 8000);
 }
 function pjMenu(e) {

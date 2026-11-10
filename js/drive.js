@@ -22,8 +22,19 @@ const syPjOf = n => /^gpapers-p-([a-z0-9]+)-/.exec(n)?.[1] || (n !== SY_IDX ? 'm
 const syS = v => JSON.stringify(v);
 const syNoHist = (k, v) => k === 'history' ? undefined : v, syPlainS = d => JSON.stringify(d, syNoHist);   // syPlainS(d) === syS(syPlain(d)), sin el paso de ida y vuelta
 const syPlain = d => JSON.parse(syPlainS(d));   // como en el JSON: sin el historial del día
+/* Dentro de una vuelta las imágenes incrustadas no viajan enteras: cada una va como su huella ({kind: 'data', data: '@huella'}) y la imagen queda en SY.img.
+   Así comparar, normalizar y fusionar no copian ni recorren megas de imágenes varias veces (con 300 imágenes, cada vuelta tardaba 1,5–2 s). Al poner el resultado
+   en la app (syApply) o en una copia de trabajo, syUntok() las devuelve. En Drive nada cambia: allí siguen como {kind: 'data', ref: huella}. */
+const syTokRep = (k, v) => { if (k === 'history') return undefined;
+  if (k === 'image' && v && v.kind === 'data' && typeof v.data === 'string' && v.data[0] !== '@') { const h = imgHash(v.data); SY.img.set(h, v.data); return {kind: 'data', data: '@' + h}; } return v; };
+const syTokS = d => JSON.stringify(d, syTokRep);
+const syTokIn = d => { if (d) for (const p of syPapersOf(d)) { const i = p.image; if (i && i.kind === 'data' && typeof i.data === 'string' && i.data[0] !== '@') { const h = imgHash(i.data); SY.img.set(h, i.data); p.image = {kind: 'data', data: '@' + h}; } } return d; };   // en el sitio
+function syUntok(d) {   // en el sitio: huella → imagen (si no está en este dispositivo, el paper se queda sin imagen, como al no poder descargarla)
+  for (const p of syPapersOf(d)) { const i = p.image; if (i && i.kind === 'data' && typeof i.data === 'string' && i.data[0] === '@') { const v = SY.img.get(i.data.slice(1)) ?? IMG_POOL.get(i.data.slice(1)); p.image = v ? {kind: 'data', data: v} : null; } }
+  return d;
+}
 function syNormRaw(d) {   // pasa por validate() para comparar siempre la misma forma; validate() ajusta los tipos y estilos globales, así que se devuelven a los de db
-  try { return syPlainS(validate(structuredClone(d))); } finally { syncTypes(db.settings.customTypes); syncStyles(db.settings.customStyles, db.settings.export); }
+  try { IMG_TK_OK = true; return syPlainS(validate(structuredClone(d))); } finally { IMG_TK_OK = false; syncTypes(db.settings.customTypes); syncStyles(db.settings.customStyles, db.settings.export); }
 }
 /* Normalizar es lo más caro de cada vuelta (clonar + validate + JSON: ~300 ms con 2000 papers en un móvil) y casi siempre se repite con lo mismo
    (la copia local, la de Drive y la fusionada suelen coincidir). SY_NM recuerda el resultado por la huella del JSON de entrada: huella → JSON normalizado.
@@ -76,7 +87,8 @@ function sySettings(x, y, z) {
 }
 function syMerge(L, R, B) {   // L = este dispositivo, R = Google Drive, B = última versión sincronizada (null la primera vez: se unen)
   const o = syObj(L, R, B, true, {sections: syLst(syTS), tags: syLst(syTS), orders: syLst(syGen), posSaves: syLst(syGen), papers: syLst(syPaper), trash: syLst(syGen, t => t.paper.id), inbox: syLst(syInbox),
-    settings: (x, y, z, h) => sySettings(x || {}, y || {}, h ? z || {} : null)});
+    settings: (x, y, z, h) => sySettings(x || {}, y || {}, h ? z || {} : null),
+    manual: (x, y, z, h) => { if (!syIsObj(x || {}) || !syIsObj(y || {})) return syVal(x, y, z, h, true); const r = syObj(x, y, h ? (syIsObj(z) ? z : {}) : null, true); return Object.keys(r).length ? r : undefined; }});   // orden manual: sección a sección (antes, entero: ordenar dos secciones en dos dispositivos perdía una)
   o.papers ||= []; o.trash ||= []; o.inbox ||= []; o.tags ||= []; o.sections ||= [];
   const live = new Map(o.papers.map(p => [p.id, p]));   // en la lista y en la papelera a la vez (un lado lo borró y el otro lo editó): gana lo último
   o.trash = o.trash.filter(t => { const p = live.get(t.paper.id); if (!p) return true; if (t.at > syWhen(p)) { o.papers.splice(o.papers.indexOf(p), 1); return true; } return false; });
@@ -169,7 +181,8 @@ const syHash = s => {   // huella de 64 bits + longitud (cyrb53 doble): la misma
 const syPapersOf = d => [...(d.papers || []), ...(d.trash || []).map(t => t && t.paper)].filter(Boolean);
 function syWire(d) {   // copia para Drive: {kind: 'data', data} → {kind: 'data', ref: huella}; devuelve también las huellas usadas
   const w = structuredClone(d), refs = new Set();
-  for (const p of syPapersOf(w)) if (p.image && p.image.kind === 'data' && p.image.data) { const h = imgHash(p.image.data); SY.img.set(h, p.image.data); p.image = {kind: 'data', ref: h}; refs.add(h); }
+  for (const p of syPapersOf(w)) if (p.image && p.image.kind === 'data' && p.image.data) { if (p.image.data[0] === '@') { const h = p.image.data.slice(1); p.image = {kind: 'data', ref: h}; refs.add(h); continue; }   // ya venía como huella
+    const h = imgHash(p.image.data); SY.img.set(h, p.image.data); p.image = {kind: 'data', ref: h}; refs.add(h); }
   return [w, refs];
 }
 async function syPool(items, fn, n = 6) {   // fn sobre cada elemento, hasta n a la vez
@@ -182,13 +195,13 @@ function syPdfJob(j) {
     try { await syPdfs(j.tok, j.files, j.m, j.N, j.id); await syPdfsVis(j.tok, j.m, j.id); } catch (e) { if (e.estado === 401) syTokDel(); } });
   SY_PDF = run.catch(() => {}); return run;
 }
-async function syUnwire(tok, w, files, N) {   // vuelve a poner las imágenes; solo descarga las que este dispositivo no tiene
+async function syUnwire(tok, w, files, N) {   // deja cada imagen como su huella (ver syTokS) y trae a SY.img las que este dispositivo no tiene
   const d = structuredClone(w), P = syPapersOf(d).filter(p => p.image && p.image.kind === 'data' && p.image.ref);
   for (const r of new Set(P.map(p => p.image.ref))) if (!SY.img.has(r) && IMG_POOL.has(r)) SY.img.set(r, IMG_POOL.get(r));   // ya están en este dispositivo: no se descargan
   const miss = [...new Set(P.map(p => p.image.ref))].filter(r => !SY.img.has(r));
   if (miss.length) await idb('readonly', st => { miss.forEach(h => { const q = st.get('imgd:' + h); q.onsuccess = () => { if (typeof q.result === 'string') SY.img.set(h, q.result); }; }); return null; }).catch(() => {});
   await syPool(miss.filter(r => !SY.img.has(r)), async r => { const f = files.find(x => x.name === N.img + r); if (f) try { SY.img.set(r, await (await syDrive(tok, `/drive/v3/files/${f.id}?alt=media`)).text()); } catch (e) {} });
-  for (const p of P) { const r = p.image.ref; p.image = SY.img.has(r) ? {kind: 'data', data: SY.img.get(r)} : null; }
+  for (const p of P) { const r = p.image.ref; p.image = SY.img.has(r) ? {kind: 'data', data: '@' + r} : null; }
   return d;
 }
 
@@ -300,11 +313,11 @@ async function syCompact(tok, R, mw, refs) {   // reescribe la copia completa y 
   const inc = R.all.map(f => f.name), f = await syUpload(tok, R.sf && R.sf.id, R.N.snap, JSON.stringify({app: 'gpapers', v: 2, at: new Date().toISOString(), inc, db: mw}), 'application/json');
   R.c.snap = {ver: syVer(f), inc, db: mw}; R.c.deltas = {}; await syCacheSet(R.N, R.c);
   const old = Date.now() - 864e5;   // una imagen que otro dispositivo acaba de subir aún no está en esta copia: solo se borran las de más de un día
-  for (const x of [...R.all, ...(R.lf ? [R.lf] : []), ...R.files.filter(x => x.name.startsWith(R.N.img) && !refs.has(x.name.slice(R.N.img.length)) && Date.parse(x.modifiedTime) < old)]) await syDel(tok, x.id);
+  await syPool([...R.all, ...(R.lf ? [R.lf] : []), ...R.files.filter(x => x.name.startsWith(R.N.img) && !refs.has(x.name.slice(R.N.img.length)) && Date.parse(x.modifiedTime) < old)], x => syDel(tok, x.id));
 }
 const syDev = () => { let d = syP().dev; if (!d) { d = Math.random().toString(36).slice(2, 8); sySet({dev: d}); } return d; };
 const syWho = async tok => { try { return (await (await syDrive(tok, '/drive/v3/about?fields=user(emailAddress)')).json()).user?.emailAddress || ''; } catch (e) { return ''; } };
-const syBase = N => idb('readonly', st => st.get('syncBase' + N.key)).catch(() => null);
+const syBase = N => idb('readonly', st => st.get('syncBase' + N.key)).then(syTokIn).catch(() => null);   // las bases de versiones anteriores llevan las imágenes enteras
 const syBaseSet = (N, d) => idb('readwrite', st => d ? st.put(d, 'syncBase' + N.key) : st.delete('syncBase' + N.key)).catch(() => {});
 /* ---- Índice: proyectos y ajustes comunes ---- */
 const syShared = s => { const o = structuredClone(s || {}); SY_LOCALSET.forEach(k => delete o[k]); return o; };
@@ -348,7 +361,7 @@ async function syOnce(inter) {
   const tok = await syToken(inter), full = syGcDue() || PJ.gone.length > 0, files = full ? await syLs(tok) : await syLsFor(tok, N);
   const [I, iB, R] = await Promise.all([syIdxGet(tok, files), idb('readonly', st => st.get('syncIdxBase')).catch(() => null), syRemote(tok, files, N)]);   // a la vez: menos esperas
   const rw = R.w ? await syUnwire(tok, R.w, files, N) : null;
-  const snap = syPlainS(db), plain = JSON.parse(snap), curS = syNormS(plain, snap);
+  const snap = syTokS(db), plain = JSON.parse(snap), curS = syNormS(plain, snap);
   const iM = I.w ? syIdxMerge(syIdxLocal(plain.settings), I.w, iB) : syIdxLocal(plain.settings);
   for (const p of PJ.list) if ((p.id === id ? dirty : p.dirty) && !iM.projects.some(e => e.id === p.id)) iM.projects.push(pjEntry(p));   // borrado en otro dispositivo, pero aquí tiene cambios sin guardar: se queda
   if (!iM.projects.some(e => e.id === id)) {   // el proyecto abierto se borró en otro dispositivo: se pasa a otro
@@ -364,7 +377,7 @@ async function syOnce(inter) {
     else { const c = await syAsk(local, remote); if (!c) return {cancel: true};
       mS = c === 'merge' ? syNormS(syMerge(local, remote, null)) : c === 'drive' ? remoteS : localS; replace = c === 'drive'; }
   }
-  if (syPlainS(db) !== snap || PJ.cur !== id) { SY.again = true; return {again: true}; }   // cambiaste algo mientras tanto: otra vuelta enseguida
+  if (syTokS(db) !== snap || PJ.cur !== id) { SY.again = true; return {again: true}; }   // cambiaste algo mientras tanto: otra vuelta enseguida
   const m = mS === localS ? local : JSON.parse(mS), news = mS !== curS;
   if (news && syBlocked()) { SY.wait = true; return {wait: true}; }   // se termina al cerrar la ventana
   syIdxApply(iM);
@@ -373,7 +386,7 @@ async function syOnce(inter) {
   if (!I.w || syS(iF) !== syS(I.w)) await syIdxPut(tok, I.f, iF);
   await idb('readwrite', st => st.put(iF, 'syncIdxBase')).catch(() => {});
   const [mw, refs] = syWire(m), have = new Set(files.filter(f => f.name.startsWith(N.img)).map(f => f.name.slice(N.img.length)));
-  for (const h of refs) if (!have.has(h)) await syUpload(tok, null, N.img + h, SY.img.get(h), 'text/plain');   // cada imagen se sube una sola vez
+  await syPool([...refs].filter(h => !have.has(h)), h => syUpload(tok, null, N.img + h, SY.img.get(h), 'text/plain'));   // cada imagen se sube una sola vez (varias a la vez)
   if (!R.sf || R.n >= SY_CFG.maxDeltas) await syCompact(tok, R, mw, refs);   // primera vez, copia de la versión anterior o muchos cambios sueltos: copia completa
   else { const p = syDiff(R.w, mw); if (p) {   // autoguardado: se sube solo lo que cambió
     const name = `${N.d}${String(Date.now()).padStart(14, '0')}-${syDev()}.json`;
@@ -381,7 +394,7 @@ async function syOnce(inter) {
     R.c.deltas[name] = p; await syCacheSet(N, R.c); } }
   if (full) { await syGc(tok, files, I.w ? iF : null); syGcDone(); }
   await syBaseSet(N, m); sySet({last: Date.now()});
-  { const now = syPlainS(db); if (now === mS || syNormS(JSON.parse(now), now) === mS) { dirty = false; hdr(); sessionSoon(); } }   // ya está guardado en Drive (normalizado: un ajuste añadido en marcha, como la paleta personalizada, puede ir en otro orden)
+  { const now = syTokS(db); if (now === mS || syNormS(JSON.parse(now), now) === mS) { dirty = false; hdr(); sessionSoon(); } }   // ya está guardado en Drive (normalizado: un ajuste añadido en marcha, como la paleta personalizada, puede ir en otro orden)
   return {news, first: !R.w, pdf: {tok, files, m, N, id}};   // los PDF se suben después, sin hacer esperar (p. ej. al cambiar de proyecto)
 }
 /* ---- Proyectos que no están abiertos: sus cambios se suben en segundo plano (al cambiar de proyecto no se espera) ---- */
@@ -392,7 +405,7 @@ async function syStored(id) {
   const rec = await idb('readonly', st => st.get('proj:' + id)).catch(() => null); if (!rec) return;
   const N = syNames(id), base = await syBase(N); if (!base) return;   // sin la última versión común: lo resuelve la vuelta normal al abrirlo (puede preguntar)
   const d = await projData(rec).catch(() => null); if (!d || PJ.cur === id) return;
-  const localS = syNormS(JSON.parse(JSON.stringify(d, syNoHist))); if (localS === JSON.stringify(base)) return;   // nada que subir
+  const localS = syNormS(JSON.parse(syTokS(d))); if (localS === JSON.stringify(base)) return;   // nada que subir
   const tok = await syToken(false), files = await syLsFor(tok, N), R = await syRemote(tok, files, N), rw = R.w ? await syUnwire(tok, R.w, files, N) : null;
   if (PJ.cur === id) return;
   const local = JSON.parse(localS), m = rw ? JSON.parse(syNormS(syMerge(local, JSON.parse(syNormS(rw)), base))) : local;
@@ -404,7 +417,7 @@ async function syStored(id) {
   await syBaseSet(N, m);
   if (PJ.cur === id) return;   // lo volviste a abrir mientras tanto: la vuelta normal lo termina
   const now = await idb('readonly', st => st.get('proj:' + id)).catch(() => null); if (!now || now.at !== rec.at) return;   // cambió mientras tanto (otra pestaña)
-  const [json, add] = projWire(m);
+  const [json, add] = projWire(syUntok(structuredClone(m)));
   await idb('readwrite', st => projPut(st, 'proj:' + id, {...rec, dirty: false, at: new Date().toISOString(), json}, add)).then(() => projSaved(add)).catch(() => {});
   Object.assign(p, {n: m.papers.length, dirty: false}); pjSave();
 }
@@ -448,7 +461,7 @@ function syApply(m, replace) {   // pone en la app lo que llega de Drive (se pue
   const hist = new Map(db.papers.map(p => [p.id, p.history]));
   SY.applying = true;
   try {
-    db = validate(structuredClone(m)); db.papers.forEach(p => p.history = hist.get(p.id) || []);
+    db = validate(syUntok(structuredClone(m))); DB_REV++; db.papers.forEach(p => p.history = hist.get(p.id) || []);
     if (replace) { path = null; handle = null; if (pjCur().name === 'Ejemplo') { pjCur().name = 'Mi biblioteca'; pjShow(); } }   // se sustituyó por la de Drive: el archivo abierto no se toca
     for (const id of [...SEL]) if (!db.papers.some(p => p.id === id)) SEL.delete(id);
     record(); dirty = true; applySettings(); render(); hdr(); sessionSoon();
@@ -555,7 +568,7 @@ async function syLogout(quiet) {
 async function syWipe() {
   const only = PJ.list.filter(p => p.remote).map(p => '«' + p.name + '»');
   if (!await askOk(`Se borrará de Google Drive la copia de todos tus proyectos y se cerrará la sesión. Los datos de este dispositivo no se tocan.${only.length ? '\nOJO: ' + only.join(', ') + (only.length === 1 ? ' solo está' : ' solo están') + ' en Google Drive y se perderá' + (only.length === 1 ? '.' : 'n.') : ''}\nSi otro dispositivo sigue conectado, volverá a crearla: cierra allí la sesión antes. ¿Continuar?`)) return;
-  try { const tok = await syToken(true); for (const f of await syLs(tok)) await syDrive(tok, '/drive/v3/files/' + f.id, {method: 'DELETE'});
+  try { const tok = await syToken(true); await syPool(await syLs(tok), f => syDrive(tok, '/drive/v3/files/' + f.id, {method: 'DELETE'}));
     await syLogout(true); toast('Copia de Google Drive borrada y sesión cerrada.', [], 5000); }
   catch (e) { toast(syErr(e)); }
 }

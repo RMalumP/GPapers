@@ -39,12 +39,17 @@ function mgAdd(id) { db[MG].push({id, name: 'Nueva', color: '#2457c5', tagIds: [
    Aparte del JSON, la app guarda (1) una copia de trabajo, para reabrir justo donde lo dejaste aunque no hayas guardado, y
    (2) el estado de la interfaz (filtros, orden, barra lateral, bloques plegados). Viven fuera de la caché de la aplicación,
    así que las actualizaciones no los tocan y no hace falta borrar datos para recibir una versión nueva. */
-const APP_V = '39.34';   // debe coincidir con la versión de sw.js
+const APP_V = '39.35';   // debe coincidir con la versión de sw.js
 let BOOTED = false, RELOADING = false, SWREG = null, tSes = 0, tUi = 0, lastUi = '';
 const sessionNow = fast => { clearTimeout(tSes); if (!BOOTED || TAB.passive) return Promise.resolve();   // fast (desde sessionSoon): si acaba de hacerse la copia para deshacer, se usa esa (un JSON entero menos por cambio)   // copia de trabajo del proyecto abierto (y la lista de proyectos)
   const p = pjCur(); if (p) { Object.assign(p, {n: db.papers.length, file: path, dirty}); delete p.remote; }
   const [json, add] = projWire(db, fast && snapEq(SNAP_SES, lastSnap) ? SNAP_SES : null);   // JSON compacto y con las imágenes aparte (solo se escriben las nuevas)
-  return idb('readwrite', st => { st.put({v: 1, cur: PJ.cur, list: PJ.list, gone: PJ.gone}, 'projects'); return projPut(st, 'proj:' + PJ.cur, {v: 1, path, dirty, at: new Date().toISOString(), json}, add); }).then(() => projSaved(add)).catch(() => {}); };
+  return idb('readwrite', st => { st.put({v: 1, cur: PJ.cur, list: PJ.list, gone: PJ.gone}, 'projects'); return projPut(st, 'proj:' + PJ.cur, {v: 1, path, dirty, at: new Date().toISOString(), json}, add); }).then(() => projSaved(add)).catch(sesWarn); };
+let SES_WARNED = false;
+function sesWarn(e) {   // antes el fallo se callaba: con el disco lleno la copia de trabajo dejaba de guardarse sin que se supiera
+  if (SES_WARNED || RELOADING) return; SES_WARNED = true; console.error(e);
+  toast('No se pudo guardar la copia de trabajo en este navegador' + (e && e.name === 'QuotaExceededError' ? ' (no queda espacio)' : '') + '. Guarda el archivo JSON o sincroniza con Google Drive para no perder los cambios.', [], 0);
+}
 const sessionSoon = () => { clearTimeout(tSes); tSes = setTimeout(() => sessionNow(true), 700); };
 const uiState = () => ({v: 1, F: {sorts: F.sorts, group: F.group, secs: [...F.secs], sec: sec1(), tags: [...F.tags], read: F.read, minRating: F.minRating, inNotes: F.inNotes, mode: F.mode, tbSec: F.tbSec, tbTag: F.tbTag, ...fExtra()},
   side: {min: $('#side').classList.contains('min'), w: sbW(), fold: [...document.querySelectorAll('#side .sg.fold')].map(e => e.id), more: !$('#sg-more').classList.contains('fold'), sortOpen: !$('#sg-sort').classList.contains('fold'), ff: [...document.querySelectorAll('#side .fs.fold')].filter(e => e.id !== 'fs-adv').map(e => e.id), adv: !$('#fs-adv').classList.contains('fold')}, cite: CITE_SEL, dataAll: DATA_ALL, citeOpen: [...CITE_OPEN], allFold: [...ALL_FOLD], cfg: [...CFG_OPEN], help: [...HELP_OPEN]});
@@ -76,7 +81,7 @@ async function forgetAppData() {
   if (!await askOk(`Se borrarán de este navegador ${n === 1 ? 'el proyecto' : `los ${n} proyectos`} (copias de trabajo) y el estado de la interfaz. Tus archivos JSON y tu Google Drive no se tocan: guarda antes lo que no tengas guardado. ¿Continuar?`)) return;
   BOOTED = false; clearTimeout(tSes); clearTimeout(tUi);
   const ks = await idb('readonly', st => st.getAllKeys()).catch(() => []);
-  await idb('readwrite', st => { ks.filter(k => typeof k === 'string' && /^(session|ui|projects|proj:|imgd:|h:|bk:|bkd:|fav:|rec:|sync)/.test(k)).forEach(k => st.delete(k)); return st.count(); }).catch(() => {});
+  await idb('readwrite', st => { ks.filter(k => typeof k === 'string' && /^(session|ui|projects|proj:|projbad:|imgd:|img:|pdf:|pdfb:|pdft:|pdfUp:|pdfVis:|h:|bk:|bkd:|fav:|rec:|sync)/.test(k)).forEach(k => st.delete(k)); return st.count(); }).catch(() => {});
   toast('Datos de este navegador borrados. La próxima vez la aplicación arrancará limpia.');   // en esta pestaña ya no se guarda nada más
 }
 const reloadApp = async () => { RELOADING = true; await sessionNow(); await uiNow(); location.reload(); };
@@ -108,7 +113,7 @@ async function bootApp() {
   pjShow(); instShow(); applyUI(ui); BOOTED = true; lastUi = JSON.stringify(uiState()); if (restored) uiNow();
   if (pj && !restored) pjSave(); else if (!restored || old) await sessionNow(); else clearTimeout(tSes);   // recuperada tal cual: no hace falta volver a escribirla
   if (old) { if (handle) rememberHandle(); idb('readwrite', st => st.delete('session')).catch(() => {}); }
-  bkDaily(); favLoad(); afterPaint(imgGc); tabHello();
+  bkDaily(); favLoad(); afterPaint(gcDaily); tabHello();
 }
 document.addEventListener('visibilitychange', () => { if (document.hidden) { sessionNow(); uiNow(); } });
 addEventListener('pagehide', () => { sessionNow(); uiNow(); });
