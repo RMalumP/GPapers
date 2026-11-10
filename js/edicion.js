@@ -60,9 +60,6 @@ function drawD() {
     <div class="ced" id="c_${k}" data-k="${k}" contenteditable="true" role="textbox" aria-multiline="true" aria-label="Cita ${esc(s.name)}" data-oninput="put(D.cites,'${k}',ceVal(this))">${ceHtml(D.cites[k] ?? s.fn(D))}</div>
     <div class="row"><button data-onclick="copyC('${k}',0,this)">Copiar</button><button data-onclick="copyC('${k}',1,this)" title="Con cursiva, para pegar en Word o Docs">Copiar con formato</button><button data-onclick="citeDel('${k}')">Regenerar desde los datos</button></div>${ex().inText ? `<div class="itx" id="it_${k}">${itHtml(k)}</div>` : ''}`;
   const fold = tab === 'all' || tab === 'cls';   // «Ver todo» y la pestaña de clasificación comparten diseño: bloques plegables
-  if (fold) {
-    h += blk('secs', 'Secciones', db.sections.map(s => chip(s, D.sectionIds.includes(s.id), `toggleS('${s.id}')`)).join('') || '<p class="empty">No hay secciones. Créalas con «Gestionar secciones».</p>', true);
-  }
   if (tab === 'cite' || tab === 'all') {
     const M = mainSty(), only = db.settings.citeOnlyMain && !CITE_ALL;
     h += blk('cite', 'Cita', citeBar() + (ex().inText ? `<label>Página o parte citada (opcional, para la cita en el texto y las notas)<input id="locIn" value="${esc(CLOC)}" placeholder="${LAW_T.has(baseT(D.type)) ? 'p. ej. 22.1 (artículo) o 3 (FJ, FD o apartado)' : 'p. ej. 87 o 87-90'}" data-oninput="clocSet(this.value)"></label>` : '')
@@ -71,7 +68,8 @@ function drawD() {
           : STY_G.map(([g, t]) => { const E = Object.entries(STYLES).filter(([k, s]) => k !== M && styGroup(s) === g), id = g || 'gen';   // el resto, en secciones plegables (cerradas salvo que las abras)
             return E.length ? `<details class="cs cgrp" data-g="${id}" ${CITE_OPEN.has(id) ? 'open' : ''} data-ontoggle="setHas(CITE_OPEN,'${id}',this.open)"><summary>${t} <small>(${E.length})</small></summary><div class="csb">${E.map(([k, s]) => citeOne(k, s)).join('')}</div></details>` : ''; }).join(''))), false);
   }
-  if (fold) {
+  if (fold) {   // Secciones justo después de la cita y antes de Etiquetas
+    h += blk('secs', 'Secciones', db.sections.map(s => chip(s, D.sectionIds.includes(s.id), `toggleS('${s.id}')`)).join('') || '<p class="empty">No hay secciones. Créalas con «Gestionar secciones».</p>', true);
     h += blk('tags', 'Etiquetas', db.tags.map(t => chip(t, D.tagIds.includes(t.id), `toggleT('${t.id}')`)).join('') || '<p class="empty">No hay etiquetas. Créalas con «Gestionar etiquetas».</p>', true);
   }
   if (fold) {
@@ -598,7 +596,7 @@ function commit() {
   if (PEND.has(D.id)) idb('readwrite', st => st.put(PEND.get(D.id), 'img:' + D.id)).catch(() => {});
   for (const n of PDF_N) { const k = pdfKey(D.id, n);   // enlaces de los PDF en este navegador
     if (PEND_PDF.has(k)) idb('readwrite', st => st.put(PEND_PDF.get(k), 'pdf:' + k)).catch(() => {});
-    if (!D[pdfF(n)]) pdfForget(k); }
+    if (!D[pdfF(n)]) pdfForget(k); else if (old && old[pdfF(n)]?.name !== D[pdfF(n)].name) covForget(k); }   // otro PDF: su portada se vuelve a sacar
   syncRelated(old ? old.related : [], D);
   i < 0 ? db.papers.push(D) : db.papers[i] = D;
   markDirty(); $('#dlg').close(); render();

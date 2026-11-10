@@ -57,13 +57,51 @@ async function inboxAdd(L) {   // L: [{file, h?}]
   if (db.settings.showInbox === false) toast('La sección «PDF por citar» está oculta: actívala en Configuración → Datos y Drive.', [], 5000);
   if (vwCan()) for (const it of add) await inboxScan(it.id, PDF_FILES.get(inKey(it.id)));
 }
+async function pdfPage1(doc) {   // miniatura de la primera página (180 px de ancho, JPEG)
+  const pg = await doc.getPage(1), v = pg.getViewport({scale: 1}), s = 180 / v.width, vp = pg.getViewport({scale: s}), cv = document.createElement('canvas');
+  cv.width = Math.round(vp.width); cv.height = Math.round(vp.height); await pg.render({canvasContext: cv.getContext('2d', {alpha: false}), viewport: vp}).promise;
+  return cv.toDataURL('image/jpeg', .72);
+}
+/* ---- Portada del PDF como imagen del paper: un paper sin imagen y con PDF muestra en la lista la primera página de su primer PDF,
+   como la bandeja. La miniatura se guarda en este navegador («pdft:<clave>», con el nombre del PDF) y se saca sin pedir nada: del archivo
+   enlazado si ya hay permiso o de la copia del navegador. Si no se puede leer todavía, se saca la primera vez que abres ese PDF. */
+const COV = new Map();   // <clave>|<nombre> → miniatura ('' = no se pudo leer el archivo sin pedir permiso)
+let COV_Q = Promise.resolve();   // se sacan de una en una, sin frenar la lista
+const covOf = p => { const n = pdfsOf(p)[0], pf = n && p[pdfF(n)]; return pf ? {n, pf, key: pdfKey(p.id, n)} : null; };
+const covCached = p => { const c = covOf(p); return c && COV.get(c.key + '|' + c.pf.name) || ''; };   // ya sacada en esta sesión: se pinta directamente, sin parpadeo
+const covForget = key => { for (const k of COV.keys()) if (k.startsWith(key + '|')) COV.delete(k); return idb('readwrite', st => st.delete('pdft:' + key)).catch(() => {}); };
+async function covStored(key, name) { const t = await idb('readonly', st => st.get('pdft:' + key)).catch(() => null); return typeof t === 'string' ? t : t && t.n === name ? t.d : ''; }   // texto: la de la bandeja
+async function covQuiet(key, pf) {   // el archivo, solo si se puede leer sin preguntar nada
+  let file = PDF_FILES.get(key);
+  if (!file && FSA) { const h = await idb('readonly', st => st.get('pdf:' + key)).catch(() => null); try { if (h && await h.queryPermission({mode: 'read'}) === 'granted') file = await h.getFile(); } catch (e) {} }
+  return file || await pdfKept(key, pf.name) || (pf.from ? await pdfKept(pf.from, pf.name) : null);
+}
+async function covMake(key, pf, file) {
+  if (!vwCan() || !file) return ''; let doc;
+  try { const L = await vwLib(); doc = await L.getDocument({data: new Uint8Array(await file.arrayBuffer()), cMapUrl: vwUrl('cmaps/'), cMapPacked: true, standardFontDataUrl: vwUrl('standard_fonts/'), isEvalSupported: false}).promise;
+    const d = await pdfPage1(doc); await idb('readwrite', st => st.put({n: pf.name, d}, 'pdft:' + key)).catch(() => {}); return d; }
+  catch (e) { return ''; } finally { doc?.destroy(); }
+}
+function covGet(p) {
+  const c = covOf(p); if (!c) return Promise.resolve(''); const ck = c.key + '|' + c.pf.name;
+  if (COV.has(ck)) return Promise.resolve(COV.get(ck));
+  const pr = COV_Q = COV_Q.then(async () => { if (COV.has(ck)) return COV.get(ck); const d = await covStored(c.key, c.pf.name) || await covMake(c.key, c.pf, await covQuiet(c.key, c.pf)); COV.set(ck, d); return d; });
+  return pr;
+}
+function covHydrate(root) {   // pone la portada en los huecos de imagen de los papers sin imagen y con PDF
+  (root || document).querySelectorAll('.pimg[data-cov]').forEach(el => { const p = db.papers.find(x => x.id === el.dataset.cov); if (!p) return;
+    covGet(p).then(d => { if (d && el.isConnected) { el.innerHTML = `<img src="${d}" alt="">`; el.title = 'Portada del PDF: ' + covOf(p)?.pf.name; } }); });
+}
+async function covFromOpen(id, n, file) {   // al abrir un PDF: si el paper aún no tenía portada, se saca ahora
+  const p = db.papers.find(x => x.id === id), c = p && !p.image && covOf(p); if (!c || c.n !== n) return;
+  const ck = c.key + '|' + c.pf.name; if (COV.get(ck)) return;
+  const d = await covStored(c.key, c.pf.name) || await covMake(c.key, c.pf, file); if (!d) return; COV.set(ck, d); covHydrate();
+}
 /* Lee la primera página: miniatura, DOI y título probable (metadatos del PDF o la línea de letra más grande). Solo con http(s): PDF.js no se carga desde file://. */
 async function inboxScan(id, file) {
   let doc; try {
     const L = await vwLib(); doc = await L.getDocument({data: new Uint8Array(await file.arrayBuffer()), cMapUrl: vwUrl('cmaps/'), cMapPacked: true, standardFontDataUrl: vwUrl('standard_fonts/'), isEvalSupported: false}).promise;
-    const pg = await doc.getPage(1), v = pg.getViewport({scale: 1}), s = 180 / v.width, vp = pg.getViewport({scale: s}), cv = document.createElement('canvas');
-    cv.width = Math.round(vp.width); cv.height = Math.round(vp.height); await pg.render({canvasContext: cv.getContext('2d', {alpha: false}), viewport: vp}).promise;
-    await idb('readwrite', st => st.put(cv.toDataURL('image/jpeg', .72), 'pdft:' + inKey(id))).catch(() => {});
+    const th = await pdfPage1(doc); await idb('readwrite', st => st.put(th, 'pdft:' + inKey(id))).catch(() => {});
     let txt = '', big = {h: 0, s: ''}; for (let i = 1; i <= Math.min(2, doc.numPages); i++) { const tc = await (await doc.getPage(i)).getTextContent();
       for (const t of tc.items) { if (typeof t.str !== 'string') continue; txt += t.str + (t.hasEOL ? '\n' : ' '); const h = Math.hypot(t.transform[2], t.transform[3]); if (i === 1 && t.str.trim().length > 3 && h > big.h + .5) big = {h, s: t.str.trim()}; else if (i === 1 && Math.abs(h - big.h) < .5 && big.s.length < 200) big.s += ' ' + t.str.trim(); } }
     const doi = (txt.replace(/\s*\n\s*/g, ' ').match(DOI_RE) || [''])[0].replace(/[.,;:)\]}>'"]+$/, '').toLowerCase();

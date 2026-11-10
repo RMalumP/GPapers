@@ -268,3 +268,22 @@ html:not(.mv) main>.row.wrapc .chip{max-width:100%;overflow:hidden;text-overflow
 #actF:not([hidden])~#list>.gbox:first-child>h2.grp{margin-top:6px}   /* con la fila de filtros encima, la primera sección va pegada a ella */
 .posb{margin-top:8px;font-size:13px;width:100%;text-align:left}
 #ctx.posm{width:min(330px,calc(100vw - 16px))}#ctx .posn{display:flex;gap:6px;padding:4px 6px}#ctx .posn input{flex:1;min-width:0}#ctx .posh{display:block;padding:2px 8px 4px;opacity:.7;font-size:12px}#ctx .posn button.pri{background:var(--pri);color:#fff;border:1px solid var(--pri);border-radius:6px;padding:4px 10px}#ctx .posn button.pri:hover{filter:brightness(1.1)}
+
+/* Panel de ☑ (Selección) compacto y menú de etiquetas de la tabla (v39.31) */
+#ctx.selm{width:min(340px,calc(100vw - 16px));max-height:calc(100vh - 16px);overflow-y:auto;padding:6px 8px 8px;gap:2px}
+#ctx.selm .ctxh{padding:2px 2px 4px;font-size:13px;opacity:.85}
+#ctx.selm .sml{font-size:12px;font-weight:600;opacity:.75;margin:6px 2px 2px}#ctx.selm .sml small{font-weight:400;opacity:.8;margin-left:4px}
+#ctx.selm .smr{display:flex;flex-wrap:wrap;gap:4px;margin:0}
+#ctx.selm .smr>button{flex:1 1 auto;text-align:center;border:1px solid var(--bd);border-radius:7px;padding:4px 8px;font-size:13px;white-space:nowrap}
+#ctx.selm .seg>button.on{background:var(--pri);color:#fff;border-color:var(--pri)}
+#ctx.selm .stars>button{flex:0 0 auto;border:0;font-size:21px;padding:0 3px;line-height:1.2}#ctx.selm .stars>button.on{opacity:1;color:#e0a100}#ctx.selm .stars>button.smx{font-size:13px;opacity:.6;margin-left:auto}
+#ctx.selm .smc,#ctx.tpk .tpkc{display:flex;flex-wrap:wrap;max-height:120px;overflow-y:auto;padding:1px 0}
+#ctx.selm .smc .chip,#ctx.tpk .tpkc .chip{cursor:pointer}#ctx .chip.part{opacity:.9;border-style:dashed;background:color-mix(in srgb,var(--c) 22%,transparent)}
+#ctx.selm .sma{margin-top:8px}#ctx.selm .sma+.sma{margin-top:4px}
+#ctx.selm .smr>button.pri{background:var(--pri);color:#fff;border-color:var(--pri)}#ctx.selm .smr>button.pri:hover{filter:brightness(1.1);background:var(--pri)}
+#ctx.selm .smr>button.danger{color:var(--red);border-color:var(--red)}
+#ctx.tpk{width:min(320px,calc(100vw - 16px));padding:6px 8px 6px;gap:4px}#ctx.tpk .tpkc{max-height:220px}
+#ctx.tpk input{width:100%;box-sizing:border-box;padding:4px 8px;font-size:13px}#ctx.tpk .tpkm{font-size:12px;opacity:.75;margin-top:2px}
+.tbl td.c-tags{cursor:pointer}html:not(.mv) .tbl td.c-tags:hover{background:color-mix(in srgb,var(--pri) 7%,transparent)}
+.pimg.pcov{font-size:16px;opacity:.7}.pimg.pcov:has(img){opacity:1;border-color:var(--bd)}.pimg.pcov img{object-position:top}
+.pimg.pcov.sm{width:38px}.tbl td.timg .pimg.xs.pcov{width:28px}   /* la portada, con forma de página */

@@ -236,7 +236,7 @@ function imgBlob(d) {
   IMG_BLOB.set(d, u); return u;
 }
 const pimgHTML = (p, cls, attrs = '') => `<div class="pimg ${cls}" ${p.image?.kind === 'file' ? `data-fpid="${p.id}" title="Imagen enlazada: ${esc(p.image.name)}"` : ''} ${attrs}>${imgInner(p.image)}</div>`;
-const thumbHTML = (p, cls) => p.image && db.settings.showImg !== false ? pimgHTML(p, cls) : '';
+const thumbHTML = (p, cls) => db.settings.showImg === false ? '' : p.image ? pimgHTML(p, cls) : pdfsOf(p).length ? (d => d ? `<div class="pimg ${cls} pcov" title="Portada del PDF: ${esc(covOf(p).pf.name)}"><img src="${d}" alt=""></div>` : `<div class="pimg ${cls} pcov" data-cov="${p.id}" title="Portada del PDF (sale cuando el PDF se puede leer; si no, al abrirlo una vez)">📄</div>`)(covCached(p)) : '';   // sin imagen: la portada del primer PDF
 async function fileImgUrl(pid, ask) {   // archivo local enlazado: el navegador puede pedir permiso de lectura en cada sesión
   const h = PEND.get(pid) || await idb('readonly', st => st.get('img:' + pid)).catch(() => null); if (!h) return null;
   let perm = await h.queryPermission({mode: 'read'}); if (perm !== 'granted' && ask) perm = await h.requestPermission({mode: 'read'});
@@ -244,6 +244,7 @@ async function fileImgUrl(pid, ask) {   // archivo local enlazado: el navegador 
   const u = URL.createObjectURL(await h.getFile()); URL.revokeObjectURL(IMG_URL.get(pid)); IMG_URL.set(pid, u); return u;
 }
 function hydrateImgs(ask, only) {
+  if (!only) covHydrate();
   document.querySelectorAll('.pimg[data-fpid]').forEach(el => { if (only && el !== only) return;
     fileImgUrl(el.dataset.fpid, ask).then(u => { el.classList.toggle('locked', !u); if (u) el.innerHTML = `<img src="${u}" alt="">`; else el.title = 'Imagen enlazada: pulsa para dar acceso al archivo (o vuelve a elegirla en Datos)'; }).catch(() => el.classList.add('locked')); });
 }
@@ -328,7 +329,7 @@ const CELL = {
   reading: p => `<td class="c-reading"><button class="rst" style="--c:${READ_C[p.reading]}" title="Clic: cambiar el estado de lectura" data-onclick="cycleRead('${p.id}')">${READ[p.reading]}</button></td>`,
   rating: p => `<td class="c-rating">${starsHTML(p)}</td>`,
   sections: p => `<td class="c-sections" title="${esc(tdSecs(p).map(s => s.name).join(', '))}">${tdSecs(p).map(s => chip(s, 1)).join('')}</td>`,
-  tags: p => `<td class="c-tags" title="${esc(p.tagIds.map(tagById).filter(Boolean).map(t => t.name).join(', '))}">${tagsOf(p)}</td>`,
+  tags: p => `<td class="c-tags" data-onclick="tagPick(event,'${p.id}')" title="${esc([p.tagIds.map(tagById).filter(Boolean).map(t => t.name).join(', '), 'Clic: poner o quitar etiquetas'].filter(Boolean).join(' · '))}">${tagsOf(p)}</td>`,
   notes: p => `<td class="c-notes nw"><button class="sm cpb" data-onclick="copyCardCite('${p.id}',this)" title="Copiar la cita (estilo elegido en Exportar), con cursiva al pegar en Word">📋</button>${pdfBtns(p)}<button class="sm" data-onclick="toggleNotes('${p.id}')" data-oncontextmenu="viewNotes(event,'${p.id}')" title="Clic: desplegar · Clic derecho: visor de notas">${pNotes(p).length} ${EXP.has(p.id) ? '▾' : '▸'}</button>${relCount(p) ? `<button class="sm" data-onclick="viewRel('${p.id}')" title="Relaciones">🔗 ${relCount(p)}</button>` : ''}</td>`};
 function thSort(k) {   // clic en una cabecera: ese criterio pasa a ser el principal; otro clic invierte el sentido
   F.sorts = F.sorts[0]?.k === k ? [{k, d: -F.sorts[0].d}, ...F.sorts.slice(1)] : [{k, d: 1}, ...F.sorts.filter(x => x.k !== k).slice(0, 2)]; render();
@@ -345,7 +346,7 @@ const rowHTML = (p, from, C = tblCols().vis) => document.documentElement.classLi
   <td class="c-del"><button class="x" title="Eliminar" data-onclick="delPaper('${p.id}')">✕</button></td></tr>${EXP.has(p.id) ? `<tr class="rn"><td></td><td colspan="${C.length + 2}">${notesHTML(p)}</td></tr>` : ''}`;
 const thHTML = k => `<th class="c-${k}${COL_SORT[k] ? ' sortable' : ''}" draggable="true" data-col="${k}"${COL_SORT[k] ? ` data-onclick="thSort('${k}')"` : ''} data-oncontextmenu="colMenu(event,'${k}')" title="${COL_SORT[k] ? 'Clic: ordenar (otro clic invierte el sentido) · ' : ''}Arrastrar: mover la columna · Clic derecho: ordenar, mover u ocultar columnas">${COLS[k]}${F.sorts[0]?.k === k ? (F.sorts[0].d > 0 ? ' ▲' : ' ▼') : ''}</th>`;
 const tableHTML = (L, from) => { const {vis, hidden} = tblCols(), w = 980 - [...hidden].reduce((s, k) => s + (COL_PX[k] || 0), 0);
-  return `<div class="twrap"><table class="tbl${db.settings.showImg !== false && db.papers.some(p => p.image) ? '' : ' noimg'}"${hidden.size ? ` style="min-width:${Math.max(420, w)}px"` : ''}><thead><tr><th class="c-sel" data-oncontextmenu="colMenu(event,'')"></th><th class="c-img" data-oncontextmenu="colMenu(event,'')"></th>${vis.map(thHTML).join('')}<th class="c-del" data-oncontextmenu="colMenu(event,'')"></th></tr></thead><tbody>${L.map(p => rowHTML(p, from, vis)).join('')}</tbody></table></div>`; };
+  return `<div class="twrap"><table class="tbl${db.settings.showImg !== false && db.papers.some(p => p.image || pdfsOf(p).length) ? '' : ' noimg'}"${hidden.size ? ` style="min-width:${Math.max(420, w)}px"` : ''}><thead><tr><th class="c-sel" data-oncontextmenu="colMenu(event,'')"></th><th class="c-img" data-oncontextmenu="colMenu(event,'')"></th>${vis.map(thHTML).join('')}<th class="c-del" data-oncontextmenu="colMenu(event,'')"></th></tr></thead><tbody>${L.map(p => rowHTML(p, from, vis)).join('')}</tbody></table></div>`; };
 /* menú de columnas: clic derecho en la cabecera (ordenador) o el botón «Columnas» (también en el móvil, sin pulsaciones largas) */
 let COLM = null;   // dónde se abrió, para volver a pintarlo abierto tras cada cambio
 function colMenu(e, k) {
@@ -472,7 +473,7 @@ function renderPaper(id) {   // repinta solo la tarjeta o fila de un paper; si e
   const tr = el.tagName === 'TR', t = document.createElement(tr ? 'tbody' : 'div'); t.innerHTML = (tr ? rowHTML : card)(p, el.dataset.from);
   if (tr && el.nextElementSibling?.classList.contains('rn')) el.nextElementSibling.remove();   // la fila de notas desplegadas va justo detrás
   const nodes = [...t.children]; el.replaceWith(...nodes); hdr(); filtDraw();   // los contadores de los filtros pueden cambiar
-  if (!tr) fitTags(nodes[0]); nodes.forEach(n => n.querySelectorAll('.pimg[data-fpid]').forEach(e => hydrateImgs(false, e)));
+  if (!tr) fitTags(nodes[0]); nodes.forEach(n => { n.querySelectorAll('.pimg[data-fpid]').forEach(e => hydrateImgs(false, e)); covHydrate(n); });
 }
 let tQ = 0;   // la búsqueda espera a que dejes de escribir (Enter la aplica al momento)
 function qSet(v, now) { F.q = v; clearTimeout(tQ); if (now) render(); else tQ = setTimeout(render, 150); }
@@ -489,6 +490,25 @@ const tick = on => on ? '✓ ' : '\u2003';
 function modeMenu(e) { ctxShow(e, '<div class="ctxh">Combinar varias etiquetas</div>' + [['any', 'Al menos una'], ['all', 'Todas']].map(([k, v]) => `<button data-onclick="ctxClose();put(F,'mode','${k}',render)">${tick(F.mode === k)}${v}</button>`).join('')); }
 function groupMenu(e) { ctxShow(e, `<div class="ctxh">Secciones</div><button data-onclick="ctxClose();put(F,'group',!F.group,render)">${tick(F.group)}Agrupar por sección</button>${F.group ? '<button data-onclick="gFoldAll(1)">▸ Plegar todas</button><button data-onclick="gFoldAll(0)">▾ Desplegar todas</button>' : ''}`); }
 function tagMenu(e, pid, tid) { ctxShow(e, `<div class="ctxh">Etiqueta «${esc(db.tags.find(t => t.id === tid)?.name)}»</div><button data-onclick="delTagFrom('${pid}','${tid}')">🗑 Borrar de este paper</button>`); }
+/* Tabla en el ordenador: clic en la celda de etiquetas = menú para ponerlas o quitarlas con un clic (se queda abierto para marcar varias) */
+let TPK = '';   // paper del menú de etiquetas abierto
+function tagPick(e, pid) {
+  if (mvOn() || e.button || e.target.closest?.('button, a, input')) return;
+  TPK = pid; ctxShow(e, tagPickHTML()); $('#ctx').classList.add('tpk'); $('#tpkQ')?.focus();
+}
+function tagPickHTML() {
+  const p = db.papers.find(x => x.id === TPK); if (!p) return '';
+  return `<div class="ctxh">Etiquetas de «${esc(shortTxt(p.alias || p.title))}»</div>` + (db.tags.length > 8 ? `<input id="tpkQ" type="search" placeholder="Buscar etiqueta" aria-label="Buscar etiqueta" data-oninput="tagPickQ(this.value)">` : '')
+    + `<div class="tpkc">${db.tags.map(t => chip(t, p.tagIds.includes(t.id), `tagPickT('${t.id}')`)).join('') || '<small>Aún no hay etiquetas.</small>'}</div>`
+    + `<button class="tpkm" data-onclick="ctxClose();openMg('tags')">✎ Gestionar etiquetas</button>`;
+}
+function tagPickQ(v) { const q = norm(v); document.querySelectorAll('#ctx .tpkc .chip').forEach(c => { c.hidden = !!q && !norm(c.textContent).includes(q); }); }
+function tagPickT(tid) {
+  const p = db.papers.find(x => x.id === TPK), t = tagById(tid); if (!p || !t) return;
+  const i = p.tagIds.indexOf(tid); i < 0 ? p.tagIds.push(tid) : p.tagIds.splice(i, 1); logChange(p, `Etiqueta ${i < 0 ? 'añadida' : 'quitada'}: ${t.name}`); markDirty();
+  F.tags.size ? render() : renderPaper(p.id);
+  const c = document.querySelector(`#ctx.tpk .tpkc .chip[data-onclick="tagPickT('${tid}')"]`); if (c) c.classList.toggle('on', i < 0);   // el menú sigue abierto (y la búsqueda, como estaba)
+}
 function delTagFrom(pid, tid) { const p = db.papers.find(x => x.id === pid); if (p) { p.tagIds = p.tagIds.filter(x => x !== tid); logChange(p, 'Etiqueta quitada: ' + (db.tags.find(t => t.id === tid)?.name || '?')); } ctxClose(); markDirty(); F.tags.size ? render() : renderPaper(pid); }
 const ctxClose = () => { const m = $('#ctx'); if (m) { m.hidden = true; document.body.appendChild(m); } };
 document.addEventListener('click', e => { if (!e.target.closest('#ctx')) ctxClose(); });
@@ -546,23 +566,37 @@ function toggleSel(id) { SEL.has(id) ? SEL.delete(id) : SEL.add(id);   // solo c
 function selVisible() { visible().forEach(p => SEL.add(p.id)); render(); }
 function selNone() { SEL.clear(); render(); }
 function selAllP() { db.papers.forEach(p => SEL.add(p.id)); render(); }
-let SELM = null;   // dónde se abrió el menú de ☑ (para sus submenús)
-function selMenu(e) {   // clic derecho (o mantener pulsado en el móvil) en ☑: elegir y, con algo elegido, lo mismo que el grupo «Selección»
-  SELM = {x: e.clientX, y: e.clientY};
-  const v = visible().length, n = db.papers.length, k = SEL.size, b = (on, t, c) => `<button${c ? ` class="${c}"` : ''} data-onclick="${on}">${t}</button>`;
-  ctxShow(e, `<div class="ctxh">Selección${k ? ` (${k} elegidos)` : ''}</div>${b('ctxClose();selVisible()', `☑ Seleccionar los que se ven (${v})`)}${b('ctxClose();selAllP()', `☑ Seleccionar todos los del proyecto (${n})`)}`
-    + (k ? '<hr>' + b("selSub('read')", '📖 Lectura ▸') + b("selSub('rate')", '⭐ Valoración ▸') + b("selSub('tag')", '🏷️ Etiqueta ▸') + b("selSub('sec')", '📁 Sección ▸')
-      + b('ctxClose();openEx()', '📤 Exportar citas…') + b('ctxClose();psOpen()', '↪ Mover o copiar a otro proyecto…') + b('ctxClose();bulkTrash()', `🗑 Enviar a la papelera (${k})`, 'danger') + '<hr>' + b('ctxClose();selNone()', '☐ Quitar la selección') : '')); $('#ctx').classList.add('selm');
+/* Menú de ☑ (clic derecho, o mantener pulsado en el móvil): elegir y, con algo elegido, todo lo del grupo «Selección» de la barra lateral
+   en un solo panel compacto. Lectura, valoración, etiquetas y secciones se aplican al momento y el panel se queda abierto. */
+function selMenu(e) { ctxShow(e, selMenuHTML()); $('#ctx').classList.add('selm'); }
+function selMenuHTML() {
+  const v = visible().length, n = db.papers.length, k = SEL.size, S = selPapers(), b = (on, t, ti, c) => `<button${c ? ` class="${c}"` : ''} data-onclick="${on}"${ti ? ` title="${ti}"` : ''}>${t}</button>`;
+  let h = `<div class="ctxh">☑ Selección${k ? ` · <b>${k}</b> ${k === 1 ? 'elegido' : 'elegidos'}` : ''}</div><div class="smr">${b('selVisible();selRedraw()', `☑ Los que se ven (${v})`, 'Seleccionar los papers que se ven')}${b('selAllP();selRedraw()', `☑ Todo el proyecto (${n})`, 'Seleccionar todos los papers del proyecto')}</div>`;
+  if (!k) return h;
+  const all = f => S.length && S.every(f), cls = (L, f) => L.length ? L.map(x => { const m = S.filter(p => p[f].includes(x.id)).length;
+    return chip(x, m === S.length ? 1 : 0, `selCls('${f}','${x.id}')`).replace('class="chip', `class="chip${m && m < S.length ? ' part' : ''}`); }).join('') : '<small>Ninguna todavía.</small>';
+  h += `<div class="sml">📖 Lectura</div><div class="seg smr">${Object.entries(READ).map(([r, t]) => b(`bulkRead('${r}',1)`, t, '', all(p => p.reading === r) ? 'on' : '')).join('')}</div>`
+    + `<div class="sml">⭐ Valoración</div><div class="stars smr">${[1, 2, 3, 4, 5].map(i => b(`bulkRate(${i},1)`, '★', `Valorar con ${i} de 5`, all(p => p.rating >= i) ? 'on' : '')).join('')}${b('bulkRate(0,1)', '✕', 'Sin valorar', 'smx')}</div>`
+    + `<div class="sml">🏷️ Etiqueta <small>clic: poner a todos o quitar</small></div><div class="smc">${cls(db.tags, 'tagIds')}</div>`
+    + `<div class="sml">📁 Sección</div><div class="smc">${cls(db.sections, 'sectionIds')}</div>`
+    + `<div class="smr sma">${b('ctxClose();openEx()', '📤 Exportar citas', 'Exportar las citas de los seleccionados', 'pri')}${b('ctxClose();psOpen()', '↪ A otro proyecto…', 'Mover o copiar a otro proyecto')}</div>`
+    + `<div class="smr sma">${b('ctxClose();bulkTrash()', `🗑 Papelera (${k})`, 'Enviar a la papelera', 'danger')}${b('selNone();selRedraw()', '☐ Quitar selección')}</div>`;
+  return h;
 }
-function selSub(k) { const M = SELM || {x: 40, y: 120}; setTimeout(() => bulkMenu({preventDefault() {}, stopPropagation() {}, clientX: M.x, clientY: M.y}, k)); }   // tras el clic: si no, el aviso de «clic fuera del menú» lo cerraría
+function selRedraw() { setTimeout(selDrawNow); }   // después del clic: el botón pulsado desaparece al repintar y el aviso de «clic fuera del menú» lo cerraría
+function selDrawNow() {   // repinta el panel abierto sin moverlo de sitio (salvo para que quepa en la pantalla)
+  const m = $('#ctx'); if (!m || m.hidden || !m.classList.contains('selm')) return; const st = m.scrollTop; m.innerHTML = selMenuHTML(); m.scrollTop = st;
+  m.style.left = Math.max(0, Math.min(m.offsetLeft, innerWidth - m.offsetWidth - 8)) + 'px'; m.style.top = Math.max(0, Math.min(m.offsetTop, innerHeight - m.offsetHeight - 8)) + 'px';
+}
+function selCls(f, id) { const S = selPapers(), add = !S.every(p => p[f].includes(id)); f === 'tagIds' ? bulkTag(id, add, 1) : bulkSec(id, add, 1); }   // si no la tienen todos, se pone a todos; si ya la tienen, se quita
 
 /* ---- Acciones en lote sobre la selección: lectura, valoración, etiquetas, secciones y papelera (un solo Ctrl+Z las deshace) ---- */
 const selPapers = () => db.papers.filter(p => SEL.has(p.id));
 const nPap = n => n === 1 ? '1 paper' : n + ' papers';
-function bulkDo(fn, msg) {
-  ctxClose(); let n = 0; selPapers().forEach(p => { if (fn(p)) { n++; p.modified = new Date().toISOString(); } });
+function bulkDo(fn, msg, keep) {   // keep: desde el panel de ☑, que se queda abierto
+  if (!keep) ctxClose(); let n = 0; selPapers().forEach(p => { if (fn(p)) { n++; p.modified = new Date().toISOString(); } });
   if (n) { markDirty(); render(); }
-  toast(n ? msg(n) : 'No había nada que cambiar.', n ? [{t: 'Deshacer', fn: undo}] : [], 5000);
+  toast(n ? msg(n) : 'No había nada que cambiar.', n ? [{t: 'Deshacer', fn: undo}] : [], 5000); if (keep) selRedraw();
 }
 function bulkMenu(e, k) {
   const b = (on, t) => `<button data-onclick="${on}">${t}</button>`, S = selPapers();
@@ -577,14 +611,14 @@ function bulkMenu(e, k) {
   }
   ctxShow(e, h);
 }
-function bulkRead(v) { bulkDo(p => { if (p.reading === v) return false; logChange(p, `Lectura: ${READ[p.reading]} → ${READ[v]}`); p.reading = v; return true; }, n => `${nPap(n)}: «${READ[v]}».`); }
-function bulkRate(v) { bulkDo(p => { if (p.rating === v) return false; logChange(p, `Valoración: ${p.rating || '—'} → ${v || '—'}`); p.rating = v; return true; }, n => `Valoración cambiada en ${nPap(n)}.`); }
-function bulkList(f, id, add, name, what) {
+function bulkRead(v, keep) { bulkDo(p => { if (p.reading === v) return false; logChange(p, `Lectura: ${READ[p.reading]} → ${READ[v]}`); p.reading = v; return true; }, n => `${nPap(n)}: «${READ[v]}».`, keep); }
+function bulkRate(v, keep) { bulkDo(p => { if (p.rating === v) return false; logChange(p, `Valoración: ${p.rating || '—'} → ${v || '—'}`); p.rating = v; return true; }, n => `Valoración cambiada en ${nPap(n)}.`, keep); }
+function bulkList(f, id, add, name, what, keep) {
   bulkDo(p => { const i = p[f].indexOf(id); if (add ? i >= 0 : i < 0) return false; add ? p[f].push(id) : p[f].splice(i, 1); logChange(p, `${what} ${add ? 'añadida' : 'quitada'}: ${name}`); return true; },
-    n => `«${name}» ${add ? 'añadida a' : 'quitada de'} ${nPap(n)}.`);
+    n => `«${name}» ${add ? 'añadida a' : 'quitada de'} ${nPap(n)}.`, keep);
 }
-function bulkTag(id, add) { bulkList('tagIds', id, add, tagById(id)?.name || '?', 'Etiqueta'); }
-function bulkSec(id, add) { bulkList('sectionIds', id, add, secById(id)?.name || '?', 'Sección'); }
+function bulkTag(id, add, keep) { bulkList('tagIds', id, add, tagById(id)?.name || '?', 'Etiqueta', keep); }
+function bulkSec(id, add, keep) { bulkList('sectionIds', id, add, secById(id)?.name || '?', 'Sección', keep); }
 function bulkTrash() {
   ctxClose(); const ids = [...SEL].filter(id => db.papers.some(p => p.id === id)); if (!ids.length) return;
   ids.forEach(trashPaper); SEL.clear(); markDirty(); render();
