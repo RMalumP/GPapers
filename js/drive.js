@@ -381,7 +381,7 @@ async function syOnce(inter) {
     R.c.deltas[name] = p; await syCacheSet(N, R.c); } }
   if (full) { await syGc(tok, files, I.w ? iF : null); syGcDone(); }
   await syBaseSet(N, m); sySet({last: Date.now()});
-  if (syPlainS(db) === mS) { dirty = false; hdr(); sessionSoon(); }   // ya está guardado en Drive
+  { const now = syPlainS(db); if (now === mS || syNormS(JSON.parse(now), now) === mS) { dirty = false; hdr(); sessionSoon(); } }   // ya está guardado en Drive (normalizado: un ajuste añadido en marcha, como la paleta personalizada, puede ir en otro orden)
   return {news, first: !R.w, pdf: {tok, files, m, N, id}};   // los PDF se suben después, sin hacer esperar (p. ej. al cambiar de proyecto)
 }
 /* ---- Proyectos que no están abiertos: sus cambios se suben en segundo plano (al cambiar de proyecto no se espera) ---- */
