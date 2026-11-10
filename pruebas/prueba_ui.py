@@ -203,7 +203,7 @@ with sync_playwright() as pw:
     eq('«Limpiar todo» quita todos los filtros', pg.evaluate("[F.read, F.yTo, $('#yTo').value, $('#actF').hidden, document.querySelectorAll('#list article.card').length]"), ['', 0, '', True, 2])
     eq('el progreso de lectura va en la fila de Lectura, desde el título hasta el borde', pg.evaluate("(r => { const t = $('#fs-read .fhb').getBoundingClientRect(), s = $('#side .sb').getBoundingClientRect(); return [$('#readP').parentElement.classList.contains('fh2'), r.left - t.right < 14, s.right - r.right < 12, r.width > 100]; })($('#readP').getBoundingClientRect())"), [True, True, True, True])
     pg.evaluate("sbWidth(480)"); pg.wait_for_timeout(250)
-    eq('con hueco, «✎ Gestionar» se lee entero', pg.evaluate("[...document.querySelectorAll('#sg-filt .mgb')].map(b => b.innerText.trim())"), ['✎ Gestionar', '✎ Gestionar'])
+    eq('«✎» de Gestionar: solo el icono, con el nombre al pasar el ratón (igual en todos los filtros)', pg.evaluate("[...document.querySelectorAll('#sg-filt .mgb')].map(b => [b.innerText.trim(), b.title])"), [['✎', 'Gestionar secciones'], ['✎', 'Gestionar etiquetas']])
     pg.evaluate("sbWidth(200)"); pg.wait_for_timeout(250)
     eq('sin hueco, solo «✎» y el título no se corta por él', pg.evaluate("[...document.querySelectorAll('#sg-filt .mgb')].map(b => b.innerText.trim())"), ['✎', '✎'])
     pg.evaluate("sbWidth(0)"); pg.wait_for_timeout(250)
@@ -304,7 +304,7 @@ with sync_playwright() as pw:
     eq('Notas de la sección y combinar etiquetas van a la izquierda de Gestionar', pg.evaluate("['#fs-sec', '#fs-tag'].map(s => [...document.querySelectorAll(s + ' .fh2 > button')].map(b => b.className))"), [['fhb', 'fhx', 'mgb'], ['fhb', 'fhx', 'mgb']])
     pg.click('#modeB'); pg.click('#ctx button >> nth=1')
     eq('el botón de combinar etiquetas cambia el modo', pg.evaluate("[F.mode, $('#modeB').textContent]"), ['all', 'Todas ▾']); pg.evaluate("F.mode = 'any'; render()")
-    eq('años: los campos en la fila del título', pg.evaluate("$('#yFrom').parentElement === $('#yTo').parentElement && $('#yFrom').parentElement.querySelector('.fht').textContent"), '📅 Años')
+    eq('valoración y años: una sola línea compacta', pg.evaluate("[$('#yFrom').parentElement === $('#yTo').parentElement, $('#yFrom').parentElement === $('#minR').parentElement, [...$('#yFrom').parentElement.querySelectorAll('.fht')].map(b => b.textContent)]"), [True, True, ['⭐', '📅']])
     for k in ['sec', 'tag', 'read']:
         pg.click(f'#fs-{k} .fhb')
     eq('Secciones, Etiquetas y Lectura se pliegan', pg.evaluate("['#secF', '#tagF', '#readF'].map(s => $(s).offsetParent === null)"), [True, True, True])
@@ -477,8 +477,8 @@ with sync_playwright() as pw:
     pg.click('#cfg button:has-text("Eliminar")'); pg.wait_for_timeout(200)
     eq('eliminar el tipo pasa los papers al tipo base', pg.evaluate("[db.settings.customTypes.length, db.papers[0].type, !!TYPES['ct_x']]"), [0, 'audio', False]); pg.evaluate("$('#cfg').close()")
     # ayuda
-    eq('final de la barra lateral: Configuración, una línea e «Información» (Ayuda, Añadir app desde http y Créditos)', pg.evaluate("[...document.querySelectorAll('#side > button.sh, #side > hr, #sg-more .sh')].filter(b => !b.hidden).slice(-6).map(b => b.tagName === 'HR' ? '——' : b.querySelector('.lbl').textContent)"), ['Configuración', '——', 'Información', 'Ayuda', 'Añadir app', 'Créditos'])
-    pg.click('#sg-more .shm'); pg.click('#side button:has-text("Ayuda")'); pg.wait_for_timeout(200)
+    eq('pie de la barra lateral: Relaciones, Papelera, Configuración e Información; dentro, Ayuda, Añadir app (desde http) y Créditos', pg.evaluate("[...document.querySelectorAll('#sbFoot .sh')].filter(b => !b.hidden).map(b => b.querySelector('.lbl').textContent)"), ['Relaciones', 'Papelera', 'Configuración', 'Información', 'Ayuda', 'Añadir app', 'Créditos'])
+    pg.click('#side .shm'); pg.click('#side button:has-text("Ayuda")'); pg.wait_for_timeout(200)
     eq('el botón Ayuda abre la ventana con todas las secciones', pg.evaluate("[$('#help').open, [...document.querySelectorAll('#hpb > details > summary')].map(s => s.textContent)]"), [True, ['Empezar aquí', 'Archivos, guardado y autoguardado', 'Proyectos', 'Copias, duplicados, PDF y filtros guardados', 'Lista principal', 'Barra lateral', 'Editar un paper', 'Exportar citas', 'Derecho y jurisprudencia', 'Importar referencias', 'Configuración', 'Tipos de documento propios', 'Estilos de cita personalizados', 'Aplicación instalada (PWA), sesión y actualizaciones', 'Sincronización con Google Drive', 'Atajos de teclado', 'Datos, privacidad y consejos']])
     pg.fill('#hpq', 'subrayado'); eq('el buscador filtra las secciones', pg.evaluate("[...document.querySelectorAll('#hpb > details')].filter(d => !d.hidden).map(d => d.querySelector('summary').textContent)"), ['Copias, duplicados, PDF y filtros guardados', 'Editar un paper'])
     pg.fill('#hpq', 'zzzzqq'); eq('y avisa si no hay resultados', pg.locator('#hpEmpty').count(), 1)
