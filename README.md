@@ -296,3 +296,6 @@ En **Gestionar etiquetas** o **Gestionar secciones**, «＋ Nueva clasificación
 ## Pie de la barra lateral adaptable (v39.33)
 - El pie (Relaciones, Papelera, Configuración e Información) sigue fijo al fondo de la pantalla, pero **se ve como antes, cada uno en su línea y con su nombre, mientras todo cabe**. Solo cuando lo de arriba no cabe (grupos desplegados, muchas etiquetas, la Selección…) se junta en una fila de iconos, y vuelve a la lista al plegarlos. Se mide siempre con el pie normal, así que no parpadea en el límite.
 - Con la barra plegada (☰) sigue la columna de iconos, y en el móvil el cajón va siempre con el pie normal.
+
+## Sincronización tras cambiar la paleta (v39.34)
+- Al elegir la **paleta personalizada** (o cambiar uno de sus colores) la cabecera se quedaba en «Sin guardar…» aunque el cambio ya estaba en Google Drive. Pasaba cuando ese ajuste se añadía después de otro ajuste propio del dispositivo (p. ej. las columnas de la tabla): la copia era la misma, pero con los campos en otro orden, y la comparación final no la daba por guardada. Ahora se compara la copia normalizada y vuelve a decir «Guardado en Google Drive».

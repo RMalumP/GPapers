@@ -138,6 +138,13 @@ with sync_playwright() as pw:
     eq('autoguardado: el cambio se sube solo', remote()['db']['papers'][0]['title'], 'Cambio en A')
     d = deltas()
     eq('solo se sube lo que cambió: un archivo pequeño con ese campo', (len(d), len(d[0]['content']) < 300, 'Cambio en A' in d[0]['content'], 'Segundo paper' in d[0]['content'], 'Cambio en A' in snapf()['content']), (1, True, True, False, False))
+    # paleta personalizada con columnas de la tabla ya elegidas: el ajuste nuevo queda en otro orden que la copia normalizada, y aun así se da por guardado
+    A.evaluate("db.settings.tblCols = {hidden: ['year']}; markDirty()"); A.wait_for_timeout(4500)
+    A.evaluate("openCfg('ap'); pickCustom()"); A.wait_for_timeout(4500)
+    eq('paleta personalizada: se sube y deja de decir «Sin guardar»', A.evaluate("[dirty, $('#fname').dataset.st, $('#fname').textContent.startsWith('Guardado en Google Drive'), SY.st]"), [False, 'ok', True, 'idle'])
+    A.evaluate("setCustom('pri', '#ff0000')"); A.wait_for_timeout(4500)
+    eq('cambiar un color de la personalizada también queda guardado', [A.evaluate("[dirty, $('#fname').dataset.st]"), json.loads(next(f for f in STORE.values() if f['name'] == 'gpapers-projects.json')['content'])['idx']['settings']['custom']['pri']], [[False, 'ok'], '#ff0000'])
+    A.evaluate("resetPal(); delete db.settings.tblCols; markDirty(); $('#cfg').close()"); A.wait_for_timeout(4500)
     A.evaluate(f"db.papers[0].image = {{kind: 'data', data: '{PNG}'}}; markDirty()"); A.wait_for_timeout(3800)
     eq('una imagen incrustada va en su propio archivo y el cambio solo lleva su huella', (len(names('gpapers-img-')), any('base64' in f['content'] for f in deltas()), remote()['db']['papers'][0]['image']), (1, False, {'kind': 'data', 'data': PNG}))
     A.evaluate(f"db.papers[1].image = {{kind: 'data', data: '{PNG}'}}; markDirty()"); A.wait_for_timeout(3800)
