@@ -8,6 +8,7 @@
            cites:{apa:"..."}}]}   <- solo citas editadas a mano; el resto se genera */
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const xesc = s => esc(String(s ?? '').replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\ufffe\uffff]/g, ''));   // para XML (Word): además, sin los caracteres de control que XML no admite (el archivo no se abría)
 /* ===== Avisos y confirmaciones propios (en lugar de alert y confirm del navegador, que en la app instalada se ven fuera de estilo y bloquean la página) =====
    say(texto) avisa; askOk(texto, {ok, danger}) pregunta y devuelve true o false. Si ya hay uno abierto, el siguiente espera su turno.
    Las pruebas pueden contestar solas con window.ASK_AUTO = 'accept' | 'dismiss'. */
@@ -27,6 +28,11 @@ function askDlg(msg, btns) {   // btns: [{t, v, cls, cancel}] → promesa con el
 }
 const say = msg => askDlg(String(msg), [{t: 'Aceptar', v: true, cls: 'pri'}]);
 const askOk = (msg, o = {}) => askDlg(String(msg), [{t: o.ok || 'Aceptar', v: true, cls: o.danger ? 'pri danger' : 'pri'}, {t: o.no || 'Cancelar', v: false, cancel: true}]);
+/* Identificadores: lo que viene de un archivo o de Drive no se fía. Un id va dentro del HTML y de los data-on…, así que solo valen letras, números, «_» y «-»;
+   cualquier otro se cambia por su huella (siempre la misma: las referencias a ese id cambian igual y la sincronización compara lo mismo). */
+const ID_RX = /^[\w-]{1,64}$/;
+const idFix = v => typeof v === 'string' ? (!v || ID_RX.test(v) ? v : 'x' + syHash(v)) : v == null || Number.isFinite(v) ? v : 'x' + syHash(JSON.stringify(v) || '');
+const idsFix = a => Array.isArray(a) ? a.map(idFix) : [];
 const uid = () => Math.random().toString(36).slice(2, 9) + Date.now().toString(36);
 const SC_NAMES = {open: 'Abrir archivo', save: 'Guardar', find: 'Buscar', newPaper: 'Nuevo paper', undo: 'Deshacer', redo: 'Rehacer', exportCites: 'Exportar citas', import: 'Importar referencias', side: 'Plegar o desplegar la barra lateral', bold: 'Negrita (dentro de una nota)', italic: 'Cursiva (dentro de una nota)', palette: 'Paleta de órdenes (buscar acciones y papers)'};
 // Alt+N en lugar de Ctrl+N: Chrome reserva Ctrl+N, Ctrl+T y Ctrl+W y no permite cambiarlos
@@ -101,11 +107,12 @@ const FSUB = {mapa: ['Mapa'], dataset: ['Dataset', 'Conjunto de datos'], softwar
   legislacion: ['Constitución', 'Estatuto de Autonomía', 'Ley Orgánica', 'Ley', 'Real Decreto-ley', 'Real Decreto Legislativo', 'Real Decreto', 'Decreto', 'Orden', 'Resolución', 'Circular', 'Instrucción', 'Tratado', 'Convenio', 'Reglamento (UE)', 'Directiva', 'Decisión', 'Recomendación', 'Dictamen'],
   jurisprudencia: ['Sentencia', 'Auto', 'Declaración', 'Providencia']};
 const shows = (k, t) => CTYPES.has(t) ? CTYPES.get(t).fields.includes(k) : FLD_T[k].includes(t);
-const IMG_RX = /^data:image\/(png|jpe?g|webp|gif);base64,[A-Za-z0-9+/=]+$/;
+const IMG_RX = /^data:image\/(png|jpe?g|webp|gif);base64,[A-Za-z0-9+/=]+$/, IMG_TK = /^@[0-9a-f]{9,40}$/;
+let IMG_TK_OK = false;   // solo dentro de una vuelta de sincronización: la imagen puede ir como su huella («@huella», ver syTokS en js/drive.js)
 function imgOk(i) {   // imagen del paper: URL, archivo local enlazado (solo el nombre; el enlace vive en este navegador) o copia reducida incrustada
   if (!i || typeof i !== 'object') return null;
   if (i.kind === 'url' && /^https?:\/\//i.test(i.url)) return {kind: 'url', url: i.url};
-  if (i.kind === 'data' && typeof i.data === 'string' && i.data.length < 600000 && IMG_RX.test(i.data)) return {kind: 'data', data: i.data};
+  if (i.kind === 'data' && typeof i.data === 'string' && i.data.length < 600000 && (IMG_RX.test(i.data) || IMG_TK_OK && IMG_TK.test(i.data))) return {kind: 'data', data: i.data};
   if (i.kind === 'file' && typeof i.name === 'string' && i.name) return {kind: 'file', name: i.name};
   return null;
 }
@@ -127,7 +134,9 @@ const annStr = (v, n) => typeof v === 'string' ? v.slice(0, n) : '';
 function annClean(l) {   // el mismo orden de campos siempre: normalizar dos veces da lo mismo (la sincronización compara el JSON)
   if (!Array.isArray(l)) return []; const seen = new Set(), out = [];
   for (const a of l) {
-    if (!a || typeof a !== 'object' || typeof a.id !== 'string' || !a.id || a.id.length > 40 || seen.has(a.id) || !ANN_K.has(a.k) || !Number.isInteger(a.p) || a.p < 0 || a.p > 99999) continue;
+    if (!a || typeof a !== 'object' || typeof a.id !== 'string' || !a.id || a.id.length > 40) continue;
+    if (!ID_RX.test(a.id)) a.id = idFix(a.id);
+    if (seen.has(a.id) || !ANN_K.has(a.k) || !Number.isInteger(a.p) || a.p < 0 || a.p > 99999) continue;
     const q = Array.isArray(a.q) ? a.q.filter(Number.isFinite).slice(0, 800) : []; if (!q.length || q.length % 4) continue;
     seen.add(a.id); const t = annStr(a.t, 4000), m = annStr(a.m, 20000), src = annStr(a.src, 60);
     out.push({id: a.id, k: a.k, p: a.p, q: q.map(x => Math.round(x * 100) / 100), c: HEX_RX.test(a.c) ? a.c.toLowerCase() : '#ffd400', ...(t ? {t} : {}), ...(m ? {m} : {}), ...(src ? {src} : {}), at: annStr(a.at, 40), up: annStr(a.up, 40)});
@@ -150,9 +159,10 @@ function inboxClean(l) {   // bandeja «PDF por citar»: PDF sin paper todavía
 /* ===== Eventos de la interfaz =====
    El HTML no lleva onclick en línea (la CSP de index.html los bloquea): cada elemento dice qué hacer en data-on<evento>, p. ej. data-onclick="openPaper('p1')".
    Ese texto no se evalúa como JavaScript: lo lee onParse, un minilenguaje de llamadas y lecturas separadas por «;» (a.b(args).c(), 'texto', "texto",
-   números, true/false/null, [listas], this = el elemento, event = el evento, y ! o + delante). Los nombres se buscan en ON_VARS (app.js) y, si no, en window. */
+   números, true/false/null, [listas], this = el elemento, event = el evento, y ! o + delante). Los nombres se buscan en ON_VARS (app.js) y, si no, entre las funciones de la aplicación (ver onFn). */
 const ON_EV = ['click', 'change', 'input', 'keydown', 'contextmenu', 'mousedown', 'pointerdown', 'dblclick', 'toggle', 'error'], ON_CAPT = new Set(['toggle', 'error']);   // toggle y error no burbujean
 const ON_AST = new Map();
+let TYPING = false;   // dentro de un data-oninput (se está escribiendo): la copia para deshacer se hace al parar, no en cada tecla (ver markDirty)
 function onParse(src) {
   let i = 0; const s = src, bad = () => { throw new SyntaxError(`data-on no válido (posición ${i}): ${s}`); };
   const ws = () => { while (i < s.length && /\s/.test(s[i])) i++; }, eat = c => { ws(); if (s[i] === c) { i++; return true; } return false; };
@@ -173,14 +183,19 @@ function onParse(src) {
   const out = []; do { ws(); if (i < s.length) out.push(expr()); } while (eat(';')); ws(); if (i < s.length) bad();
   return out;
 }
+/* Defensa en profundidad: un data-on solo llama a funciones de la aplicación (o a lo que da ON_VARS). Ni window, ni document, ni el almacenamiento,
+   ni funciones del navegador (fetch, eval…): aunque un texto ajeno llegara a un data-on, no podría leer la sesión ni enviar nada fuera. */
+const ON_NAT = /\{\s*\[native code\]\s*\}\s*$/;
+const onFn = k => { const f = Object.hasOwn(window, k) ? window[k] : undefined; return typeof f === 'function' && !ON_NAT.test(Function.prototype.toString.call(f)) ? f : undefined; };
+const onBad = v => v === window || v === document || v === Function || typeof Storage === 'function' && v instanceof Storage || typeof Window === 'function' && v instanceof Window || typeof Document === 'function' && v instanceof Document;
 function onEval(n, el, ev) {
   if (n.t === 'lit') return n.v;
   if (n.t === 'not') return !onEval(n.e, el, ev);
   if (n.t === 'num') return +onEval(n.e, el, ev);
   if (n.t === 'arr') return n.a.map(x => onEval(x, el, ev));
-  let self, v = n.root === 'this' ? el : n.root === 'event' ? ev : n.root in ON_VARS ? ON_VARS[n.root] : window[n.root];
+  let self, v = n.root === 'this' ? el : n.root === 'event' ? ev : Object.hasOwn(ON_VARS, n.root) ? ON_VARS[n.root] : onFn(n.root);
   if (v === undefined && n.root !== 'this') throw new ReferenceError(`data-on: «${n.root}» no existe`);
-  for (const o of n.ops) { if (o.p) { self = v; v = v[o.p]; } else { v = v.apply(self, o.a.map(x => onEval(x, el, ev))); self = undefined; } }
+  for (const o of n.ops) { if (o.p) { self = v; v = v[o.p]; if (onBad(v)) throw new ReferenceError(`data-on: «${o.p}» no se puede usar`); } else { v = v.apply(self, o.a.map(x => onEval(x, el, ev))); self = undefined; if (onBad(v)) throw new ReferenceError('data-on: resultado no permitido'); } }
   return v;
 }
 const onRun = (src, el, ev) => { let a = ON_AST.get(src); if (!a) ON_AST.set(src, a = onParse(src)); for (const n of a) onEval(n, el, ev); };
@@ -189,7 +204,7 @@ for (const type of ON_EV) document.addEventListener(type, e => {   // se registr
   for (let el = e.target instanceof Element ? e.target : e.target?.parentElement; el; el = ON_CAPT.has(type) ? null : el.parentElement) {
     const src = el.getAttribute(at); if (src === null) continue;
     const ev = new Proxy(e, {get: (t, k) => k === 'currentTarget' ? el : typeof t[k] === 'function' ? t[k].bind(t) : t[k]});   // como en línea: currentTarget es el elemento
-    try { onRun(src, el, ev); } catch (x) { console.error(x); }
+    try { TYPING = type === 'input'; onRun(src, el, ev); } catch (x) { console.error(x); } finally { TYPING = false; }
     if (e.cancelBubble) { e.stopImmediatePropagation(); break; }   // stopPropagation() en un manejador también para a los demás oyentes del documento
   }
 }, ON_CAPT.has(type));

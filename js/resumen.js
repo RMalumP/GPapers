@@ -42,7 +42,7 @@ function sumMd(D) {
   return out.join('\n') + '\n';
 }
 function sumDocx(D) {
-  const P = (inner, ppr = '') => `<w:p>${ppr ? `<w:pPr>${ppr}</w:pPr>` : ''}${inner}</w:p>`, R = (t, rpr = '') => `<w:r>${rpr ? `<w:rPr>${rpr}</w:rPr>` : ''}<w:t xml:space="preserve">${esc(t)}</w:t></w:r>`;
+  const P = (inner, ppr = '') => `<w:p>${ppr ? `<w:pPr>${ppr}</w:pPr>` : ''}${inner}</w:p>`, R = (t, rpr = '') => `<w:r>${rpr ? `<w:rPr>${rpr}</w:rPr>` : ''}<w:t xml:space="preserve">${xesc(t)}</w:t></w:r>`;
   const body = [P(R('Resumen de anotaciones'), '<w:pStyle w:val="Heading1"/>'), P(R(`${D.length} ${D.length === 1 ? 'paper' : 'papers'} · ${new Date().toLocaleDateString('es-ES')}`, '<w:i/><w:sz w:val="20"/>'), '<w:spacing w:after="240"/>')];
   for (const x of D) {
     body.push(P(docxRuns(x.cite), '<w:keepNext/><w:spacing w:before="280" w:after="100"/><w:ind w:left="720" w:hanging="720"/>'));

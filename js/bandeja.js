@@ -124,10 +124,11 @@ async function inboxDel(id) {
   if (annN(it) && !await askOk(`«${it.name}» tiene ${annN(it)} ${annN(it) === 1 ? 'anotación' : 'anotaciones'}. ¿Quitarlo de la bandeja?`, {ok: 'Quitar', danger: true})) return;
   db.inbox = db.inbox.filter(x => x !== it); markDirty(); inboxDraw(); toast(`«${shortTxt(it.name)}» quitado de la bandeja.`, [{t: 'Deshacer', fn: undo}], 5000);
 }
-async function ibMove(it, pid, n) {   // el archivo de la bandeja pasa al hueco de un paper (enlace, copia del navegador y miniatura)
+async function ibMove(it, pid, n) {   // el archivo de la bandeja pasa al hueco de un paper: se copian el enlace y la miniatura; la copia del navegador se queda con la clave de la bandeja
+  // (pdfFile la encuentra por «from»). Nada se borra aquí: así «Deshacer» devuelve el PDF a la bandeja con su archivo; lo que sobre lo quita pdfGc
   const from = inKey(it.id), to = pdfKey(pid, n);
   if (PDF_FILES.has(from)) PDF_FILES.set(to, PDF_FILES.get(from));
-  await idb('readwrite', st => { for (const pre of ['pdf:', 'pdfb:', 'pdft:']) { const q = st.get(pre + from); q.onsuccess = () => { if (q.result != null) { st.put(q.result, pre + to); st.delete(pre + from); } }; } return null; }).catch(() => {});
+  await idb('readwrite', st => { for (const pre of ['pdf:', 'pdft:']) { const q = st.get(pre + from); q.onsuccess = () => { if (q.result != null) st.put(q.result, pre + to); }; } return null; }).catch(() => {});
   return {name: it.name, ...(it.page ? {page: it.page} : {}), ...(it.ann?.length ? {ann: structuredClone(it.ann)} : {}), ...(it.vis ? {vis: it.vis} : {}), ...(it.vid ? {vid: it.vid} : {}), from};   // from: la copia de Drive sigue con el nombre de la bandeja
 }
 const ibDup = it => { const d = it && normDoi(it.doi); return d ? db.papers.find(p => normDoi(p.doi) === d) || null : null; };   // ese DOI ya es un paper de la biblioteca

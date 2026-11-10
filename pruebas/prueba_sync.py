@@ -87,7 +87,7 @@ with sync_playwright() as pw:
         p = c.new_page(); p.on('pageerror', lambda e: errs.append(str(e))); p.on('console', lambda m: errs.append(m.text) if m.type == 'error' and 'favicon' not in m.text else None); p.on('dialog', lambda d: d.accept()); p.add_init_script("window.ASK_AUTO = 'accept'")
         p.goto('http://localhost:8792/index.html'); p.wait_for_timeout(1200); return c, p
     cR, RD = device()   # lector: reconstruye lo que hay en Drive (copia + cambios + imágenes) sin iniciar sesión
-    remote = lambda: {'db': RD.evaluate("(async () => { const t = await syToken(false), f = await syLs(t), N = syNames('main'), R = await syRemote(t, f, N); return R.w ? syNorm(await syUnwire(t, R.w, f, N)) : null; })()")}
+    remote = lambda: {'db': RD.evaluate("(async () => { const t = await syToken(false), f = await syLs(t), N = syNames('main'), R = await syRemote(t, f, N); return R.w ? syUntok(syNorm(await syUnwire(t, R.w, f, N))) : null; })()")}
     cA, A = device('allow')
     eq('el botón de Google Drive está a la izquierda de Guardar', A.evaluate("[!$('#syncBtn').hidden, $('#syncBtn').nextElementSibling.getAttribute('aria-label'), $('#syncBtn').dataset.st, $('#syncBtn').previousElementSibling]"), [True, 'Guardar', 'off', None])
     eq('cabecera: solo Drive, Guardar, Importar, Exportar y «Archivo ▾»', A.evaluate("[...document.querySelectorAll('header .row > button, header .row > .fm > button')].map(b => b.textContent.trim().replace(/\\s+/g, ' '))"), ['🔄Conectar con Google Drive', '💾', '📥 Importar', 'Exportar citas', 'Archivo ▾'])

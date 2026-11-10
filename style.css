@@ -193,7 +193,7 @@ aside.min #sg-search .sgh input{display:none}
 .ced+.row{margin-top:6px}
 .dsep{display:flex;align-items:center;justify-content:space-between;gap:8px}.dsep button{font-size:13px;padding:3px 10px;font-weight:400}
 details.cgrp{margin-top:12px}details.cgrp>summary small{font-weight:400;opacity:.7}
-#list > .more{text-align:center;margin:12px 0}
+#list .more{text-align:center;margin:12px 0}
 main > .row > #q{width:220px;min-width:0;flex:0 1 220px}
 .chip .cn{font-size:11px;opacity:.75}.chip.ex{opacity:.9;text-decoration:line-through;border-style:dashed}.chip[hidden]{display:none}
 #tagQ{width:100%;margin:0 0 4px;font-size:13px}#readP{width:100%;margin:6px 0 2px}#readP[hidden]{display:none}#minR{align-self:flex-start}
