@@ -1,7 +1,7 @@
 'use strict';
 /* ===== Edición de paper (trabaja sobre un borrador D) ===== */
 function openPaper(id, dock) {   // dock: dentro del visor de PDF, en un panel al lado del PDF (se abre en «Notas»)
-  D = id ? structuredClone(db.papers.find(p => p.id === id)) : {id: uid(), created: new Date().toISOString(), title: '', alias: '', sortKey: '', related: [], refTo: [], history: [], reading: 'por_leer', rating: 0, sectionIds: F.sec ? [F.sec] : [], authors: [], year: '', url: '', type: 'articulo', venue: '', doi: '', accessed: '', general: '', tagIds: [], notes: [], cites: {}}; if (!id) NEWF(D);
+  D = id ? structuredClone(db.papers.find(p => p.id === id)) : {id: uid(), created: new Date().toISOString(), title: '', alias: '', sortKey: '', related: [], refTo: [], history: [], reading: 'por_leer', rating: 0, sectionIds: secsSel(), authors: [], year: '', url: '', type: 'articulo', venue: '', doi: '', accessed: '', general: '', tagIds: [], notes: [], cites: {}}; if (!id) NEWF(D);
   tab = dock ? 'notes' : 'all'; CITE_ALL = false; drawD(); dock ? $('#dlg').show() : $('#dlg').showModal(); if (id) recPush(id);
 }
 const lbl = (k, def) => (CTYPES.has(D.type) ? CTYPES.get(D.type).labels[k] : null) || FLBL[k]?.[baseT(D.type)] || def;   // un tipo propio usa sus etiquetas y, si no tiene, las del tipo en que se basa   // etiqueta del campo según el tipo del borrador
@@ -285,7 +285,7 @@ function tplMenu(e, key) {
   ctxShow(e, '<div class="ctxh">Insertar plantilla</div>' + (db.settings.templates.map(t => `<button data-onclick="tplInsert('${key}','${t.id}')">${esc(t.name)}</button>`).join('') || '<div class="ctxh">No hay plantillas (créalas en Configuración)</div>'));
 }
 function tplInsert(key, id) { const t = db.settings.templates.find(x => x.id === id); ctxClose(); if (t) edInsert(key, tplText(t)); }
-function addNote(tid) { const t = tid && db.settings.templates.find(x => x.id === tid); D.notes.push({id: uid(), sectionId: F.sec || db.sections[0].id, content: t ? tplText(t) : ''}); drawD(); }
+function addNote(tid) { const t = tid && db.settings.templates.find(x => x.id === tid); D.notes.push({id: uid(), sectionId: sec1() || db.sections[0].id, content: t ? tplText(t) : ''}); drawD(); }
 function addNoteMenu(e) {
   ctxShow(e, '<div class="ctxh">Nueva nota con plantilla</div>' + (db.settings.templates.map(t => `<button data-onclick="ctxClose();addNote('${t.id}')">${esc(t.name)}</button>`).join('') || '<div class="ctxh">No hay plantillas (créalas en Configuración)</div>'));
 }
@@ -514,21 +514,30 @@ function viewRel(id) {   // relaciones de un paper: relacionados, cita a y citad
   $('#rv').innerHTML = `<h2>Relaciones de «${esc(shortTxt(p.alias || p.title))}»</h2>${sec('Relacionados', p.related)}${sec('Cita a', p.refTo || [])}${sec('Citado por', db.papers.filter(q => (q.refTo || []).includes(id)).map(q => q.id))}<div class="row" style="margin-top:12px"><button data-onclick="$('#rv').close()">Cerrar</button></div>`;
   $('#rv').showModal();
 }
-function movePaper(id, from, to) {   // arrastrar un paper de una sección a otra (a '' = Sin sección)
+const dragIds = id => SEL.has(id) ? [id, ...db.papers.filter(p => p.id !== id && SEL.has(p.id)).map(p => p.id)] : [id];   // al arrastrar un paper seleccionado van todos los seleccionados
+function movePaper(id, from, to) {   // arrastrar un paper de una sección a otra (a '' = Sin sección); si está seleccionado, se mueven todos los seleccionados
   if (from === to) return;
-  const p = db.papers.find(x => x.id === id); if (!p) return;
-  p.sectionIds = p.sectionIds.filter(x => x !== from);
-  if (to && !p.sectionIds.includes(to)) p.sectionIds.push(to);
-  logChange(p, 'Sección: ' + (from ? secName(from) : 'Sin sección') + ' → ' + (to ? secName(to) : 'Sin sección'));
-  if (from && to) p.notes.forEach(n => { if (n.sectionId === from) n.sectionId = to; });   // sus notas se mueven con él
-  markDirty(); render();
+  const ids = dragIds(id); let n = 0;
+  ids.forEach(pid => { const p = db.papers.find(x => x.id === pid); if (!p) return;
+    const own = p.sectionIds.filter(secById);   // de dónde sale cada uno: de la sección de origen si está en ella; si no, de su única sección
+    const f = pid === id || (from ? own.includes(from) : !own.length) ? from : own.length === 1 ? own[0] : null;
+    if (f === to || (f === null && (!to || p.sectionIds.includes(to)))) return;
+    if (f === null) { p.sectionIds.push(to); logChange(p, 'Sección añadida: ' + secName(to)); n++; return; }   // estaba en varias: se le añade la de destino
+    p.sectionIds = p.sectionIds.filter(x => x !== f);
+    if (to && !p.sectionIds.includes(to)) p.sectionIds.push(to);
+    logChange(p, 'Sección: ' + (f ? secName(f) : 'Sin sección') + ' → ' + (to ? secName(to) : 'Sin sección'));
+    if (f && to) p.notes.forEach(x => { if (x.sectionId === f) x.sectionId = to; });   // sus notas se mueven con él
+    n++; });
+  if (!n) return; markDirty(); render();
+  if (ids.length > 1) toast(`${n === 1 ? '1 paper movido' : n + ' papers movidos'} a «${to ? secName(to) : 'Sin sección'}».`, [], 3000);
 }
 function addTag(id, tid) { const p = db.papers.find(x => x.id === id); if (p && !p.tagIds.includes(tid)) { p.tagIds.push(tid); logChange(p, 'Etiqueta añadida: ' + (db.tags.find(t => t.id === tid)?.name || '?')); markDirty(); } render(); }
 const clearOver = () => document.querySelectorAll('.over,.insA,.insB').forEach(x => x.classList.remove('over', 'insA', 'insB'));
 document.addEventListener('dragstart', e => {
   const t = e.target.closest?.('.chip[data-tag], .card[draggable=true], .rw[draggable=true]'); if (!t) return;
   if (t.dataset.tag) { e.dataTransfer.setData('application/x-tag', t.dataset.tag); e.dataTransfer.effectAllowed = 'copy'; }
-  else { e.dataTransfer.setData('application/x-paper', JSON.stringify({id: t.dataset.id, from: t.dataset.from || ''})); e.dataTransfer.effectAllowed = 'move'; t.classList.add('drag'); }
+  else { e.dataTransfer.setData('application/x-paper', JSON.stringify({id: t.dataset.id, from: t.dataset.from || ''})); e.dataTransfer.effectAllowed = 'move'; t.classList.add('drag');
+    if (SEL.has(t.dataset.id)) document.querySelectorAll('#list [data-id]').forEach(x => SEL.has(x.dataset.id) && x.classList.add('drag')); }   // se ve que van todos los seleccionados
 });
 document.addEventListener('dragend', () => { clearOver(); document.querySelectorAll('.drag').forEach(x => x.classList.remove('drag')); });
 const insAfter = (e, el) => { const r = el.getBoundingClientRect(), wide = el.tagName === 'TR' || r.width > el.parentElement.getBoundingClientRect().width * .6; return wide ? e.clientY > r.top + r.height / 2 : e.clientX > r.left + r.width / 2; };   // ¿antes o después? (en fila: arriba/abajo; en rejilla: izquierda/derecha)
@@ -659,6 +668,6 @@ async function delM(id) {
   if (!await askOk(MG === 'tags' ? `¿Eliminar la etiqueta «${x.name}»? Se quitará de todos los papers y secciones.` : `¿Eliminar la sección «${x.name}»? Se borrarán las notas asociadas a ella.`)) return;
   db[MG] = db[MG].filter(y => y.id !== id);
   if (MG === 'tags') { db.papers.forEach(p => p.tagIds = p.tagIds.filter(t => t !== id)); F.tags.delete(id); F.exTags.delete(id); db.sections.forEach(s => s.tagIds = s.tagIds.filter(t => t !== id)); }
-  else { db.papers.forEach(p => { p.notes = p.notes.filter(n => n.sectionId !== id); p.sectionIds = p.sectionIds.filter(x => x !== id); }); if (F.sec === id) F.sec = ''; }
+  else { db.papers.forEach(p => { p.notes = p.notes.filter(n => n.sectionId !== id); p.sectionIds = p.sectionIds.filter(x => x !== id); }); F.secs.delete(id); }
   markDirty(); drawMg();
 }

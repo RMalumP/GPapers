@@ -114,7 +114,7 @@ async function inboxCiteAll() {   // todas las de la bandeja con DOI, a la vez; 
 }
 async function ibMake(it, r, batch) {   // crea el paper de un PDF de la bandeja (sin abrir su ficha); batch: el deshacer va al final, una vez
   const now = new Date().toISOString(), pid = uid();
-  const p = NEWF({id: pid, created: now, title: r.title || it.name, alias: '', reading: 'por_leer', rating: 0, sectionIds: F.sec ? [F.sec] : [], authors: r.authors || [], year: r.year ? +r.year : '', url: r.url || '', type: r.type || 'articulo',
+  const p = NEWF({id: pid, created: now, title: r.title || it.name, alias: '', reading: 'por_leer', rating: 0, sectionIds: secsSel(), authors: r.authors || [], year: r.year ? +r.year : '', url: r.url || '', type: r.type || 'articulo',
     venue: r.venue || '', doi: r.doi || '', ...Object.fromEntries(IMP_F.filter(k => r[k] != null).map(k => [k, r[k]])), general: '', tagIds: [], notes: [], cites: {}, related: [], refTo: [], history: [{t: now, s: 'Creado desde la bandeja «PDF por citar»'}]});
   p.pdf = await ibMove(it, pid, 1);
   db.inbox = db.inbox.filter(x => x !== it); db.papers.push(p); if (!batch) markDirty(); return p;

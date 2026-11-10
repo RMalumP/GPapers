@@ -288,7 +288,7 @@ function impDraw() {
   } else {
     const R = IMP.refs, nd = R.filter(r => r.dup || r.near).length;
     h += `<p>${R.length} encontrados${nd ? ` · ${nd} posibles duplicados (desmarcados)` : ''}</p><div class="ilist">${R.map((r, i) => `<label class="irow"><input type="checkbox" ${r.on ? 'checked' : ''} ${r.bad ? 'disabled' : ''} data-onchange="impOn(${i},this.checked)"><span><b>${esc(r.title || '(sin título)')}</b>${r.dup ? ' <span class="tag-dup">Duplicado</span>' : r.near ? ` <span class="tag-dup" title="Parecido a «${esc(r.near)}»">Parecido</span>` : ''}${r.bad ? ' <span class="tag-dup">No legible</span>' : ''}<br><small>${esc(r.authors.join('; '))}${r.year ? ' · ' + esc(r.year) : ''}${r.venue ? ' · ' + esc(r.venue) : ''}</small></span></label>`).join('')}</div>
-      <div class="grid" style="margin-top:10px"><label>Sección<select id="iSec"><option value="">(ninguna)</option>${db.sections.map(s => `<option value="${s.id}" ${F.sec === s.id ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}</select></label>
+      <div class="grid" style="margin-top:10px"><label>Sección<select id="iSec"><option value="">(ninguna)</option>${db.sections.map(s => `<option value="${s.id}" ${sec1() === s.id ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}</select></label>
       <label>Etiqueta<select id="iTag"><option value="">(ninguna)</option>${db.tags.map(t => `<option value="${t.id}">${esc(t.name)}</option>`).join('')}</select></label>
       <label>Estado de lectura<select id="iRd">${Object.entries(READ).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select></label></div>
       <div class="row" style="margin-top:12px"><button class="pri" id="iGo" data-onclick="impGo()"></button>${close}</div>`;

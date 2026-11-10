@@ -56,8 +56,8 @@ function mvFMenu(k) {
   let h;
   if (k === 'sec') {
     h = '<div class="ctxh">Secciones</div>' + it(F.tbSec, 'Mostrarlas debajo', "mvFAct('sec','show')") + it(F.group, 'Agrupar por sección', "mvFAct('sec','group')") + (F.group ? it(false, '▸ Plegar todas', 'gFoldAll(1)') + it(false, '▾ Desplegar todas', 'gFoldAll(0)') : '')
-      + '<hr>' + it(!F.sec && !F.noSec, 'Todas', "mvFAct('sec','pick','')", N, '#888888')
-      + db.sections.map(x => it(F.sec === x.id, esc(x.name), `mvFAct('sec','pick','${x.id}')`, cnt.get(x.id) || 0, x.color)).join('')
+      + '<hr>' + it(!F.secs.size && !F.noSec, 'Todas', "mvFAct('sec','pick','')", N, '#888888')
+      + db.sections.map(x => it(F.secs.has(x.id), esc(x.name), `mvFAct('sec','pick','${x.id}')`, cnt.get(x.id) || 0, x.color)).join('')
       + (db.sections.length ? it(F.noSec, 'Sin sección', "mvFAct('sec','none')", none, '#888888') : '<div class="ctxh">Aún no hay secciones.</div>')
       + `<hr><button data-onclick="ctxClose();openMg('sections')">✎ Gestionar secciones</button>`;
   } else {
@@ -77,7 +77,7 @@ function mvFAct(k, a, v) {   // una opción del menú; al elegir una sección se
   if (k === 'sec') { if (a === 'show') F.tbSec = !F.tbSec; else if (a === 'group') F.group = !F.group; else if (a === 'pick') setSecF(v); else if (a === 'none') noSecF(); }
   else { if (a === 'show') F.tbTag = !F.tbTag; else if (a === 'mode') F.mode = v; else if (a === 'all') tagsAll(); else if (a === 'pick') toggleF(v); else if (a === 'none') noTagF(); }
   if (a === 'show' || a === 'group' || a === 'mode') render();
-  if (k === 'sec' && (a === 'pick' || a === 'none')) return ctxClose();
+  if (k === 'sec' && (a === 'none' || a === 'pick' && !v)) return ctxClose();   // elegir secciones deja el menú abierto para marcar varias
   const st = mv$('#ctx')?.scrollTop || 0;   // después del clic: si no, el aviso de «clic fuera del menú» (el botón pulsado ya no existe) lo cerraría
   setTimeout(() => { mvFMenu(k); mv$('#ctx').scrollTop = st; });
 }
@@ -178,7 +178,7 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
     const t = e.touches[0]; S = {el, id: el.dataset.id, from: el.dataset.from || '', x: t.clientX, y: t.clientY, on: false};
     T = setTimeout(() => {
       if (!S) return; S.on = true; el.classList.add('drag'); document.documentElement.classList.add('mvdrag'); navigator.vibrate?.(20);
-      const p = db.papers.find(q => q.id === S.id), g = document.createElement('div'); g.className = 'mvghost'; g.textContent = '📄 ' + (p ? p.alias || p.title : ''); document.body.append(g); S.ghost = g;
+      const p = db.papers.find(q => q.id === S.id), g = document.createElement('div'); g.className = 'mvghost'; const k = SEL.has(S.id) ? SEL.size : 1; g.textContent = '📄 ' + (k > 1 ? k + ' papers' : p ? p.alias || p.title : ''); document.body.append(g); S.ghost = g;
       g.style.left = S.x + 'px'; g.style.top = S.y + 'px';
     }, 450);
   }, {passive: true});

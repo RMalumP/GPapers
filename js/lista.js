@@ -4,10 +4,14 @@ const chip = (t, on, click, drag, ctx, n) => `<span class="chip ${on === 'ex' ? 
 const BYID = new WeakMap();   // índice por id de una lista (etiquetas, secciones); dura hasta acabar la tarea en curso, así nunca queda desfasado
 const byId = arr => { let m = BYID.get(arr); if (!m || m.n !== arr.length) { m = new Map(arr.map(x => [x.id, x])); m.n = arr.length; BYID.set(arr, m); queueMicrotask(() => BYID.delete(arr)); } return m; };
 const tagById = i => byId(db.tags).get(i), secById = i => byId(db.sections).get(i);
+const secsSel = () => db.sections.filter(s => F.secs.has(s.id)).map(s => s.id);   // secciones elegidas en los filtros, en el orden de la lista
+const sec1 = () => secsSel()[0] || '';
+const secsLoad = f => new Set((Array.isArray(f.secs) ? f.secs : [f.sec]).filter(id => typeof id === 'string' && db.sections.some(s => s.id === id)));   // filtros guardados: varias secciones (o una, de versiones anteriores)
 const secChips = id => (secById(id)?.tagIds || []).map(tagById).filter(Boolean).map(t => chip(t, 1)).join('');
 const hdr = () => { syIcon(); fitBars(); };   // syIcon también redibuja el estado de guardado
 // En escritorio, la cabecera y la fila de «Nuevo paper» ocupan siempre una línea: si no caben, se acortan los textos de
-// algunos botones (clase «cmp»); lo que aún sobre se comprime (título con «…», búsqueda más corta, etiquetas con desplazamiento lateral)
+// algunos botones (clase «cmp»); lo que aún sobre se comprime (título con «…», búsqueda más corta). Si las secciones o etiquetas de la fila
+// no caben enteras, pasan debajo en varias líneas (clase «wrapc»), como en el móvil, en vez de quedar tapadas
 let FIT_RO = null;
 function fitBars() {
   const h = $('header'), t = $('#appName'), r = $('main > .row'); if (!h || !r) return;
@@ -15,7 +19,10 @@ function fitBars() {
   if (!FIT_RO && window.ResizeObserver) { FIT_RO = new ResizeObserver(() => fitBars()); FIT_RO.observe(h); FIT_RO.observe(r); }
   const over = e => e.scrollWidth > e.clientWidth + 1;
   h.classList.remove('cmp'); if (over(h) || over(t)) h.classList.add('cmp');
-  r.classList.remove('cmp'); if (over(r) || r.querySelector('#q')?.clientWidth < 140) r.classList.add('cmp');
+  const C = [...r.querySelectorAll('.chips')].filter(c => !c.hidden && c.querySelector('.chip'));   // filas de secciones o etiquetas con algo dentro
+  r.classList.remove('cmp', 'wrapc'); if (C.some(over)) r.classList.add('wrapc');
+  if (over(r) || r.querySelector('#q')?.clientWidth < 140) r.classList.add('cmp');
+  if (over(r) && C.length) r.classList.add('wrapc');   // ni acortando los botones cabe: las secciones y etiquetas, debajo
 }
 for (const c of ['#secF2', '#tagF2']) document.querySelector(c)?.addEventListener('wheel', e => {   // la rueda desplaza en horizontal las etiquetas de la fila
   const el = e.currentTarget; if (el.scrollWidth <= el.clientWidth || Math.abs(e.deltaX) > Math.abs(e.deltaY)) return;
@@ -104,7 +111,7 @@ function hl(s, terms) {
 function visible() {
   const T = qParse(F.q); hlSet(T);
   return sortList(db.papers.filter(p => (!T.length || qTest(p, T))
-    && (!F.sec || p.sectionIds.includes(F.sec)) && (!F.read || p.reading === F.read) && p.rating >= F.minRating && (!F.tags.size || [...F.tags][F.mode === 'all' ? 'every' : 'some'](t => has(p, t)))
+    && (!F.secs.size || p.sectionIds.some(s => F.secs.has(s))) && (!F.read || p.reading === F.read) && p.rating >= F.minRating && (!F.tags.size || [...F.tags][F.mode === 'all' ? 'every' : 'some'](t => has(p, t)))
     && (!F.noSec || !p.sectionIds.some(secById)) && (!F.noTag || !p.tagIds.some(tagById)) && (!F.exTags.size || ![...F.exTags].some(t => has(p, t)))
     && (!F.yFrom || +p.year >= F.yFrom) && (!F.yTo || (+p.year > 0 && +p.year <= F.yTo)) && advTest(p)));
 }
@@ -143,7 +150,7 @@ const fYears = () => F.yFrom && F.yTo ? `${F.yFrom}–${F.yTo}` : F.yFrom ? `des
 function actList() {   // filtros aplicados, cada uno con su forma de quitarlo
   const A = [];
   if (F.q) A.push(['🔍 «' + F.q + '»', "fClr('q')"]);
-  if (F.sec && secById(F.sec)) A.push(['📁 ' + secById(F.sec).name, "fClr('sec')"]);
+  secsSel().forEach(s => A.push(['📁 ' + secById(s).name, `fClr('sec','${s}')`]));
   if (F.noSec) A.push(['📁 Sin sección', "fClr('noSec')"]);
   F.tags.forEach(t => tagById(t) && A.push(['🏷️ ' + tagById(t).name, `fClr('tag','${t}')`]));
   F.exTags.forEach(t => tagById(t) && A.push(['🚫 ' + tagById(t).name, `fClr('ex','${t}')`]));
@@ -155,11 +162,11 @@ function actList() {   // filtros aplicados, cada uno con su forma de quitarlo
   return A;
 }
 function fClr(k, id) {
-  if (k === 'q') { F.q = ''; $('#q').value = ''; } else if (k === 'sec') F.sec = ''; else if (k === 'tag') F.tags.delete(id); else if (k === 'ex') F.exTags.delete(id);
+  if (k === 'q') { F.q = ''; $('#q').value = ''; } else if (k === 'sec') id ? F.secs.delete(id) : F.secs.clear(); else if (k === 'tag') F.tags.delete(id); else if (k === 'ex') F.exTags.delete(id);
   else if (k === 'read') F.read = ''; else if (k === 'min') F.minRating = 0; else if (k === 'years') F.yFrom = F.yTo = 0; else if (k === 'adv') F.adv.rules = []; else F[k] = false;
   render();
 }
-function fClrAll() { F.q = ''; $('#q').value = ''; F.sec = ''; F.tags.clear(); F.exTags.clear(); F.noSec = F.noTag = false; F.read = ''; F.minRating = 0; F.yFrom = F.yTo = 0; F.adv.rules = []; render(); }
+function fClrAll() { F.q = ''; $('#q').value = ''; F.secs.clear(); F.tags.clear(); F.exTags.clear(); F.noSec = F.noTag = false; F.read = ''; F.minRating = 0; F.yFrom = F.yTo = 0; F.adv.rules = []; render(); }
 function actDraw() {
   const A = actList(), el = $('#actF'); el.hidden = !A.length;
   const cn = $('#count'), row = $('main>.row');   // en el móvil, con filtros, la cuenta va a la derecha de su fila en vez de ocupar una línea propia
@@ -195,7 +202,7 @@ function filtDraw() {   // chips de Secciones, Etiquetas y Lectura, con cuántos
   db.papers.forEach(p => { let s = 0, t = 0; p.sectionIds.forEach(i => { if (secById(i)) { s = 1; cS.set(i, (cS.get(i) || 0) + 1); } }); p.tagIds.forEach(i => { if (tagById(i)) { t = 1; cT.set(i, (cT.get(i) || 0) + 1); } });
     nS += !s; nT += !t; cR[p.reading in cR ? p.reading : 'por_leer']++; });
   const N = db.papers.length;
-  const secC = side => [{name: 'Todas', color: '#888888'}, ...db.sections].map(x => (x.id ? `<span class="cw" data-sec="${x.id}">` : '') + chip(x, x.id ? F.sec === x.id : !F.sec && !F.noSec, `setSecF('${x.id || ''}')`, 0, `svOpen('${x.id || ''}',event)`, side ? x.id ? cS.get(x.id) || 0 : N : null) + (x.id ? '</span>' : '')).join('')   // data-sec: soltar un paper aquí le pone la sección
+  const secC = side => [{name: 'Todas', color: '#888888'}, ...db.sections].map(x => (x.id ? `<span class="cw" data-sec="${x.id}">` : '') + chip(x, x.id ? F.secs.has(x.id) : !F.secs.size && !F.noSec, `setSecF('${x.id || ''}')`, 0, `svOpen('${x.id || ''}',event)`, side ? x.id ? cS.get(x.id) || 0 : N : null) + (x.id ? '</span>' : '')).join('')   // data-sec: soltar un paper aquí le pone la sección
     + (side && db.sections.length ? chip({name: 'Sin sección', color: '#888888'}, F.noSec, 'noSecF()', 0, '', nS) : '');
   const tagC = side => db.tags.length ? chip({name: 'Todas', color: '#888888'}, !F.tags.size && !F.exTags.size && !F.noTag, 'tagsAll()', 0, '', side ? N : null)
     + db.tags.map(t => chip(t, F.exTags.has(t.id) ? 'ex' : F.tags.has(t.id), `toggleF('${t.id}')`, 1, `tagFMenu(event,'${t.id}')`, side ? cT.get(t.id) || 0 : null)).join('')
@@ -374,8 +381,8 @@ function colMove(k, to, after) {   // arrastrar una cabecera sobre otra
 }
 const items = (l, from) => db.settings.view === 'table' ? (l.length ? tableHTML(l, from) : '') : l.map(p => card(p, from)).join('');
 function groupsOf(L) {   // [sección, sus papers] en el orden en que se ven (con el orden manual de cada sección, si es el criterio principal)
-  const G = F.noSec ? [] : db.sections.filter(s => !F.sec || s.id === F.sec).map(s => [s, L.filter(p => p.sectionIds.includes(s.id))]);
-  if (!F.sec) G.push([{id: '', name: 'Sin sección', color: '#888888'}, L.filter(p => !p.sectionIds.some(secById))]);
+  const G = F.noSec ? [] : db.sections.filter(s => !F.secs.size || F.secs.has(s.id)).map(s => [s, L.filter(p => p.sectionIds.includes(s.id))]);
+  if (!F.secs.size) G.push([{id: '', name: 'Sin sección', color: '#888888'}, L.filter(p => !p.sectionIds.some(secById))]);
   return F.sorts[0]?.k === 'manual' ? G.map(([s, l]) => [s, manSort(l, s.id || '_')]) : G;
 }
 const FOLD = new Set((() => { try { return JSON.parse(localStorage.getItem('gp-fold') || '[]'); } catch (e) { return []; } })());   // secciones plegadas en la vista agrupada (de cada dispositivo)
@@ -387,8 +394,9 @@ function listHTML(L) {
     return `<section class="gbox${fo ? ' fold' : ''}" data-sec="${s.id || ''}"><h2 class="grp" style="border-color:${esc(s.color || '#888888')}" data-onclick="gFold('${k}')" title="Clic: plegar o desplegar${s.id ? ' · Clic derecho: notas de la sección' : ''}" ${s.id ? `data-oncontextmenu="svOpen('${s.id}',event)"` : ''}><span class="gcar">${fo ? '▸' : '▾'}</span>${esc(s.name)} <small>(${l.length})</small></h2>${fo ? '' : items(l, s.id || '') || '<p class="empty drop">Arrastra papers aquí</p>'}</section>`; }).join('');
 }
 function paperPlace(id, from, to, ref, after) {   // coloca un paper (arrastrado) antes o después de otro; to: sección de destino ('' = Sin sección) o null sin agrupar
-  const grouped = F.group && to != null;
+  const grouped = F.group && to != null, mv = dragIds(id);   // si el paper está seleccionado, se colocan todos los seleccionados juntos
   if (grouped && to !== from) { movePaper(id, from, to); if (!db.papers.some(p => p.id === id && (to ? p.sectionIds.includes(to) : !p.sectionIds.some(secById)))) return; }
+  if (ref !== id && mv.length > 1 && mv.includes(ref)) return;   // soltado sobre otro de los que se arrastran: el orden no cambia
   const shown = () => { const L = visible(); return grouped ? groupsOf(L).map(([s, l]) => [s.id || '_', l.map(p => p.id)]) : [[MAN_ALL, L.map(p => p.id)]]; };
   db.manual = db.manual && typeof db.manual === 'object' ? db.manual : {};
   if (F.sorts[0]?.k !== 'manual' || F.sorts[0].d < 0) {   // al empezar a colocar a mano: cada lista parte del orden que se ve ahora
@@ -396,8 +404,9 @@ function paperPlace(id, from, to, ref, after) {   // coloca un paper (arrastrado
     F.sorts = [{k: 'manual', d: 1}, ...F.sorts.filter(x => x.k !== 'manual').slice(0, 2)];
   }
   const key = grouped ? to || '_' : MAN_ALL, cur = shown().find(([k]) => k === key)?.[1] || [];
-  const ids = [...cur, ...(db.manual[key] || []).filter(i => !cur.includes(i))].filter(i => i !== id);
-  const at = ref && ref !== id && ids.includes(ref) ? ids.indexOf(ref) + (after ? 1 : 0) : ids.length; ids.splice(at, 0, id);
+  const blk = cur.filter(i => i !== id && mv.includes(i)); blk.splice(Math.max(0, cur.filter(i => i === id || blk.includes(i)).indexOf(id)), 0, id);   // el bloque, en el orden en que se ven
+  const ids = [...cur, ...(db.manual[key] || []).filter(i => !cur.includes(i))].filter(i => !blk.includes(i));
+  const at = ref && ref !== id && ids.includes(ref) ? ids.indexOf(ref) + (after ? 1 : 0) : ids.length; ids.splice(at, 0, ...blk);
   db.manual[key] = ids; markDirty(); render();
 }
 /* posiciones guardadas: el orden de cada sección (y de la lista sin agrupar) con un nombre, para volver a él */
@@ -426,7 +435,7 @@ function render() {
   hdr();
   filtDraw();
   const tg = (id, open, label, active) => { const b = $(id); b.textContent = `${label} ${open ? '▾' : '▸'}${!open && active ? ' •' : ''}`; b.classList.toggle('on', open); };   // «•» = hay filtro activo con la lista plegada
-  tg('#tbSec', F.tbSec, 'Sección', F.sec || F.noSec); tg('#tbTag', F.tbTag, 'Etiquetas', F.tags.size || F.exTags.size || F.noTag);
+  tg('#tbSec', F.tbSec, 'Sección', F.secs.size || F.noSec); tg('#tbTag', F.tbTag, 'Etiquetas', F.tags.size || F.exTags.size || F.noTag);
   $('#secF2').hidden = !F.tbSec; $('#tagF2').hidden = !F.tbTag; $('#grpChk').checked = F.group;
   selDraw(0);
   $('#d-search').hidden = !F.q && !advRules().length; advDraw(); $('#d-tr').hidden = !db.trash.length; $('#trLbl').textContent = 'Papelera' + (db.trash.length ? ` (${db.trash.length})` : ''); $('#tbView').innerHTML = db.settings.view === 'table' ? '▦<span class="bl"> Tarjetas</span>' : '☰<span class="bl"> Tabla</span>'; $('#tbCols').hidden = db.settings.view !== 'table';
@@ -440,7 +449,7 @@ function render() {
   LIST.L = L; LIST.shown = part ? LIST.step : L.length;
   $('#list').innerHTML = (listHTML(part ? L.slice(0, LIST.step) : L) + (part ? moreHTML() : '')) || '<p class="empty">No hay papers que mostrar. Crea uno con «Nuevo paper» o ajusta los filtros.</p>';
   fitTags(); hydrateImgs(); moreWatch(); uiSoon(); kMark();
-  LIST.n = L.length; countDraw(); progDraw(); inboxDraw();
+  LIST.n = L.length; countDraw(); progDraw(); inboxDraw(); fitBars();   // con los chips y la cuenta ya puestos: ¿caben en la fila?
 }
 const LIST = {L: [], n: 0, shown: 0, get step() { return document.documentElement.classList.contains('mv') ? 40 : 150; }};   // lo que se ve en la lista y cuántos papers lleva pintados (en el móvil caben pocas tarjetas: se pintan de 40 en 40)
 const moreHTML = () => `<p class="more"><button data-onclick="listMore()">Mostrar ${Math.min(LIST.step, LIST.L.length - LIST.shown)} más (quedan ${LIST.L.length - LIST.shown})</button></p>`;
@@ -488,7 +497,7 @@ const fmClose = () => { $('#fmenu').hidden = true; $('#fmBtn').setAttribute('ari
 function fmToggle(e) { e.stopPropagation(); const m = $('#fmenu'), open = m.hidden; ctxClose(); m.hidden = !open; $('#fmBtn').setAttribute('aria-expanded', String(open)); }
 document.addEventListener('click', e => { if (!e.target.closest('.fm')) fmClose(); });
 document.addEventListener('contextmenu', e => { if (!e.target.closest('[data-oncontextmenu]')) ctxClose(); });   // clic derecho en otro sitio también cierra
-function setSecF(id) { F.sec = id && F.sec === id ? '' : id; F.noSec = false; render(); }   // '' = Todas; pulsar la sección activa también vuelve a «Todas»
+function setSecF(id) { if (!id) F.secs.clear(); else if (!F.secs.delete(id)) F.secs.add(id); F.noSec = false; render(); }   // '' = Todas; como las etiquetas, cada sección se añade o se quita (se ven los papers de cualquiera de ellas)
 function sbToggle() { $('#side').classList.toggle('min'); uiSoon(); }
 function sbAllMenu(e) { ctxShow(e, '<div class="ctxh">Grupos de la barra</div><button data-onclick="ctxClose();sbAll(0)">Desplegar todos</button><button data-onclick="ctxClose();sbAll(1)">Plegar todos</button>'); }
 function sbWidth(w) { const a = $('#side'); if (w) a.style.setProperty('--sbw', Math.max(200, Math.min(480, Math.round(w))) + 'px'); else a.style.removeProperty('--sbw'); }
@@ -530,7 +539,8 @@ function sbGroup(g) {   // con la barra plegada, pulsar un icono la despliega en
 }
 function cycleRead(id) { const p = db.papers.find(x => x.id === id); if (!p) return; const k = Object.keys(READ); const was = p.reading; p.reading = k[(k.indexOf(p.reading) + 1) % k.length]; logChange(p, `Lectura: ${READ[was]} → ${READ[p.reading]}`); markDirty(); renderPaper(id); }
 function setRead(k) { F.read = k; render(); }
-function noSecF() { F.noSec = !F.noSec; F.sec = ''; render(); }
+function svOpenF() { svOpen(F.secs.size === 1 ? sec1() : ''); }   // «📄 Notas» de Filtros: las de la sección elegida (con varias o ninguna, todas)
+function noSecF() { F.noSec = !F.noSec; F.secs.clear(); render(); }
 function toggleSel(id) { SEL.has(id) ? SEL.delete(id) : SEL.add(id);   // solo cambian la casilla, la barra de selección y el contador
   const c = $(`#list [data-id="${id}"] input[type=checkbox]`); if (c) c.checked = SEL.has(id); selDraw(); }
 function selVisible() { visible().forEach(p => SEL.add(p.id)); render(); }
