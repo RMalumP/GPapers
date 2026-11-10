@@ -86,7 +86,7 @@ function validate(d) {
 const pickFile = (acc = '.json') => new Promise(res => { const i = document.createElement('input'); i.type = 'file'; i.accept = acc;
   i.onchange = () => i.files[0] ? i.files[0].text().then(text => res({path: i.files[0].name, text})) : res(null); i.click(); });
 async function loadText(text, name, quiet) {   // text: el JSON, o el objeto ya leído
-  try { db = validate(typeof text === 'string' ? JSON.parse(text) : text); path = name; dirty = false; F.tags.clear(); F.exTags.clear(); F.sec = ''; SEL.clear(); UNDO.length = 0; REDO.length = 0; lastSnap = snapDb(); fmtPinned = db.settings.fmtOpen; applySettings(); render(); sessionSoon(); return true; }
+  try { db = validate(typeof text === 'string' ? JSON.parse(text) : text); path = name; dirty = false; F.tags.clear(); F.exTags.clear(); F.secs.clear(); SEL.clear(); UNDO.length = 0; REDO.length = 0; lastSnap = snapDb(); fmtPinned = db.settings.fmtOpen; applySettings(); render(); sessionSoon(); return true; }
   catch (e) { if (!quiet) say('Archivo no válido (se mantienen los datos actuales): ' + e.message); return false; }
 }
 async function doOpen() {   // cada archivo JSON se abre como proyecto (ver Proyectos)

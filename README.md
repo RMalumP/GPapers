@@ -274,3 +274,8 @@ En **Gestionar etiquetas** o **Gestionar secciones**, «＋ Nueva clasificación
 ## Fila de filtros aún más fina en el móvil (v39.29)
 - Los botones de «Filtros: … ✕ · Limpiar todo» miden 20 px de alto (antes 26 px) con letra de 11,5 px, y la fila casi no tiene margen.
 - Con filtros aplicados, la cuenta «4 de 6 · 0 sel.» pasa a la derecha de la fila de filtros, en vez de ocupar una línea propia debajo de los botones.
+
+## Varias secciones a la vez, arrastrar la selección y fila que no tapa (v39.30)
+- **Filtro de secciones con varias a la vez**, como las etiquetas: cada sección que pulsas se añade o se quita, y se ven los papers que están en cualquiera de ellas. «Todas» quita el filtro. En el móvil, el menú de «Sección» se queda abierto para marcar varias. Las vistas guardadas recuerdan todas las secciones elegidas (las de versiones anteriores, con una sola, siguen funcionando).
+- **Arrastrar varios papers a la vez**: si arrastras un paper que está seleccionado a otra sección (vista agrupada, en el ordenador o en el móvil), se mueven todos los seleccionados, con sus notas; un solo Ctrl+Z lo deshace. En el orden manual, los seleccionados se colocan juntos.
+- **En el ordenador, las secciones y etiquetas de la fila de arriba ya no quedan tapadas**: si no caben en la fila, pasan debajo en varias líneas, como en el móvil; si caben, siguen en la misma fila.

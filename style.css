@@ -248,6 +248,12 @@ html:not(.mv) main>.row .chip{flex:0 0 auto;white-space:nowrap}html:not(.mv) mai
 html:not(.mv) main>.row>#q{flex:1 1 220px;max-width:220px;min-width:70px}
 html:not(.mv) #count{flex:0 0 auto;white-space:nowrap}
 html:not(.mv) main>.row.cmp .bl{display:none}
+/* Si las secciones o etiquetas no caben en la fila (clase «wrapc», la pone fitBars), pasan debajo, en varias líneas, como en el móvil */
+html:not(.mv) main>.row.wrapc{flex-wrap:wrap;overflow:visible}
+html:not(.mv) main>.row.wrapc #secF2{order:3}html:not(.mv) main>.row.wrapc #tagF2{order:4}
+html:not(.mv) main>.row.wrapc .chips{flex:1 0 100%;flex-wrap:wrap;gap:6px 0;min-width:0;overflow:visible;margin:0}
+html:not(.mv) main>.row.wrapc .chips[hidden]{display:none}
+html:not(.mv) main>.row.wrapc .chip{max-width:100%;overflow:hidden;text-overflow:ellipsis}
 
 /* Clasificaciones para ordenar (Gestionar secciones / etiquetas) */
 #mg .mgo{display:flex;flex-direction:column;gap:6px;margin:0 0 12px;padding:10px;border:1px solid var(--bd);border-radius:10px;background:var(--bg)}

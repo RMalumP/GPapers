@@ -270,9 +270,13 @@ with sync_playwright() as pw:
         pg.add_init_script("window.ASK_AUTO = 'accept'"); pg.goto('file://' + str(folder / 'index.html')); pg.wait_for_timeout(1000)
         pg.evaluate("$('#appName').textContent = 'Las Publicaciones de la muerte'; for (let i = 0; i < 8; i++) db.tags.push({id: 'w' + i, name: 'Etiqueta larga ' + i, color: '#8888cc'}); F.tbTag = true; $('#side').classList.add('min'); render()"); pg.wait_for_timeout(200)
         hh, rh = pg.evaluate(H)
-        eq(f'{w}px: la cabecera y la fila de «Nuevo paper» ocupan una línea', [hh < 70, rh < 45], [True, True])
+        # las etiquetas no caben en la fila: pasan debajo, en varias líneas si hace falta, sin que ninguna quede tapada
+        eq(f'{w}px: la cabecera ocupa una línea y las etiquetas que no caben pasan debajo', [hh < 70, pg.evaluate("""(() => { const r = $('main > .row'), c = $('#tagF2'); return [r.classList.contains('wrapc'),
+            c.getBoundingClientRect().top >= $('#tbTag').getBoundingClientRect().bottom - 1, c.scrollWidth <= c.clientWidth + 1, r.scrollWidth <= r.clientWidth + 1]; })()""")], [True, [True, True, True, True]])
         if w == 700:
-            eq('700px: los botones se acortan (el texto completo queda en su título)', pg.evaluate("[$('header').classList.contains('cmp'), $('main > .row').classList.contains('cmp'), $('#tbView').textContent.trim().length > 2, getComputedStyle($('main > .row .bl')).display]"), [True, True, True, 'none'])
+            eq('700px: la cabecera acorta sus botones (el texto completo queda en su título)', pg.evaluate("[$('header').classList.contains('cmp'), $('#tbView').textContent.trim().length > 2]"), [True, True])
+        pg.evaluate("db.tags.splice(0, db.tags.length); render()"); pg.wait_for_timeout(200)
+        eq(f'{w}px: si caben, la fila de «Nuevo paper» sigue en una línea', [pg.evaluate(H)[1] < 45, pg.evaluate("$('main > .row').classList.contains('wrapc')")], [True, False])
         ctx.close()
     eq('sin errores al comprimir las barras', errs, [])
     b.close()

@@ -51,7 +51,10 @@ with sync_playwright() as pw:
     eq('Sección ▾ abre un menú: mostrar debajo, agrupar y las secciones', pg.evaluate("[!$('#ctx').hidden, F.tbSec, [...$('#ctx').querySelectorAll('button')].map(b => b.textContent.replace(/[\\d✓\\u2003]/g, '').trim())]"),
        [True, True, ['Mostrarlas debajo', 'Agrupar por sección', 'Todas', 'Intro', 'Teoría política', 'RRII', 'Política y administración', 'Sin sección', '✎ Gestionar secciones']])
     pg.tap('#ctx button:has-text("RRII")'); pg.wait_for_timeout(200)
-    eq('elegir una sección filtra y cierra el menú', pg.evaluate("[F.sec, $('#ctx').hidden]"), ['x1', True])
+    eq('elegir una sección filtra y deja el menú abierto para marcar más', pg.evaluate("[[...F.secs], $('#ctx').hidden]"), [['x1'], False])
+    pg.tap('#ctx button:has-text("Intro")'); pg.wait_for_timeout(200)
+    eq('se pueden marcar varias secciones', pg.evaluate("[...F.secs].sort()"), ['s1', 'x1'])
+    pg.evaluate("ctxClose()"); pg.wait_for_timeout(200)
     pg.tap('#tbSec'); pg.wait_for_timeout(200); pg.tap('#ctx button:has-text("Agrupar")'); pg.wait_for_timeout(200)
     eq('«Agrupar por sección» se marca y el menú sigue abierto', pg.evaluate("[F.group, !$('#ctx').hidden, $('#ctx').textContent.includes('✓ Agrupar')]"), [True, True, True])
     pg.tap('#ctx button:has(span:text-is("Todas"))'); pg.wait_for_timeout(200); pg.evaluate("F.group = false; render()")

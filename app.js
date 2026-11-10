@@ -39,21 +39,21 @@ function mgAdd(id) { db[MG].push({id, name: 'Nueva', color: '#2457c5', tagIds: [
    Aparte del JSON, la app guarda (1) una copia de trabajo, para reabrir justo donde lo dejaste aunque no hayas guardado, y
    (2) el estado de la interfaz (filtros, orden, barra lateral, bloques plegados). Viven fuera de la caché de la aplicación,
    así que las actualizaciones no los tocan y no hace falta borrar datos para recibir una versión nueva. */
-const APP_V = '39.29';   // debe coincidir con la versión de sw.js
+const APP_V = '39.30';   // debe coincidir con la versión de sw.js
 let BOOTED = false, RELOADING = false, SWREG = null, tSes = 0, tUi = 0, lastUi = '';
 const sessionNow = fast => { clearTimeout(tSes); if (!BOOTED || TAB.passive) return Promise.resolve();   // fast (desde sessionSoon): si acaba de hacerse la copia para deshacer, se usa esa (un JSON entero menos por cambio)   // copia de trabajo del proyecto abierto (y la lista de proyectos)
   const p = pjCur(); if (p) { Object.assign(p, {n: db.papers.length, file: path, dirty}); delete p.remote; }
   const [json, add] = projWire(db, fast && snapEq(SNAP_SES, lastSnap) ? SNAP_SES : null);   // JSON compacto y con las imágenes aparte (solo se escriben las nuevas)
   return idb('readwrite', st => { st.put({v: 1, cur: PJ.cur, list: PJ.list, gone: PJ.gone}, 'projects'); return projPut(st, 'proj:' + PJ.cur, {v: 1, path, dirty, at: new Date().toISOString(), json}, add); }).then(() => projSaved(add)).catch(() => {}); };
 const sessionSoon = () => { clearTimeout(tSes); tSes = setTimeout(() => sessionNow(true), 700); };
-const uiState = () => ({v: 1, F: {sorts: F.sorts, group: F.group, sec: F.sec, tags: [...F.tags], read: F.read, minRating: F.minRating, inNotes: F.inNotes, mode: F.mode, tbSec: F.tbSec, tbTag: F.tbTag, ...fExtra()},
+const uiState = () => ({v: 1, F: {sorts: F.sorts, group: F.group, secs: [...F.secs], sec: sec1(), tags: [...F.tags], read: F.read, minRating: F.minRating, inNotes: F.inNotes, mode: F.mode, tbSec: F.tbSec, tbTag: F.tbTag, ...fExtra()},
   side: {min: $('#side').classList.contains('min'), w: sbW(), fold: [...document.querySelectorAll('#side .sg.fold')].map(e => e.id), more: !$('#sg-more').classList.contains('fold'), ff: [...document.querySelectorAll('#side .fs.fold')].filter(e => e.id !== 'fs-adv').map(e => e.id), adv: !$('#fs-adv').classList.contains('fold')}, cite: CITE_SEL, dataAll: DATA_ALL, citeOpen: [...CITE_OPEN], allFold: [...ALL_FOLD], cfg: [...CFG_OPEN], help: [...HELP_OPEN]});
 const uiNow = () => { clearTimeout(tUi); if (!BOOTED || TAB.sat) return Promise.resolve(); const s = JSON.stringify(uiState()); if (s === lastUi) return Promise.resolve(); lastUi = s; return idb('readwrite', st => st.put(JSON.parse(s), 'ui')).catch(() => {}); };
 const uiSoon = () => { clearTimeout(tUi); tUi = setTimeout(uiNow, 500); };
 function applyUI(u) {   // lo guardado nunca se fía: cada dato se valida contra el estado actual (un paper o etiqueta borrados no rompen nada)
   if (!u || u.v !== 1) return; const f = u.F || {}, strs = a => (Array.isArray(a) ? a : []).filter(x => typeof x === 'string' && x.length < 40).slice(0, 40);
   const so = (Array.isArray(f.sorts) ? f.sorts : []).filter(x => x && Object.hasOwn(SORTS, x.k) && (x.d === 1 || x.d === -1)).slice(0, 3); if (so.length) F.sorts = so.map(x => ({k: x.k, d: x.d}));
-  F.group = !!f.group; F.sec = db.sections.some(s => s.id === f.sec) ? f.sec : ''; F.tags = new Set(strs(f.tags).filter(id => db.tags.some(t => t.id === id)));
+  F.group = !!f.group; F.secs = secsLoad(f); F.tags = new Set(strs(f.tags).filter(id => db.tags.some(t => t.id === id)));
   F.read = Object.hasOwn(READ, f.read) ? f.read : ''; F.minRating = Number.isInteger(f.minRating) && f.minRating >= 0 && f.minRating <= 5 ? f.minRating : 0; F.inNotes = !!f.inNotes; F.mode = f.mode === 'all' ? 'all' : 'any'; F.tbSec = !!f.tbSec; F.tbTag = f.tbTag !== false; fExtraLoad(f);
   const sd = u.side || {}; $('#side').classList.toggle('min', !!sd.min); sbWidth(Number.isFinite(sd.w) ? sd.w : 0); document.querySelectorAll('#side .sg').forEach(e => e.classList.toggle('fold', strs(sd.fold).includes(e.id)));
   $('#sg-more').classList.toggle('fold', sd.more !== true); ['sec', 'tag', 'read', 'sort'].forEach(k => fsToggle(k, strs(sd.ff).includes('fs-' + k))); fsToggle('adv', sd.adv !== true); $('#sg-more .shm').setAttribute('aria-expanded', sd.more === true);

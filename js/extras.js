@@ -108,7 +108,7 @@ let FAV = [];   // filtros guardados de este proyecto (solo en este navegador): 
 const favLoad = async () => { const arr = k => idb('readonly', st => st.get(k + PJ.cur)).then(a => Array.isArray(a) ? a : []).catch(() => []);   // también los recientes del proyecto
   FAV = await arr('fav:'); REC = (await arr('rec:')).filter(x => typeof x === 'string'); favDraw(); recDraw(); };
 const favPut = () => idb('readwrite', st => st.put(FAV, 'fav:' + PJ.cur)).catch(() => {});
-const favNow = () => ({q: F.q, sorts: F.sorts.map(s => ({...s})), group: F.group, sec: F.sec, tags: [...F.tags], read: F.read, minRating: F.minRating, inNotes: F.inNotes, mode: F.mode, ...fExtra()});
+const favNow = () => ({q: F.q, sorts: F.sorts.map(s => ({...s})), group: F.group, secs: secsSel(), sec: sec1(), tags: [...F.tags], read: F.read, minRating: F.minRating, inNotes: F.inNotes, mode: F.mode, ...fExtra()});
 const favKey = f => JSON.stringify(['q', 'sorts', 'group', 'sec', 'tags', 'read', 'minRating', 'inNotes', 'mode', 'exTags', 'noTag', 'noSec', 'yFrom', 'yTo', 'adv'].map(k => f[k] ?? null));
 function favDraw() {   // «Vistas»: un clic aplica la vista; la que coincide con los filtros actuales sale marcada
   const el = $('#favL'); if (!el) return; const now = favKey(favNow());
@@ -128,7 +128,7 @@ function favSave(nm) {
 }
 function favApply(v) {
   const f = FAV[+v]; if (!f) return;
-  F.q = typeof f.q === 'string' ? f.q : ''; $('#q').value = F.q; F.group = !!f.group; F.sec = db.sections.some(s => s.id === f.sec) ? f.sec : '';   // lo que ya no existe se ignora
+  F.q = typeof f.q === 'string' ? f.q : ''; $('#q').value = F.q; F.group = !!f.group; F.secs = secsLoad(f);   // lo que ya no existe se ignora
   F.tags = new Set((f.tags || []).filter(id => db.tags.some(t => t.id === id))); F.read = Object.hasOwn(READ, f.read) ? f.read : ''; F.minRating = Number.isInteger(f.minRating) && f.minRating >= 0 && f.minRating <= 5 ? f.minRating : 0;
   F.inNotes = !!f.inNotes; F.mode = f.mode === 'all' ? 'all' : 'any'; fExtraLoad(f); const so = (f.sorts || []).filter(x => x && Object.hasOwn(sortOpts(), x.k) && (x.d === 1 || x.d === -1)).slice(0, 3); if (so.length) F.sorts = so.map(x => ({k: x.k, d: x.d}));
   document.querySelector('#sg-search .sb input[type=checkbox]').checked = F.inNotes; render();
