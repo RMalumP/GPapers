@@ -203,7 +203,7 @@ async function pdfOpen(id, n = 1, ev) {
   const p = D && D.id === id && $('#dlg').open ? D : db.papers.find(x => x.id === id), pf = p && p[pdfF(n)], key = pdfKey(id, n); if (!pf) return;   // con el editor abierto, el borrador
   try {
     const file = await pdfFile(key, pf); if (!file) return;
-    vwOpenAny({kind: 'paper', id, n}, file, ev, pf.page);
+    vwOpenAny({kind: 'paper', id, n}, file, ev, pf.page); covFromOpen(id, n, file);
   } catch (e) { if (e.name !== 'AbortError') say('No se pudo abrir el PDF: ' + e.message); }
 }
 const annN = pf => pf?.ann?.length || 0;
