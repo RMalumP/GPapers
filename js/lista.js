@@ -8,11 +8,22 @@ const secsSel = () => db.sections.filter(s => F.secs.has(s.id)).map(s => s.id); 
 const sec1 = () => secsSel()[0] || '';
 const secsLoad = f => new Set((Array.isArray(f.secs) ? f.secs : [f.sec]).filter(id => typeof id === 'string' && db.sections.some(s => s.id === id)));   // filtros guardados: varias secciones (o una, de versiones anteriores)
 const secChips = id => (secById(id)?.tagIds || []).map(tagById).filter(Boolean).map(t => chip(t, 1)).join('');
-const hdr = () => { syIcon(); fitBars(); };   // syIcon también redibuja el estado de guardado
+const hdr = () => { syIcon(); fitBars(); sbFit(); };   // syIcon también redibuja el estado de guardado
 // En escritorio, la cabecera y la fila de «Nuevo paper» ocupan siempre una línea: si no caben, se acortan los textos de
 // algunos botones (clase «cmp»); lo que aún sobre se comprime (título con «…», búsqueda más corta). Si las secciones o etiquetas de la fila
 // no caben enteras, pasan debajo en varias líneas (clase «wrapc»), como en el móvil, en vez de quedar tapadas
 let FIT_RO = null;
+/* Barra lateral (ordenador): fija y del alto de la pantalla; arriba (bajo la cabecera, que se va al bajar) y abajo el pie siempre a la vista */
+function sbFit() { const h = $('header'), a = $('#side'); if (!h || !a) return; const v = Math.max(0, Math.round(h.getBoundingClientRect().bottom)) + 'px'; if (a.style.getPropertyValue('--sbt') !== v) { a.style.setProperty('--sbt', v); sbFootFit(); } }
+/* Pie de la barra: con su texto si todo cabe; en fila de iconos solo si lo de arriba no cabe con el pie normal (se mide siempre con el normal: no parpadea) */
+let SBF_RO = null;
+function sbFootFit() {
+  const f = $('#sbFoot'), m = $('#sbMain'), a = $('#side'); if (!f || !m) return;
+  if (document.documentElement.classList.contains('mv') || a.classList.contains('min')) { f.classList.remove('cmp'); return; }
+  if (!SBF_RO && window.ResizeObserver) { SBF_RO = new ResizeObserver(() => sbFootFit()); [a, ...m.children].forEach(e => SBF_RO.observe(e)); }
+  f.classList.remove('cmp'); if (m.scrollHeight > m.clientHeight + 1) f.classList.add('cmp');
+}
+addEventListener('scroll', sbFit, {passive: true}); addEventListener('resize', () => { sbFit(); sbFootFit(); });
 function fitBars() {
   const h = $('header'), t = $('#appName'), r = $('main > .row'); if (!h || !r) return;
   if (document.documentElement.classList.contains('mv')) { h.classList.remove('cmp'); r.classList.remove('cmp'); return; }
@@ -412,16 +423,9 @@ function paperPlace(id, from, to, ref, after) {   // coloca un paper (arrastrado
 }
 /* posiciones guardadas: el orden de cada sección (y de la lista sin agrupar) con un nombre, para volver a él */
 function posSnap() { const L = visible(), o = {...(db.manual || {})}; groupsOf(L).forEach(([s, l]) => o[s.id || '_'] = l.map(p => p.id)); o[MAN_ALL] = (F.group ? sortList(L) : L).map(p => p.id); return o; }
-function posMenu(e) {
-  const P = db.posSaves || [];
-  ctxShow(e, `<div class="ctxh">📌 Posiciones guardadas</div><div class="posn"><input id="posName" maxlength="40" placeholder="Nombre (p. ej. Para el capítulo 2)" aria-label="Nombre" data-onkeydown="posKey(event)"><button class="pri" data-onclick="posSave()">Guardar</button></div><small class="posh">Guarda cómo están colocados ahora los papers (en cada sección) para volver a ese orden.</small>`
-    + (P.length ? '<hr>' + P.map(x => `<div class="colr"><button class="colck" data-onclick="posLoad('${x.id}')" title="Volver a este orden">📌 ${esc(x.name)}</button><button class="colmv" data-onclick="posDel('${x.id}')" title="Borrar" aria-label="Borrar">✕</button></div>`).join('') : ''));
-  $('#ctx').classList.add('posm');
-}
-function posKey(e) { if (e.key === 'Enter') { e.preventDefault(); posSave(); } }
-function posSave() { const n = $('#posName').value.trim(); if (!n) return $('#posName').focus(); db.posSaves ||= []; db.posSaves.push({id: uid(), name: n, manual: posSnap()}); ctxClose(); markDirty(); toast(`Posiciones guardadas: «${n}».`, [], 2500); }
+function posSaveAs(n) { db.posSaves ||= []; db.posSaves.push({id: uid(), name: n, manual: posSnap()}); markDirty(); favDraw(); toast(`Posiciones guardadas: «${n}».`, [], 2500); }   // desde «＋ Guardar» de Vistas
 function posLoad(id) { const x = (db.posSaves || []).find(y => y.id === id); ctxClose(); if (!x) return; db.manual = structuredClone(x.manual); F.sorts = [{k: 'manual', d: 1}, ...F.sorts.filter(y => y.k !== 'manual').slice(0, 2)]; markDirty(); render(); toast(`Orden «${x.name}».`, [], 2000); }
-function posDel(id) { const M = {x: +($('#ctx').style.left || '0').replace('px', ''), y: +($('#ctx').style.top || '0').replace('px', '')}; db.posSaves = (db.posSaves || []).filter(y => y.id !== id); markDirty(); setTimeout(() => posMenu({preventDefault() {}, stopPropagation() {}, clientX: M.x, clientY: M.y})); }
+async function posDelAsk(id) { const x = (db.posSaves || []).find(y => y.id === id); if (!x || !await askOk(`¿Borrar las posiciones «${x.name}»?`)) return; db.posSaves = db.posSaves.filter(y => y !== x); markDirty(); favDraw(); }
 function fitTags(only) {   // las etiquetas van en la barra superior de la tarjeta; si no caben, pasan a su propia línea entre esa barra y el título
   (only ? [only] : document.querySelectorAll('#list article.card')).forEach(c => { const ct = c.querySelector('.ct'), tl = ct.querySelector('.tl') || c.querySelector(':scope > .tl'); if (!tl) return;
     if (tl.parentElement !== ct) ct.insertBefore(tl, ct.querySelector('.rd'));
@@ -439,9 +443,10 @@ function render() {
   tg('#tbSec', F.tbSec, 'Sección', F.secs.size || F.noSec); tg('#tbTag', F.tbTag, 'Etiquetas', F.tags.size || F.exTags.size || F.noTag);
   $('#secF2').hidden = !F.tbSec; $('#tagF2').hidden = !F.tbTag; $('#grpChk').checked = F.group;
   selDraw(0);
-  $('#d-search').hidden = !F.q && !advRules().length; advDraw(); $('#d-tr').hidden = !db.trash.length; $('#trLbl').textContent = 'Papelera' + (db.trash.length ? ` (${db.trash.length})` : ''); $('#tbView').innerHTML = db.settings.view === 'table' ? '▦<span class="bl"> Tarjetas</span>' : '☰<span class="bl"> Tabla</span>'; $('#tbCols').hidden = db.settings.view !== 'table';
+  $('#d-search').hidden = !F.q && !advRules().length; advDraw(); $('#d-tr').hidden = !db.trash.length; $('#trLbl').textContent = $('#side .trb').title = 'Papelera' + (db.trash.length ? ` (${db.trash.length})` : ''); $('#tbView').innerHTML = db.settings.view === 'table' ? '▦<span class="bl"> Tarjetas</span>' : '☰<span class="bl"> Tabla</span>'; $('#tbCols').hidden = db.settings.view !== 'table';
   F.sorts = F.sorts.filter(s => Object.hasOwn(sortOpts(), s.k)); if (!F.sorts.length) F.sorts = [{k: 'title', d: 1}];   // una clasificación borrada deja de ordenar
   const nextKey = Object.keys(SORTS).find(k => !F.sorts.some(s => s.k === k)) || 'title';
+  const so = sortOpts(); $('#sortSum').textContent = F.sorts.map(s => (so[s.k] || s.k).replace(/ \(.*\)$/, '') + (s.d > 0 ? ' ▲' : ' ▼')).join(' · ') + (F.group ? ' · por sección' : '');   // el orden actual, en la cabecera de Ordenar
   $('#sortUI').innerHTML = F.sorts.map((s, i) => `<div class="row"><select data-onchange="sortSet(${i},this.value)">${Object.entries(sortOpts()).map(([k, v]) => `<option value="${k}" ${s.k === k ? 'selected' : ''}>${v}</option>`).join('')}</select>
     <button title="${s.d > 0 ? 'Ascendente (A→Z, antiguo→reciente)' : 'Descendente (Z→A, reciente→antiguo)'}" data-onclick="sortFlip(${i})">${s.d > 0 ? '▲' : '▼'}</button>
     ${F.sorts.length > 1 ? `<button data-onclick="sortDel(${i})">✕</button>` : ''}</div>`).join('')
@@ -465,7 +470,7 @@ const moreWatch = () => { if (!MORE_IO) return; MORE_IO.disconnect(); const m = 
 const countDraw = () => { $('#count').textContent = `${LIST.n} de ${db.papers.length} · ${SEL.size} sel.`; };
 function selDraw(count = 1) {   // barra de selección (solo sale con papers marcados) y contador
   const sg = $('#sg-sel'), hadSel = !sg.hidden; sg.hidden = !SEL.size; if (SEL.size && !hadSel) sg.classList.remove('fold');
-  $('#selT').textContent = `Selección (${SEL.size})`; if (count) countDraw();
+  $('#selT').textContent = `Selección (${SEL.size})`; $('#selP').innerHTML = SEL.size ? selBodyHTML() : ''; if (count) countDraw();   // el mismo panel compacto que el de ☑
 }
 function renderPaper(id) {   // repinta solo la tarjeta o fila de un paper; si el cambio puede moverlo o sacarlo de la lista, todo
   const p = db.papers.find(x => x.id === id), el = $(`#list [data-id="${id}"]`);
@@ -518,7 +523,7 @@ function fmToggle(e) { e.stopPropagation(); const m = $('#fmenu'), open = m.hidd
 document.addEventListener('click', e => { if (!e.target.closest('.fm')) fmClose(); });
 document.addEventListener('contextmenu', e => { if (!e.target.closest('[data-oncontextmenu]')) ctxClose(); });   // clic derecho en otro sitio también cierra
 function setSecF(id) { if (!id) F.secs.clear(); else if (!F.secs.delete(id)) F.secs.add(id); F.noSec = false; render(); }   // '' = Todas; como las etiquetas, cada sección se añade o se quita (se ven los papers de cualquiera de ellas)
-function sbToggle() { $('#side').classList.toggle('min'); uiSoon(); }
+function sbToggle() { $('#side').classList.toggle('min'); sbFootFit(); uiSoon(); }
 function sbAllMenu(e) { ctxShow(e, '<div class="ctxh">Grupos de la barra</div><button data-onclick="ctxClose();sbAll(0)">Desplegar todos</button><button data-onclick="ctxClose();sbAll(1)">Plegar todos</button>'); }
 function sbWidth(w) { const a = $('#side'); if (w) a.style.setProperty('--sbw', Math.max(200, Math.min(480, Math.round(w))) + 'px'); else a.style.removeProperty('--sbw'); }
 function sbWidthReset() { sbWidth(0); uiSoon(); }
@@ -539,7 +544,7 @@ new MutationObserver(sbSearchDock).observe($('#side'), {attributes: true, attrib
 function sbMore() {   // «Información» (Ayuda, Privacidad y Créditos): plegada por defecto; con la barra plegada, la despliega abierta
   const a = $('#side'), el = $('#sg-more'), wasMin = a.classList.contains('min');
   a.classList.remove('min'); wasMin ? el.classList.remove('fold') : el.classList.toggle('fold');
-  el.querySelector('.shm').setAttribute('aria-expanded', !el.classList.contains('fold')); uiSoon();
+  $('#side .shm').setAttribute('aria-expanded', !el.classList.contains('fold')); sbFootFit(); uiSoon();
 }
 function mgFit() {   // «✎ Gestionar» entero si cabe junto al título; si no, solo «✎»
   document.querySelectorAll('#sg-filt .fh2 .mgb').forEach(b => { const l = b.querySelector('.mgl'), t = b.parentElement.querySelector('.fhb b'); if (!l || !t) return;
@@ -554,7 +559,7 @@ function minRMenu(e) { ctxShow(e, '<div class="ctxh">Valoración mínima</div>' 
 function sbGroup(g) {   // con la barra plegada, pulsar un icono la despliega en ese grupo
   const a = $('#side'), el = $('#sg-' + g), wasMin = a.classList.contains('min');
   a.classList.remove('min'); wasMin ? el.classList.remove('fold') : el.classList.toggle('fold');
-  if (g === 'search' && !el.classList.contains('fold')) { fsToggle('sort', false); $('#q').focus(); }   // al abrir Buscar, Ordenar sale desplegado
+  if (g === 'search' && !el.classList.contains('fold')) $('#q').focus();
   uiSoon();
 }
 function cycleRead(id) { const p = db.papers.find(x => x.id === id); if (!p) return; const k = Object.keys(READ); const was = p.reading; p.reading = k[(k.indexOf(p.reading) + 1) % k.length]; logChange(p, `Lectura: ${READ[was]} → ${READ[p.reading]}`); markDirty(); renderPaper(id); }
@@ -572,7 +577,11 @@ function selMenu(e) { ctxShow(e, selMenuHTML()); $('#ctx').classList.add('selm')
 function selMenuHTML() {
   const v = visible().length, n = db.papers.length, k = SEL.size, S = selPapers(), b = (on, t, ti, c) => `<button${c ? ` class="${c}"` : ''} data-onclick="${on}"${ti ? ` title="${ti}"` : ''}>${t}</button>`;
   let h = `<div class="ctxh">☑ Selección${k ? ` · <b>${k}</b> ${k === 1 ? 'elegido' : 'elegidos'}` : ''}</div><div class="smr">${b('selVisible();selRedraw()', `☑ Los que se ven (${v})`, 'Seleccionar los papers que se ven')}${b('selAllP();selRedraw()', `☑ Todo el proyecto (${n})`, 'Seleccionar todos los papers del proyecto')}</div>`;
-  if (!k) return h;
+  return k ? h + selBodyHTML() : h;
+}
+function selBodyHTML() {   // lectura, valoración, etiquetas, secciones y acciones de la selección (panel de ☑ y grupo Selección de la barra lateral)
+  const k = SEL.size, S = selPapers(), b = (on, t, ti, c) => `<button${c ? ` class="${c}"` : ''} data-onclick="${on}"${ti ? ` title="${ti}"` : ''}>${t}</button>`;
+  let h = '';
   const all = f => S.length && S.every(f), cls = (L, f) => L.length ? L.map(x => { const m = S.filter(p => p[f].includes(x.id)).length;
     return chip(x, m === S.length ? 1 : 0, `selCls('${f}','${x.id}')`).replace('class="chip', `class="chip${m && m < S.length ? ' part' : ''}`); }).join('') : '<small>Ninguna todavía.</small>';
   h += `<div class="sml">📖 Lectura</div><div class="seg smr">${Object.entries(READ).map(([r, t]) => b(`bulkRead('${r}',1)`, t, '', all(p => p.reading === r) ? 'on' : '')).join('')}</div>`

@@ -110,16 +110,23 @@ const favLoad = async () => { const arr = k => idb('readonly', st => st.get(k + 
 const favPut = () => idb('readwrite', st => st.put(FAV, 'fav:' + PJ.cur)).catch(() => {});
 const favNow = () => ({q: F.q, sorts: F.sorts.map(s => ({...s})), group: F.group, secs: secsSel(), sec: sec1(), tags: [...F.tags], read: F.read, minRating: F.minRating, inNotes: F.inNotes, mode: F.mode, ...fExtra()});
 const favKey = f => JSON.stringify(['q', 'sorts', 'group', 'sec', 'tags', 'read', 'minRating', 'inNotes', 'mode', 'exTags', 'noTag', 'noSec', 'yFrom', 'yTo', 'adv'].map(k => f[k] ?? null));
-function favDraw() {   // «Vistas»: un clic aplica la vista; la que coincide con los filtros actuales sale marcada
-  const el = $('#favL'); if (!el) return; const now = favKey(favNow());
-  el.innerHTML = FAV.map((f, i) => `<div class="fav${favKey(f) === now ? ' on' : ''}"><button class="fva" data-onclick="favApply(${i})" title="Aplicar esta vista">${esc(f.name)}</button><button class="x" data-onclick="favDel(${i})" title="Borrar esta vista" aria-label="Borrar la vista ${esc(f.name)}">✕</button></div>`).join('')
-    || ($('#favN').hidden ? '<small>Aún no hay vistas.</small>' : '');
+function favDraw() {   // «Vistas»: las vistas (⭐, un clic las aplica; la que coincide con los filtros actuales sale marcada) y, debajo, las posiciones guardadas (📌)
+  const el = $('#favL'); if (!el) return; const now = favKey(favNow()), P = db.posSaves || [];
+  el.innerHTML = FAV.map((f, i) => `<div class="fav${favKey(f) === now ? ' on' : ''}"><button class="fva" data-onclick="favApply(${i})" title="Aplicar esta vista"><span class="fvi">⭐</span>${esc(f.name)}</button><button class="x" data-onclick="favDel(${i})" title="Borrar esta vista" aria-label="Borrar la vista ${esc(f.name)}">✕</button></div>`).join('')
+    + P.map(x => `<div class="fav pos"><button class="fva" data-onclick="posLoad('${x.id}')" title="Volver a estas posiciones (orden manual)"><span class="fvi">📌</span>${esc(x.name)}</button><button class="x" data-onclick="posDelAsk('${x.id}')" title="Borrar estas posiciones" aria-label="Borrar las posiciones ${esc(x.name)}">✕</button></div>`).join('')
+    || ($('#favN').hidden ? '<small>Aún no hay nada guardado. Con «＋ Guardar» guardas la búsqueda y los filtros (⭐ vista) o cómo están colocados los papers (📌 posiciones).</small>' : '');
 }
-function favNew() {   // «＋ Guardar vista»: pide el nombre en la propia barra, con una explicación
-  $('#side').classList.remove('min'); $('#sg-fav').classList.remove('fold'); $('#favN').hidden = false; favDraw(); const i = $('#favName'); i.value = ''; i.focus(); uiSoon();
+let FAVK = 'fav';   // qué se guarda con el formulario: una vista o unas posiciones
+function favKind(k) {
+  FAVK = k === 'pos' ? 'pos' : 'fav'; $('#favK1').classList.toggle('on', FAVK === 'fav'); $('#favK2').classList.toggle('on', FAVK === 'pos');
+  $('#favName').placeholder = FAVK === 'pos' ? 'Nombre (p. ej. Para el capítulo 2)' : 'Nombre de la vista';
+  $('#favH').textContent = FAVK === 'pos' ? 'Guarda cómo están colocados ahora los papers (en cada sección) para volver a ese orden.' : 'Guarda la búsqueda, el orden y los filtros que uses a menudo.'; $('#favName').focus();
+}
+function favNew(k) {   // «＋ Guardar»: pide el nombre en la propia barra; arriba se elige vista o posiciones
+  $('#side').classList.remove('min'); $('#sg-fav').classList.remove('fold'); $('#favN').hidden = false; favDraw(); const i = $('#favName'); i.value = ''; favKind(k || 'fav'); i.focus(); uiSoon();
 }
 function favCancel() { $('#favN').hidden = true; favDraw(); }
-function favSaveForm() { const n = $('#favName').value.trim(); if (!n) return $('#favName').focus(); favSave(n); favCancel(); }
+function favSaveForm() { const n = $('#favName').value.trim(); if (!n) return $('#favName').focus(); FAVK === 'pos' ? posSaveAs(n) : favSave(n); favCancel(); }
 function favKeyDown(e) { if (e.key === 'Enter') { e.preventDefault(); favSaveForm(); } else if (e.key === 'Escape') { e.stopPropagation(); favCancel(); } }
 function favSave(nm) {
   const name = String(nm || '').trim().slice(0, 40); if (!name) return;

@@ -60,7 +60,7 @@ with sync_playwright() as pw:
     # ---- U1: acciones en lote
     pg.evaluate(SEED)
     pg.evaluate("SEL.add('a'); SEL.add('b'); render()")
-    eq('la selección muestra las acciones en lote', pg.evaluate("[!$('#sg-sel').hidden, document.querySelectorAll('#sg-sel .blk button').length]"), [True, 4])
+    eq('la selección muestra las acciones en lote', pg.evaluate("[!$('#sg-sel').hidden, document.querySelectorAll('#sg-sel .selp .sml').length]"), [True, 4])
     pg.evaluate("bulkRead('leido')")
     eq('lectura en lote', pg.evaluate("db.papers.map(p => p.reading)"), ['leido', 'leido', 'por_leer'])
     pg.evaluate("bulkRate(4)")

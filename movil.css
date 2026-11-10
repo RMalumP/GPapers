@@ -38,7 +38,7 @@ html.mv #mvShade[hidden]{display:block}
 html.mv .mvdh{display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:3;background:var(--bg);padding:max(6px,env(safe-area-inset-top)) 6px 6px 16px;border-bottom:1px solid var(--bd);font-size:17px}
 html.mv .mvdf{display:block;position:sticky;bottom:0;z-index:3;margin-top:auto;padding:10px 12px calc(10px + var(--mvsafe));background:var(--bg);border-top:1px solid var(--bd)}
 html.mv .mvdf button{width:100%;min-height:46px;font-weight:600}
-html.mv #sbGrip,html.mv aside>.sh:first-of-type{display:none}
+html.mv #sbGrip,html.mv #sbMain>.sh:first-of-type{display:none}
 html.mv aside.min .sb,html.mv aside.min .lbl,html.mv aside.min .sbinfo{display:revert}html.mv aside.min .sb{display:flex}   /* en el móvil la barra nunca está «plegada en iconos» */
 html.mv aside.min .dot{position:static}
 html.mv aside .sh{min-height:48px;padding:10px 16px}
@@ -155,7 +155,7 @@ html.mv dialog .ctabs{display:flex;overflow-x:auto;flex-wrap:nowrap;scrollbar-wi
 .mvdx{display:none}
 html.mv dialog>.mvdx{display:flex;position:sticky;top:0;float:right;z-index:5;margin:6px -6px 0 8px;font-size:20px;background:var(--bg);border:1px solid var(--bd);border-radius:50%;width:44px;height:44px}
 html.mv dialog>.dh+.mvdx,html.mv dialog>.dh~.mvdx{display:none}
-html.mv .sgh{display:flex}html.mv #sg-search .sgh{display:flex}html.mv #sg-search .sgh .sh::after{content:"Buscar y ordenar"}
+html.mv .sgh{display:flex}html.mv #sg-search .sgh{display:flex}html.mv #sg-search .sgh .sh::after{content:"Buscar"}
 html.mv #sg-search .sgh .sh{width:100%}
 html.mv dialog.ask{width:auto;max-width:calc(100vw - 32px);height:auto;max-height:80dvh;margin:auto;border:1px solid var(--bd);border-radius:14px;padding:18px 20px}
 
@@ -212,3 +212,5 @@ html.tb:not(.mv) main>.row .chips{flex:1 0 100%;flex-wrap:wrap;gap:6px;min-width
 html.tb:not(.mv) main>.row .chips[hidden]{display:none}
 html.tb:not(.mv) main>.row .chip{white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis}
 html.tb:not(.mv) #ctx.mvfm button{min-height:40px;padding:6px 12px}
+/* Barra lateral ordenada (v39.32): en el móvil el cajón se desplaza entero; el pie (iconos y texto de la app) va al final */
+html.mv #sbMain,html.mv #sbFoot{flex:none}html.mv #sbFoot{margin-top:8px;padding:6px 8px 4px}html.mv .sbf .sh.sfi{min-height:44px}
