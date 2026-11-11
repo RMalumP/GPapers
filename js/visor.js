@@ -59,6 +59,7 @@ function vwBuild() {
       <span class="vwz"><button class="vwib" data-onclick="vwZoomBy(0.8333)" title="Alejar (Ctrl + −)" aria-label="Alejar">−</button><button id="vwZl" class="vwzl" data-onclick="vwFitW()" title="Ajustar al ancho">100 %</button><button class="vwib" data-onclick="vwZoomBy(1.2)" title="Acercar (Ctrl + +)" aria-label="Acercar">＋</button></span>
       <span class="vwf"><input id="vwQ" type="search" placeholder="Buscar en el PDF" aria-label="Buscar en el PDF" data-onkeydown="vwFindKey(event)" data-oninput="vwFindReset()"><span id="vwQn"></span></span>
       <button class="vwib vwfb" data-onclick="vwFindToggle()" title="Buscar (Ctrl+F)" aria-label="Buscar">🔍</button>
+      <button class="vwib" data-onclick="vwFs(true)" title="Pantalla completa" aria-label="Pantalla completa">⛶</button>
       <button class="vwib" id="vwMoreB" data-onclick="vwMore(event)" title="Más: descargar con las anotaciones, ficha del paper…" aria-label="Más">⋯</button></div>
     <div class="vwtb" role="toolbar" aria-label="Herramientas">
       <button class="vwm vwun" data-onclick="vwUndo()" title="Deshacer (Ctrl+Z)" aria-label="Deshacer"><span>↶</span><small>Deshacer</small></button>
@@ -69,10 +70,15 @@ function vwBuild() {
       <span class="vwcs" role="group" aria-label="Color">${sw}</span>
       <button class="vwm vwtc" data-onclick="vwPanel('toc')" title="Índice del PDF y miniaturas de las páginas"><span>📑</span><small>Índice</small></button>
       <button class="vwm vwnb" data-onclick="vwNotes()" title="Notas del paper (generales y por sección) al lado del PDF, con todas las opciones del editor"><span>📝</span><small>Notas</small></button>
+      <button class="vwm vwfsb" data-onclick="vwTbHide(true)" title="Ocultar esta barra (se vuelve a sacar con la pestaña ▾ de arriba)"><span>▴</span><small>Ocultar</small></button>
+      <button class="vwm vwfsb" data-onclick="vwFs(false)" title="Salir de pantalla completa (Esc o «atrás»)"><span>⛶</span><small>Salir</small></button>
       <button class="vwm vwsb" data-onclick="vwPanel('ann')" title="Subrayados, notas y comentarios"><span>💬</span><small>Anotaciones</small><b id="vwAn"></b></button></div>
     <div class="vwbody"><div id="vwScroll" tabindex="-1"><div id="vwPages"></div><p id="vwLoad" class="vwload">Abriendo el PDF…</p></div><aside id="vwSide" hidden></aside></div>
     <div id="vwSel" class="vwfloat" hidden>${sw.replace(/vwColor/g, 'vwSelColor')}<button class="vwib" data-onclick="vwSelNote()" title="Subrayar y comentar" aria-label="Subrayar y comentar">💬</button><button class="vwib" data-onclick="vwSelCopy()" title="Copiar el texto" aria-label="Copiar">📋</button></div>
-    <div id="vwPop" class="vwfloat vwpop" hidden></div></dialog>`);
+    <div id="vwPop" class="vwfloat vwpop" hidden></div>
+    <button id="vwTbTab" class="vwfloat" data-onclick="vwTbHide(false)" title="Sacar la barra de herramientas" aria-label="Sacar la barra">▾</button>
+    <div id="vwPgTip" class="vwfloat" hidden></div>
+    <div id="vwCol" class="vwfloat" hidden>${sw.replace(/vwColor\((\d)\)/g, 'vwColPick($1)')}</div></dialog>`);
   const d = $('#vw'), sc = $('#vwScroll');
   d.addEventListener('cancel', e => { e.preventDefault(); vwEsc(); });
   d.addEventListener('close', () => { if (VW.open) vwClose(); });   // Chrome cierra sin «cancel» si se pulsa Esc dos veces seguidas: se cierra bien igualmente
@@ -84,7 +90,11 @@ function vwBuild() {
   sc.addEventListener('pointerdown', vwDown); sc.addEventListener('pointermove', vwMove); sc.addEventListener('pointerup', vwUp); sc.addEventListener('pointercancel', vwUp);
   document.addEventListener('selectionchange', () => { if (VW.open) { clearTimeout(VW.selT); VW.selT = setTimeout(vwSelShow, VW.mode === 'sel' ? 250 : 0); } });
   new ResizeObserver(() => { if (VW.open && VW.fit && VW.pages.length) vwFitW(true); }).observe(sc);
-  window.addEventListener('popstate', () => { if (VW.open && VW.pushed) { VW.pushed = false; vwClose(true); } });
+  window.addEventListener('popstate', e => {
+    if (VW.fsSkip) { VW.fsSkip = false; return; }
+    if (VW.open && VW.fsPushed) { VW.fsPushed = false; return vwFs(false); }   // «atrás» en pantalla completa: sale de ella, no del visor
+    if (VW.open && VW.pushed) { VW.pushed = false; vwClose(true); } });
+  document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement && VW.fs) vwFs(false); });
 }
 async function vwOpen(src, file) {
   vwBuild(); if (VW.open) await vwClose(false, true);
@@ -125,7 +135,7 @@ function vwAskPass(wrong) {   // contraseña de un PDF protegido
   });
 }
 async function vwClose(fromPop, keepHist) {
-  if (!VW.open) return; vwSaveComment(); vwNotesClose(true);
+  if (!VW.open) return; if (VW.fs) vwFs(false); vwSaveComment(); vwNotesClose(true);
   const src = VW.src, page = VW.cur + 1, pf = vwHolders()[0];
   VW.open = false; VW.gen++; VW.io?.disconnect(); VW.queue.clear();
   for (const p of VW.pages) { try { p.task?.cancel(); } catch (e) {} p.proxy?.cleanup(); }
@@ -163,6 +173,8 @@ async function vwOther(ann) {   // abrir en otra app: el menú «Compartir» del
   pdfNative(f, VW.cur + 1);
 }
 function vwEsc() {
+  if (!$('#vwCol').hidden) return vwColClose();
+  if (VW.fs) return vwFs(false);
   if (vwDocked()) return vwNotesClose();
   if (!$('#vwPop').hidden) return vwPopClose();
   if (!$('#vwSel').hidden) { getSelection().removeAllRanges(); $('#vwSel').hidden = true; return; }
@@ -270,6 +282,7 @@ function vwOnScroll() {
   const sc = $('#vwScroll'), y = sc.scrollTop + sc.clientHeight / 3; let lo = 0, hi = VW.pages.length - 1;
   while (lo < hi) { const m = (lo + hi + 1) >> 1; if (VW.pages[m].el.offsetTop <= y) lo = m; else hi = m - 1; }
   if (VW.pages.length && lo !== VW.cur) { VW.cur = lo; vwThCur(); }
+  if (VW.fs && VW.pages.length && VW.cur !== VW.tipPg) vwPgTip();
   const inp = $('#vwPg'); if (VW.pages.length && document.activeElement !== inp) inp.value = VW.cur + 1;
   if (!$('#vwSel').hidden) vwSelShow();
   if (VW.pop) { vwPopPlace(); vwHandles(); }
@@ -437,8 +450,10 @@ function vwDown(e) {
     VW.drag = {kind: 'hl', p, a: c, x: e.clientX, y: e.clientY, id: e.pointerId, touch: e.pointerType !== 'mouse'}; e.preventDefault(); $('#vwScroll').setPointerCapture(e.pointerId); getSelection().removeAllRanges(); }
   else if (VW.mode === 'area') { VW.drag = {kind: 'area', p, x: e.clientX, y: e.clientY, id: e.pointerId}; e.preventDefault(); $('#vwScroll').setPointerCapture(e.pointerId); }
   else VW.tap = {x: e.clientX, y: e.clientY, t: Date.now()};
+  if (VW.fs && !e.target.closest('.textLayer span')) { clearTimeout(VW.lpT); const x = e.clientX, y = e.clientY; VW.lpT = setTimeout(() => { if (VW.tap && !VW.drag) { VW.tap = null; vwBars(); } }, 550); }
 }
 function vwMove(e) {
+  if (VW.tap && Math.hypot(e.clientX - VW.tap.x, e.clientY - VW.tap.y) >= 8) clearTimeout(VW.lpT);
   const pn = VW.pan; if (pn && pn.id === e.pointerId) { const sc = $('#vwScroll'); sc.scrollLeft = pn.l - (e.clientX - pn.x); sc.scrollTop = pn.t - (e.clientY - pn.y); return; }
   const g = VW.drag; if (!g || g.id !== e.pointerId) return;
   if (g.kind === 'hl') {
@@ -453,7 +468,8 @@ function vwMove(e) {
   }
 }
 function vwUp(e) {
-  const pn = VW.pan; if (pn && pn.id === e.pointerId) { VW.pan = null; if (e.type !== 'pointercancel' && Math.hypot(e.clientX - pn.x, e.clientY - pn.y) < 8) vwTapAt(e.clientX, e.clientY); return; }
+  clearTimeout(VW.lpT);
+  const pn = VW.pan; if (pn && pn.id === e.pointerId) { VW.pan = null; if (e.type !== 'pointercancel' && Math.hypot(e.clientX - pn.x, e.clientY - pn.y) < 8 && !vwTapAt(e.clientX, e.clientY) && VW.fs) vwTaps(e.clientX, e.clientY); return; }
   const g = VW.drag; if (e.type === 'pointercancel') { VW.drag = null; VW.tap = null; $('#vwBox')?.remove(); return; }
   if (g && g.id === e.pointerId) {
     VW.drag = null; $('#vwBox')?.remove();
@@ -470,13 +486,14 @@ function vwUp(e) {
     const n = e.target.closest?.('.vwnote'); if (n) return vwPopOpen(n.dataset.a);
     if (VW.mode === 'note') { const p = vwPageAt(e.clientX, e.clientY); if (!p) return; const [x, y] = vwToPdf(p, e.clientX, e.clientY), id = uid(), now = vwNow();
       vwAdd({id, k: 'note', p: p.i, q: [x, y, x, y], c: VW_COLORS[VW.color][0], at: now, up: now}); return vwPopOpen(id, true); }
-    if (!vwSelRange()) vwTapAt(e.clientX, e.clientY);
+    if (!vwSelRange()) { if (vwTapAt(e.clientX, e.clientY) || !VW.fs) return; vwTaps(e.clientX, e.clientY); }
   }
 }
 function vwTapAt(x, y) {   // tocar un subrayado o una zona abre su ventanita
   const m = document.documentElement.classList.contains('mv') || matchMedia('(pointer: coarse)').matches ? 10 : 2;   // con el dedo, más margen
   const hit = [...document.querySelectorAll('#vw .vwhl, #vw .vwcmk')].reverse().find(el => { const r = el.getBoundingClientRect(); return x >= r.left - m && x <= r.right + m && y >= r.top - m && y <= r.bottom + m; });
   if (hit) vwPopOpen(hit.dataset.a); else if (VW.pop) vwPopClose();
+  return !!hit;
 }
 
 /* ---- Ventanita de una anotación: color, comentario, copiar, a las notas del paper, borrar ---- */
@@ -951,3 +968,36 @@ addEventListener('popstate', e => {
   else if (bkMenus()) mvClose();
   setTimeout(() => { if (bkTop() || bkMenus()) bkGuard(); }, 0);   // queda otra ventana abierta (o la ficha pidió confirmar): otra guarda
 });
+
+/* ===== Pantalla completa (v39.38): sin la barra del título; la de herramientas se puede ocultar (pestaña ▾ para sacarla).
+   Doble toque en una zona vacía: colores para subrayar. Pulsación larga o tres toques rápidos: las dos barras durante 3 s (para salir).
+   «Atrás» (móvil y tablet) o Esc salen de la pantalla completa. Al cambiar de página, «Página X de N» arriba durante 3 s. */
+function vwFs(on) {
+  on = !!on; if (!VW.open || VW.fs === on) return; VW.fs = on; const d = $('#vw'); d.classList.toggle('fs', on); d.classList.remove('fsbars'); vwColClose();
+  if (on) {
+    VW.tbHide = false; d.classList.remove('tbh'); try { history.pushState({vwfs: 1}, ''); VW.fsPushed = true; } catch (e) {}
+    try { if (!document.fullscreenElement) document.documentElement.requestFullscreen?.().catch(() => {}); } catch (e) {}
+    vwPgTip();
+  } else {
+    d.classList.remove('tbh'); $('#vwPgTip').hidden = true;
+    if (VW.fsPushed) { VW.fsPushed = false; VW.fsSkip = true; history.back(); }
+    try { if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {}); } catch (e) {}
+  }
+  if (VW.fit) setTimeout(() => vwFitW(true), 60);
+}
+function vwTbHide(h) { VW.tbHide = h; $('#vw').classList.toggle('tbh', h); }
+function vwBars() { const d = $('#vw'); d.classList.add('fsbars'); clearTimeout(VW.barT); VW.barT = setTimeout(() => d.classList.remove('fsbars'), 3000); }
+function vwPgTip() { const t = $('#vwPgTip'); if (!VW.pages.length) return; VW.tipPg = VW.cur; t.textContent = `Página ${VW.cur + 1} de ${VW.pages.length}`; t.hidden = false; clearTimeout(VW.pgT); VW.pgT = setTimeout(() => t.hidden = true, 3000); }
+function vwTaps(x, y) {   // toques seguidos en una zona vacía: 2 → colores, 3 → barras
+  const now = Date.now(), L = VW.taps = (VW.taps || []).filter(t => now - t.t < 450 && Math.hypot(t.x - x, t.y - y) < 40); L.push({x, y, t: now});
+  clearTimeout(VW.tapT);
+  if (L.length >= 3) { VW.taps = []; vwColClose(); return vwBars(); }
+  if (L.length === 2) VW.tapT = setTimeout(() => { VW.taps = []; vwColOpen(x, y); }, 300);   // espera por si llega un tercer toque
+}
+function vwColOpen(x, y) {
+  const m = $('#vwCol'), D = $('#vw').getBoundingClientRect(); m.querySelectorAll('.vwc').forEach(b => b.classList.toggle('on', +b.dataset.c === VW.color)); m.hidden = false;
+  m.style.left = Math.max(8, Math.min(x - D.left - m.offsetWidth / 2, D.width - m.offsetWidth - 8)) + 'px'; m.style.top = Math.max(8, Math.min(y - D.top - m.offsetHeight - 12, D.height - m.offsetHeight - 8)) + 'px';
+  clearTimeout(VW.colT); VW.colT = setTimeout(vwColClose, 5000);
+}
+function vwColClose() { const m = $('#vwCol'); if (m) m.hidden = true; }
+function vwColPick(i) { VW.color = i; vwColorShow(); vwColClose(); toast(`Subrayar en ${VW_COLORS[i][1].toLowerCase()}.`, [], 1200); }
