@@ -129,3 +129,9 @@ html.mv .vwnote{width:32px;height:32px;font-size:18px;transform:translate(-7px,-
 #vw.vwdk.vwsp.vwcol .vwsplit::after{top:5px;bottom:5px;left:50%;right:auto;width:56px;height:auto;transform:translateX(-50%)}
 #vw.vwdk.vwsp.vwcol .vwbody>#dlg.vwdock{border-top:1px solid var(--bd);box-shadow:0 -4px 14px #0002;min-height:0}
 #vw.vwdk.vwsp.vwcol #vwScroll{min-height:0}
+/* v39.36: deshacer en la barra y tiradores para alargar un subrayado */
+.vwun span{font-size:17px}
+.vwhd{position:absolute;z-index:7;width:22px;height:22px;margin-top:1px;background:var(--pri);border:2px solid #fff;box-shadow:0 1px 4px #0006;touch-action:none;cursor:ew-resize}
+.vwhd[hidden]{display:none}.vwhd0{margin-left:-22px;border-radius:50% 0 50% 50%}.vwhd1{border-radius:0 50% 50% 50%}
+.vwhd.drag{pointer-events:none;opacity:.7}
+html.mv .vwhd{width:28px;height:28px}html.mv .vwhd0{margin-left:-28px}
