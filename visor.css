@@ -135,3 +135,9 @@ html.mv .vwnote{width:32px;height:32px;font-size:18px;transform:translate(-7px,-
 .vwhd[hidden]{display:none}.vwhd0{margin-left:-22px;border-radius:50% 0 50% 50%}.vwhd1{border-radius:0 50% 50% 50%}
 .vwhd.drag{pointer-events:none;opacity:.7}
 html.mv .vwhd{width:28px;height:28px}html.mv .vwhd0{margin-left:-28px}
+/* v39.37: notas al lado del PDF: solo las notas y una cabecera de una línea que no se rompe al estrechar el panel */
+#dlg.vwdock>.dh.vwdh{flex-wrap:nowrap;gap:6px;align-items:center}
+#dlg.vwdock>.dh.vwdh h2{flex:1 1 auto;min-width:0;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block;line-height:34px}
+#dlg.vwdock>.dh.vwdh .dbtn{flex:none;gap:4px;flex-wrap:nowrap}#dlg.vwdock>.dh.vwdh .dbtn button{padding:4px 8px}
+@container vwdlg (max-width:420px){#dlg.vwdock>.dh.vwdh .dbtn button span{display:none}}
+#dlg.vwdock{container:vwdlg/inline-size}

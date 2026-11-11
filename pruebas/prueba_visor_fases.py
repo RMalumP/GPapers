@@ -36,6 +36,13 @@ with sync_playwright() as pw:
     A.click('#vw .vwun'); A.wait_for_timeout(300)
     eq('el botón ↶ deshace el alargado', A.evaluate("vwAnns()[0]?.t"), t0)
     eq('el botón deshacer está junto a «Seleccionar»', A.evaluate("document.querySelector('#vw .vwun').nextElementSibling.dataset.m"), 'sel')
+    # notas al lado del PDF: solo la sección de notas y una cabecera que cabe en un panel estrecho
+    A.evaluate("vwNotes()"); A.wait_for_timeout(500)
+    eq('al lado del PDF solo están las notas (sin pestañas ni datos de la cita)', A.evaluate("[!!document.querySelector('#dlg .tabs'), !!document.querySelector('#dlg input[data-k=url]'), document.querySelectorAll('#dlg .ned, #dlg [data-ed]').length > 0 || /Notas generales/.test($('#dlg').textContent)]"), [False, False, True])
+    A.evaluate("vwSplitSet(22)"); A.wait_for_timeout(300)
+    eq('estrecho: título en una línea y los botones caben dentro del panel', A.evaluate("""(() => { const d = $('#dlg').getBoundingClientRect(), h = document.querySelector('#dlg .dh'), bs = [...h.querySelectorAll('.dbtn button')].filter(b => b.offsetParent);
+      return [h.getBoundingClientRect().height < 60, bs.length >= 2, bs.every(b => { const r = b.getBoundingClientRect(); return r.right <= d.right + 1 && r.left >= d.left - 1; })]; })()"""), [True, True, True])
+    A.evaluate("$('#dlg').close()"); A.wait_for_timeout(200)
     # móvil: en «Subrayar», arrastrar con el dedo fuera del texto mueve la página
     cB, B = device(True)
     B.evaluate("vwMode('hl'); vwZoomBy(2)"); B.wait_for_timeout(600)
