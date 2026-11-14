@@ -129,7 +129,7 @@ async function ibMove(it, pid, n) {   // el archivo de la bandeja pasa al hueco 
   const from = inKey(it.id), to = pdfKey(pid, n);
   if (PDF_FILES.has(from)) PDF_FILES.set(to, PDF_FILES.get(from));
   await idb('readwrite', st => { for (const pre of ['pdf:', 'pdft:']) { const q = st.get(pre + from); q.onsuccess = () => { if (q.result != null) st.put(q.result, pre + to); }; } return null; }).catch(() => {});
-  return {name: it.name, ...(it.page ? {page: it.page} : {}), ...(it.ann?.length ? {ann: structuredClone(it.ann)} : {}), ...(it.vis ? {vis: it.vis} : {}), ...(it.vid ? {vid: it.vid} : {}), from};   // from: la copia de Drive sigue con el nombre de la bandeja
+  return {name: it.name, ...(it.page ? {page: it.page} : {}), ...(it.ann?.length ? {ann: structuredClone(it.ann)} : {}), ...(it.bm?.length ? {bm: [...it.bm]} : {}), ...(it.vis ? {vis: it.vis} : {}), ...(it.vid ? {vid: it.vid} : {}), from};   // from: la copia de Drive sigue con el nombre de la bandeja
 }
 const ibDup = it => { const d = it && normDoi(it.doi); return d ? db.papers.find(p => normDoi(p.doi) === d) || null : null; };   // ese DOI ya es un paper de la biblioteca
 async function inboxCite(id) {

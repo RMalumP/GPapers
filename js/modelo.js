@@ -144,11 +144,13 @@ function annClean(l) {   // el mismo orden de campos siempre: normalizar dos vec
   }
   return out;
 }
+/* Marcadores rápidos del visor (v39.40): «bm», las páginas marcadas (desde 0), ordenadas y sin repetir */
+const bmClean = l => Array.isArray(l) ? [...new Set(l.filter(x => Number.isInteger(x) && x >= 0 && x <= 99999))].sort((a, b) => a - b).slice(0, 500) : [];
 const PDF_VIS = new Set(['si', 'no']);   // por PDF: también en el Drive normal (si), solo en la carpeta oculta (no); sin el campo, lo de Configuración
 function pdfClean(v) {
   if (!v || typeof v !== 'object' || typeof v.name !== 'string' || !v.name) return null;
-  const ann = annClean(v.ann), from = annStr(v.from, 80), vid = typeof v.vid === 'string' && /^[\w-]{6,200}$/.test(v.vid) ? v.vid : '';
-  return {name: v.name.slice(0, 260), ...(pdfPage(v.page) ? {page: pdfPage(v.page)} : {}), ...(ann.length ? {ann} : {}), ...(PDF_VIS.has(v.vis) ? {vis: v.vis} : {}), ...(vid ? {vid} : {}), ...(from ? {from} : {})};
+  const ann = annClean(v.ann), from = annStr(v.from, 80), vid = typeof v.vid === 'string' && /^[\w-]{6,200}$/.test(v.vid) ? v.vid : '', bm = bmClean(v.bm);
+  return {name: v.name.slice(0, 260), ...(pdfPage(v.page) ? {page: pdfPage(v.page)} : {}), ...(ann.length ? {ann} : {}), ...(bm.length ? {bm} : {}), ...(PDF_VIS.has(v.vis) ? {vis: v.vis} : {}), ...(vid ? {vid} : {}), ...(from ? {from} : {})};
 }
 function inboxClean(l) {   // bandeja «PDF por citar»: PDF sin paper todavía
   if (!Array.isArray(l)) return []; const seen = new Set();

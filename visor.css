@@ -163,3 +163,9 @@ html.mv #vw.fs.tbh #vwTbTab{top:auto;bottom:0;border-radius:10px 10px 0 0;border
 #vwAuto .vwap{font-size:18px;background:color-mix(in srgb,var(--pri) 16%,transparent);border-radius:99px}
 #vwAuto.paused .vwap{background:var(--pri);color:#fff}
 html.mv #vwAuto{bottom:10px}html.mv #vwAuto .vwib{min-width:40px;min-height:40px}
+/* ---- v39.40: recorte de márgenes, marcadores ---- */
+#vw.crop #vwPages{overflow:clip}
+#vw.crop .vwp{box-shadow:none;margin:calc(var(--scale-factor) * var(--ct) * -1) calc(var(--scale-factor) * var(--cr) * -1) calc(var(--scale-factor) * var(--cb) * -1) calc(var(--scale-factor) * var(--cl) * -1);clip-path:inset(calc(var(--scale-factor) * var(--ct)) calc(var(--scale-factor) * var(--cr)) calc(var(--scale-factor) * var(--cb)) calc(var(--scale-factor) * var(--cl)))}
+.vwp.bm::after{content:"🔖";position:absolute;z-index:3;top:calc(var(--scale-factor) * var(--ct,0px));right:calc(var(--scale-factor) * var(--cr,0px) + 6px);font-size:22px;line-height:1;pointer-events:none;filter:drop-shadow(0 1px 2px #0005)}
+.vwbml{display:flex;flex-direction:column;max-height:38vh;overflow:auto}
+.vwbme{margin:6px 10px;font-size:13px;opacity:.75;max-width:260px}
