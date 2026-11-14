@@ -151,3 +151,15 @@ html.mv #vw.fs.tbh #vwTbTab{top:auto;bottom:0;border-radius:10px 10px 0 0;border
 #vwPgTip{top:10px;left:50%;transform:translateX(-50%);padding:4px 12px;font-size:13px;border-radius:99px;pointer-events:none;z-index:8}
 #vwPgTip[hidden],#vwCol[hidden]{display:none}
 #vwCol{display:flex;gap:6px;padding:8px;z-index:8}
+/* ---- Modo de lectura (v39.39): doble página, página a página y desplazamiento automático ---- */
+#vw.two:not(.flip) #vwPages{display:grid;grid-template-columns:repeat(2,max-content);justify-content:center;align-items:start}
+#vw.two.cover:not(.flip) .vwp:first-child{grid-column:2}
+#vw.flip #vwPages{flex-direction:row;justify-content:center;align-items:center;min-height:100%;box-sizing:border-box}
+#vw.flip .vwp:not(.cur){display:none}
+.vwmenu .vwsub{opacity:.65;font-size:12px;margin-left:6px}
+#vwAuto{position:absolute;left:50%;bottom:14px;transform:translateX(-50%);display:flex;align-items:center;gap:2px;padding:4px 6px;border-radius:99px;max-width:calc(100% - 16px)}#vwAuto[hidden]{display:none}
+#vwAuto input[type=range]{width:min(180px,32vw);accent-color:var(--pri);margin:0 4px}
+#vwAuto #vwAutoV{min-width:1.6em;text-align:center;font-size:13px;font-variant-numeric:tabular-nums;opacity:.75}
+#vwAuto .vwap{font-size:18px;background:color-mix(in srgb,var(--pri) 16%,transparent);border-radius:99px}
+#vwAuto.paused .vwap{background:var(--pri);color:#fff}
+html.mv #vwAuto{bottom:10px}html.mv #vwAuto .vwib{min-width:40px;min-height:40px}
