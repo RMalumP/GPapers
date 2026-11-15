@@ -167,24 +167,24 @@ function progDraw() {   // barra de progreso de lectura del proyecto, en la cabe
    En navegadores sin acceso a archivos hay que elegir el PDF cada vez que se abre.
    Cada hueco tiene su clave (pdfKey): la del primero es el id del paper, como siempre; la del segundo, <id>~2. Con ella se nombran el enlace
    en IndexedDB («pdf:<clave>») y la copia en Google Drive («gpapers-pdf-<clave>»). */
-const PDF_T = [{description: 'PDF', accept: {'application/pdf': ['.pdf']}}], PEND_PDF = new Map(), PDF_FILES = new Map();   // PEND_PDF: elegidos en el borrador · PDF_FILES: archivos de esta sesión (sin acceso a archivos); ambos por clave
+const PDF_T = [{description: 'PDF o EPUB', accept: {'application/pdf': ['.pdf'], 'application/epub+zip': ['.epub']}}], DOC_ACC = '.pdf,.epub,application/pdf,application/epub+zip', PEND_PDF = new Map(), PDF_FILES = new Map();   // PEND_PDF: elegidos en el borrador · PDF_FILES: archivos de esta sesión (sin acceso a archivos); ambos por clave
 const PDF_N = [1, 2], pdfF = n => n === 2 ? 'pdf2' : 'pdf', pdfKey = (id, n) => n === 2 ? id + '~2' : id;
 const pdfPage = v => { v = parseInt(v, 10); return Number.isInteger(v) && v > 0 && v < 100000 ? v : 0; };
 const pdfsOf = p => PDF_N.filter(n => p[pdfF(n)]);   // huecos con PDF de un paper
 async function pdfChoose(key) {   // elige el archivo de un hueco (guardándolo en el borrador o en el paper); devuelve el File
   if (FSA) { const [h] = await showOpenFilePicker({types: PDF_T}); PEND_PDF.set(key, h); return {file: await h.getFile(), h}; }
-  const file = await new Promise(res => { const i = document.createElement('input'); i.type = 'file'; i.accept = '.pdf,application/pdf'; i.onchange = () => res(i.files[0] || null); i.oncancel = () => res(null); i.click(); });
+  const file = await new Promise(res => { const i = document.createElement('input'); i.type = 'file'; i.accept = DOC_ACC; i.onchange = () => res(i.files[0] || null); i.oncancel = () => res(null); i.click(); });
   if (!file) throw Object.assign(Error('cancelado'), {name: 'AbortError'}); PDF_FILES.set(key, file); pdfKeep(key, file); return {file};
 }
 /* Sin acceso a archivos (móvil, Safari, Firefox) el navegador no puede volver a leer un PDF elegido: se guarda una copia en este navegador
    («pdfb:<clave>», hasta 100 MB), igual que la que se descarga de Google Drive, para no tener que elegirlo ni descargarlo cada vez. */
 const PDF_KEEP = 100 * 1048576;
-const pdfKeep = (key, file) => { if (file && file.size <= PDF_KEEP) idb('readwrite', st => st.put(new Blob([file], {type: 'application/pdf'}), 'pdfb:' + key)).catch(() => {}); };
-const pdfKept = async (key, name) => { const b = await idb('readonly', st => st.get('pdfb:' + key)).catch(() => null); return b instanceof Blob ? new File([b], name || 'documento.pdf', {type: 'application/pdf'}) : null; };
+const pdfKeep = (key, file) => { if (file && file.size <= PDF_KEEP) idb('readwrite', st => st.put(new Blob([file], {type: docMime(file.name)}), 'pdfb:' + key)).catch(() => {}); };
+const pdfKept = async (key, name) => { const b = await idb('readonly', st => st.get('pdfb:' + key)).catch(() => null); return b instanceof Blob ? new File([b], name || 'documento.pdf', {type: docMime(name)}) : null; };
 const pdfForget = key => idb('readwrite', st => { st.delete('pdf:' + key); st.delete('pdfb:' + key); return st.delete('pdft:' + key); }).catch(() => {});
 async function pdfPick(n = 1) {
   const f = pdfF(n);
-  try { const {file} = await pdfChoose(pdfKey(D.id, n)); const o = D[f]; D[f] = o && o.name === file.name ? {...o} : {name: file.name, ...(pdfPage(o?.page) ? {page: o.page} : {}), ...(o?.vis ? {vis: o.vis} : {})}; drawD(); }   // el mismo archivo (movido): se quedan sus anotaciones
+  try { const {file} = await pdfChoose(pdfKey(D.id, n)); const o = D[f]; D[f] = o && o.name === file.name ? {...o} : {name: file.name, ...(pdfPage(o?.page) ? {page: o.page} : {}), ...(o?.vis ? {vis: o.vis} : {})}; drawD(); docOffer(file); }   // el mismo archivo (movido): se quedan sus anotaciones
   catch (e) { if (e.name !== 'AbortError') say('No se pudo elegir el archivo: ' + e.message); }
 }
 async function pdfClear(n = 1) {
@@ -209,6 +209,7 @@ async function pdfFile(key, pf, ask = true) {   // el archivo de un PDF enlazado
   return file;
 }
 function pdfNative(file, page) {   // el visor del navegador, en otra pestaña (desde file:// o si se pide)
+  if (isEpub(file.name)) return;   // un EPUB no tiene visor del navegador: se abre siempre en el lector propio
   const url = URL.createObjectURL(file.type === 'application/pdf' ? file : new Blob([file], {type: 'application/pdf'})) + (pdfPage(page) ? '#page=' + pdfPage(page) : '');
   window.open(url, '_blank'); setTimeout(() => URL.revokeObjectURL(url.split('#')[0]), 120000);
 }
@@ -217,11 +218,70 @@ async function pdfOpen(id, n = 1, ev) {
   try {
     const file = await pdfFile(key, pf); if (!file) return;
     vwOpenAny({kind: 'paper', id, n}, file, ev, pf.page); covFromOpen(id, n, file);
-  } catch (e) { if (e.name !== 'AbortError') say('No se pudo abrir el PDF: ' + e.message); }
+  } catch (e) { if (e.name !== 'AbortError') say(`No se pudo abrir el ${docKind(pf.name)}: ` + e.message); }
 }
 const annN = pf => pf?.ann?.length || 0;
 const pdfBtns = (p, full) => pdfsOf(p).map(n => { const pf = p[pdfF(n)], a = annN(pf);
-  return `<button class="sm" data-onclick="pdfOpen('${p.id}',${n},event)" title="Abrir el PDF: ${esc(pf.name)}${a ? ` · ${a} ${a === 1 ? 'anotación' : 'anotaciones'} (subrayados y notas)` : ''}">📄${full ? ' PDF' : ''}${n === 2 ? ' 2' : ''}${a ? `<span class="annc">${a}</span>` : ''}</button>`; }).join('');   // botones de la tarjeta (full) y de la tabla, con cuántas anotaciones tiene
+  const ep = isEpub(pf.name); return `<button class="sm" data-onclick="pdfOpen('${p.id}',${n},event)" title="Abrir el ${ep ? 'EPUB' : 'PDF'}: ${esc(pf.name)}${a ? ` · ${a} ${a === 1 ? 'anotación' : 'anotaciones'} (subrayados y notas)` : ''}">${ep ? '📘' : '📄'}${full ? (ep ? ' EPUB' : ' PDF') : ''}${n === 2 ? ' 2' : ''}${a ? `<span class="annc">${a}</span>` : ''}</button>`; }).join('');   // botones de la tarjeta (full) y de la tabla, con cuántas anotaciones tiene
+
+/* ---- Insertar PDF y EPUB (v39.42) ----
+   · Soltar un archivo sobre una tarjeta o una fila (docAttach) lo enlaza a ese paper; sobre la ficha abierta, o pegarlo con Ctrl+V (docDraft), al borrador.
+   · Al enlazarlo se lee lo que trae (docSniff: DOI y título de la primera página del PDF; título, autores, año, editorial e ISBN del EPUB) y, si falta en
+     la ficha, se ofrece completarla (solo los campos vacíos; con DOI, con los datos de CrossRef). Nada sale a internet sin pulsar el botón. */
+async function docSniff(file) {
+  if (isEpub(file.name)) { const m = await epMeta(file); return m && {...m, ep: true}; }
+  if (!vwCan()) return null; let doc;
+  try { const L = await vwLib(); doc = await L.getDocument({data: new Uint8Array(await file.arrayBuffer()), cMapUrl: vwUrl('cmaps/'), cMapPacked: true, standardFontDataUrl: vwUrl('standard_fonts/'), isEvalSupported: false}).promise;
+    return await pdfSniffDoc(doc); } catch (e) { return null; } finally { try { doc?.destroy(); } catch (e) {} }
+}
+const docRef = s => s.ep ? {title: s.title, authors: s.authors, year: s.year, publisher: s.publisher, isbn: s.isbn, type: 'libro'} : {title: s.title};
+const DOC_FL = {title: 'título', authors: 'autores', year: 'año', publisher: 'editorial', isbn: 'ISBN', venue: 'revista', volume: 'volumen', issue: 'número', pages: 'páginas', url: 'URL'};
+const docEmpty = (p, k) => Array.isArray(p[k]) ? !p[k].length : !String(p[k] ?? '').trim();
+const docMissing = (p, r) => Object.keys(DOC_FL).filter(k => docEmpty(p, k) && !docEmpty(r, k));
+function docFill(p, r) {   // pone en el paper (o el borrador) los datos que le faltan; devuelve cuáles
+  const ks = docMissing(p, r), was = !String(p.title || '').trim();
+  for (const k of ks) p[k] = k === 'year' ? +r.year || '' : Array.isArray(r[k]) ? [...r[k]] : r[k];
+  if (was && r.type && (!p.type || p.type === 'articulo')) p.type = r.type;
+  if (r.doi && !normDoi(p.doi)) { p.doi = r.doi; ks.push('doi'); }
+  return ks;
+}
+async function docFillDoi(id, doi) {
+  toast('Buscando los datos del DOI en CrossRef…', [], 2500); let r; try { r = await fetchDoi(doi); } catch (e) { return toast(e.message, [], 5000); }
+  if (D?.id !== id || !$('#dlg').open) openPaper(id); if (D?.id !== id) return;
+  const ks = docFill(D, {...r, doi}); drawD(); toast(ks.length ? `Completado: ${ks.map(k => DOC_FL[k] || k.toUpperCase()).join(', ')}. Revísalo y guarda la ficha.` : 'La ficha ya tenía esos datos.', [], 5000);
+}
+function docFillDraft(id, r) { if (D?.id !== id || !$('#dlg').open) openPaper(id); if (D?.id !== id) return; const ks = docFill(D, r); drawD(); toast(ks.length ? `Completado: ${ks.map(k => DOC_FL[k]).join(', ')}. Revísalo y guarda la ficha.` : 'La ficha ya tenía esos datos.', [], 5000); }
+async function docOffer(file, pid) {   // pid: paper ya guardado (si no, el borrador de la ficha abierta)
+  const id = pid || D?.id, s = id && await docSniff(file); if (!s) return;
+  const p = pid ? db.papers.find(x => x.id === pid) : D?.id === id && $('#dlg').open ? D : null; if (!p) return;
+  const K = docKind(file.name);
+  if (s.doi && !normDoi(p.doi)) return toast(`El ${K} trae el DOI ${s.doi}.`, [{t: 'Completar con sus datos', fn: () => docFillDoi(id, s.doi)}], 10000);
+  const r = docRef(s), miss = docMissing(p, r); if (!miss.length || !s.ep && String(p.title || '').trim()) return;   // de un PDF sin DOI solo se ofrece el título, si falta
+  toast(`El ${K} trae ${miss.map(k => DOC_FL[k]).join(', ')}, que faltan en la ficha.`, [{t: 'Completar', fn: () => docFillDraft(id, r)}], 10000);
+}
+async function docAttach(pid, file, h) {   // soltado sobre una tarjeta o una fila: al primer hueco libre del paper
+  const P = db.papers.find(p => p.id === pid); if (!P || !isDoc(file)) return; const T = shortTxt(P.alias || P.title), K = docKind(file.name);
+  if ([P.pdf, P.pdf2].some(pf => pf && pf.name === file.name)) return toast(`«${T}» ya tiene enlazado «${file.name}».`, [{t: 'Abrir', fn: () => pdfOpen(pid, P.pdf?.name === file.name ? 1 : 2)}], 4000);
+  let n = !P.pdf ? 1 : !P.pdf2 ? 2 : 0;
+  if (!n) { const o = P.pdf2, a = annN(o); if (!await askOk(`«${T}» ya tiene dos documentos. ¿Sustituir el segundo, «${o.name}», por «${file.name}»?${a ? ` Tiene ${a} ${a === 1 ? 'anotación, que se perderá' : 'anotaciones, que se perderán'}.` : ''}`, {ok: 'Sustituir', danger: !!a})) return; n = 2; }
+  const key = pdfKey(pid, n); PDF_FILES.set(key, file); covForget(key);
+  await idb('readwrite', st => h ? st.put(h, 'pdf:' + key) : st.delete('pdf:' + key)).catch(() => {}); if (!h) pdfKeep(key, file);
+  P[pdfF(n)] = {name: file.name.slice(0, 260)}; P.modified = new Date().toISOString(); logChange(P, `${K}${n === 2 ? ' 2' : ''} enlazado: ${file.name}`); markDirty(); render();
+  toast(`${K} enlazado a «${T}».`, [{t: 'Abrir', fn: () => pdfOpen(pid, n)}, {t: 'Deshacer', fn: undo}], 6000);
+  setTimeout(() => docOffer(file, pid), 1500);
+}
+async function docDraft(file, h, n) {   // soltado o pegado en la ficha abierta: en ese hueco o en el primero libre del borrador
+  if (!D || !$('#dlg').open || !isDoc(file)) return; n = n === 1 || n === 2 ? n : !D.pdf ? 1 : !D.pdf2 ? 2 : 0;
+  if (!n) { const a = annN(D.pdf2); if (!await askOk(`Este paper ya tiene dos documentos. ¿Sustituir el segundo, «${D.pdf2.name}»?${a ? ` Tiene ${a} ${a === 1 ? 'anotación' : 'anotaciones'}.` : ''}`, {ok: 'Sustituir', danger: !!a})) return; n = 2; }
+  if (n === 2 && !D.pdf) n = 1;
+  const key = pdfKey(D.id, n), o = D[pdfF(n)]; PDF_FILES.set(key, file); if (h) PEND_PDF.set(key, h); else { PEND_PDF.delete(key); pdfKeep(key, file); }
+  D[pdfF(n)] = o && o.name === file.name ? {...o} : {name: file.name.slice(0, 260), ...(o?.vis ? {vis: o.vis} : {})}; drawD();
+  toast(`${docKind(file.name)} enlazado: se guarda al guardar la ficha.`, [], 3000); docOffer(file);
+}
+document.addEventListener('paste', e => {   // Ctrl+V con un PDF o EPUB copiado, con la ficha abierta
+  if (!$('#dlg')?.open || !D || TAB.passive) return; const f = [...(e.clipboardData?.files || [])].find(isDoc); if (!f) return;
+  e.preventDefault(); docDraft(f, null, 0);
+});
 
 /* ===== Mover o copiar papers a otro proyecto =====
    Los papers seleccionados (con sus notas, etiquetas, secciones y las relaciones entre ellos) pasan a la copia de trabajo del otro

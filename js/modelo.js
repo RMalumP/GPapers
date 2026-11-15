@@ -144,6 +144,12 @@ function annClean(l) {   // el mismo orden de campos siempre: normalizar dos vec
   }
   return out;
 }
+/* EPUB (v39.42): van en los mismos huecos que los PDF («pdf» y «pdf2», la bandeja); el formato lo dice la extensión del nombre */
+const isEpub = n => /\.epub$/i.test(String(n || ''));
+const isDoc = f => !!f && (/\.(pdf|epub)$/i.test(f.name || '') || f.type === 'application/pdf' || f.type === 'application/epub+zip');   // un archivo que se puede enlazar (PDF o EPUB)
+const docMime = n => isEpub(n) ? 'application/epub+zip' : 'application/pdf';
+const docKind = n => isEpub(n) ? 'EPUB' : 'PDF';
+const annPg = (a, ep) => (ep ? 'cap. ' : 'p. ') + (a.p + 1);   // dónde está una anotación: página del PDF o capítulo del EPUB
 /* Marcadores rápidos del visor (v39.40): «bm», las páginas marcadas (desde 0), ordenadas y sin repetir */
 const bmClean = l => Array.isArray(l) ? [...new Set(l.filter(x => Number.isInteger(x) && x >= 0 && x <= 99999))].sort((a, b) => a - b).slice(0, 500) : [];
 const PDF_VIS = new Set(['si', 'no']);   // por PDF: también en el Drive normal (si), solo en la carpeta oculta (no); sin el campo, lo de Configuración

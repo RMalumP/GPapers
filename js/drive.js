@@ -135,9 +135,9 @@ function syPatch(a, p, f) {   // aplica un parche sin tocar a
    preguntar; cualquier dispositivo con la sesión iniciada puede abrir el PDF desde Drive. Los de PDF que ya no están enlazados se borran pasado un día. */
 async function syUploadFile(tok, id, name, file) {   // siempre reanudable: el archivo va tal cual, sin pasarlo a texto
   const F = '&fields=id,md5Checksum,modifiedTime,size', r = await syDrive(tok, `/upload/drive/v3/files${id ? '/' + id : ''}?uploadType=resumable${F}`, {method: id ? 'PATCH' : 'POST',
-    headers: {'Content-Type': 'application/json; charset=UTF-8', 'X-Upload-Content-Type': 'application/pdf'}, body: JSON.stringify(id ? {} : {name, parents: ['appDataFolder']})});
+    headers: {'Content-Type': 'application/json; charset=UTF-8', 'X-Upload-Content-Type': docMime(file.name)}, body: JSON.stringify(id ? {} : {name, parents: ['appDataFolder']})});
   const loc = r.headers.get('Location'); if (!loc) throw Error('reanudable');
-  const u = await fetch(loc, {method: 'PUT', headers: {'Content-Type': 'application/pdf'}, body: file, cache: 'no-store'});
+  const u = await fetch(loc, {method: 'PUT', headers: {'Content-Type': docMime(file.name)}, body: file, cache: 'no-store'});
   if (!u.ok) { const e = Error('drive ' + u.status); e.estado = u.status; throw e; }
   return u.json();
 }
@@ -168,7 +168,7 @@ const pdfSlots = (m, trash) => [...(trash ? syPapersOf(m) : m.papers || []).flat
 async function pdfFromDrive(id, name, quiet) {   // id: clave del hueco (pdfKey). El PDF subido por otro dispositivo (solo con acceso vigente: no se abre ninguna ventana de Google)
   const tok = syOn() && syTokGet(); if (!tok) return null;
   try { const nm = syNames(PJ.cur).pdf + id, f = (await syLs(tok, `name = '${nm}'`)).find(x => x.name === nm); if (!f) return null; if (!quiet) toast('Descargando el PDF de tu Google Drive…', [], 3000);
-    return new File([await (await syDrive(tok, `/drive/v3/files/${f.id}?alt=media`)).blob()], name, {type: 'application/pdf'}); } catch (e) { return null; }
+    return new File([await (await syDrive(tok, `/drive/v3/files/${f.id}?alt=media`)).blob()], name, {type: docMime(name)}); } catch (e) { return null; }
 }
 function setPdfDrive(on) { setCfg('pdfDrive', on); if (on && syAuto()) sySoon(500); }
 /* ---- Imágenes incrustadas aparte: en la biblioteca de Drive solo queda su huella ---- */
