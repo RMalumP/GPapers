@@ -107,22 +107,31 @@ async function vwOpen(src, file) {
   if (!VW.pushed && !VW_TAB) { try { history.pushState({vw: 1}, ''); VW.pushed = true; } catch (e) {} }   // el botón «atrás» del móvil cierra el visor
   try {
     const L = await vwLib(); if (gen !== VW.gen) return;
-    const task = L.getDocument({data: new Uint8Array(await file.arrayBuffer()), cMapUrl: vwUrl('cmaps/'), cMapPacked: true, standardFontDataUrl: vwUrl('standard_fonts/'), isEvalSupported: false, enableXfa: false});
-    task.onPassword = (cb, why) => vwAskPass(why === 2).then(p => p == null ? task.destroy() : cb(p));
-    const doc = await task.promise; if (gen !== VW.gen) { doc.destroy(); return; }
-    VW.doc = doc; const p1 = await doc.getPage(1), v1 = p1.getViewport({scale: 1});
-    VW.pages = Array.from({length: doc.numPages}, (_, i) => ({i, w: v1.width, h: v1.height, vp1: i ? null : v1, proxy: i ? null : p1, el: null, cv: null, rs: 0, tl: null, sized: !i}));
+    const kept = vwKeepTake(src, file);   // reabrir el mismo PDF poco después de cerrarlo: ya está leído
+    const doc = kept ? kept.doc : await vwLoadDoc(L, file); if (gen !== VW.gen) { if (!kept) doc.destroy(); else vwKeepPut(kept); return; }
+    if (kept) VW.find.txt = kept.txt;
+    VW.doc = doc; const p1 = await doc.getPage(1), v1 = p1.getViewport({scale: 1}), szc = vwSzGet(src, file, doc.numPages);
+    VW.pages = Array.from({length: doc.numPages}, (_, i) => { const c = szc?.[i]; return {i, w: c ? c[0] : v1.width, h: c ? c[1] : v1.height, vp1: i ? null : v1, proxy: i ? null : p1, el: null, cv: null, rs: 0, tl: null, sized: !i}; });
+    VW.szOk = !!szc;
     $('#vwLoad').hidden = true; $('#vwPn').textContent = '/ ' + doc.numPages; $('#vwPg').max = doc.numPages;
     $('#vwPages').innerHTML = VW.pages.map(p => `<div class="vwp" data-i="${p.i}"><div class="vwa"></div></div>`).join('');
     VW.pages.forEach(p => { p.el = $('#vwPages').children[p.i]; vwSize(p); });
     VW.cur = 0; vwFlipShow(); VW.fit = true; vwFitW(true);
     const pf = vwHolders()[0], start = Math.min(doc.numPages, Math.max(1, pdfPage(pf?.page) || 1)) - 1; VW.startPage = start;
-    if (start) vwGo(start, true); vwObserve(); vwDrawAnn(); vwBmDraw(); vwOnScroll();
-    vwSizes(gen); vwForeign(gen); if (VW.crop) vwCropCalc(gen);
+    if (start) vwGo(start, true); vwPosRestore(start); vwObserve(); vwDrawAnn(); vwBmDraw(); vwOnScroll();
+    if (start) toast(`Sigues en la página ${start + 1}, donde lo dejaste.`, [{t: '⏮ Ir al principio', fn: () => vwGo(0)}], 3500);
+    if (!VW.szOk) vwSizes(gen); vwForeign(gen); if (VW.crop) vwCropCalc(gen);
   } catch (e) {
     if (gen !== VW.gen) return; console.error(e);
     $('#vwLoad').innerHTML = `${e.name === 'PasswordException' ? 'El PDF está protegido con contraseña.' : 'No se pudo abrir el PDF' + (e.message ? ': ' + esc(e.message) : '.')} <button data-onclick="vwNative()">Abrir con el visor del navegador</button>`;
   }
+}
+function vwLoadDoc(L, file) {
+  return file.arrayBuffer().then(buf => {
+    const task = L.getDocument({data: new Uint8Array(buf), cMapUrl: vwUrl('cmaps/'), cMapPacked: true, standardFontDataUrl: vwUrl('standard_fonts/'), isEvalSupported: false, enableXfa: false});
+    task.onPassword = (cb, why) => vwAskPass(why === 2).then(p => p == null ? task.destroy() : cb(p));
+    return task.promise;
+  });
 }
 function vwAskPass(wrong) {   // contraseña de un PDF protegido
   return new Promise(res => {
@@ -136,21 +145,64 @@ function vwAskPass(wrong) {   // contraseña de un PDF protegido
 }
 async function vwClose(fromPop, keepHist) {
   if (!VW.open) return; vwAutoStop(); if (VW.fs) vwFs(false); vwSaveComment(); vwNotesClose(true);
-  const src = VW.src, page = VW.cur + 1, pf = vwHolders()[0];
+  const src = VW.src; vwPageSave(true);
   VW.open = false; VW.gen++; VW.io?.disconnect(); VW.queue.clear();
   for (const p of VW.pages) { try { p.task?.cancel(); } catch (e) {} p.proxy?.cleanup(); }
-  try { VW.doc?.destroy(); } catch (e) {}
+  if (VW.doc && src && VW.file) vwKeepPut({key: vwSrcKey(src), size: VW.file.size, doc: VW.doc, txt: VW.find.txt}); else try { VW.doc?.destroy(); } catch (e) {}
   VW.doc = null; VW.pages = []; VW.file = null; $('#vwPages').innerHTML = ''; vwPopClose(); $('#vwSel').hidden = true;
   if (!keepHist) { const d = $('#vw'); if (d.open) d.close(); }
   if (VW.pushed && !fromPop && !keepHist) { VW.pushed = false; history.back(); }
-  if (pf && src && (pdfPage(pf.page) || 1) !== page && (page > 1 || pf.page)) {   // la página donde ibas, para volver a ella
-    const hs = vwHoldersOf(src); hs.forEach(h => page > 1 ? h.page = page : delete h.page); if (hs.length) markDirty();
-  }
   if (RENDER_VW) { RENDER_VW = false; render(); } else if (src?.kind === 'paper' && db.papers.some(p => p.id === src.id)) renderPaper(src.id);
   if (src?.kind === 'inbox') inboxDraw();
   if ($('#dlg').open && D && src?.kind === 'paper' && D.id === src.id) drawD();
   if (VW_TAB) return vwSatClose();
   if (syAuto()) sySoon(1500);
+}
+/* ---- Recordar dónde ibas: la página va con el PDF del paper (campo «page», se sincroniza); la posición exacta dentro de la página, en este dispositivo.
+   Se guarda al cerrar el visor y también al salir de la aplicación o cambiar de app con el visor abierto (v39.41): antes solo al cerrarlo. */
+const VW_POS_K = 'gp-vw-pos';
+function vwPageSave(closing) {
+  if (!VW.open || !VW.src || !VW.pages.length) return; const page = VW.cur + 1, pf = vwHolders()[0];
+  try { const a = vwAnchor(), o = JSON.parse(localStorage.getItem(VW_POS_K) || '{}'), k = vwSrcKey(VW.src); delete o[k];
+    if (a && !VW.flip) o[k] = [a.i, Math.round(Math.max(0, Math.min(1, a.f)) * 1000) / 1000]; const ks = Object.keys(o); for (const x of ks.slice(0, Math.max(0, ks.length - 60))) delete o[x];
+    localStorage.setItem(VW_POS_K, JSON.stringify(o)); } catch (e) {}
+  if (pf && (pdfPage(pf.page) || 1) !== page && (page > 1 || pf.page)) {   // la página donde ibas, para volver a ella
+    const hs = vwHolders(); hs.forEach(h => page > 1 ? h.page = page : delete h.page); if (hs.length) { markDirty(); if (!closing) vwSatPush(); }
+  }
+}
+function vwPosRestore(start) {   // vuelve al mismo punto de la página (si la página guardada es la misma)
+  if (VW.flip) return; try { const r = JSON.parse(localStorage.getItem(VW_POS_K) || '{}')[vwSrcKey(VW.src)];
+    if (Array.isArray(r) && r[0] === start && r[1] > 0) { const p = VW.pages[start]; $('#vwScroll').scrollTop = p.el.offsetTop + r[1] * p.el.offsetHeight; } } catch (e) {}
+}
+document.addEventListener('visibilitychange', () => { if (document.hidden && VW.open) vwPageSave(); });   // antes que la copia de trabajo (app.js), que la guarda
+addEventListener('pagehide', () => { if (VW.open) vwPageSave(); });
+
+/* ---- Caché para papers largos (v39.41) ----
+   · Tamaños de las páginas, por PDF y en este dispositivo: al volver a abrirlo cada página sale ya con su tamaño (no hay que medirlas todas ni se mueve
+     lo que lees). Solo se guardan los cambios de tamaño (tramos), así que ocupa poco aunque el PDF tenga cientos de páginas.
+   · El último PDF cerrado se queda leído un rato (3 min; 1 min en el móvil): si lo vuelves a abrir, sale al instante, con la búsqueda ya preparada. */
+const VW_SZ_K = 'gp-vw-sz';
+function vwSzGet(src, file, n) {
+  try { const r = JSON.parse(localStorage.getItem(VW_SZ_K) || '{}')[vwSrcKey(src)]; if (!r || r.n !== n || r.s !== file.size) return null;
+    const out = []; for (const [c, w, h] of r.t) for (let j = 0; j < c; j++) out.push([w, h]); return out.length === n ? out : null; } catch (e) { return null; }
+}
+function vwSzPut() {
+  if (!VW.src || !VW.file || !VW.pages.length) return; const t = [];
+  for (const p of VW.pages) { const w = Math.round(p.w * 100) / 100, h = Math.round(p.h * 100) / 100, l = t[t.length - 1]; if (l && l[1] === w && l[2] === h) l[0]++; else t.push([1, w, h]); }
+  try { const o = JSON.parse(localStorage.getItem(VW_SZ_K) || '{}'), k = vwSrcKey(VW.src); delete o[k]; if (t.length > 400) return;   // un PDF con tamaños muy variados no se guarda
+    o[k] = {n: VW.pages.length, s: VW.file.size, t}; const ks = Object.keys(o); for (const x of ks.slice(0, Math.max(0, ks.length - 40))) delete o[x];
+    localStorage.setItem(VW_SZ_K, JSON.stringify(o)); } catch (e) {}
+}
+const VW_KEEP = {k: null, t: 0};
+function vwKeepPut(k) {
+  vwKeepDrop(); try { k.doc.cleanup(); } catch (e) {}   // libera lo pintado; el PDF sigue leído
+  VW_KEEP.k = k; VW_KEEP.t = setTimeout(vwKeepDrop, vwMaxPx() < 6e6 ? 60e3 : 180e3);
+}
+function vwKeepDrop() { clearTimeout(VW_KEEP.t); const k = VW_KEEP.k; VW_KEEP.k = null; try { k?.doc.destroy(); } catch (e) {} }
+function vwKeepTake(src, file) {
+  const k = VW_KEEP.k; if (!k) return null;
+  if (k.key !== vwSrcKey(src) || k.size !== file.size) { vwKeepDrop(); return null; }   // otro PDF: el guardado ya no sirve
+  clearTimeout(VW_KEEP.t); VW_KEEP.k = null; return k;
 }
 function vwHoldersOf(src) { const s = VW.src; VW.src = src; try { return vwHolders(); } finally { VW.src = s; } }
 let RENDER_VW = false;   // la lista no se repinta debajo del visor: se hace al cerrarlo
@@ -173,6 +225,8 @@ async function vwOther(ann) {   // abrir en otra app: el menú «Compartir» del
   pdfNative(f, VW.cur + 1);
 }
 function vwEsc() {
+  if (vwConcTap()) return;   // modo concentración: Esc saca las barras
+  const m = $('#vwMenu'); if (m && !m.hidden) { m.hidden = true; return $('#vwMoreB').focus(); }   // un menú abierto: Esc lo cierra (no el visor)
   if (!$('#vwCol').hidden) return vwColClose();
   if (VW.fs) return vwFs(false);
   if (vwDocked()) return vwNotesClose();
@@ -202,6 +256,28 @@ function vwKey(e) {
   else if (k === 'Delete' && VW.pop) { e.preventDefault(); vwPopDel(); }
   else if (k === 'b' || k === 'B') { e.preventDefault(); vwBmToggle(); }   // marcador en esta página
   else if (k === ']' || k === '[') { e.preventDefault(); vwBmStep(k === ']' ? 1 : -1); }
+  else if ((k === 'ArrowUp' || k === 'ArrowDown') && VW.auto) { e.preventDefault(); vwAutoSpeed(k === 'ArrowUp' ? 1 : -1); }   // desplazamiento automático: ↑ ↓ cambian la velocidad
+  else { const f = VW_KEYS[k.length === 1 ? k.toLowerCase() : k]; if (f) { e.preventDefault(); f[1](); } }
+}
+/* Más atajos del visor (v39.41). ? (o ⋯ → ⌨ Atajos de teclado) muestra todos. */
+const VW_KEYS = {
+  s: ['Herramienta Seleccionar', () => vwMode('sel')], h: ['Herramienta Subrayar', () => vwMode('hl')], r: ['Herramienta Zona (recuadro)', () => vwMode('area')], n: ['Herramienta Nota', () => vwMode('note')],
+  1: ['Color 1 (amarillo)', () => vwColor(0)], 2: ['Color 2', () => vwColor(1)], 3: ['Color 3', () => vwColor(2)], 4: ['Color 4', () => vwColor(3)], 5: ['Color 5', () => vwColor(4)],
+  '+': ['Acercar', () => vwZoomBy(1.2)], '-': ['Alejar', () => vwZoomBy(1 / 1.2)], w: ['Ajustar al ancho', () => vwFitW()],
+  g: ['Ir a la página… (escribe el número)', () => { const i = $('#vwPg'); i.focus(); i.select(); }],
+  i: ['Índice y miniaturas', () => vwPanel('toc')], l: ['Lista de anotaciones', () => vwPanel('ann')], e: ['Notas del paper', () => { if (!vw$('.vwnb').hidden) vwNotes(); }],
+  f: ['Pantalla completa (entrar o salir)', () => vwFs(!VW.fs)], d: ['Doble página (sí o no)', () => vwRdSet('two', !VW.two)], p: ['Página a página (sí o no)', () => vwRdSet('flip', !VW.flip)],
+  a: ['Desplazamiento automático (empezar o parar)', () => VW.auto ? vwAutoStop() : vwAutoStart()], c: ['Modo concentración (sí o no)', () => vwConcSet(!vwConcOn())],
+  '?': ['Esta lista de atajos', () => vwKeysHelp()]
+};
+function vwKeysHelp() {
+  if (!VW.menuR) VW.menuR = $('#vwMoreB').getBoundingClientRect();
+  const kb = s => s.split(' ').map(x => `<kbd>${esc(x)}</kbd>`).join(' '), row = (k, t) => `<tr><td>${kb(k)}</td><td>${esc(t)}</td></tr>`;
+  const fixed = [['Ctrl+F', 'Buscar en el PDF'], ['Ctrl++ Ctrl+−', 'Zoom'], ['Ctrl+0', 'Ajustar al ancho'], ['Ctrl+Z', 'Deshacer'], ['← →', 'Página (o par) anterior y siguiente'], ['RePág AvPág', 'Pantalla anterior y siguiente'], ['Inicio Fin', 'Primera y última página'],
+    ['Espacio', 'Bajar una pantalla (con el automático: pausa)'], ['↑ ↓', 'Con el automático: más deprisa o más despacio'], ['B', 'Marcar o quitar el marcador'], ['[ ]', 'Marcador anterior y siguiente'], ['Supr', 'Borrar la anotación abierta'], ['Esc', 'Cerrar (o salir de pantalla completa)']];
+  vwMenu(VW.menuR, `<button data-keep data-onclick="vwMoreBack()">‹ Volver</button><hr><div class="ctxh">⌨ Atajos de teclado del visor</div>
+    <table class="vwkeys">${fixed.map(([k, t]) => row(k, t)).join('')}${Object.entries(VW_KEYS).map(([k, [t]]) => row(k.toUpperCase(), t)).join('')}</table>
+    <div class="vwhint">Las letras funcionan fuera de los campos de texto. El tamaño del texto de la interfaz se cambia en Configuración → Apariencia (y con ${esc(db.settings.shortcuts.uiBig || '—')} / ${esc(db.settings.shortcuts.uiSmall || '—')}).</div>`);
 }
 
 /* ---- Páginas: tamaño, zoom y pintado de las que se ven ----
@@ -216,6 +292,7 @@ async function vwSizes(gen) {   // el tamaño real de cada página (casi siempre
     if (Math.abs(v.width - p.w) > .5 || Math.abs(v.height - p.h) > .5) { const a = vwAnchor(); p.w = v.width; p.h = v.height; vwSize(p); vwAnchorSet(a); if (VW.fit) vwFitW(true); }
     if (p.i % 20 === 19) await new Promise(r => setTimeout(r, 0));
   }
+  if (gen === VW.gen) vwSzPut();   // la próxima vez, sin medir
 }
 const vwAnchor = () => { const p = VW.pages[VW.cur], sc = $('#vwScroll'); return p && {i: p.i, f: (sc.scrollTop - p.el.offsetTop) / Math.max(1, p.el.offsetHeight)}; };
 const vwAnchorSet = a => { if (!a) return; const p = VW.pages[a.i]; $('#vwScroll').scrollTop = p.el.offsetTop + a.f * p.el.offsetHeight; };
@@ -280,7 +357,7 @@ function vwFree() {   // libera los lienzos lejanos (memoria del móvil): se vue
   const keep = vwMaxPx() < 6e6 ? 6 : 14, on = VW.pages.filter(p => p.cv);
   if (on.length <= keep) return;
   on.sort((a, b) => Math.abs(b.i - VW.cur) - Math.abs(a.i - VW.cur));
-  for (const p of on.slice(0, on.length - keep)) { if (p.vis) continue; p.cv.width = p.cv.height = 0; p.cv.remove(); p.cv = null; p.rs = 0; if (p.det) { p.det.width = p.det.height = 0; p.det.remove(); p.det = null; } if (Math.abs(p.i - VW.cur) > 30 && p.tl) { p.tl.cancel?.(); p.el.querySelector('.textLayer')?.remove(); p.tl = null; } }
+  for (const p of on.slice(0, on.length - keep)) { if (p.vis) continue; p.cv.width = p.cv.height = 0; p.cv.remove(); p.cv = null; p.rs = 0; if (p.det) { p.det.width = p.det.height = 0; p.det.remove(); p.det = null; } if (Math.abs(p.i - VW.cur) > 30 && p.tl) { p.tl.cancel?.(); p.el.querySelector('.textLayer')?.remove(); p.tl = null; } if (Math.abs(p.i - VW.cur) > 8) p.proxy?.cleanup(); }   // lejos: PDF.js suelta también lo que tenía preparado de la página (papers largos)
 }
 function vwOnScroll() {
   vwDetailSoon();
@@ -478,7 +555,7 @@ function vwMove(e) {
 }
 function vwUp(e) {
   clearTimeout(VW.lpT);
-  const pn = VW.pan; if (pn && pn.id === e.pointerId) { VW.pan = null; const hp = !!VW.pop; if (e.type !== 'pointercancel' && Math.hypot(e.clientX - pn.x, e.clientY - pn.y) < 8 && !vwTapAt(e.clientX, e.clientY) && !vwReadTap(e.clientX, hp)) vwEmptyTap(e.clientX, e.clientY); return; }
+  const pn = VW.pan; if (pn && pn.id === e.pointerId) { VW.pan = null; const hp = !!VW.pop; if (e.type !== 'pointercancel' && Math.hypot(e.clientX - pn.x, e.clientY - pn.y) < 8 && !vwConcTap() && !vwTapAt(e.clientX, e.clientY) && !vwReadTap(e.clientX, hp)) vwEmptyTap(e.clientX, e.clientY); return; }
   const g = VW.drag; if (e.type === 'pointercancel') { VW.drag = null; VW.tap = null; $('#vwBox')?.remove(); return; }
   if (g && g.id === e.pointerId) {
     VW.drag = null; $('#vwBox')?.remove();
@@ -492,6 +569,7 @@ function vwUp(e) {
   }
   const tp = VW.tap; VW.tap = null;
   if (tp && Math.hypot(e.clientX - tp.x, e.clientY - tp.y) < 8) {
+    if (vwConcTap()) return;
     const n = e.target.closest?.('.vwnote'); if (n) return vwPopOpen(n.dataset.a);
     if (VW.mode === 'note') { const p = vwPageAt(e.clientX, e.clientY); if (!p) return; const [x, y] = vwToPdf(p, e.clientX, e.clientY), id = uid(), now = vwNow();
       vwAdd({id, k: 'note', p: p.i, q: [x, y, x, y], c: VW_COLORS[VW.color][0], at: now, up: now}); return vwPopOpen(id, true); }
@@ -733,7 +811,7 @@ function vwFindMark(p) {
 function vwMore(e) {
   e.stopPropagation(); const r = VW.menuR = e.currentTarget.getBoundingClientRect(), paper = vwPaper(), P = paper && db.papers.find(p => p.id === paper.id), pf = vwHolders()[0];
   const vis = pf ? pdfVisOf(pf) : false;
-  vwMenu(r, `<button data-keep data-onclick="vwReadMenu()">📖 Modo de lectura <small class="vwsub">${esc(vwRdSum())} ›</small></button><button data-keep data-onclick="vwBmMenu()">🔖 Marcadores <small class="vwsub">${vwBms().length || 'ninguno'} ›</small></button><hr><button data-onclick="vwOut()">⬇ Descargar el PDF con las anotaciones</button>${vwAnns().length ? '<button data-onclick="vwMd()">⬇ Resumen de subrayados y comentarios (.md)</button>' : ''}
+  vwMenu(r, `<button data-keep data-onclick="vwReadMenu()">📖 Modo de lectura <small class="vwsub">${esc(vwRdSum())} ›</small></button><button data-keep data-onclick="vwBmMenu()">🔖 Marcadores <small class="vwsub">${vwBms().length || 'ninguno'} ›</small></button>${vwMv() ? '' : '<button data-keep data-onclick="vwKeysHelp()">⌨ Atajos de teclado <small class="vwsub">? ›</small></button>'}<hr><button data-onclick="vwOut()">⬇ Descargar el PDF con las anotaciones</button>${vwAnns().length ? '<button data-onclick="vwMd()">⬇ Resumen de subrayados y comentarios (.md)</button>' : ''}
     ${vwCanShare() ? `<button data-onclick="vwOther(false)">📲 Abrir en otra app…</button>${vwAnns().length ? '<button data-onclick="vwOther(true)">📲 Abrir en otra app, con las anotaciones…</button>' : ''}` : ''}
     <button data-onclick="vwNative()">↗ Abrir con el visor del navegador</button>${vwAnns().length && !vwCanShare() ? '<button data-onclick="vwOther(true)">↗ Abrir con el visor del navegador, con las anotaciones</button>' : ''}
     ${P && !$('#dlg').open ? '<button data-onclick="vwFicha()">📝 Ficha del paper</button>' : ''}${VW.src?.kind === 'inbox' ? '<button data-onclick="vwCite()">＋ Crear la cita de este PDF</button>' : ''}
@@ -1059,11 +1137,19 @@ function vwReadMenu() {
     <hr><div class="ctxh">Pasar de página</div>
     <button data-onclick="vwRdSet('flip',0)">${tick(!VW.flip)}↕ Desplazando (todo seguido)</button>
     <button data-onclick="vwRdSet('flip',1)">${tick(VW.flip)}👆 Página a página, con toques a los lados</button>
-    <hr><button data-onclick="${VW.auto ? 'vwAutoStop()' : 'vwAutoStart()'}">${tick(VW.auto)}⏬ Desplazamiento automático</button>
+    <hr><button data-keep data-onclick="vwAutoMenu()">⏬ Desplazamiento automático <small class="vwsub">${VW.auto ? (VW.autoPaused ? 'en pausa' : 'en marcha') : 'parado'}${vwConcOn() ? ' · concentración' : ''} ›</small></button>
     <hr><button data-onclick="vwRdSet('crop',${VW.crop ? 0 : 1})" title="Quita los márgenes en blanco de las páginas para que el texto se vea más grande">${tick(VW.crop)}✂ Recortar los márgenes (automático)</button>
     <hr><div class="ctxh">Gestos de zoom</div>
     <button data-onclick="vwRdSet('zPinch',${VW.zPinch ? 0 : 1})">${tick(VW.zPinch)}🤏 Pellizcar con dos dedos</button>
     <button data-onclick="vwRdSet('zDbl',${VW.zDbl ? 0 : 1})" title="En pantalla completa el doble toque sigue sacando los colores">${tick(VW.zDbl)}👆 Doble toque: acercar y volver a ajustar</button>`);
+}
+function vwAutoMenu() {   // submenú del desplazamiento automático (v39.41): empezar o parar, velocidad y modo concentración
+  vwMenu(VW.menuR, `<button data-keep data-onclick="vwReadMenu()">‹ Volver</button><hr>
+    <button data-onclick="${VW.auto ? 'vwAutoStop()' : 'vwAutoStart()'}">${VW.auto ? '⏹ Parar el desplazamiento automático' : '▶ Empezar el desplazamiento automático'}</button>
+    <div class="ctxh">Velocidad: ${VW.auto ? VW.autoLv : vwAutoLv()} de 20</div>
+    <button data-keep data-onclick="vwAutoSpeed(-1);vwAutoMenu()">🐢 Más despacio</button><button data-keep data-onclick="vwAutoSpeed(1);vwAutoMenu()">🐇 Más deprisa</button>
+    <hr><button data-onclick="vwConcSet(${vwConcOn() ? 0 : 1})" title="Mientras la página baja sola, oculta las barras y los menús; un toque en la página los vuelve a sacar (y pausa)">${tick(vwConcOn())}🧘 Modo concentración</button>
+    <div class="vwhint">Oculta las barras y los menús mientras baja. Un toque en la página (o Esc) los saca y pausa; otro toque en el centro sigue y los vuelve a ocultar. Tecla C.</div>`);
 }
 function vwMoreBack() { vwMore({stopPropagation() {}, currentTarget: {getBoundingClientRect: () => VW.menuR}}); }
 
@@ -1078,12 +1164,29 @@ function vwAutoBar() {
     <input id="vwAutoR" type="range" min="1" max="20" step="1" aria-label="Velocidad" data-oninput="vwAutoSet(this.value)">
     <button class="vwib" data-onclick="vwAutoSpeed(1)" title="Más deprisa (toque a la derecha de la página)" aria-label="Más deprisa">🐇</button>
     <span id="vwAutoV"></span>
+    <button class="vwib vwcb" data-onclick="vwConcSet(!vwConcOn())" title="Modo concentración: oculta las barras mientras baja; un toque las saca (C)" aria-label="Modo concentración">🧘</button>
     <button class="vwib" data-onclick="vwAutoStop()" title="Parar el desplazamiento automático" aria-label="Parar">✕</button></div>`);
   return $('#vwAuto');
 }
+/* Modo concentración (v39.41, submenú del desplazamiento automático): mientras baja sola, sin barras, menús ni ventanitas (ni el puntero del ratón).
+   Un toque en cualquier sitio de la página, Esc o la barra espaciadora pausan y las sacan; seguir (toque en el centro) las vuelve a ocultar.
+   Se recuerda en este dispositivo (gp-vw-conc). */
+const VW_CONC_K = 'gp-vw-conc';
+function vwConcOn() { try { return localStorage.getItem(VW_CONC_K) === '1'; } catch (e) { return false; } }
+function vwConcSet(on) {
+  try { localStorage.setItem(VW_CONC_K, on ? '1' : '0'); } catch (e) {}
+  if (on && !VW.auto) vwAutoStart(); else if (VW.auto) vwAutoShow(); else vwConcShow();
+  if (on) toast('Modo concentración: toca la página para sacar las barras.', [], 2600);
+}
+const vwConcHidden = () => !!(VW.open && VW.auto && !VW.autoPaused && vwConcOn());
+function vwConcShow() {
+  const d = $('#vw'); if (!d) return; const h = vwConcHidden(), was = d.classList.contains('conc'); d.classList.toggle('conc', h);
+  if (h && !was) { const m = $('#vwMenu'); if (m) m.hidden = true; vwPopClose(); vwColClose(); $('#vwSel').hidden = true; $('#vwPgTip').hidden = true; }
+}
+function vwConcTap() { if (!vwConcHidden()) return false; vwAutoPause(true); return true; }   // con las barras ocultas, un toque solo las saca
 function vwAutoShow() {
-  const b = vwAutoBar(); b.hidden = !VW.auto; if (!VW.auto) return;
-  $('#vwAutoR').value = VW.autoLv; $('#vwAutoV').textContent = VW.autoLv; b.classList.toggle('paused', !!VW.autoPaused);
+  vwConcShow(); const b = vwAutoBar(); b.hidden = !VW.auto; if (!VW.auto) return;
+  b.querySelector('.vwcb').classList.toggle('on', vwConcOn()); $('#vwAutoR').value = VW.autoLv; $('#vwAutoV').textContent = VW.autoLv; b.classList.toggle('paused', !!VW.autoPaused);
   const p = b.querySelector('.vwap'); p.textContent = VW.autoPaused ? '▶' : '⏸'; p.title = (VW.autoPaused ? 'Seguir' : 'Pausa') + ' (barra espaciadora, o toque en el centro de la página)'; p.ariaLabel = VW.autoPaused ? 'Seguir' : 'Pausa';
 }
 function vwAutoStart() {
@@ -1099,7 +1202,7 @@ function vwAutoPause(on) {
   vwAutoShow();
 }
 function vwAutoSet(v) { VW.autoLv = Math.max(1, Math.min(20, Math.round(+v) || 7)); try { localStorage.setItem(VW_AUTO_K, VW.autoLv); } catch (e) {} vwAutoShow(); }
-function vwAutoSpeed(d) { vwAutoSet(VW.autoLv + d); toast(`Velocidad ${VW.autoLv} de 20`, [], 900); }
+function vwAutoSpeed(d) { vwAutoSet((VW.auto ? VW.autoLv : vwAutoLv()) + d); toast(`Velocidad ${VW.autoLv} de 20`, [], 900); }
 function vwAutoTick(t) {
   if (!VW.auto || !VW.open) return; VW.autoRaf = requestAnimationFrame(vwAutoTick);
   const dt = VW.autoT ? Math.min(.1, (t - VW.autoT) / 1000) : 0; VW.autoT = t;
