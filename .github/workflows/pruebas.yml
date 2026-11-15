@@ -21,7 +21,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        prueba: [f4, ui, sync, visor, visor_notas, visor_fases, proyectos, mejoras, interfaz, derecho, principal, importar, rendimiento, movil, motor, varias_secciones, tabla_seleccion, auditoria]
+        prueba: [f4, ui, sync, visor, visor_notas, visor_fases, visor_lectura, proyectos, mejoras, interfaz, derecho, principal, importar, rendimiento, movil, motor, varias_secciones, tabla_seleccion, auditoria]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
