@@ -31,7 +31,7 @@ with sync_playwright() as pw:
     if shots: pg.screenshot(path=os.path.join(shots, '1_datos_simplificado.png'))
     eq('Datos (artículo, APA): salen los campos que usa la cita', pg.evaluate(f"['title', 'year', 'venue', 'volume', 'issue', 'pages', 'url'].map({has})"), [True] * 7)
     eq('el título personalizado sale siempre por defecto', pg.evaluate(f"({has})('alias')"), True)
-    eq('y se ocultan los demás', pg.evaluate(f"[...['sortKey', 'accessed', 'issn', 'pubDate'].map({has}), !!$('#dlg .pdfrow'), !!$('#dlg .dsep')]"), [False] * 6)
+    eq('y se ocultan los demás (menos «Enlazar un PDF o EPUB…», que se ve siempre desde v39.42)', pg.evaluate(f"[...['sortKey', 'accessed', 'issn', 'pubDate'].map({has}), !!$('#dlg .pdfrow'), !!$('#dlg .dsep')]"), [False] * 4 + [True, False])
     pg.evaluate("db.settings.aliasInMore = true; drawD()")
     eq('con «aliasInMore» el título personalizado vacío pasa a «Mostrar todos los campos»', pg.evaluate(f"({has})('alias')"), False)
     pg.evaluate("D.alias = 'DL'; drawD()")

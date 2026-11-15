@@ -178,3 +178,55 @@ html.mv #vwAuto{bottom:10px}html.mv #vwAuto .vwib{min-width:40px;min-height:40px
 .vwkeys{border-collapse:collapse;margin:0 6px 4px;font-size:calc(13px * var(--fz,1))}.vwkeys td{padding:2px 6px;vertical-align:top}.vwkeys td:first-child{white-space:nowrap;text-align:right}
 .vwkeys kbd,.vwhint kbd{font:inherit;font-size:.92em;padding:0 5px;border:1px solid var(--bd);border-bottom-width:2px;border-radius:4px;background:var(--bg)}
 #vwMenu:has(.vwkeys){max-height:calc(100dvh - 70px);overflow-y:auto}
+
+/* ===== Lector de EPUB (v39.42, js/epub.js): la misma cabecera, barra y panel que el visor de PDF; el texto se adapta a la pantalla ===== */
+#ep{width:100vw;max-width:100vw;height:100dvh;max-height:100dvh;margin:0;padding:0;border:0;border-radius:0;overflow:hidden;display:none;flex-direction:column;background:var(--bg);
+  --ep-bg:#fff;--ep-fg:#1f2328;--ep-link:#2457c5;--ep-fs:19px;--ep-lh:1.6;--ep-w:38em;--ep-ff:Georgia,serif}
+#ep[open]{display:flex}#ep::backdrop{background:var(--bg)}
+#ep[data-th=sepia]{--ep-bg:#f5ecd9;--ep-fg:#4d3b29;--ep-link:#8a4b12}#ep[data-th=night]{--ep-bg:#16181d;--ep-fg:#d7d9de;--ep-link:#8ab4ff}
+#ep .vwib{border:0;background:none;padding:4px 8px;min-width:34px;min-height:34px;font-size:calc(17px * var(--fz,1));line-height:1;border-radius:8px}
+#ep .vwib:hover,#ep .vwm:hover{background:color-mix(in srgb,var(--fg) 8%,transparent)}
+#ep.find .vwf{display:flex}
+.epw{font-size:calc(13px * var(--fz,1));opacity:.75;white-space:nowrap;font-variant-numeric:tabular-nums}
+#ep .epaa{font-family:Georgia,serif;font-weight:700}
+#epScroll{flex:1;overflow:auto;position:relative;background:var(--ep-bg);color:var(--ep-fg);outline:none;overscroll-behavior:contain}
+#epDoc{max-width:var(--ep-w);margin:0 auto;padding:28px 22px 40vh;font-family:var(--ep-ff);font-size:var(--ep-fs);line-height:var(--ep-lh);overflow-wrap:break-word;color:var(--ep-fg)}
+#epDoc p{margin:0 0 .8em}#ep.epjust #epDoc p{text-align:justify;hyphens:auto;-webkit-hyphens:auto}
+#epDoc :is(h1,h2,h3,h4,h5,h6){line-height:1.25;margin:1.2em 0 .6em;break-after:avoid}#epDoc h1{font-size:1.6em}#epDoc h2{font-size:1.35em}#epDoc h3{font-size:1.15em}#epDoc :is(h4,h5,h6){font-size:1em}
+#epDoc img{max-width:100%;height:auto}#epDoc figure{margin:1em 0;text-align:center}#epDoc figcaption{font-size:.85em;opacity:.8}
+#epDoc blockquote{margin:1em 0 1em 1em;padding-left:.8em;border-left:3px solid color-mix(in srgb,var(--ep-fg) 25%,transparent)}
+#epDoc table{border-collapse:collapse;display:block;overflow-x:auto;max-width:100%;font-size:.88em;margin:1em 0}#epDoc :is(td,th){border:1px solid color-mix(in srgb,var(--ep-fg) 25%,transparent);padding:.2em .45em;vertical-align:top}
+#epDoc pre{white-space:pre-wrap;font-size:.85em}#epDoc a{color:var(--ep-link)}#epDoc hr{border:0;border-top:1px solid color-mix(in srgb,var(--ep-fg) 25%,transparent);margin:1.5em 0}
+#epDoc .epnr{text-decoration:none;font-size:.8em;vertical-align:super;line-height:0;padding:0 .15em}
+.epc{padding-bottom:1.5em;display:flow-root}.epc+.epc{border-top:1px dashed color-mix(in srgb,var(--ep-fg) 18%,transparent);padding-top:1.5em}
+#ep.eppaged #epScroll{overflow:hidden}
+#ep.eppaged #epDoc{max-width:none;padding:36px 0;box-sizing:border-box;column-fill:auto}
+#ep.eppaged .epc{break-before:column;padding:0}#ep.eppaged .epc+.epc{border-top:0}
+#ep.eppaged #epDoc img{max-height:var(--ep-ch);object-fit:contain}#ep.eppaged #epDoc :is(figure,tr,img){break-inside:avoid}
+mark.eph{background:color-mix(in srgb,var(--c) 45%,transparent);color:inherit;border-radius:2px;cursor:pointer;padding:0}#ep[data-th=night] mark.eph{background:color-mix(in srgb,var(--c) 36%,transparent)}
+mark.eph.cm{border-bottom:2px solid var(--c)}mark.eph.on{outline:2px solid var(--c);outline-offset:1px}
+mark.epfh{background:#ff9632;color:#000;border-radius:2px;padding:0}
+.epfoot{display:flex;align-items:center;gap:10px;padding:2px 12px;border-top:1px solid var(--bd);background:var(--card);min-height:30px}
+#epBar{flex:1;min-width:80px;accent-color:var(--pri)}#epPct{font-size:calc(12px * var(--fz,1));opacity:.7;max-width:45%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#epSide{width:320px;flex:none;border-left:1px solid var(--bd);background:var(--card);display:flex;flex-direction:column;min-height:0}#epSide[hidden]{display:none}
+#epSide .vwtl.on{background:color-mix(in srgb,var(--pri) 14%,transparent);font-weight:600}
+#epSel{display:flex;gap:6px;align-items:center;padding:6px 8px}#epSel[hidden]{display:none}
+#epPop[hidden]{display:none}.epnote{max-height:40vh;overflow:auto;font-size:calc(14px * var(--fz,1));line-height:1.45;margin:0 0 4px;white-space:pre-wrap}
+#epAuto{position:absolute;left:50%;bottom:14px;transform:translateX(-50%);display:flex;align-items:center;gap:2px;padding:4px 6px;border-radius:99px;max-width:calc(100% - 16px)}#epAuto[hidden]{display:none}
+#epAuto input[type=range]{width:min(180px,32vw);accent-color:var(--pri);margin:0 4px}#epAutoV{min-width:1.6em;text-align:center;font-size:calc(13px * var(--fz,1));opacity:.75}
+#epAuto .vwap{font-size:calc(18px * var(--fz,1));background:color-mix(in srgb,var(--pri) 16%,transparent);border-radius:99px}#epAuto.paused .vwap{background:var(--pri);color:#fff}#epAuto .vwcb.on{background:color-mix(in srgb,var(--pri) 22%,transparent)}
+#epFsX{display:none;top:8px;right:8px;opacity:.6}#ep.fs #epFsX{display:block}#ep.fs .vwh,#ep.fs .vwtb,#ep.fs .epfoot{display:none}
+#ep.conc .vwh,#ep.conc .vwtb,#ep.conc .epfoot,#ep.conc #epAuto,#ep.conc #epMenu,#ep.conc #epPop,#ep.conc #epSel,#ep.conc #epFsX{display:none!important}#ep.conc #epScroll{cursor:none}
+.epmrow{display:flex;gap:4px;padding:2px 6px 4px}.vwmenu .epmrow button{flex:1;text-align:center;border:1px solid var(--bd);padding:6px 4px}.vwmenu .epmrow button.on{background:color-mix(in srgb,var(--pri) 16%,transparent);border-color:color-mix(in srgb,var(--pri) 50%,transparent)}
+.vwmenu .epth .ep-light{background:#fff;color:#222}.vwmenu .epth .ep-sepia{background:#f5ecd9;color:#4d3b29}.vwmenu .epth .ep-night{background:#16181d;color:#d7d9de}.vwmenu .epth .ep-auto{background:linear-gradient(135deg,#fff 50%,#16181d 50%);color:#888}
+.vwmenu .epth button.on{outline:2px solid var(--pri);outline-offset:1px}
+@media(max-width:900px){#epSide{position:absolute;right:0;top:0;bottom:0;z-index:4;box-shadow:-4px 0 18px #0003;width:min(340px,92vw)}}
+html.mv #ep .vwh{padding:2px 4px;padding-top:max(2px,env(safe-area-inset-top));gap:2px;min-height:48px}
+html.mv #ep .vwib{min-width:44px;min-height:44px;font-size:calc(20px * var(--fz,1))}html.mv #ep.find .vwt,html.mv #ep.find .epw{display:none}html.mv #ep.find .vwf{flex:1}
+html.mv #epDoc h1{display:block}html.mv #ep .epfoot{order:2}html.mv #ep .vwtb{order:3}html.mv #epDoc{padding:20px 16px 40vh}
+html.mv #epSide{position:fixed;left:0;right:0;top:auto;bottom:0;width:auto;max-height:70dvh;border-radius:14px 14px 0 0;border-left:0;box-shadow:0 -6px 24px #0004;z-index:7;padding-bottom:env(safe-area-inset-bottom,0px)}
+html.mv #epSel{position:fixed;gap:8px}html.mv #epSel .vwc{width:32px;height:32px;min-width:32px;min-height:32px}html.mv #epAuto{bottom:10px}html.mv #epAuto .vwib{min-width:40px;min-height:40px}
+/* inserción de PDF y EPUB (v39.42): soltar un archivo sobre una tarjeta, una fila o la ficha */
+.card.fover,.rw.fover{outline:3px dashed var(--pri);outline-offset:2px;background:color-mix(in srgb,var(--pri) 8%,var(--card))}
+#dlg.fover .pdfrow,#dlg .pdfrow.fover{outline:2px dashed var(--pri);outline-offset:3px;border-radius:6px;background:color-mix(in srgb,var(--pri) 8%,transparent)}
+.pdfrow .pdfdz{opacity:.65}

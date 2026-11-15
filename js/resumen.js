@@ -4,7 +4,7 @@
 const SUM_KIND = a => a.k === 'note' ? 'Nota' : a.k === 'area' ? 'Zona' : 'Subrayado';
 function sumData() {
   const o = ex(), L = exList();
-  return L.map(p => ({p, cite: cite(p, o), pdfs: PDF_N.map(n => p[pdfF(n)]).filter(pf => pf && Array.isArray(pf.ann) && pf.ann.length).map(pf => ({name: pf.name || 'PDF', L: annSorted(pf.ann)}))}))
+  return L.map(p => ({p, cite: cite(p, o), pdfs: PDF_N.map(n => p[pdfF(n)]).filter(pf => pf && Array.isArray(pf.ann) && pf.ann.length).map(pf => ({name: pf.name || 'PDF', ep: isEpub(pf.name), L: annSorted(pf.ann)}))}))
     .filter(x => x.pdfs.length);
 }
 const sumOne = s => String(s || '').replace(/\s*\n\s*/g, ' ').trim();
@@ -36,7 +36,7 @@ function sumMd(D) {
     for (const f of x.pdfs) {
       if (x.pdfs.length > 1) out.push('', `### ${f.name}`);
       out.push('');
-      for (const a of f.L) out.push(`- **p. ${a.p + 1}** · ${SUM_KIND(a)}${a.t ? `: «${sumOne(a.t)}»` : ''}${a.m ? `\n  ${a.k === 'note' ? '' : '*Comentario:* '}${a.m.trim().replace(/\n/g, '\n  ')}` : ''}`);
+      for (const a of f.L) out.push(`- **${annPg(a, f.ep)}** · ${SUM_KIND(a)}${a.t ? `: «${sumOne(a.t)}»` : ''}${a.m ? `\n  ${a.k === 'note' ? '' : '*Comentario:* '}${a.m.trim().replace(/\n/g, '\n  ')}` : ''}`);
     }
   }
   return out.join('\n') + '\n';
@@ -50,7 +50,7 @@ function sumDocx(D) {
       if (x.pdfs.length > 1) body.push(P(R(f.name, '<w:b/><w:sz w:val="20"/>'), '<w:keepNext/><w:spacing w:before="80" w:after="40"/><w:ind w:left="360"/>'));
       for (const a of f.L) {
         const col = /^#[0-9a-f]{6}$/i.test(a.c) ? a.c.slice(1) : 'FFD400';
-        body.push(P(R('■ ', `<w:color w:val="${col}"/><w:sz w:val="20"/>`) + R(`p. ${a.p + 1}  `, '<w:b/><w:sz w:val="22"/>') + (a.t ? R(`«${sumOne(a.t)}»`, '<w:sz w:val="22"/>') : R(SUM_KIND(a), '<w:i/><w:sz w:val="22"/>')), '<w:spacing w:after="40"/><w:ind w:left="360"/>'));
+        body.push(P(R('■ ', `<w:color w:val="${col}"/><w:sz w:val="20"/>`) + R(`${annPg(a, f.ep)}  `, '<w:b/><w:sz w:val="22"/>') + (a.t ? R(`«${sumOne(a.t)}»`, '<w:sz w:val="22"/>') : R(SUM_KIND(a), '<w:i/><w:sz w:val="22"/>')), '<w:spacing w:after="40"/><w:ind w:left="360"/>'));
         if (a.m) a.m.trim().split('\n').forEach(l => body.push(P(R(l, '<w:i/><w:sz w:val="21"/>'), '<w:spacing w:after="40"/><w:ind w:left="720"/>')));
       }
     }
@@ -95,7 +95,7 @@ async function sumPdf(D) {   // PDF con pdf-lib y las letras estándar (Times): 
     for (const f of x.pdfs) {
       if (x.pdfs.length > 1) para([{t: f.name, f: 'b'}], {size: 10, left: 18, before: 4, after: 2});
       for (const a of f.L) {
-        para([{t: `p. ${a.p + 1}  `, f: 'b'}, a.t ? {t: `«${sumOne(a.t)}»`, f: 'r'} : {t: SUM_KIND(a), f: 'i'}], {size: 11, left: 36, after: a.m ? 1 : 4, mark: hex(a.c)});
+        para([{t: `${annPg(a, f.ep)}  `, f: 'b'}, a.t ? {t: `«${sumOne(a.t)}»`, f: 'r'} : {t: SUM_KIND(a), f: 'i'}], {size: 11, left: 36, after: a.m ? 1 : 4, mark: hex(a.c)});
         if (a.m) para([{t: sumOne(a.m), f: 'i'}], {size: 10.5, left: 54, after: 4});
       }
     }

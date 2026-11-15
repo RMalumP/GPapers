@@ -954,6 +954,7 @@ async function vwTabOpen(src, file) {   // desde la pestaña principal
   if (!window.open(url, '_blank')) toast('El navegador no dejó abrir la pestaña nueva.', [{t: 'Abrir pestaña', fn: () => window.open(url, '_blank')}, {t: 'Abrir aquí', fn: () => vwOpen(src, file)}], 0);
 }
 function vwOpenAny(src, file, ev, page) {   // 📄: pestaña nueva o dentro de la aplicación (Ctrl + clic: lo contrario de lo elegido)
+  if (isEpub(file?.name)) return epOpen(src, file);   // EPUB: su propio lector, siempre dentro de la aplicación (también desde file://)
   if (!vwCan()) return pdfNative(file, page);
   if (src.kind === 'paper') { const P = db.papers.find(p => p.id === src.id), pf = P && P[pdfF(src.n)], d = D && D.id === src.id && $('#dlg').open && D[pdfF(src.n)]; if (!pf || d && d.name !== pf.name) return vwOpen(src, file); }   // aún sin guardar en la ficha: aquí
   const alt = !!(ev && (ev.ctrlKey || ev.metaKey)), canTab = vwCan() && !VW_TAB && !document.documentElement.classList.contains('mv');

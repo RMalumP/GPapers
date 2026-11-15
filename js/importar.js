@@ -334,7 +334,7 @@ function fillGo() {
   if ($('#f_authors')?.checked && r.authorType === 'entidad' && D.authorType === 'auto') D.authorType = 'entidad';
   D.doi = r.doi; $('#imp').close(); drawD();
 }
-function openMenu(e) { ctxShow(e, `<div class="ctxh">Importar referencias</div><button data-onclick="openImport('file')">📄 Desde archivo (.bib, .ris, .txt o CSL-JSON)</button><button data-onclick="openImport('text')">📋 Pegar BibTeX, RIS o citas de Google Scholar</button><button data-onclick="openImport('doi')">🔎 Buscar por DOI, ISBN o título</button><button data-onclick="ctxClose();inboxPick()">🗃️ PDF sin cita (bandeja «PDF por citar»)</button>`); }
+function openMenu(e) { ctxShow(e, `<div class="ctxh">Importar referencias</div><button data-onclick="openImport('file')">📄 Desde archivo (.bib, .ris, .txt o CSL-JSON)</button><button data-onclick="openImport('text')">📋 Pegar BibTeX, RIS o citas de Google Scholar</button><button data-onclick="openImport('doi')">🔎 Buscar por DOI, ISBN o título</button><button data-onclick="ctxClose();inboxPick()">🗃️ PDF o EPUB sin cita (bandeja «PDF por citar»)</button>`); }
 /* ---- Compartir con GPapers (Android: «Compartir» desde el navegador o la app de la revista; ver share_target en manifest.json) ----
    Llega como index.html?title=…&text=…&url=…: se busca un DOI (o un ISBN) en lo compartido y, si no hay, el título de la página. */
 const DOI_RE = /\b10\.\d{4,9}\/[^\s"<>]+/;
@@ -351,16 +351,34 @@ function shareIn() {
 }
 /* ---- Soltar archivos en la ventana: .bib, .ris, .txt o CSL-JSON → Importar; un JSON de la aplicación → se abre como proyecto ---- */
 const fileDrag = e => [...(e.dataTransfer?.types || [])].includes('Files');
-document.addEventListener('dragover', e => { if (!fileDrag(e) || document.querySelector('dialog[open]')) return; e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; document.body.classList.add('fdrop'); });
-document.addEventListener('dragleave', e => { if (!e.relatedTarget || e.relatedTarget === document.documentElement) document.body.classList.remove('fdrop'); });
+/* PDF y EPUB (v39.42): soltados sobre una tarjeta o una fila de la tabla, se enlazan a ese paper; sobre la ficha abierta, a su borrador (en la fila del
+   PDF 1 o 2 sobre la que caigan, o en el primer hueco libre); en cualquier otro sitio, a la bandeja «PDF por citar». */
+const docDrag = e => [...(e.dataTransfer?.items || [])].some(i => i.kind === 'file' && /^application\/(pdf|epub\+zip)$/.test(i.type));
+const docMaybe = e => [...(e.dataTransfer?.items || [])].some(i => i.kind === 'file' && !i.type);   // sin tipo (algunos navegadores con los EPUB): puede serlo
+const FDROP = {over: null};
+const fdOver = el => { if (FDROP.over === el) return; FDROP.over?.classList.remove('fover'); FDROP.over = el; el?.classList.add('fover'); };
+const fdClear = () => { fdOver(null); document.body.classList.remove('fdrop', 'fdoc'); document.querySelectorAll('.fover').forEach(x => x.classList.remove('fover')); };
+const fdTarget = e => { const dlg = document.querySelector('dialog[open]'); if (dlg) return dlg.id === 'dlg' && D ? e.target.closest?.('#dlg .pdfrow') || $('#dlg') : undefined; return e.target.closest?.('#list .card[data-id], #list .rw[data-id]') || null; };
+document.addEventListener('dragover', e => {
+  if (!fileDrag(e)) return; const t = fdTarget(e); if (t === undefined) return;   // otra ventana abierta encima: nada
+  const doc = docDrag(e), may = doc || docMaybe(e), dlg = !!document.querySelector('dialog[open]'); if (t && !may && dlg) return;   // en la ficha solo se sueltan PDF o EPUB
+  e.preventDefault(); e.dataTransfer.dropEffect = may && t ? 'link' : 'copy';
+  document.body.classList.toggle('fdoc', doc && !dlg); document.body.classList.toggle('fdrop', !doc && !(may && t) && !dlg);
+  fdOver(may ? t : null);
+});
+document.addEventListener('dragleave', e => { if (!e.relatedTarget || e.relatedTarget === document.documentElement) fdClear(); });
+document.addEventListener('dragend', fdClear);
 document.addEventListener('drop', async e => {
-  document.body.classList.remove('fdrop');
-  if (!fileDrag(e) || document.querySelector('dialog[open]') || TAB.passive) return; e.preventDefault();
+  const t = fileDrag(e) ? fdTarget(e) : undefined; fdClear();
+  if (!fileDrag(e) || t === undefined || TAB.passive) return; e.preventDefault();
   const its = [...e.dataTransfer.items].filter(i => i.kind === 'file'), hps = its.map(i => FSA ? i.getAsFileSystemHandle?.() : null), it = its[0], hp = hps[0], f = e.dataTransfer.files[0]; if (!f) return;   // el enlace al archivo se pide antes de cualquier await
   const name = f.name, ext = (name.match(/\.(\w+)$/) || [, ''])[1].toLowerCase();
-  const pdfs = [...e.dataTransfer.files].map((file, i) => ({file, hp: hps[i]})).filter(x => /\.pdf$/i.test(x.file.name) || x.file.type === 'application/pdf');
-  if (pdfs.length) return inboxAdd(await Promise.all(pdfs.map(async x => { let h = null; try { h = await x.hp; if (h && h.kind !== 'file') h = null; } catch (err) {} return {file: x.file, h}; })));   // PDF soltados: a la bandeja «PDF por citar»
-  if (!['json', 'bib', 'ris', 'txt'].includes(ext)) return toast('Suelta un archivo .bib, .ris, .txt, CSL-JSON o un proyecto .json.', [], 5000);
+  const pdfs = [...e.dataTransfer.files].map((file, i) => ({file, hp: hps[i]})).filter(x => isDoc(x.file));
+  const hOf = async x => { let h = null; try { h = await x.hp; if (h && h.kind !== 'file') h = null; } catch (err) {} return h; };
+  if (t && t.id === 'dlg' || t?.classList?.contains('pdfrow')) { if (!pdfs.length) return toast('En la ficha se puede soltar un PDF o un EPUB, para enlazarlo.', [], 4000); return docDraft(pdfs[0].file, await hOf(pdfs[0]), +t.dataset.pdf || 0); }
+  if (t && pdfs.length) { if (pdfs.length > 1) toast('Se enlaza el primero; para varios, suéltalos fuera de los papers (van a la bandeja).', [], 4000); return docAttach(t.dataset.id, pdfs[0].file, await hOf(pdfs[0])); }
+  if (pdfs.length) return inboxAdd(await Promise.all(pdfs.map(async x => ({file: x.file, h: await hOf(x)}))));   // PDF o EPUB soltados fuera de los papers: a la bandeja «PDF por citar»
+  if (!['json', 'bib', 'ris', 'txt'].includes(ext)) return toast('Suelta un PDF o un EPUB (sobre un paper para enlazarlo), o un archivo .bib, .ris, .txt, CSL-JSON o un proyecto .json.', [], 5000);
   let text; try { text = await f.text(); } catch (err) { return say('No se pudo leer el archivo: ' + err.message); }
   if (ext === 'json' && !isCsl(text)) { let h = null; try { h = FSA ? await hp : null; if (h && h.kind !== 'file') h = null; } catch (err) {} return pjOpenFile(text, name, h); }
   impText(text);

@@ -448,6 +448,7 @@ function render() {
   CITED = null;
   if (RENDER_HOLD) { RENDER_HELD = true; return; }
   vwSatNotify();
+  epDbChanged();   // lector de EPUB abierto: sus subrayados y marcadores
   if (VW.open) return vwDbChanged();   // con el visor abierto, la lista se repinta al cerrarlo
   hdr();
   filtDraw();

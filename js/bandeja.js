@@ -24,9 +24,9 @@ async function inboxDraw() {
     ${fold ? '' : `<span class="ibnav"><button data-onclick="inboxGo(-1)" aria-label="Anterior" ${L.length < 2 ? 'disabled' : ''}>‹</button><span>${IB.i + 1} de ${L.length}</span><button data-onclick="inboxGo(1)" aria-label="Siguiente" ${L.length < 2 ? 'disabled' : ''}>›</button></span>`}
     ${!fold && L.filter(x => x.doi && !ibDup(x)).length > 1 ? `<button class="sm ibadd" data-onclick="inboxCiteAll()" title="Crea a la vez la cita de cada PDF con DOI (con los datos de CrossRef); los que fallen se quedan en la bandeja">＋ Crear todas las citas</button>` : ''}
     <button class="sm ibadd" data-onclick="inboxPick()" title="Añadir PDF a la bandeja (también puedes soltarlos en la ventana)">＋ PDF</button></div>
-    ${fold ? '' : `<div class="ibc" data-id="${it.id}"><button class="ibt" data-onclick="inboxOpen('${it.id}',event)" title="Abrir en el visor"><span class="ibi">📄</span></button>
+    ${fold ? '' : `<div class="ibc" data-id="${it.id}"><button class="ibt" data-onclick="inboxOpen('${it.id}',event)" title="Abrir en el visor"><span class="ibi">${isEpub(it.name) ? '📘' : '📄'}</span></button>
       <div class="ibd"><b class="ibname" title="${esc(it.name)}">${esc(it.name)}</b>
-        ${it.guess ? `<small title="Título que se ha leído del PDF">${esc(it.guess)}</small>` : ''}${it.doi ? `<small>DOI: ${esc(it.doi)}</small>` : '<small class="ibno">Sin DOI en la primera página: la cita se crea con el título y la completas tú.</small>'}
+        ${it.guess ? `<small title="Título que se ha leído del PDF">${esc(it.guess)}</small>` : ''}${it.doi ? `<small>DOI: ${esc(it.doi)}</small>` : (isEpub(it.name) ? '<small class="ibno">EPUB sin DOI: la cita se crea como libro con sus datos (título, autores, editorial, ISBN).</small>' : '<small class="ibno">Sin DOI en la primera página: la cita se crea con el título y la completas tú.</small>')}
         ${dup ? `<div class="ibdup">⚠ Ya tienes este paper: <b>${esc(shortTxt(dup.alias || dup.title) || '(sin título)')}</b>${dup.pdf && dup.pdf2 ? ' (ya tiene dos PDF)' : ` <button class="sm" data-onclick="ibpGo('${it.id}','${dup.id}')" title="El PDF (y sus anotaciones) pasa a ese paper">🔗 Enlazar a ese paper</button>`}</div>` : ''}
         ${a ? `<button class="ibann" data-onclick="inboxOpenSide('${it.id}',event)" title="Abrir el PDF con la lista de subrayados y comentarios">🖍 ${a} ${a === 1 ? 'anotación' : 'anotaciones'} · ver</button>` : ''}
         <div class="row ibb"><button class="pri" data-onclick="inboxCite('${it.id}')" title="${it.doi ? 'Crea la cita con los datos de CrossRef y abre su ficha para revisarla' : 'Crea la cita con el título y abre su ficha para completarla'}">＋ Crear cita</button>
@@ -40,12 +40,12 @@ function inboxGo(d) { const n = (db.inbox || []).length; if (!n) return; IB.i = 
 async function inboxPick() {
   try {
     if (FSA) { const hs = await showOpenFilePicker({types: PDF_T, multiple: true}); return inboxAdd(await Promise.all(hs.map(async h => ({file: await h.getFile(), h})))); }
-    const fs = await new Promise(res => { const i = document.createElement('input'); i.type = 'file'; i.accept = '.pdf,application/pdf'; i.multiple = true; i.onchange = () => res([...i.files]); i.oncancel = () => res([]); i.click(); });
+    const fs = await new Promise(res => { const i = document.createElement('input'); i.type = 'file'; i.accept = DOC_ACC; i.multiple = true; i.onchange = () => res([...i.files]); i.oncancel = () => res([]); i.click(); });
     if (fs.length) inboxAdd(fs.map(file => ({file})));
   } catch (e) { if (e.name !== 'AbortError') say('No se pudo elegir el archivo: ' + e.message); }
 }
 async function inboxAdd(L) {   // L: [{file, h?}]
-  L = L.filter(x => x.file && (/\.pdf$/i.test(x.file.name) || x.file.type === 'application/pdf')); if (!L.length) return;
+  L = L.filter(x => isDoc(x.file)); if (!L.length) return;   // PDF o EPUB
   const now = new Date().toISOString(), add = [];
   for (const {file, h} of L) {
     const it = {id: uid(), name: file.name.slice(0, 260), at: now, up: now}, key = inKey(it.id);
@@ -53,9 +53,9 @@ async function inboxAdd(L) {   // L: [{file, h?}]
     add.push(it);
   }
   db.inbox = [...(db.inbox || []), ...add]; markDirty(); IB.i = db.inbox.length - add.length; inboxDraw();
-  toast(`${add.length === 1 ? '1 PDF' : add.length + ' PDF'} en la bandeja «PDF por citar».`, [{t: 'Deshacer', fn: undo}], 5000);
+  toast(`${add.length === 1 ? '1 ' + docKind(add[0].name) : add.length + ' archivos'} en la bandeja «PDF por citar».`, [{t: 'Deshacer', fn: undo}], 5000);
   if (db.settings.showInbox === false) toast('La sección «PDF por citar» está oculta: actívala en Configuración → Datos y Drive.', [], 5000);
-  if (vwCan()) for (const it of add) await inboxScan(it.id, PDF_FILES.get(inKey(it.id)));
+  for (const it of add) if (vwCan() || isEpub(it.name)) await inboxScan(it.id, PDF_FILES.get(inKey(it.id)));   // el EPUB se lee sin PDF.js (también desde file://)
 }
 async function pdfPage1(doc) {   // miniatura de la primera página (180 px de ancho, JPEG)
   const pg = await doc.getPage(1), v = pg.getViewport({scale: 1}), s = 180 / v.width, vp = pg.getViewport({scale: s}), cv = document.createElement('canvas');
@@ -77,6 +77,7 @@ async function covQuiet(key, pf) {   // el archivo, solo si se puede leer sin pr
   return file || await pdfKept(key, pf.name) || (pf.from ? await pdfKept(pf.from, pf.name) : null);
 }
 async function covMake(key, pf, file) {
+  if (file && isEpub(pf.name)) { const bk = await epBook(file).catch(() => null), d = bk ? await epThumb(bk) : ''; if (d) await idb('readwrite', st => st.put({n: pf.name, d}, 'pdft:' + key)).catch(() => {}); return d; }   // EPUB: su portada
   if (!vwCan() || !file) return ''; let doc;
   try { const L = await vwLib(); doc = await L.getDocument({data: new Uint8Array(await file.arrayBuffer()), cMapUrl: vwUrl('cmaps/'), cMapPacked: true, standardFontDataUrl: vwUrl('standard_fonts/'), isEvalSupported: false}).promise;
     const d = await pdfPage1(doc); await idb('readwrite', st => st.put({n: pf.name, d}, 'pdft:' + key)).catch(() => {}); return d; }
@@ -98,15 +99,20 @@ async function covFromOpen(id, n, file) {   // al abrir un PDF: si el paper aún
   const d = await covStored(c.key, c.pf.name) || await covMake(c.key, c.pf, file); if (!d) return; COV.set(ck, d); covHydrate();
 }
 /* Lee la primera página: miniatura, DOI y título probable (metadatos del PDF o la línea de letra más grande). Solo con http(s): PDF.js no se carga desde file://. */
-async function inboxScan(id, file) {
-  let doc; try {
-    const L = await vwLib(); doc = await L.getDocument({data: new Uint8Array(await file.arrayBuffer()), cMapUrl: vwUrl('cmaps/'), cMapPacked: true, standardFontDataUrl: vwUrl('standard_fonts/'), isEvalSupported: false}).promise;
-    const th = await pdfPage1(doc); await idb('readwrite', st => st.put(th, 'pdft:' + inKey(id))).catch(() => {});
+async function pdfSniffDoc(doc) {   // {doi, title} de las dos primeras páginas y los metadatos de un PDF ya abierto con PDF.js
     let txt = '', big = {h: 0, s: ''}; for (let i = 1; i <= Math.min(2, doc.numPages); i++) { const tc = await (await doc.getPage(i)).getTextContent();
       for (const t of tc.items) { if (typeof t.str !== 'string') continue; txt += t.str + (t.hasEOL ? '\n' : ' '); const h = Math.hypot(t.transform[2], t.transform[3]); if (i === 1 && t.str.trim().length > 3 && h > big.h + .5) big = {h, s: t.str.trim()}; else if (i === 1 && Math.abs(h - big.h) < .5 && big.s.length < 200) big.s += ' ' + t.str.trim(); } }
     const doi = (txt.replace(/\s*\n\s*/g, ' ').match(DOI_RE) || [''])[0].replace(/[.,;:)\]}>'"]+$/, '').toLowerCase();
     const meta = await doc.getMetadata().catch(() => null), mt = String(meta?.info?.Title || '').trim();
     const guess = (mt.length > 8 && !/^(microsoft word|untitled|doi|\S+\.(docx?|pdf|tex))/i.test(mt) ? mt : big.s).replace(/\s+/g, ' ').trim().slice(0, 400);
+    return {doi, title: guess};
+}
+async function inboxScan(id, file) {   // miniatura, DOI y título probable de lo que entra en la bandeja (EPUB: de sus metadatos y su portada)
+  let doc; try {
+    let doi, guess;
+    if (isEpub(file.name)) { const m = await epMeta(file); if (!m) return; if (m.thumb) await idb('readwrite', st => st.put(m.thumb, 'pdft:' + inKey(id))).catch(() => {}); doi = m.doi; guess = [m.title, m.authors.map(a => a.split(',')[0]).slice(0, 3).join(', ')].filter(Boolean).join(' · ').slice(0, 400); }
+    else { const L = await vwLib(); doc = await L.getDocument({data: new Uint8Array(await file.arrayBuffer()), cMapUrl: vwUrl('cmaps/'), cMapPacked: true, standardFontDataUrl: vwUrl('standard_fonts/'), isEvalSupported: false}).promise;
+      const th = await pdfPage1(doc); await idb('readwrite', st => st.put(th, 'pdft:' + inKey(id))).catch(() => {}); ({doi, title: guess} = await pdfSniffDoc(doc)); }
     const it = (db.inbox || []).find(x => x.id === id); if (!it) return;
     if ((doi && it.doi !== doi) || (guess && it.guess !== guess)) { if (doi) it.doi = doi; if (guess) it.guess = guess; it.up = new Date().toISOString(); markDirty(); }
     inboxDraw();
@@ -115,7 +121,7 @@ async function inboxScan(id, file) {
 async function inboxOpen(id, ev) {
   const it = (db.inbox || []).find(x => x.id === id); if (!it) return;
   try { const file = await pdfFile(inKey(id), it); if (!file) return; vwOpenAny({kind: 'inbox', id}, file, ev, it.page); }
-  catch (e) { if (e.name !== 'AbortError') say('No se pudo abrir el PDF: ' + e.message); }
+  catch (e) { if (e.name !== 'AbortError') say(`No se pudo abrir el ${docKind(it.name)}: ` + e.message); }
 }
 function inboxOpenSide(id, ev) { VW.sideNext = true; return inboxOpen(id, ev); }   // con el panel de anotaciones abierto
 function ibToggle() { IB.shown = !IB.shown; inboxDraw(); if (IB.shown) setTimeout(() => $('#inbox')?.scrollIntoView({block: 'nearest', behavior: 'smooth'}), 30); }
@@ -138,7 +144,9 @@ async function inboxCite(id) {
   if (dup && !await askOk(`Ya tienes este paper: «${shortTxt(dup.alias || dup.title)}». ¿Crear otra cita igualmente? (Con «🔗 Enlazar a ese paper» el PDF pasa al que ya tienes.)`, {ok: 'Crear otra'})) return;
   let r = null;
   if (it.doi) { toast('Buscando los datos del DOI en CrossRef…', [], 2500); try { r = await fetchDoi(it.doi); } catch (e) { toast(e.message + ' Se crea con el título.', [], 5000); } }
-  r ||= {title: it.guess || it.name.replace(/\.pdf$/i, '').replace(/[_]+/g, ' '), authors: [], year: '', type: 'articulo', doi: it.doi || '', url: it.doi ? 'https://doi.org/' + it.doi : ''};
+  if (!r && isEpub(it.name)) { const f = await pdfFile(inKey(id), it, false).catch(() => null), m = f && await epMeta(f);   // EPUB: un libro, con sus metadatos
+    if (m) r = {title: m.title || it.name.replace(/\.epub$/i, ''), authors: m.authors, year: m.year, type: 'libro', publisher: m.publisher, isbn: m.isbn, doi: it.doi || '', url: it.doi ? 'https://doi.org/' + it.doi : ''}; }
+  r ||= {title: (it.guess || '').split(' · ')[0] || it.name.replace(/\.(pdf|epub)$/i, '').replace(/[_]+/g, ' '), authors: [], year: '', type: isEpub(it.name) ? 'libro' : 'articulo', doi: it.doi || '', url: it.doi ? 'https://doi.org/' + it.doi : ''};
   const p = await ibMake(it, r); render();
   toast(`Cita creada${r.authors?.length ? '' : ': complétala en su ficha'}.`, [{t: 'Deshacer', fn: undo}], 6000); openPaper(p.id);
 }
@@ -200,15 +208,15 @@ async function syVisFolder(tok) {
   try { localStorage.setItem('gp-vis-folder', id); } catch (e) {} return id;
 }
 async function syVisUp(tok, id, folder, name, bytes) {
-  const r = await syDrive(tok, `/upload/drive/v3/files${id ? '/' + id : ''}?uploadType=resumable&fields=id`, {method: id ? 'PATCH' : 'POST',
-    headers: {'Content-Type': 'application/json; charset=UTF-8', 'X-Upload-Content-Type': 'application/pdf'}, body: JSON.stringify(id ? {name} : {name, parents: [folder], mimeType: 'application/pdf'})});
+  const mt = docMime(name), r = await syDrive(tok, `/upload/drive/v3/files${id ? '/' + id : ''}?uploadType=resumable&fields=id`, {method: id ? 'PATCH' : 'POST',
+    headers: {'Content-Type': 'application/json; charset=UTF-8', 'X-Upload-Content-Type': mt}, body: JSON.stringify(id ? {name} : {name, parents: [folder], mimeType: mt})});
   const loc = r.headers.get('Location'); if (!loc) throw Error('reanudable');
-  const u = await fetch(loc, {method: 'PUT', headers: {'Content-Type': 'application/pdf'}, body: bytes, cache: 'no-store'});
+  const u = await fetch(loc, {method: 'PUT', headers: {'Content-Type': mt}, body: bytes, cache: 'no-store'});
   if (!u.ok) { const e = Error('drive ' + u.status); e.estado = u.status; throw e; }
   return u.json();
 }
 const visName = s => { if (s.it) return s.it.name; const p = s.p, a = (p.authors[0] || '').split(',')[0].trim();
-  return `${[a, p.year].filter(Boolean).join(' ')}${a || p.year ? ' - ' : ''}${p.alias || p.title}`.replace(/[\\/:*?"<>|\n\r]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 140) + (s.n === 2 ? ' (2)' : '') + '.pdf'; };
+  return `${[a, p.year].filter(Boolean).join(' ')}${a || p.year ? ' - ' : ''}${p.alias || p.title}`.replace(/[\\/:*?"<>|\n\r]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 140) + (s.n === 2 ? ' (2)' : '') + (isEpub(s.pf.name) ? '.epub' : '.pdf'); };
 let VIS_RUN = null; const VIS_IDS = new Map();   // una sola subida a la vez; el id de lo ya creado en esta sesión (para no duplicar si la ficha aún no lo tiene)
 function syPdfsVis(tok, m, pj = PJ.cur) { const run = (VIS_RUN || Promise.resolve()).then(() => syPdfsVis1(tok, m, pj)); VIS_RUN = run.catch(() => {}); return run; }
 async function syPdfsVis1(tok, m, pj) {   // cada PDF con «también en mi Drive normal», ya anotado, si cambió desde la última vez (y no está abierto en el visor)
@@ -221,7 +229,7 @@ async function syPdfsVis1(tok, m, pj) {   // cada PDF con «también en mi Drive
       const file = await pdfLocal(s.key) || (s.pf.from && await pdfLocal(s.pf.from)) || await pdfFromDrive(s.key, s.pf.name, true); if (!file || file.size > SY_CFG.pdfMax) continue;
       const name = visName(s), sig = syHash(JSON.stringify(s.pf.ann || []) + '|' + file.size + '|' + name), k = `pdfVis:${pj}:${s.key}`, rec = await idb('readonly', st => st.get(k)).catch(() => null);
       const vid = s.pf.vid || VIS_IDS.get(pj + ':' + s.key); if (rec === sig && vid) continue;
-      let bytes; try { bytes = await vwPdfOut(file, s.pf.ann || []); } catch (e) { bytes = new Uint8Array(await file.arrayBuffer()); }   // cifrado: se sube tal cual
+      let bytes; try { if (isEpub(s.pf.name)) throw 0; bytes = await vwPdfOut(file, s.pf.ann || []); } catch (e) { bytes = new Uint8Array(await file.arrayBuffer()); }   // cifrado (o EPUB): se sube tal cual
       folder ||= await syVisFolder(tok);
       let r; try { r = await syVisUp(tok, vid, folder, name, bytes); } catch (e) { if (vid && e.estado === 404) r = await syVisUp(tok, null, folder, name, bytes); else throw e; }   // la borraste de Drive: se crea otra
       if (r.id) VIS_IDS.set(pj + ':' + s.key, r.id); await idb('readwrite', st => st.put(sig, k)).catch(() => {});
@@ -250,16 +258,16 @@ const ANN_FMTS = [['txt', 'Texto'], ['md', 'Markdown'], ['cite', 'Con cita (auto
 const annY = a => Math.max(...a.q.filter((_, i) => i % 2));
 const annSorted = L => [...L].sort((a, b) => a.p - b.p || annY(b) - annY(a));   // por página y de arriba abajo
 const annNoteId = (p, n) => `annpdf${n === 2 ? 2 : 1}${p.id}`;
-function annCite(p, page) {
+function annCite(p, page, ep) {
   const a = (p.authors || []).map(x => String(x).split(',')[0].trim()).filter(Boolean);
   const who = !a.length ? shortTxt(p.alias || p.title || '').slice(0, 40) : a.length === 1 ? a[0] : a.length === 2 ? `${a[0]} y ${a[1]}` : `${a[0]} et al.`;
-  return `(${who}, ${p.year || 's. f.'}, p. ${page})`;
+  return `(${who}, ${p.year || 's. f.'}, ${ep ? 'cap.' : 'p.'} ${page})`;
 }
-function annText(p, L, fmt = db.settings.annFmt) {
+function annText(p, L, fmt = db.settings.annFmt, ep = false) {   // ep: anotaciones de un EPUB (capítulos, no páginas)
   const name = VW_COLORS.reduce((o, [c, t]) => (o[c] = t, o), {}), one = s => String(s || '').replace(/\s*\n\s*/g, ' ').trim();
   L = annSorted(L);
-  if (fmt === 'md') return L.map(a => `- **p. ${a.p + 1}** · ${a.k === 'note' ? 'Nota' : a.k === 'area' ? 'Zona' : 'Subrayado'} (${name[a.c] || a.c})${a.t ? `\n  > ${one(a.t)}` : ''}${a.m ? `\n  ${a.m.trim().replace(/\n/g, '\n  ')}` : ''}`).join('\n');
-  return L.map(a => { const ref = fmt === 'cite' && p ? annCite(p, a.p + 1) : `(p. ${a.p + 1})`;
+  if (fmt === 'md') return L.map(a => `- **${annPg(a, ep)}** · ${a.k === 'note' ? 'Nota' : a.k === 'area' ? 'Zona' : 'Subrayado'} (${name[a.c] || a.c})${a.t ? `\n  > ${one(a.t)}` : ''}${a.m ? `\n  ${a.m.trim().replace(/\n/g, '\n  ')}` : ''}`).join('\n');
+  return L.map(a => { const ref = fmt === 'cite' && p ? annCite(p, a.p + 1, ep) : `(${annPg(a, ep)})`;
     return (a.t ? `«${one(a.t)}» ${ref}` : ref) + (a.m ? '\n' + a.m.trim() : ''); }).join('\n\n');
 }
 async function annCopy(text) {
@@ -267,8 +275,8 @@ async function annCopy(text) {
   catch (e) { const t = document.createElement('textarea'); t.value = text; t.style.cssText = 'position:fixed;opacity:0'; (document.querySelector('dialog[open]') || document.body).append(t); t.select(); try { document.execCommand('copy'); } catch (e2) {} t.remove(); }
 }
 function annNoteSet(P, n, L, fmt) {   // la nota «Anotaciones del PDF» de ese PDF (en el paper y, si su ficha está abierta, en el borrador)
-  const id = annNoteId(P, n), pf = P[pdfF(n)], head = `Anotaciones del PDF${pf?.name ? ' «' + pf.name + '»' : ''}`;
-  const content = L.length ? head + '\n\n' + annText(P, L, fmt) : '';
+  const id = annNoteId(P, n), pf = P[pdfF(n)], ep = isEpub(pf?.name), head = `Anotaciones del ${ep ? 'EPUB' : 'PDF'}${pf?.name ? ' «' + pf.name + '»' : ''}`;
+  const content = L.length ? head + '\n\n' + annText(P, L, fmt, ep) : '';
   let changed = false;
   for (const p of new Set([P, D && D.id === P.id && $('#dlg').open ? D : null].filter(Boolean))) {
     const i = p.notes.findIndex(x => x.id === id);
