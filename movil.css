@@ -4,17 +4,17 @@
 
 html.mv{--mvnav:60px;--mvsafe:env(safe-area-inset-bottom,0px);-webkit-text-size-adjust:100%}
 html.mv body{padding-bottom:calc(var(--mvnav) + var(--mvsafe) + 8px);overscroll-behavior-y:contain}
-html.mv input,html.mv select,html.mv textarea{font-size:16px}   /* menos de 16 px hace que el iPhone amplíe la página al escribir */
+html.mv input,html.mv select,html.mv textarea{font-size:max(16px,calc(16px * var(--fz,1)))}   /* menos de 16 px hace que el iPhone amplíe la página al escribir */
 html.mv button{min-height:40px;touch-action:manipulation}
-html.mv .mvib{display:inline-flex;align-items:center;justify-content:center;min-width:44px;min-height:44px;padding:0;border:0;background:none;font-size:22px;line-height:1;position:relative}
+html.mv .mvib{display:inline-flex;align-items:center;justify-content:center;min-width:44px;min-height:44px;padding:0;border:0;background:none;font-size:calc(22px * var(--fz,1));line-height:1;position:relative}
 
 /* --- Cabecera: una sola fila (☰ · proyecto · estado · ⋯) --- */
 html.mv header{position:sticky;top:0;z-index:40;background:var(--bg);flex-wrap:nowrap;gap:4px;padding:4px 4px 4px 2px;padding-top:max(4px,env(safe-area-inset-top))}
 html.mv #mvMenuBtn,html.mv #mvMoreBtn{display:inline-flex;flex-shrink:0}
 html.mv h1{display:none}
 html.mv .pj{margin-left:0;min-width:0}html.mv .pjs{display:none}
-html.mv #pjName{font-size:17px;max-width:42vw}html.mv #pjBtn{min-height:36px;min-width:36px;padding:0}
-html.mv #fname{font-size:12px;min-width:0;flex:1}
+html.mv #pjName{font-size:calc(17px * var(--fz,1));max-width:42vw}html.mv #pjBtn{min-height:36px;min-width:36px;padding:0}
+html.mv #fname{font-size:calc(12px * var(--fz,1));min-width:0;flex:1}
 html.mv #pjProg{display:none}
 /* el resto de la cabecera, como menú ⋯ que baja desde arriba */
 html.mv #mvHdrRow{display:none;position:fixed;z-index:70;top:calc(52px + env(safe-area-inset-top,0px));right:8px;left:auto;width:min(320px,calc(100vw - 16px));max-height:calc(100dvh - 140px);overflow:auto;flex-direction:column;align-items:stretch;gap:2px;padding:6px;background:var(--card);border:1px solid var(--bd);border-radius:12px;box-shadow:0 8px 28px #0005}
@@ -35,7 +35,7 @@ html.mv.mv-dr aside{transform:none;visibility:visible}
 html.mv #mvShade{display:block;position:fixed;inset:0;z-index:75;background:#0006;opacity:0;pointer-events:none;transition:opacity .22s}
 html.mv.mv-dr #mvShade,html.mv.mv-mo #mvShade{opacity:1;pointer-events:auto}html.mv.mv-mo #mvShade{z-index:65;background:#0003}
 html.mv #mvShade[hidden]{display:block}
-html.mv .mvdh{display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:3;background:var(--bg);padding:max(6px,env(safe-area-inset-top)) 6px 6px 16px;border-bottom:1px solid var(--bd);font-size:17px}
+html.mv .mvdh{display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:3;background:var(--bg);padding:max(6px,env(safe-area-inset-top)) 6px 6px 16px;border-bottom:1px solid var(--bd);font-size:calc(17px * var(--fz,1))}
 html.mv .mvdf{display:block;position:sticky;bottom:0;z-index:3;margin-top:auto;padding:10px 12px calc(10px + var(--mvsafe));background:var(--bg);border-top:1px solid var(--bd)}
 html.mv .mvdf button{width:100%;min-height:46px;font-weight:600}
 html.mv #sbGrip,html.mv #sbMain>.sh:first-of-type{display:none}
@@ -52,7 +52,7 @@ html.mv .trb{margin-top:0}
 html.mv #mvTop{display:block;position:sticky;top:calc(52px + env(safe-area-inset-top,0px));z-index:30;background:var(--bg);margin:0 -10px;padding:6px 10px 4px}
 html.mv #mvSearch{display:flex;gap:6px;align-items:center}
 html.mv #mvSearch #q{flex:1;min-width:0;min-height:40px;border-radius:22px;padding:8px 16px}
-html.mv #mvSearch .mvib{border:1px solid var(--bd);border-radius:50%;background:var(--card);font-size:19px}
+html.mv #mvSearch .mvib{border:1px solid var(--bd);border-radius:50%;background:var(--card);font-size:calc(19px * var(--fz,1))}
 html.mv .mvfd{position:absolute;top:6px;right:6px;margin:0}
 /* fila de Tarjetas, Sección, Etiquetas y ☑: ocupa solo el ancho de la pantalla (sin desplazar); las secciones y etiquetas, debajo, en líneas que bajan */
 html.mv main>.row{flex-wrap:wrap;margin:0;padding:2px 0 6px;gap:6px;align-items:center}
@@ -63,30 +63,30 @@ html.mv main>.row>#selAll{order:1;flex:0 0 auto}html.mv main>.row>#selAll .bl{di
 html.mv main>.row>#count{order:2;flex:1 0 100%;text-align:right;margin-top:-2px}   /* la cuenta, en su propia línea pequeña: así los botones caben enteros */
 html.mv main>.row>#tbCols{order:1;flex:0 0 auto}html.mv main>.row>#tbCols .bl{display:none}   /* «Columnas» (solo en la tabla): pequeño, en la barra de Tarjetas */
 html.mv main>.row #secF2{order:3}html.mv main>.row #tagF2{order:4}
-html.mv main>.row .chips>small:only-child{font-size:12px;line-height:1.15;opacity:.65;margin:-4px 0 -3px}   /* «Aún no hay etiquetas.»: una línea fina, sin hueco */
+html.mv main>.row .chips>small:only-child{font-size:calc(12px * var(--fz,1));line-height:1.15;opacity:.65;margin:-4px 0 -3px}   /* «Aún no hay etiquetas.»: una línea fina, sin hueco */
 html.mv main>.row .chips{flex:1 0 100%;flex-wrap:wrap;gap:6px;min-width:0;overflow:visible;margin:0}
 html.mv main>.row .chips[hidden]{display:none}
 html.mv main>.row .chip{white-space:nowrap;padding:4px 12px;margin:0;max-width:100%;overflow:hidden;text-overflow:ellipsis}
-html.mv main>.row button{border-radius:18px;padding:4px 10px;min-height:34px;font-size:14px}
-@media (max-width:349px){html.mv main>.row button{padding:4px 7px;font-size:13px}html.mv main>.row{gap:4px}}
-html.mv #count{font-size:12px;opacity:.75;white-space:nowrap}html.mv #actF>#count{margin-left:auto;flex:0 0 auto;padding-left:8px;font-size:11px}
-html.mv #actF{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;gap:4px;margin:0 0 2px;font-size:11.5px;line-height:1}html.mv #actF .af,html.mv #actF .afx{white-space:nowrap;flex-shrink:0;min-height:20px;height:20px;padding:0 7px;line-height:1;font-size:11.5px;display:inline-flex;align-items:center}html.mv #actF .afx{padding:0 4px}html.mv #actF small{font-size:11px}
+html.mv main>.row button{border-radius:18px;padding:4px 10px;min-height:34px;font-size:calc(14px * var(--fz,1))}
+@media (max-width:349px){html.mv main>.row button{padding:4px 7px;font-size:calc(13px * var(--fz,1))}html.mv main>.row{gap:4px}}
+html.mv #count{font-size:calc(12px * var(--fz,1));opacity:.75;white-space:nowrap}html.mv #actF>#count{margin-left:auto;flex:0 0 auto;padding-left:8px;font-size:calc(11px * var(--fz,1))}
+html.mv #actF{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;gap:4px;margin:0 0 2px;font-size:calc(11.5px * var(--fz,1));line-height:1}html.mv #actF .af,html.mv #actF .afx{white-space:nowrap;flex-shrink:0;min-height:20px;height:20px;padding:0 7px;line-height:1;font-size:calc(11.5px * var(--fz,1));display:inline-flex;align-items:center}html.mv #actF .afx{padding:0 4px}html.mv #actF small{font-size:calc(11px * var(--fz,1))}
 
 /* --- Tarjetas --- */
-html.mv .card .ct{margin-bottom:2px}html.mv .card .ct .sm,html.mv .card>.row .sm{min-height:32px;padding:2px 10px;font-size:13px}
+html.mv .card .ct{margin-bottom:2px}html.mv .card .ct .sm,html.mv .card>.row .sm{min-height:32px;padding:2px 10px;font-size:calc(13px * var(--fz,1))}
 html.mv .card .ct .cpb,html.mv .card>.row .sm{border-color:transparent;background:none}
 html.mv .card .th{margin-top:2px}html.mv .card>.row{margin-top:2px;gap:4px}
-html.mv .card .au{font-size:14px;opacity:.85}
+html.mv .card .au{font-size:calc(14px * var(--fz,1));opacity:.85}
 html.mv .card{padding:8px 10px 6px;border-radius:12px;margin-top:6px}
 html.mv .card[draggable],html.mv .tbl tr[draggable]{-webkit-user-drag:none}
 html.mv .card .ct{flex-wrap:wrap;gap:6px}
 html.mv .card .ct .sel{font-size:0;gap:0}html.mv .card .ct .sel input{width:22px;height:22px;margin:0 4px 0 0}
-html.mv .card .sm{min-height:36px;padding:4px 12px;font-size:14px}
+html.mv .card .sm{min-height:36px;padding:4px 12px;font-size:calc(14px * var(--fz,1))}
 html.mv .card{position:relative}html.mv .card .ct{padding-right:44px}html.mv .card .ct .x{position:absolute;top:8px;right:6px;min-height:32px;min-width:32px;border-color:transparent;opacity:.7}
-html.mv .card .rd{margin-left:0}html.mv .rst{min-height:30px;padding:2px 10px;font-size:13px}
-html.mv .card h3{font-size:16px;line-height:1.3}
-html.mv .card a{word-break:break-word;overflow-wrap:anywhere;display:inline-block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px}
-html.mv .stv{font-size:18px}
+html.mv .card .rd{margin-left:0}html.mv .rst{min-height:30px;padding:2px 10px;font-size:calc(13px * var(--fz,1))}
+html.mv .card h3{font-size:calc(16px * var(--fz,1));line-height:1.3}
+html.mv .card a{word-break:break-word;overflow-wrap:anywhere;display:inline-block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:calc(13px * var(--fz,1))}
+html.mv .stv{font-size:calc(18px * var(--fz,1))}
 
 /* --- Vista tabla: cada fila, una ficha compacta --- */
 html.mv .twrap{overflow:visible;border:0;background:none}
@@ -94,26 +94,26 @@ html.mv .tbl,html.mv .tbl tbody{display:block;background:none}html.mv .tbl thead
 /* ficha compacta: 1.ª línea casilla + título + ✕ · 2.ª autores · año · revista (recortados) · 3.ª lectura, estrellas, secciones, etiquetas y botones */
 html.mv .twrap{margin-top:4px;background:var(--card);border:1px solid var(--bd);border-radius:10px;overflow:hidden}
 /* cada fila, una ficha en rejilla (no depende del orden de las columnas): 1.ª línea casilla + título + ✕ · 2.ª autores · año · revista (las que se vean, en su orden) · 3.ª el resto de columnas que se vean, en su orden */
-html.mv .tbl tr.rw{display:grid;grid-template-columns:auto auto minmax(0,1fr) auto;grid-template-rows:auto;column-gap:8px;row-gap:3px;align-items:center;border-bottom:1px solid var(--bd);padding:6px 4px 6px 10px;font-size:13px}html.mv .tbl tr.rw:last-child{border-bottom:0}
+html.mv .tbl tr.rw{display:grid;grid-template-columns:auto auto minmax(0,1fr) auto;grid-template-rows:auto;column-gap:8px;row-gap:3px;align-items:center;border-bottom:1px solid var(--bd);padding:6px 4px 6px 10px;font-size:calc(13px * var(--fz,1))}html.mv .tbl tr.rw:last-child{border-bottom:0}
 html.mv .tbl tr.rw>td{display:block;border:0;padding:0;min-width:0}
 html.mv .tbl tr.rw>td.c-sel{grid-area:1/1}html.mv .tbl tr.rw>td.c-img{grid-area:1/2/3/3;align-self:start}html.mv .tbl tr.rw>td.c-title{grid-area:1/3}html.mv .tbl tr.rw>td.c-del{grid-area:1/4}
 html.mv .tbl tr.rw>td.timg:not(:has(.pimg)){display:none}
-html.mv .tbl tr.rw>td.tt{overflow:hidden;font-size:14px;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+html.mv .tbl tr.rw>td.tt{overflow:hidden;font-size:calc(14px * var(--fz,1));line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 html.mv .tbl tr.rw>td.c-del .x{min-height:26px;min-width:28px;padding:0;border-color:transparent;opacity:.7}
 html.mv .tbl tr.rw>td.mvm{grid-area:2/3/3/5;opacity:.75;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}html.mv .tbl tr.rw>td.mvm i{font-style:normal;opacity:.6;margin:0 5px}
 html.mv .tbl tr.rw>td.mvx{grid-area:3/3/4/5;display:flex;flex-wrap:nowrap;align-items:center;gap:4px 6px;min-width:0;overflow:hidden;white-space:nowrap}
 html.mv .tbl tr.rw:has(td.timg .pimg)>td.mvx{grid-area:3/2/4/5}   /* con foto, la 3.ª línea empieza debajo de ella */
 html.mv .tbl tr.rw>td.mvx>div{flex:none;min-width:0;max-width:100%}html.mv .tbl tr.rw>td.mvx>:is(.c-tags,.c-sections){flex:0 1 auto;min-width:0;overflow:hidden}   /* etiquetas y secciones se recortan para que lo demás (lectura, estrellas, notas) quepa siempre en la línea */html.mv .tbl tr.rw>td.mvx>:is(.c-tags,.c-sections):empty{display:none}
-html.mv .tbl tr.rw>td.mvx>.c-notes{margin-left:auto;display:flex;gap:0}html.mv .tbl tr.rw .sm{min-height:28px;padding:0 7px;border:0;background:none;font-size:13px}
-html.mv .tbl tr.rw .rst{min-height:22px;padding:0 8px;font-size:11px}html.mv .tbl .stv{font-size:13px;letter-spacing:0}
+html.mv .tbl tr.rw>td.mvx>.c-notes{margin-left:auto;display:flex;gap:0}html.mv .tbl tr.rw .sm{min-height:28px;padding:0 7px;border:0;background:none;font-size:calc(13px * var(--fz,1))}
+html.mv .tbl tr.rw .rst{min-height:22px;padding:0 8px;font-size:calc(11px * var(--fz,1))}html.mv .tbl .stv{font-size:calc(13px * var(--fz,1));letter-spacing:0}
 html.mv .tbl{table-layout:auto;min-width:0!important}   /* aunque se oculten columnas (el ancho mínimo de escritorio va en línea) */
-html.mv .tbl tr.rw .chip{font-size:11px;padding:0 7px;margin:0 3px 0 0;border-width:1px}
+html.mv .tbl tr.rw .chip{font-size:calc(11px * var(--fz,1));padding:0 7px;margin:0 3px 0 0;border-width:1px}
 html.mv .tbl tr.rw td input[type=checkbox]{width:18px;height:18px;margin:0}
 /* miniatura del paper (a la izquierda, sin cambiar el alto de la ficha): en la tabla ocupa las dos primeras líneas; en las tarjetas va junto al título y los autores */
 html.mv .tbl tr.rw>td.timg{line-height:0;width:46px}
-html.mv .tbl tr.rw>td.timg .pimg.xs{display:flex;width:46px;height:46px;margin:0;font-size:20px}
+html.mv .tbl tr.rw>td.timg .pimg.xs{display:flex;width:46px;height:46px;margin:0;font-size:calc(20px * var(--fz,1))}
 html.mv .card:has(.th .pimg.sm) .th{display:contents}   /* la foto flota a la izquierda y el título, los autores y el resto de líneas la rodean: ningún botón de la fila de arriba puede quedar debajo de ella */
-html.mv .card .th .pimg.sm{float:left;width:56px;height:56px;margin:2px 10px 0 0;font-size:22px}
+html.mv .card .th .pimg.sm{float:left;width:56px;height:56px;margin:2px 10px 0 0;font-size:calc(22px * var(--fz,1))}
 html.mv .card:has(.th .pimg.sm)::after{content:"";display:block;clear:both}
 html.mv .card .pimg:has(img),html.mv .tbl .pimg:has(img){cursor:zoom-in}
 #mvZoom{display:none}
@@ -126,19 +126,19 @@ html.mv #mvNav{display:grid;grid-template-columns:minmax(0,1fr) 64px minmax(0,1f
 html.mv #mvNav .mvns{display:flex;min-width:0}html.mv #mvNav .mvns>button{flex:1 1 0;min-width:0}html.mv #mvNav .mvns>button[hidden]{display:none}   /* + siempre en el centro: a cada lado, la mitad del espacio repartida entre sus botones */
 html.mv #mvNav button>span:last-child{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 html.mv #mvNav [data-mv=cfg] .mvl::after{content:"Configuración"}html.mv #mvNav #mvIb:not([hidden])~[data-mv=cfg] .mvl::after{content:"Ajustes"}   /* con 🗃️ a su lado no cabe entero */
-@media (max-width:369px){html.mv #mvNav button{font-size:10px}html.mv #mvNav{padding-left:0;padding-right:0}}@media (max-width:339px){html.mv #mvNav [data-mv=cfg] .mvl::after{content:"Ajustes"}html.mv #mvNav{grid-template-columns:minmax(0,1fr) 52px minmax(0,1fr)}html.mv #mvNav .mvnew .ic{width:42px}}   /* móviles estrechos: que quepan los nombres */
-html.mv #mvIb .ic b{position:absolute;top:-4px;right:-12px;font-size:10px;line-height:15px;min-width:15px;padding:0 4px;border-radius:8px;background:var(--pri);color:#fff}html.mv #mvIb.on .ic{outline:2px solid var(--pri);outline-offset:2px;border-radius:6px}
+@media (max-width:369px){html.mv #mvNav button{font-size:calc(10px * var(--fz,1))}html.mv #mvNav{padding-left:0;padding-right:0}}@media (max-width:339px){html.mv #mvNav [data-mv=cfg] .mvl::after{content:"Ajustes"}html.mv #mvNav{grid-template-columns:minmax(0,1fr) 52px minmax(0,1fr)}html.mv #mvNav .mvnew .ic{width:42px}}   /* móviles estrechos: que quepan los nombres */
+html.mv #mvIb .ic b{position:absolute;top:-4px;right:-12px;font-size:calc(10px * var(--fz,1));line-height:15px;min-width:15px;padding:0 4px;border-radius:8px;background:var(--pri);color:#fff}html.mv #mvIb.on .ic{outline:2px solid var(--pri);outline-offset:2px;border-radius:6px}
 html.mv #ibBtn{display:none}   /* en el móvil, la bandeja va en la barra inferior */
-html.mv #mvNav button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;border:0;background:none;padding:4px 0;font-size:11px;min-height:0}
-html.mv #mvNav .ic{font-size:20px;width:auto;position:relative}html.mv #mvNav .mvfd{top:-2px;right:-8px}
-html.mv #mvNav .mvnew .ic{background:var(--pri);color:#fff;width:46px;height:34px;border-radius:17px;display:flex;align-items:center;justify-content:center;font-size:22px}
+html.mv #mvNav button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;border:0;background:none;padding:4px 0;font-size:calc(11px * var(--fz,1));min-height:0}
+html.mv #mvNav .ic{font-size:calc(20px * var(--fz,1));width:auto;position:relative}html.mv #mvNav .mvfd{top:-2px;right:-8px}
+html.mv #mvNav .mvnew .ic{background:var(--pri);color:#fff;width:46px;height:34px;border-radius:17px;display:flex;align-items:center;justify-content:center;font-size:calc(22px * var(--fz,1))}
 html.mv.mv-dr #mvNav{z-index:50}
 html.mv #toast{bottom:calc(var(--mvnav) + var(--mvsafe) + 10px);max-width:calc(100vw - 20px);flex-wrap:wrap}
 
 /* --- Ventanas a pantalla completa --- */
 html.mv dialog{width:100vw;max-width:100vw;height:100dvh;max-height:100dvh;margin:0;border:0;border-radius:0;padding:0 14px calc(16px + var(--mvsafe))}
 html.mv dialog>.dh{margin:0 -14px 8px;padding:max(10px,env(safe-area-inset-top)) 14px 8px;flex-wrap:wrap;gap:8px}
-html.mv dialog>.dh h2{font-size:18px}
+html.mv dialog>.dh h2{font-size:calc(18px * var(--fz,1))}
 html.mv dialog .dbtn{flex-wrap:wrap;gap:6px}
 html.mv dialog .tabs{overflow-x:auto;flex-wrap:nowrap;scrollbar-width:none;gap:14px}html.mv dialog .tabs::-webkit-scrollbar{display:none}
 html.mv dialog .tabs button{white-space:nowrap;flex-shrink:0}
@@ -153,7 +153,7 @@ html.mv label.row{flex-wrap:nowrap;align-items:flex-start}html.mv label.row>inpu
 html.mv dialog .ctabs{display:flex;overflow-x:auto;flex-wrap:nowrap;scrollbar-width:none}html.mv dialog .ctabs::-webkit-scrollbar{display:none}html.mv dialog .ctabs button{white-space:nowrap;flex-shrink:0}
 /* ventanas sin cabecera propia: botón ✕ fijo arriba a la derecha */
 .mvdx{display:none}
-html.mv dialog>.mvdx{display:flex;position:sticky;top:0;float:right;z-index:5;margin:6px -6px 0 8px;font-size:20px;background:var(--bg);border:1px solid var(--bd);border-radius:50%;width:44px;height:44px}
+html.mv dialog>.mvdx{display:flex;position:sticky;top:0;float:right;z-index:5;margin:6px -6px 0 8px;font-size:calc(20px * var(--fz,1));background:var(--bg);border:1px solid var(--bd);border-radius:50%;width:44px;height:44px}
 html.mv dialog>.dh+.mvdx,html.mv dialog>.dh~.mvdx{display:none}
 html.mv .sgh{display:flex}html.mv #sg-search .sgh{display:flex}html.mv #sg-search .sgh .sh::after{content:"Buscar"}
 html.mv #sg-search .sgh .sh{width:100%}
@@ -162,7 +162,7 @@ html.mv dialog.ask{width:auto;max-width:calc(100vw - 32px);height:auto;max-heigh
 /* --- Menú de Sección y Etiquetas (al tocar su botón): mostrar debajo, agrupar o combinar, y elegir --- */
 html.tb #ctx.mvfm{max-height:min(70dvh,560px);min-width:240px;overflow-y:auto;overscroll-behavior:contain}
 html.tb #ctx .mvsw{display:inline-block;width:12px;height:12px;border-radius:50%;margin-right:8px;vertical-align:-1px;flex-shrink:0}
-html.tb #ctx .mvn{margin-left:auto;padding-left:12px;opacity:.6;font-size:13px}
+html.tb #ctx .mvn{margin-left:auto;padding-left:12px;opacity:.6;font-size:calc(13px * var(--fz,1))}
 html.tb #ctx.mvfm button{display:flex;align-items:center}
 html.tb #ctx button.ex{text-decoration:line-through;opacity:.75}
 
@@ -183,26 +183,26 @@ html.mv #ctx.colm{max-height:min(75dvh,600px);overflow-y:auto;overscroll-behavio
 /* arrastrar un paper con el dedo a otra sección */
 html.mvdrag,html.mvdrag body{user-select:none;-webkit-user-select:none}
 html.mv #list .card,html.mv #list tr.rw{-webkit-touch-callout:none}
-.mvghost{position:fixed;z-index:300;transform:translate(-50%,-130%);max-width:70vw;padding:6px 12px;border-radius:16px;background:var(--pri);color:#fff;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none;box-shadow:0 4px 14px #0004}
+.mvghost{position:fixed;z-index:300;transform:translate(-50%,-130%);max-width:70vw;padding:6px 12px;border-radius:16px;background:var(--pri);color:#fff;font-size:calc(13px * var(--fz,1));white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none;box-shadow:0 4px 14px #0004}
 html.mv #list .gbox.over{outline:2px dashed var(--pri);outline-offset:2px;border-radius:10px}
 /* tabla del móvil, más compacta: menos aire, letra y botones algo más pequeños (las zonas táctiles siguen siendo cómodas en altura de línea) */
-html.mv .tbl tr.rw{padding:4px 2px 4px 8px;row-gap:1px;column-gap:7px;font-size:12px}
-html.mv .tbl tr.rw>td.tt{font-size:13.5px;line-height:1.25}
-html.mv .tbl tr.rw>td.mvm{font-size:12px;line-height:1.3}
+html.mv .tbl tr.rw{padding:4px 2px 4px 8px;row-gap:1px;column-gap:7px;font-size:calc(12px * var(--fz,1))}
+html.mv .tbl tr.rw>td.tt{font-size:calc(13.5px * var(--fz,1));line-height:1.25}
+html.mv .tbl tr.rw>td.mvm{font-size:calc(12px * var(--fz,1));line-height:1.3}
 html.mv .tbl tr.rw>td.mvx{gap:2px 5px;min-height:24px}
-html.mv .tbl tr.rw .sm{min-height:24px;padding:0 6px;font-size:12px}
-html.mv .tbl tr.rw .rst{min-height:18px;padding:0 6px;font-size:10.5px;line-height:16px}
-html.mv .tbl .stv{font-size:11.5px}html.mv .tbl tr.rw .chip{font-size:10.5px;padding:0 6px;line-height:16px}
+html.mv .tbl tr.rw .sm{min-height:24px;padding:0 6px;font-size:calc(12px * var(--fz,1))}
+html.mv .tbl tr.rw .rst{min-height:18px;padding:0 6px;font-size:calc(10.5px * var(--fz,1));line-height:16px}
+html.mv .tbl .stv{font-size:calc(11.5px * var(--fz,1))}html.mv .tbl tr.rw .chip{font-size:calc(10.5px * var(--fz,1));padding:0 6px;line-height:16px}
 html.mv .tbl tr.rw>td.c-del .x{min-height:22px;min-width:26px}
 html.mv .tbl tr.rw td input[type=checkbox]{width:16px;height:16px}
-html.mv .tbl tr.rw>td.timg{width:38px}html.mv .tbl tr.rw>td.timg .pimg.xs{width:38px;height:38px;font-size:17px}
+html.mv .tbl tr.rw>td.timg{width:38px}html.mv .tbl tr.rw>td.timg .pimg.xs{width:38px;height:38px;font-size:calc(17px * var(--fz,1))}
 html.mv #ctx.selm{max-height:min(80dvh,640px);overflow-y:auto;overscroll-behavior:contain}
 /* aún más apretada: dos líneas por paper (título · y debajo autores/año/revista seguidos del resto de columnas) */
 html.mv .tbl tr.rw>td.mvx,html.mv .tbl tr.rw:has(td.timg .pimg)>td.mvx{grid-area:2/3/3/5}
-html.mv .tbl tr.rw>td.mvx>.mvm{flex:1 1 auto;min-width:40px;max-width:none;opacity:.75;overflow:hidden;text-overflow:ellipsis;font-size:12px}html.mv .tbl tr.rw>td.mvx>.mvm i{font-style:normal;opacity:.6;margin:0 4px}
+html.mv .tbl tr.rw>td.mvx>.mvm{flex:1 1 auto;min-width:40px;max-width:none;opacity:.75;overflow:hidden;text-overflow:ellipsis;font-size:calc(12px * var(--fz,1))}html.mv .tbl tr.rw>td.mvx>.mvm i{font-style:normal;opacity:.6;margin:0 4px}
 html.mv .tbl tr.rw>td.mvx>:is(.c-tags,.c-sections){flex:0 1000 auto}   /* se recortan antes que los autores */
 html.mv .tbl tr.rw>td.mvx>.c-notes{margin-left:0}html.mv .tbl tr.rw>td.mvx>.c-notes .sm{padding:0 4px}
-html.mv .tbl tr.rw>td.mvx{min-height:22px}html.mv .tbl tr.rw>td.timg{width:34px}html.mv .tbl tr.rw>td.timg .pimg.xs{width:34px;height:34px;font-size:15px}
+html.mv .tbl tr.rw>td.mvx{min-height:22px}html.mv .tbl tr.rw>td.timg{width:34px}html.mv .tbl tr.rw>td.timg .pimg.xs{width:34px;height:34px;font-size:calc(15px * var(--fz,1))}
 html.mv #list .card.insB{box-shadow:0 -4px 0 var(--pri)}html.mv #list .card.insA{box-shadow:0 4px 0 var(--pri)}
 
 /* --- Pantallas táctiles grandes (tablet en horizontal): las filas de secciones y etiquetas van debajo de la barra, en varias líneas, como en el móvil --- */

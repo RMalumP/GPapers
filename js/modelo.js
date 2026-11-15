@@ -34,9 +34,9 @@ const ID_RX = /^[\w-]{1,64}$/;
 const idFix = v => typeof v === 'string' ? (!v || ID_RX.test(v) ? v : 'x' + syHash(v)) : v == null || Number.isFinite(v) ? v : 'x' + syHash(JSON.stringify(v) || '');
 const idsFix = a => Array.isArray(a) ? a.map(idFix) : [];
 const uid = () => Math.random().toString(36).slice(2, 9) + Date.now().toString(36);
-const SC_NAMES = {open: 'Abrir archivo', save: 'Guardar', find: 'Buscar', newPaper: 'Nuevo paper', undo: 'Deshacer', redo: 'Rehacer', exportCites: 'Exportar citas', import: 'Importar referencias', side: 'Plegar o desplegar la barra lateral', bold: 'Negrita (dentro de una nota)', italic: 'Cursiva (dentro de una nota)', palette: 'Paleta de órdenes (buscar acciones y papers)'};
+const SC_NAMES = {open: 'Abrir archivo', save: 'Guardar', find: 'Buscar', newPaper: 'Nuevo paper', undo: 'Deshacer', redo: 'Rehacer', exportCites: 'Exportar citas', import: 'Importar referencias', side: 'Plegar o desplegar la barra lateral', bold: 'Negrita (dentro de una nota)', italic: 'Cursiva (dentro de una nota)', palette: 'Paleta de órdenes (buscar acciones y papers)', uiBig: 'Texto de la interfaz más grande', uiSmall: 'Texto de la interfaz más pequeño'};
 // Alt+N en lugar de Ctrl+N: Chrome reserva Ctrl+N, Ctrl+T y Ctrl+W y no permite cambiarlos
-const SC_DEF = {open: 'Ctrl+O', save: 'Ctrl+S', find: 'Ctrl+F', newPaper: 'Alt+N', undo: 'Ctrl+Z', redo: 'Ctrl+Shift+Z', exportCites: 'Ctrl+Shift+E', import: 'Alt+I', side: 'Alt+M', bold: 'Ctrl+B', italic: 'Ctrl+I', palette: 'Ctrl+K'};
+const SC_DEF = {open: 'Ctrl+O', save: 'Ctrl+S', find: 'Ctrl+F', newPaper: 'Alt+N', undo: 'Ctrl+Z', redo: 'Ctrl+Shift+Z', exportCites: 'Ctrl+Shift+E', import: 'Alt+I', side: 'Alt+M', bold: 'Ctrl+B', italic: 'Ctrl+I', palette: 'Ctrl+K', uiBig: 'Alt+Shift+ArrowUp', uiSmall: 'Alt+Shift+ArrowDown'};
 const TRASH_DAYS = 5;   // días que un paper eliminado permanece en la papelera
 const trashLeft = t => Math.max(0, Math.ceil(TRASH_DAYS - (Date.now() - new Date(t.at)) / 864e5));
 const TPL_DEF = [   // plantillas de nota de serie; {fecha} y {paper} se sustituyen al insertarlas

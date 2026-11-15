@@ -1,4 +1,5 @@
 'use strict';
+try { const z = +localStorage.getItem('gp-ui-fz'); if (z >= .8 && z <= 1.6 && z !== 1) document.documentElement.style.setProperty('--fz', z); } catch (e) {}   // tamaño del texto de la interfaz (ver uiFzSet en js/config.js), antes de pintar
 try { const t = localStorage.getItem('gp-theme'); if (t === 'dark' || t === 'light') document.documentElement.dataset.theme = t; } catch (e) {}   // tema elegido a mano (ver setTheme en js/config.js): antes de pintar, sin parpadeo
 /* ===== Interfaz para móviles =====
    Solo se activa en pantallas táctiles estrechas (o un móvil en horizontal): pone la clase «mv» en <html> y todo lo de movil.css va detrás de ella.

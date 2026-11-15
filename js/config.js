@@ -9,7 +9,7 @@ function comboOf(e) {   // p. ej. «Ctrl+Shift+Z»; null si solo se ha pulsado u
   return parts.join('+');
 }
 const SC_ACT = {
-  open: () => doOpen(), save: () => save(false), newPaper: () => openPaper(), undo, redo, exportCites: () => openEx(), import: () => openImport('file'), side: () => sbToggle(), palette: () => cmdOpen(),
+  open: () => doOpen(), save: () => save(false), newPaper: () => openPaper(), undo, redo, exportCites: () => openEx(), import: () => openImport('file'), side: () => sbToggle(), palette: () => cmdOpen(), uiBig: () => uiFzStep(1), uiSmall: () => uiFzStep(-1),
   find: () => { if (!$('#side').classList.contains('min')) $('#sg-search').classList.remove('fold'); $('#q').focus(); }   // con la barra plegada, la búsqueda ya está en la fila de «Nuevo paper»
 };
 document.addEventListener('keydown', e => {
@@ -19,7 +19,7 @@ document.addEventListener('keydown', e => {
   if (act === 'bold' || act === 'italic') { const ed = e.target.closest?.('.ned'), ce = e.target.closest?.('.ced'); if (ed || ce) { e.preventDefault(); ed ? edCmd(ed.dataset.key, act) : citeCmd(act); } return; }   // solo dentro de una nota o de una cita
   const inText = /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName) || e.target.isContentEditable;
   // Dentro de campos de texto o con una ventana abierta, solo funciona Guardar; lo demás es el comportamiento nativo (p. ej. Ctrl+Z en una nota)
-  if (act !== 'save' && (inText || document.querySelector('dialog[open]'))) return;
+  if (act !== 'save' && (inText || document.querySelector('dialog[open]') && !act.startsWith('ui'))) return;   // el tamaño del texto también con una ventana o el visor abiertos
   e.preventDefault(); SC_ACT[act]();
 });
 window.addEventListener('keydown', e => {   // modo grabación: captura la siguiente combinación antes que el resto de atajos
@@ -68,6 +68,17 @@ function setCustom(k, v) { db.settings.custom[k] = v; applySettings(); markDirty
 function resetPal() { delete db.settings.custom; setCfg('palette', 'azul'); drawCfg(); }
 function setInText(v) { db.settings.export.inText = !!v; markDirty(); }   // ajuste opcional (F4): por defecto oculto
 function setMainStyle(v) { db.settings.mainStyle = v; ex().style = v; CITE_SEL = ''; markDirty(); uiSoon(); }   // también pasa a ser el estilo de Exportar
+/* Tamaño del texto de la interfaz (v39.41, accesibilidad): en este dispositivo (gp-ui-fz). Todos los font-size de los CSS van multiplicados por --fz,
+   así que crece el texto y, con él, botones, menús y barras; las páginas del PDF no cambian (tienen su propio zoom). Se aplica antes de pintar (js/movil.js). */
+const UI_FZ = [.9, 1, 1.1, 1.25, 1.4, 1.6];
+function uiFz() { try { const z = +localStorage.getItem('gp-ui-fz'); return UI_FZ.includes(z) ? z : 1; } catch (e) { return 1; } }
+function uiFzSet(z) {
+  z = UI_FZ.includes(+z) ? +z : 1; try { z === 1 ? localStorage.removeItem('gp-ui-fz') : localStorage.setItem('gp-ui-fz', z); } catch (e) {}
+  if (z === 1) document.documentElement.style.removeProperty('--fz'); else document.documentElement.style.setProperty('--fz', z);
+  if ($('#cfg')?.open) drawCfg(); if (typeof fitBars === 'function') requestAnimationFrame(() => fitBars());
+  if (VW.open && VW.fit) setTimeout(() => vwFitW(true), 60);   // las barras del visor cambian de alto
+}
+function uiFzStep(d) { const i = UI_FZ.indexOf(uiFz()), z = UI_FZ[Math.max(0, Math.min(UI_FZ.length - 1, i + d))]; uiFzSet(z); toast(`Texto de la interfaz: ${Math.round(z * 100)} %`, [], 1200); }
 function setCfg(k, v) { db.settings[k] = v; applySettings(); markDirty(); }
 let CFG_TAB = 'ap';   // pestaña abierta de Configuración
 const CFG_TABS = [['ap', 'Apariencia'], ['no', 'Notas y citas'], ['sc', 'Atajos'], ['da', 'Datos y Drive']];
@@ -78,6 +89,7 @@ function drawCfg() {
   const T = {
     ap: `<label>Nombre de la aplicación<input value="${esc(c.appName)}" maxlength="30" data-oninput="setCfg('appName', this.value)"></label>
     ${cfgSec('pal', 'Paleta de colores', `<label class="thm">Tema <select data-onchange="setTheme(this.value)" aria-label="Tema">${Object.entries(THEMES).map(([k, v]) => `<option value="${k}" ${themeGet() === k ? 'selected' : ''}>${v}</option>`).join('')}</select> <small>(solo en este dispositivo)</small></label><div style="margin:6px 0 10px">${Object.entries(PAL).map(([k, p]) => chip({name: p.n, color: p.c}, c.palette === k, `setCfg('palette','${k}');drawCfg()`)).join('')}${chip({name: 'Personalizada', color: c.custom?.pri || '#888888'}, c.palette === 'custom', 'pickCustom()')}</div>${c.palette === 'custom' && c.custom ? `<div class="cpick">${LAB.map(([k, t]) => `<label class="row"><input type="color" value="${c.custom[k]}" data-oninput="setCustom('${k}', this.value)"> ${t}</label>`).join('')}<button data-onclick="resetPal()">Restablecer a Azul</button></div>` : ''}`)}
+    <div class="row uifz"><span>Tamaño del texto de la interfaz</span><span class="row" role="group" aria-label="Tamaño del texto de la interfaz">${UI_FZ.map(z => `<button class="${uiFz() === z ? 'pri' : ''}" aria-pressed="${uiFz() === z}" data-onclick="uiFzSet(${z})" style="font-size:${Math.round(13 * z)}px">${Math.round(z * 100)} %</button>`).join('')}</span> <small>(solo en este dispositivo; también con ${esc(c.shortcuts.uiBig || '—')} y ${esc(c.shortcuts.uiSmall || '—')})</small></div>
     <label class="row"><input type="checkbox" ${c.showImg !== false ? 'checked' : ''} data-onchange="setCfg('showImg', this.checked);render()"> Mostrar la imagen del paper en las tarjetas y la tabla (sin imagen, la portada de su PDF)</label>
     <label class="row"><input type="checkbox" ${c.showFile ? 'checked' : ''} data-onchange="setCfg('showFile', this.checked)"> Mostrar el archivo abierto en la cabecera</label>
     <label class="row"><input type="checkbox" ${c.showProgress ? 'checked' : ''} data-onchange="setCfg('showProgress', this.checked)"> Mostrar el progreso de lectura (papers leídos) junto al nombre del proyecto</label>`,
@@ -436,7 +448,7 @@ function helpHTML() {
       <li><b>Sin límite de tamaño práctico</b>: lo que pasa de 4 MB se sube por partes (subida reanudable de Google Drive), sin configurar nada.</li>
       <li><b>Proyectos</b>: se sincroniza el proyecto abierto, la lista de proyectos (con sus nombres) y los ajustes comunes. Los proyectos creados en otro dispositivo salen en ▾ con ☁ y se descargan al abrirlos; renombrar o borrar un proyecto llega a los demás dispositivos.</li>
       <li>La vista (tarjetas o tabla) es de cada dispositivo y no se sincroniza. Tus archivos JSON siguen funcionando igual.</li></ul>`],
-    atajos: ['Atajos de teclado', helpTbl(Object.keys(SC_NAMES).map(a => [esc(SC_NAMES[a]), kb(a)]).concat([['Esta ayuda', '<kbd>F1</kbd>'], ['Cerrar menús y ventanas', '<kbd>Esc</kbd>']])) + '<p>Se cambian en Configuración → Atajos de teclado. Dentro de campos de texto solo funciona «Guardar»; negrita y cursiva actúan dentro de una nota.</p>'],
+    atajos: ['Atajos de teclado', helpTbl(Object.keys(SC_NAMES).map(a => [esc(SC_NAMES[a]), kb(a)]).concat([['Esta ayuda', '<kbd>F1</kbd>'], ['Cerrar menús y ventanas', '<kbd>Esc</kbd>']])) + '<p>Se cambian en Configuración → Atajos de teclado. Dentro de campos de texto solo funciona «Guardar»; negrita y cursiva actúan dentro de una nota. El tamaño del texto de la interfaz funciona también con una ventana o el visor abiertos.</p><p>En el <b>visor de PDF</b> hay más (herramientas, colores, pantalla completa, doble página, desplazamiento automático, modo concentración…): pulsa <kbd>?</kbd> dentro del visor, o ⋯ → ⌨ Atajos de teclado.</p>'],
     datos: ['Datos, privacidad y consejos', `<ul><li>Todo se queda en tu navegador y en tu archivo JSON. La aplicación solo sale a internet para <b>buscar un DOI en CrossRef</b>, para mostrar <b>imágenes por URL</b> y, si la activas, para la <b>sincronización con Google Drive</b>. Detalles en la <a href="privacidad.html" data-onclick="event.preventDefault();openPriv()">Política de privacidad</a> (enlace al final de la barra lateral).</li>
       <li>Funciona sin conexión una vez cargada (se puede instalar como aplicación). Las imágenes por URL y la búsqueda de DOI necesitan internet.</li>
       <li>Haz copias del JSON de vez en cuando: es tu única base de datos. La papelera guarda 5 días; el historial no se guarda.</li>
