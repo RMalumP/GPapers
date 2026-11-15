@@ -36,7 +36,7 @@ with sync_playwright() as pw:
     eq('el menú se cierra al elegir', A.evaluate("$('#vwMenu').hidden"), True)
     eq('doble página con portada: la 2 y la 3 en la misma fila, la 1 sola arriba', [pos[1][0] == pos[2][0], pos[0][0] < pos[1][0], pos[1][1] < pos[2][1]], [True, True, True])
     eq('las dos páginas caben a lo ancho', A.evaluate("(() => { const sc = $('#vwScroll'); return sc.scrollWidth <= sc.clientWidth; })()"), True)
-    eq('se recuerda en el dispositivo', A.evaluate("JSON.parse(localStorage.getItem('gp-vw-read'))"), {'two': True, 'cover': True, 'flip': False})
+    eq('se recuerda en el dispositivo', A.evaluate("(o => ({two: o.two, cover: o.cover, flip: o.flip}))(JSON.parse(localStorage.getItem('gp-vw-read')))"), {'two': True, 'cover': True, 'flip': False})
     A.evaluate("vwRdSet('cover', 0)"); A.wait_for_timeout(300)
     pos = A.evaluate("VW.pages.map(p => Math.round(p.el.getBoundingClientRect().top))")
     eq('sin portada: la 1 y la 2 juntas', pos[0] == pos[1] and pos[2] > pos[0], True)
