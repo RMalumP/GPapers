@@ -341,7 +341,7 @@ async function vwPump() {   // pinta de una en una, primero la más cercana a la
 const vwMaxPx = () => VW.lite ? 3e6 : document.documentElement.classList.contains('mv') || /iPhone|iPad|Android/.test(navigator.userAgent) ? 5e6 : 16e6;
 /* Modo ligero (v39.45): táctil con poca memoria o pocos núcleos (móviles Android de gama baja). Lienzos con menos píxeles (y como mucho
    el doble de la pantalla), menos páginas pintadas en memoria y la capa de texto solo cerca de la que lees. */
-const vwLiteWant = () => tsWant() && ((navigator.deviceMemory || 8) <= 4 || (navigator.hardwareConcurrency || 8) <= 4 || !!window.VW_LITE);   // los móviles cierran la pestaña con lienzos enormes
+const vwLiteWant = () => { const p = vwLitePref(); return p === 'on' || p === 'auto' && tsWant() && ((navigator.deviceMemory || 8) <= 4 || (navigator.hardwareConcurrency || 8) <= 4 || !!window.VW_LITE); };   // los móviles cierran la pestaña con lienzos enormes
 async function vwRender(p, gen) {
   try {
     p.proxy ||= await VW.doc.getPage(p.i + 1); if (gen !== VW.gen) return;
@@ -582,7 +582,6 @@ function vwModeShow() { document.querySelectorAll('#vw .vwm[data-m]').forEach(b 
 const ANN_COL_K = 'gp-ann-col';
 const annColOnly = () => { try { return localStorage.getItem(ANN_COL_K) === 'one'; } catch (e) { return false; } };
 function annColSet(one) { try { localStorage.setItem(ANN_COL_K, one ? 'one' : 'next'); } catch (e) {} toast(one ? 'Cambiar el color de un subrayado ya no cambia el color para subrayar.' : 'Al cambiar el color de un subrayado, también será el color para los siguientes.', [], 2600); }
-const annColMenu = (back) => `<hr><div class="ctxh">Al cambiar el color de un subrayado</div><button data-keep data-onclick="annColSet(1);${back}">${tick(annColOnly())}🎯 Solo cambia ese subrayado</button><button data-keep data-onclick="annColSet(0);${back}">${tick(!annColOnly())}🖍 Ese y los siguientes (también el color para subrayar)</button>`;
 function vwColor(i) { if (VW.pop) { vwUpd(VW.pop, {c: VW_COLORS[i][0]}); if (annColOnly()) return; } VW.color = i; vwColorShow(); if (VW.mode === 'sel' && vwSelRange()) vwFromSel(i); }
 function vwColorShow() { document.querySelectorAll('#vw .vwtb .vwc').forEach(b => b.classList.toggle('on', +b.dataset.c === VW.color)); }
 function vwCaret(x, y) {
@@ -922,17 +921,16 @@ function vwFindMark(p) {
 /* ---- Más: descargar, ficha del paper, abrir con el navegador, dónde se guarda ---- */
 function vwMore(e) {
   e.stopPropagation(); const r = VW.menuR = e.currentTarget.getBoundingClientRect(), paper = vwPaper(), P = paper && db.papers.find(p => p.id === paper.id), pf = vwHolders()[0];
-  const vis = pf ? pdfVisOf(pf) : false;
-  vwMenu(r, `<button data-keep data-onclick="vwReadMenu()">📖 Modo de lectura <small class="vwsub">${esc(vwRdSum())} ›</small></button><button data-keep data-onclick="vwBmMenu()">🔖 Marcadores <small class="vwsub">${vwBms().length || 'ninguno'} ›</small></button>${vwMv() ? '' : '<button data-keep data-onclick="vwKeysHelp()">⌨ Atajos de teclado <small class="vwsub">? ›</small></button>'}<hr><button data-onclick="vwOut()">⬇ Descargar el PDF con las anotaciones</button>${vwAnns().length ? '<button data-onclick="vwMd()">⬇ Resumen de subrayados y comentarios (.md)</button>' : ''}
+  vwMenu(r, `<button data-keep data-onclick="vwReadMenu()">📖 Modo de lectura <small class="vwsub">${esc(vwRdSum())} ›</small></button><button data-keep data-onclick="vwBmMenu()">🔖 Marcadores <small class="vwsub">${vwBms().length || 'ninguno'} ›</small></button><button data-keep data-onclick="vwCfgMenu()">⚙ Ajustes del visor <small class="vwsub">›</small></button><hr><button data-onclick="vwOut()">⬇ Descargar el PDF con las anotaciones</button>${vwAnns().length ? '<button data-onclick="vwMd()">⬇ Resumen de subrayados y comentarios (.md)</button>' : ''}
     ${vwCanShare() ? `<button data-onclick="vwOther(false)">📲 Abrir en otra app…</button>${vwAnns().length ? '<button data-onclick="vwOther(true)">📲 Abrir en otra app, con las anotaciones…</button>' : ''}` : ''}
     <button data-onclick="vwNative()">↗ Abrir con el visor del navegador</button>${vwAnns().length && !vwCanShare() ? '<button data-onclick="vwOther(true)">↗ Abrir con el visor del navegador, con las anotaciones</button>' : ''}
     ${P && !$('#dlg').open ? '<button data-onclick="vwFicha()">📝 Ficha del paper</button>' : ''}${VW.src?.kind === 'inbox' ? '<button data-onclick="vwCite()">＋ Crear la cita de este PDF</button>' : ''}
-    <hr><div class="ctxh">🌙 Modo noche</div>${[['off', 'No'], ['on', 'Sí'], ['auto', 'Como el sistema (modo oscuro)']].map(([v, t]) => `<button data-onclick="vwNight('${v}')">${tick(vwNightPref() === v)}${t}</button>`).join('')}
-    ${pf ? `<hr><button data-onclick="vwVis()">${tick(vis)}Guardar también en mi Drive normal (con los subrayados)</button>` : ''}`);
+`);
 }
 function vwMenu(r, html) {   // menú desplegable dentro del visor (el de la aplicación queda debajo del visor)
   let m = $('#vwMenu'); if (!m) { m = document.createElement('div'); m.id = 'vwMenu'; m.className = 'vwfloat vwmenu'; $('#vw').append(m); m.addEventListener('click', ev => { const b = ev.target.closest('button'); if (b && !b.hasAttribute('data-keep')) setTimeout(() => m.hidden = true); }); }   // data-keep: abre un submenú
   m.innerHTML = html; m.hidden = false; const w = m.offsetWidth; m.style.left = Math.max(8, Math.min(r.right - w, innerWidth - w - 8)) + 'px'; m.style.top = (r.bottom + 4) + 'px';
+  m.style.maxHeight = `calc(100dvh - ${Math.round(r.bottom + 12)}px)`; m.style.overflow = 'auto';   // los menús largos (⚙ Ajustes) se desplazan
   setTimeout(() => document.addEventListener('pointerdown', ev => { if (!m.contains(ev.target)) m.hidden = true; }, {once: true, capture: true}));
 }
 /* ---- Notas del paper al lado del PDF: el mismo editor de la ficha (#dlg), metido en el visor como panel.
@@ -1265,12 +1263,29 @@ function vwReadMenu() {
     ${VW.flip ? `<button data-onclick="vwLockSet(${VW.zLock ? 0 : 1})" title="No deja cambiar el zoom y, al pasar de página, se queda el mismo tamaño y la misma zona">${tick(VW.zLock)}🔒 Candado del tamaño <small class="vwsub">K</small></button>` : ''}
     <hr><button data-keep data-onclick="vwAutoMenu()">⏬ Desplazamiento automático <small class="vwsub">${VW.auto ? (VW.autoPaused ? 'en pausa' : 'en marcha') : 'parado'}${vwConcOn() ? ' · concentración' : ''} ›</small></button>
     <hr><button data-onclick="vwRdSet('crop',${VW.crop ? 0 : 1})" title="Quita los márgenes en blanco de las páginas para que el texto se vea más grande">${tick(VW.crop)}✂ Recortar los márgenes (automático)</button>
-    <hr><div class="ctxh">Gestos de zoom</div>
-    <button data-onclick="vwRdSet('zPinch',${VW.zPinch ? 0 : 1})">${tick(VW.zPinch)}🤏 Pellizcar con dos dedos</button>
-    <button data-onclick="vwRdSet('zDbl',${VW.zDbl ? 0 : 1})" title="En pantalla completa el doble toque sigue sacando los colores">${tick(VW.zDbl)}👆 Doble toque: acercar y volver a ajustar</button>
-    <hr><div class="ctxh">Pantalla completa: pestaña ▾ de la barra oculta</div>
-    ${[['l', '◧ A la izquierda'], ['c', '▣ En el centro'], ['r', '◨ A la derecha']].map(([v, t]) => `<button data-keep data-onclick="vwTabPos('${v}');vwReadMenu()">${tick(VW.tbPos === v)}${t}</button>`).join('')}${annColMenu('vwReadMenu()')}`);
+`);
 }
+/* ⚙ Ajustes del visor (v39.47, ⋯ → ⚙): lo que se elige una vez y se olvida, fuera de los submenús de lectura. Mismo panel en el PDF y en
+   el EPUB (ep: sin lo que solo tiene el PDF). Todo se recuerda en el dispositivo, menos «Abrir los PDF» (Configuración, pdfTab) y la copia en el Drive normal (de cada PDF). */
+const VW_LITE_K = 'gp-vw-lite';
+const vwLitePref = () => { try { const v = localStorage.getItem(VW_LITE_K); return v === 'on' || v === 'off' ? v : 'auto'; } catch (e) { return 'auto'; } };
+function vwLiteSet(v) { try { localStorage.setItem(VW_LITE_K, v); } catch (e) {} if (VW.open) { VW.lite = vwLiteWant(); $('#vw').classList.toggle('lite', VW.lite); } }
+function vwSidePref(on) { try { localStorage.setItem('gp-vw-side', on ? '1' : '0'); } catch (e) {} }
+function vwCfgHtml(ep) {
+  const back = ep ? 'epMoreBack()' : 'vwMoreBack()', me = ep ? 'epCfgMenu()' : 'vwCfgMenu()', b = (on, fn, t, ti) => `<button data-keep data-onclick="${fn};${me}"${ti ? ` title="${ti}"` : ''}>${tick(on)}${t}</button>`;
+  const pf = !ep && vwHolders()[0], desk = !vwMv() && !matchMedia('(pointer: coarse)').matches;
+  return `<button data-keep data-onclick="${back}">‹ Volver</button><hr><div class="ctxh">⚙ Ajustes del visor</div>
+    <div class="ctxh">🖍 Al cambiar el color de un subrayado</div>${b(annColOnly(), 'annColSet(1)', '🎯 Solo cambia ese subrayado')}${b(!annColOnly(), 'annColSet(0)', 'Ese y los siguientes (también el color para subrayar)')}
+    ${ep ? '' : `<hr><div class="ctxh">👆 Gestos de zoom</div>${b(VW.zPinch, `vwRdSet('zPinch',${VW.zPinch ? 0 : 1})`, '🤏 Pellizcar con dos dedos')}${b(VW.zDbl, `vwRdSet('zDbl',${VW.zDbl ? 0 : 1})`, '👆 Doble toque: acercar y volver a ajustar', 'En pantalla completa el doble toque sigue sacando los colores')}
+    <hr><div class="ctxh">⛶ Pantalla completa: pestaña ▾ de la barra oculta</div>${[['l', '◧ A la izquierda'], ['c', '▣ En el centro'], ['r', '◨ A la derecha']].map(([v, t]) => b(VW.tbPos === v, `vwTabPos('${v}')`, t)).join('')}
+    <hr><div class="ctxh">🌙 Modo noche</div>${[['off', 'No'], ['on', 'Sí'], ['auto', 'Como el sistema (modo oscuro)']].map(([v, t]) => b(vwNightPref() === v, `vwNight('${v}')`, t)).join('')}`}
+    <hr><div class="ctxh">Aa Tamaño del texto de la interfaz</div><div class="epmrow">${UI_FZ.map(z => `<button data-keep class="${uiFz() === z ? 'on' : ''}" data-onclick="uiFzSet(${z});${me}">${Math.round(z * 100)} %</button>`).join('')}</div>
+    <hr><div class="ctxh">📂 Al abrir</div>${desk ? `${b(db.settings.pdfTab !== 'app', "setCfg('pdfTab','tab')", 'Los PDF, en una pestaña nueva')}${b(db.settings.pdfTab === 'app', "setCfg('pdfTab','app')", 'Los PDF, dentro de la aplicación')}` : ''}${b(vwSideOn(), `vwSidePref(${vwSideOn() ? 0 : 1})`, 'Con el panel de anotaciones abierto (pantallas anchas)')}
+    ${pf ? b(pdfVisOf(pf), 'vwVis()', '☁ Guardar este PDF también en mi Drive normal (con los subrayados)') : ''}
+    <hr><div class="ctxh">⚡ Rendimiento: modo ligero</div>${[['auto', 'Automático (móviles con poca memoria)'], ['on', 'Siempre'], ['off', 'Nunca']].map(([v, t]) => b(vwLitePref() === v, `vwLiteSet('${v}')`, t, 'Menos resolución y menos páginas en memoria: más fluido en móviles de gama baja')).join('')}
+    ${desk ? `<hr><button data-keep data-onclick="${ep ? 'epKeysHelp()' : 'vwKeysHelp()'}">⌨ Atajos de teclado <small class="vwsub">? ›</small></button>` : ''}`;
+}
+function vwCfgMenu() { vwMenu(VW.menuR, vwCfgHtml(false)); }
 function vwTabPos(v) { VW.tbPos = v === 'l' || v === 'r' ? v : 'c'; vwRdSave(); vwRdClass(); }   // v39.43: dónde va la pestaña que saca la barra (en el móvil, abajo)
 
 /* Candado del tamaño (v39.43), en página a página: no deja cambiar el zoom (botones, Ctrl + rueda, pellizco, doble toque, «ajustar»)
@@ -1291,7 +1306,7 @@ function vwLocked() { if (!VW.zLock) return false; toast('🔒 La hoja está blo
 function vwAutoMenu() {   // submenú del desplazamiento automático (v39.41): empezar o parar, velocidad y modo concentración
   vwMenu(VW.menuR, `<button data-keep data-onclick="vwReadMenu()">‹ Volver</button><hr>
     <button data-onclick="${VW.auto ? 'vwAutoStop()' : 'vwAutoStart()'}">${VW.auto ? '⏹ Parar el desplazamiento automático' : '▶ Empezar el desplazamiento automático'}</button>
-    <div class="ctxh">Velocidad: ${VW.auto ? VW.autoLv : vwAutoLv()} de 20</div>
+    <div class="ctxh">Velocidad: ${vwAutoFmt(VW.auto ? VW.autoLv : vwAutoLv())} de 20</div>
     <button data-keep data-onclick="vwAutoSpeed(-1);vwAutoMenu()">🐢 Más despacio</button><button data-keep data-onclick="vwAutoSpeed(1);vwAutoMenu()">🐇 Más deprisa</button>
     <hr><button data-onclick="vwConcSet(${vwConcOn() ? 0 : 1})" title="Mientras la página baja sola, oculta las barras y los menús; un toque en la página los vuelve a sacar (y pausa)">${tick(vwConcOn())}🧘 Modo concentración</button>
     <div class="vwhint">Oculta las barras y los menús mientras baja. Un toque en la página (o Esc) los saca y pausa; otro toque en el centro sigue y los vuelve a ocultar. Tecla C.</div>`);
@@ -1299,14 +1314,16 @@ function vwAutoMenu() {   // submenú del desplazamiento automático (v39.41): e
 function vwMoreBack() { vwMore({stopPropagation() {}, currentTarget: {getBoundingClientRect: () => VW.menuR}}); }
 
 /* Desplazamiento automático: velocidad de 1 a 20, en puntos del PDF por segundo (sigue igual al hacer zoom) */
-const vwAutoLv = () => { try { const v = +localStorage.getItem(VW_AUTO_K); return v >= 1 && v <= 20 ? v : 7; } catch (e) { return 7; } };
+const vwAutoLv = () => { try { const v = +localStorage.getItem(VW_AUTO_K); return v >= 1 && v <= 20 ? Math.round(v * 2) / 2 : 7; } catch (e) { return 7; } };
+const vwAutoR = v => Math.max(1, Math.min(20, Math.round(+v * 2) / 2 || 7));   // v39.47: también medios puntos (7, 7,5, 8…)
+const vwAutoFmt = v => String(v).replace('.', ',');
 const vwAutoPts = l => 2 * Math.pow(1.2, l - 1);
 function vwAutoBar() {
   let b = $('#vwAuto'); if (b) return b;
   vw$('.vwbody').insertAdjacentHTML('beforeend', `<div id="vwAuto" class="vwfloat" role="toolbar" aria-label="Desplazamiento automático" hidden>
     <button class="vwib vwap" data-onclick="vwAutoPause()" title="Pausa (barra espaciadora, o toque en el centro de la página)" aria-label="Pausa">⏸</button>
     <button class="vwib" data-onclick="vwAutoSpeed(-1)" title="Más despacio (toque a la izquierda de la página)" aria-label="Más despacio">🐢</button>
-    <input id="vwAutoR" type="range" min="1" max="20" step="1" aria-label="Velocidad" data-oninput="vwAutoSet(this.value)">
+    <input id="vwAutoR" type="range" min="1" max="20" step="0.5" aria-label="Velocidad" data-oninput="vwAutoSet(this.value)">
     <button class="vwib" data-onclick="vwAutoSpeed(1)" title="Más deprisa (toque a la derecha de la página)" aria-label="Más deprisa">🐇</button>
     <span id="vwAutoV"></span>
     <button class="vwib vwcb" data-onclick="vwConcSet(!vwConcOn())" title="Modo concentración: oculta las barras mientras baja; un toque las saca (C)" aria-label="Modo concentración">🧘</button>
@@ -1331,7 +1348,7 @@ function vwConcShow() {
 function vwConcTap() { if (!vwConcHidden()) return false; vwAutoPause(true); return true; }   // con las barras ocultas, un toque solo las saca
 function vwAutoShow() {
   vwConcShow(); const b = vwAutoBar(); b.hidden = !VW.auto; if (!VW.auto) return;
-  b.querySelector('.vwcb').classList.toggle('on', vwConcOn()); $('#vwAutoR').value = VW.autoLv; $('#vwAutoV').textContent = VW.autoLv; b.classList.toggle('paused', !!VW.autoPaused);
+  b.querySelector('.vwcb').classList.toggle('on', vwConcOn()); $('#vwAutoR').value = VW.autoLv; $('#vwAutoV').textContent = vwAutoFmt(VW.autoLv); b.classList.toggle('paused', !!VW.autoPaused);
   const p = b.querySelector('.vwap'); p.textContent = VW.autoPaused ? '▶' : '⏸'; p.title = (VW.autoPaused ? 'Seguir' : 'Pausa') + ' (barra espaciadora, o toque en el centro de la página)'; p.ariaLabel = VW.autoPaused ? 'Seguir' : 'Pausa';
 }
 function vwAutoStart() {
@@ -1346,8 +1363,8 @@ function vwAutoPause(on) {
   if (!VW.autoPaused) { const sc = $('#vwScroll'); VW.autoY = sc.scrollTop; VW.autoT = 0; if (sc.scrollTop + sc.clientHeight >= sc.scrollHeight - 1) VW.autoPaused = true; }   // al final no hay nada más
   vwAutoShow();
 }
-function vwAutoSet(v) { VW.autoLv = Math.max(1, Math.min(20, Math.round(+v) || 7)); try { localStorage.setItem(VW_AUTO_K, VW.autoLv); } catch (e) {} vwAutoShow(); }
-function vwAutoSpeed(d) { vwAutoSet((VW.auto ? VW.autoLv : vwAutoLv()) + d); toast(`Velocidad ${VW.autoLv} de 20`, [], 900); }
+function vwAutoSet(v) { VW.autoLv = vwAutoR(v); try { localStorage.setItem(VW_AUTO_K, VW.autoLv); } catch (e) {} vwAutoShow(); }
+function vwAutoSpeed(d) { vwAutoSet((VW.auto ? VW.autoLv : vwAutoLv()) + d / 2); toast(`Velocidad ${vwAutoFmt(VW.autoLv)} de 20`, [], 900); }   // cada paso, medio punto
 function vwAutoTick(t) {
   if (!VW.auto || !VW.open) return; VW.autoRaf = requestAnimationFrame(vwAutoTick);
   const dt = VW.autoT ? Math.min(.1, (t - VW.autoT) / 1000) : 0; VW.autoT = t;

@@ -541,7 +541,7 @@ function epAutoBar() {
   ep$('.vwbody').insertAdjacentHTML('beforeend', `<div id="epAuto" class="vwfloat" role="toolbar" aria-label="Desplazamiento automático" hidden>
     <button class="vwib vwap" data-onclick="epAutoPause()" title="Pausa (barra espaciadora, o toque en el centro)" aria-label="Pausa">⏸</button>
     <button class="vwib" data-onclick="epAutoSpeed(-1)" title="Más despacio (toque a la izquierda)" aria-label="Más despacio">🐢</button>
-    <input id="epAutoR" type="range" min="1" max="20" step="1" aria-label="Velocidad" data-oninput="epAutoSet(this.value)">
+    <input id="epAutoR" type="range" min="1" max="20" step="0.5" aria-label="Velocidad" data-oninput="epAutoSet(this.value)">
     <button class="vwib" data-onclick="epAutoSpeed(1)" title="Más deprisa (toque a la derecha)" aria-label="Más deprisa">🐇</button><span id="epAutoV"></span>
     <button class="vwib vwcb" data-onclick="epConcSet(!vwConcOn())" title="Modo concentración: oculta las barras mientras baja; un toque las saca (C)" aria-label="Modo concentración">🧘</button>
     <button class="vwib" data-onclick="epAutoStop()" title="Parar el desplazamiento automático" aria-label="Parar">✕</button></div>`);
@@ -553,7 +553,7 @@ function epConcTap() { if (!epConcHidden()) return false; epAutoPause(true); ret
 function epConcSet(on) { try { localStorage.setItem(VW_CONC_K, on ? '1' : '0'); } catch (e) {} if (on && !EP.auto) epAutoStart(); else epAutoShow(); if (on) toast('Modo concentración: toca la página para sacar las barras.', [], 2600); }
 function epAutoShow() {
   epConcShow(); const b = epAutoBar(); b.hidden = !EP.auto; if (!EP.auto) return;
-  b.querySelector('.vwcb').classList.toggle('on', vwConcOn()); $('#epAutoR').value = EP.autoLv; $('#epAutoV').textContent = EP.autoLv; b.classList.toggle('paused', !!EP.autoPaused);
+  b.querySelector('.vwcb').classList.toggle('on', vwConcOn()); $('#epAutoR').value = EP.autoLv; $('#epAutoV').textContent = vwAutoFmt(EP.autoLv); b.classList.toggle('paused', !!EP.autoPaused);
   const p = b.querySelector('.vwap'); p.textContent = EP.autoPaused ? '▶' : '⏸'; p.ariaLabel = EP.autoPaused ? 'Seguir' : 'Pausa';
 }
 function epAutoStart() {
@@ -568,8 +568,8 @@ function epAutoPause(on) {
   if (!EP.autoPaused) { const sc = $('#epScroll'); EP.autoY = sc.scrollTop; EP.autoT = 0; if (sc.scrollTop + sc.clientHeight >= sc.scrollHeight - 1) EP.autoPaused = true; }
   epAutoShow();
 }
-function epAutoSet(v) { EP.autoLv = Math.max(1, Math.min(20, Math.round(+v) || 7)); try { localStorage.setItem(VW_AUTO_K, EP.autoLv); } catch (e) {} epAutoShow(); }
-function epAutoSpeed(d) { epAutoSet((EP.auto ? EP.autoLv : vwAutoLv()) + d); toast(`Velocidad ${EP.autoLv} de 20`, [], 900); }
+function epAutoSet(v) { EP.autoLv = vwAutoR(v); try { localStorage.setItem(VW_AUTO_K, EP.autoLv); } catch (e) {} epAutoShow(); }
+function epAutoSpeed(d) { epAutoSet((EP.auto ? EP.autoLv : vwAutoLv()) + d / 2); toast(`Velocidad ${vwAutoFmt(EP.autoLv)} de 20`, [], 900); }
 function epAutoTick(t) {   // la velocidad va en líneas: con letra más grande, más píxeles por segundo
   if (!EP.auto || !EP.open) return; EP.autoRaf = requestAnimationFrame(epAutoTick);
   const dt = EP.autoT ? Math.min(.1, (t - EP.autoT) / 1000) : 0; EP.autoT = t; if (EP.autoPaused || EP.autoHold || !dt) return;
@@ -588,12 +588,13 @@ function epMenu(r, html) {
 function epMore(e) {
   e?.stopPropagation?.(); if (e?.currentTarget) EP.menuR = e.currentTarget.getBoundingClientRect(); const s = epSet(), P = epPaperOf();
   const mode = (EP.auto ? 'Automático' : s.mode === 'page' ? (s.two ? 'Doble página' : 'Página a página') : 'Seguido');
-  epMenu(EP.menuR, `<button data-keep data-onclick="epReadMenu()">📖 Modo de lectura <small class="vwsub">${mode} ›</small></button><button data-keep data-onclick="epTypoMenu()">Aa Texto y colores <small class="vwsub">›</small></button><button data-keep data-onclick="epBmMenu()">🔖 Marcadores <small class="vwsub">${epBms().length || 'ninguno'} ›</small></button>${vwMv() ? '' : '<button data-keep data-onclick="epKeysHelp()">⌨ Atajos de teclado <small class="vwsub">? ›</small></button>'}
+  epMenu(EP.menuR, `<button data-keep data-onclick="epReadMenu()">📖 Modo de lectura <small class="vwsub">${mode} ›</small></button><button data-keep data-onclick="epTypoMenu()">Aa Texto y colores <small class="vwsub">›</small></button><button data-keep data-onclick="epBmMenu()">🔖 Marcadores <small class="vwsub">${epBms().length || 'ninguno'} ›</small></button><button data-keep data-onclick="epCfgMenu()">⚙ Ajustes del visor <small class="vwsub">›</small></button>
     <hr>${epCanShare() ? '<button data-onclick="epShare()">📲 Abrir en otra app…</button>' : ''}<button data-onclick="epDownload()">⬇ Descargar el EPUB</button>
     ${P && !$('#dlg').open ? '<button data-onclick="epFicha()">📝 Ficha del paper</button>' : ''}${EP.src?.kind === 'inbox' ? '<button data-onclick="epCite()">＋ Crear la cita de este EPUB</button>' : ''}
     ${EP.bk ? `<hr><div class="vwhint">${esc(EP.bk.meta.title || '')}${EP.bk.meta.authors.length ? ' · ' + esc(EP.bk.meta.authors.slice(0, 3).join('; ')) : ''}${EP.bk.meta.year ? ' · ' + esc(EP.bk.meta.year) : ''} · ${EP.secs.length} ${EP.secs.length === 1 ? 'capítulo' : 'capítulos'}</div>` : ''}`);
 }
 function epMoreBack() { epMore(); }
+function epCfgMenu() { epMenu(EP.menuR, vwCfgHtml(true)); }
 function epReadMenu() {
   const s = epSet(), o = (on, fn, t, k) => `<button data-onclick="${fn}">${tick(on)}${t}${k ? ` <small class="vwsub">${k}</small>` : ''}</button>`;
   epMenu(EP.menuR, `<button data-keep data-onclick="epMoreBack()">‹ Volver</button><hr>
@@ -601,7 +602,7 @@ function epReadMenu() {
     ${!EP.auto && s.mode === 'page' && s.two ? `${o(!s.one, "epSetPut('one',false)", '⏩ Pasar de dos en dos', '')}${o(s.one, "epSetPut('one',true)", '↪ Pasar de una en una (la derecha pasa a la izquierda)', '')}` : ''}
     <div class="vwhint">Página a página: toca a la izquierda o a la derecha (o desliza, o ← →) para pasar. La doble página necesita una pantalla ancha.</div><hr>
     <button data-onclick="${EP.auto ? 'epAutoStop()' : 'epAutoStart()'}">${EP.auto ? '⏹ Parar el desplazamiento automático' : '⏬ Desplazamiento automático'} <small class="vwsub">A</small></button>
-    <button data-onclick="epConcSet(${vwConcOn() ? 0 : 1})">${tick(vwConcOn())}🧘 Modo concentración <small class="vwsub">C</small></button>${annColMenu('epReadMenu()')}`);
+    <button data-onclick="epConcSet(${vwConcOn() ? 0 : 1})">${tick(vwConcOn())}🧘 Modo concentración <small class="vwsub">C</small></button>`);
 }
 function epMode(m) { if (EP.auto) epAutoStop(); const o = epSet(); o.mode = m === 'scroll' ? 'scroll' : 'page'; o.two = m === 'two'; try { localStorage.setItem(EP_SET_K, JSON.stringify(o)); } catch (e) {} epSetApply(true); }
 function epFicha() { const p = epPaperOf(); if (p) openPaper(p.id); }

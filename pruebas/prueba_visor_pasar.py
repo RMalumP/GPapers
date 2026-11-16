@@ -29,10 +29,10 @@ with sync_playwright() as pw:
     N = A.evaluate("VW.pages.length")
     eq('el PDF de prueba tiene 8 páginas', N, 8)
     # ---- pestaña ▾ de la barra oculta
-    A.click('#vwMoreB'); A.wait_for_timeout(150); A.click("#vwMenu button[data-onclick=\"vwReadMenu()\"]"); A.wait_for_timeout(150)
-    eq('el submenú tiene la pestaña de la barra (izquierda, centro, derecha)', A.evaluate("['pestaña ▾', 'A la izquierda', 'En el centro', 'A la derecha'].map(t => $('#vwMenu').textContent.includes(t))"), [True] * 4)
+    A.click('#vwMoreB'); A.wait_for_timeout(150); A.click("#vwMenu button[data-onclick=\"vwCfgMenu()\"]"); A.wait_for_timeout(150)
+    eq('⚙ Ajustes del visor tiene la pestaña de la barra (izquierda, centro, derecha)', A.evaluate("['pestaña ▾', 'A la izquierda', 'En el centro', 'A la derecha'].map(t => $('#vwMenu').textContent.includes(t))"), [True] * 4)
     eq('por defecto, en el centro', A.evaluate("VW.tbPos"), 'c')
-    A.click("#vwMenu button[data-onclick=\"vwTabPos('r');vwReadMenu()\"]"); A.wait_for_timeout(150)
+    A.click("#vwMenu button[data-onclick=\"vwTabPos('r');vwCfgMenu()\"]"); A.wait_for_timeout(150)
     eq('elegir no cierra el menú y marca la opción', A.evaluate("[!$('#vwMenu').hidden, [...$('#vwMenu').querySelectorAll('button')].find(b => b.textContent.includes('A la derecha')).textContent.trim().startsWith('✓')]"), [True, True])
     eq('se recuerda en el dispositivo', A.evaluate("JSON.parse(localStorage.getItem('gp-vw-read')).tab"), 'r')
     A.evaluate("$('#vwMenu').hidden = true; vwFs(true); vwTbHide(true)"); A.wait_for_timeout(300)

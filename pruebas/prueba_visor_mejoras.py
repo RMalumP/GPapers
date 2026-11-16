@@ -96,7 +96,7 @@ with sync_playwright() as pw:
     A.keyboard.press('d'); A.wait_for_timeout(200); eq('D: doble página', A.evaluate("VW.two"), True)
     A.keyboard.press('d'); A.wait_for_timeout(200); eq('D otra vez: una página', A.evaluate("VW.two"), False)
     A.keyboard.press('a'); A.wait_for_timeout(150); A.keyboard.press('ArrowUp'); A.wait_for_timeout(100)
-    eq('A: automático; ↑ más deprisa', [A.evaluate("VW.auto"), A.evaluate("VW.autoLv")], [True, 8])
+    eq('A: automático; ↑ más deprisa', [A.evaluate("VW.auto"), A.evaluate("VW.autoLv")], [True, 7.5])
     A.keyboard.press('ArrowDown'); A.keyboard.press('a'); A.wait_for_timeout(100)
     eq('↓ más despacio; A otra vez lo para', [A.evaluate("VW.autoLv"), A.evaluate("VW.auto")], [7, False])
     A.keyboard.press('i'); A.wait_for_timeout(200); eq('I: índice', A.evaluate("[VW.side, VW.tab]"), [True, 'toc'])
