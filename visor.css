@@ -148,6 +148,10 @@ html.mv .vwhd{width:28px;height:28px}html.mv .vwhd0{margin-left:-28px}
 #vw.fs.tbh #vwTbTab{display:block;position:absolute;top:0;left:50%;transform:translateX(-50%);z-index:6;border-radius:0 0 10px 10px;border-top:0;padding:0 16px;min-height:22px;line-height:22px;font-size:calc(14px * var(--fz,1));opacity:.75}
 html.mv #vw.fs.tbh #vwTbTab{top:auto;bottom:0;border-radius:10px 10px 0 0;border-top:1px solid var(--bd);border-bottom:0}
 #vw.fs.fsbars .vwh{display:flex}#vw.fs.fsbars .vwtb{display:flex}#vw.fs.fsbars #vwTbTab{display:none}
+/* v39.44: la barra sacada con la pestaña ▾ flota encima de la página (la hoja no se mueve); las dos barras de 3 s, también */
+#vw.fs.tbx .vwtb{position:absolute;left:0;right:0;top:0;z-index:6;box-shadow:0 2px 10px #0003}
+#vw.fs.tbx.fsbars .vwh{position:absolute;left:0;right:0;top:0;margin:0;z-index:7}#vw.fs.tbx.fsbars .vwtb{top:var(--vwhh,49px)}
+html.mv #vw.fs.tbx .vwtb{top:auto;bottom:0;box-shadow:0 -2px 10px #0003}
 /* v39.43: la pestaña ▾ a un lado (⋯ → Modo de lectura) y el candado del tamaño (página a página): en la barra y, en pantalla completa, en una esquina casi transparente */
 #vw.fs.tbh.tabl #vwTbTab{left:10px;transform:none}#vw.fs.tbh.tabr #vwTbTab{left:auto;right:10px;transform:none}
 #vw .vwlk{display:none}#vw.flip .vwh .vwlk{display:inline-flex}
