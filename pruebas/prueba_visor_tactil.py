@@ -69,8 +69,8 @@ with sync_playwright() as pw:
     eq('también con los colores de la barra, con su ventanita abierta', A.evaluate("[db.papers[0].pdf.ann[0].c, VW.color]"), ['#4dabf7', 0])
     A.evaluate("annColSet(false)"); A.evaluate("vwPopColor(4)")
     eq('«ese y los siguientes» (por defecto, como antes)', A.evaluate("[db.papers[0].pdf.ann[0].c, VW.color, localStorage.getItem('gp-ann-col')]"), ['#b197fc', 4, 'next'])
-    A.evaluate("vwPopClose(); vwMore({stopPropagation() {}, currentTarget: $('#vw .vwh button[data-onclick*=vwMore]') || $('#vw .vwtb')}); vwReadMenu()"); A.wait_for_timeout(200)
-    eq('la opción está en ⋯ → Modo de lectura', A.evaluate("[...document.querySelectorAll('#vwMenu button')].filter(b => /Solo cambia ese|Ese y los siguientes/.test(b.textContent)).length"), 2)
+    A.evaluate("vwPopClose(); vwMore({stopPropagation() {}, currentTarget: $('#vw .vwh button[data-onclick*=vwMore]') || $('#vw .vwtb')}); vwCfgMenu()"); A.wait_for_timeout(200)
+    eq('la opción está en ⋯ → ⚙ Ajustes del visor', A.evaluate("[...document.querySelectorAll('#vwMenu button')].filter(b => /Solo cambia ese|Ese y los siguientes/.test(b.textContent)).length"), 2)
     eq('en táctil, los subrayados sin «multiplicar»', A.evaluate("getComputedStyle(document.querySelector('#vw .vwhl')).mixBlendMode"), 'normal')
     A.evaluate("vwClose()"); A.wait_for_timeout(300)
     # ---- EPUB: también selección propia

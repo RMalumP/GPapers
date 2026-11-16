@@ -364,3 +364,10 @@ Todo en **⋯ del visor → 📖 Modo de lectura** (se recuerda en este disposit
 ## Visor: con el candado la hoja tampoco se mueve (v39.46)
 - Con **🔒 candado** (página a página) la hoja queda **fija**: no cambia el tamaño y **tampoco se mueve** (ni arrastrando con el dedo, ni con dos dedos, ni con la rueda del ratón). Solo se pasa de página (toques a los lados, ← →, ↑ ↓, AvPág/RePág, espacio), y la página nueva sale en la misma zona. Para mover la hoja o cambiar el tamaño, se quita el candado.
 - Pruebas: `python3 pruebas/prueba_visor_pasar.py .`
+
+## Visor: ⚙ Ajustes del visor y medios puntos de velocidad (v39.47)
+- **⋯ → ⚙ Ajustes del visor** (PDF y EPUB) reúne lo que se elige una vez y se olvida, para que los submenús de lectura no estén saturados:
+  🖍 al cambiar el color de un subrayado (solo ese / ese y los siguientes) · 👆 gestos de zoom (pellizcar, doble toque; solo PDF) · ⛶ dónde va la pestaña ▾ en pantalla completa (solo PDF) · 🌙 modo noche (solo PDF; el EPUB tiene sus colores en «Aa Texto y colores») · Aa tamaño del texto de la interfaz · 📂 al abrir (los PDF en pestaña nueva o dentro de la app, en el ordenador; panel de anotaciones abierto o no; este PDF también en el Drive normal) · ⚡ modo ligero (automático, siempre o nunca; `gp-vw-lite`) · ⌨ atajos de teclado (en el ordenador).
+- **⋯** queda con 📖 Modo de lectura, 🔖 Marcadores, ⚙ Ajustes del visor y lo de descargar o abrir en otra app. **📖 Modo de lectura** queda con lo de leer: una o doble página, seguido o página a página, 🔒 candado, desplazamiento automático y recortar márgenes.
+- **Desplazamiento automático con medios puntos**: la velocidad va de 1 a 20 de medio en medio (7, 7,5, 8…); 🐢/🐇, los toques a los lados, ↑ ↓ y la barra cambian medio punto. También en el EPUB.
+- Pruebas: `python3 pruebas/prueba_visor_ajustes.py .`
