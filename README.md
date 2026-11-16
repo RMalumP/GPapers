@@ -371,3 +371,10 @@ Todo en **⋯ del visor → 📖 Modo de lectura** (se recuerda en este disposit
 - **⋯** queda con 📖 Modo de lectura, 🔖 Marcadores, ⚙ Ajustes del visor y lo de descargar o abrir en otra app. **📖 Modo de lectura** queda con lo de leer: una o doble página, seguido o página a página, 🔒 candado, desplazamiento automático y recortar márgenes.
 - **Desplazamiento automático con medios puntos**: la velocidad va de 1 a 20 de medio en medio (7, 7,5, 8…); 🐢/🐇, los toques a los lados, ↑ ↓ y la barra cambian medio punto. También en el EPUB.
 - Pruebas: `python3 pruebas/prueba_visor_ajustes.py .`
+
+## Visor: límites fijos para un subrayado ya hecho (v39.48)
+- **⚙ Ajustes del visor → ✋ Límites de un subrayado ya hecho (tiradores)** (PDF): para no alargar ni acortar un subrayado sin querer al tocarlo.
+  - **Fijos con el 🔒 candado o el ⚡ modo ligero** (por defecto): con cualquiera de los dos activo, al tocar un subrayado sale su ventanita (color, comentario, copiar, borrar) pero **no salen los tiradores**. Al poner o quitar el candado, o cambiar el modo ligero, se aplica al momento.
+  - **Siempre fijos** o **Siempre se pueden mover** (como antes). Se recuerda en el dispositivo (`gp-vw-hdlk`).
+- Subrayar texto nuevo sigue igual (con sus tiradores de selección).
+- Pruebas: `python3 pruebas/prueba_visor_tiradores.py .`

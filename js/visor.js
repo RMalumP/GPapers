@@ -599,22 +599,28 @@ function vwSnap(c, start) {   // lleva el punto al principio (o al final) de la 
 }
 function vwUndo() { vwSaveComment(); getSelection().removeAllRanges(); undo(); }
 /* Tiradores para alargar o acortar un subrayado por delante y por detrás: salen al tocarlo (con su ventanita) */
+/* v39.48: los tiradores se pueden bloquear (⚙ Ajustes del visor → ✋ Límites de un subrayado ya hecho) para no moverlos sin querer al tocar.
+   Por defecto («auto»), bloqueados con el 🔒 candado o con el ⚡ modo ligero; «on», siempre; «off», nunca. Se recuerda en el dispositivo. */
+const VW_HDLK_K = 'gp-vw-hdlk';
+const vwHdLkPref = () => { try { const v = localStorage.getItem(VW_HDLK_K); return v === 'on' || v === 'off' ? v : 'auto'; } catch (e) { return 'auto'; } };
+const vwHdLocked = () => { const p = vwHdLkPref(); return p === 'on' || p === 'auto' && (!!VW.zLock || !!VW.lite); };
+function vwHdLkSet(v) { try { localStorage.setItem(VW_HDLK_K, v); } catch (e) {} if (VW.open && VW.pop) vwHandles(); }
 function vwHandles() {
-  const a = VW.pop && vwAnns().find(x => x.id === VW.pop), d = $('#vw'); let hs = d.querySelectorAll('.vwhd');
+  const a = VW.pop && vwAnns().find(x => x.id === VW.pop), d = $('#vw'); let hs = d.querySelectorAll('.vwhd:not(.tsh)');   // .tsh: los de la selección nueva (táctil), aparte
   if (VW.ext) return;
-  const els = a && a.k === 'hl' ? [...document.querySelectorAll(`#vwPages .vwhl[data-a="${a.id}"]`)] : [];
+  const els = a && a.k === 'hl' && !vwHdLocked() ? [...document.querySelectorAll(`#vwPages .vwhl[data-a="${a.id}"]`)] : [];
   if (!els.length) { hs.forEach(h => h.hidden = true); return; }
   if (!hs.length) {
     for (const k of [0, 1]) { const h = document.createElement('div'); h.className = 'vwhd vwhd' + k; h.dataset.e = k; h.title = k ? 'Arrastra para alargar o acortar por detrás' : 'Arrastra para alargar o acortar por delante';
       h.addEventListener('pointerdown', vwHdDown); h.addEventListener('pointermove', vwHdMove); h.addEventListener('pointerup', vwHdUp); h.addEventListener('pointercancel', vwHdUp); d.append(h); }
-    hs = d.querySelectorAll('.vwhd');
+    hs = d.querySelectorAll('.vwhd:not(.tsh)');
   }
   const D = d.getBoundingClientRect(), f = els[0].getBoundingClientRect(), l = els.at(-1).getBoundingClientRect();
   Object.assign(hs[0].style, {left: f.left - D.left + 'px', top: f.bottom - D.top + 'px', '--c': a.c}); Object.assign(hs[1].style, {left: l.right - D.left + 'px', top: l.bottom - D.top + 'px', '--c': a.c});
   hs.forEach(h => h.hidden = false);
 }
 function vwHdDown(e) {
-  const h = e.currentTarget, a = vwAnns().find(x => x.id === VW.pop); if (!a) return; e.preventDefault(); e.stopPropagation();
+  const h = e.currentTarget, a = vwAnns().find(x => x.id === VW.pop); if (!a || vwHdLocked()) return; e.preventDefault(); e.stopPropagation();
   const R = [...document.querySelectorAll(`#vwPages .vwhl[data-a="${a.id}"]`)].map(x => x.getBoundingClientRect()); if (!R.length) return;
   const start = h.dataset.e === '0', o = start ? R.at(-1) : R[0], m = start ? R[0] : R.at(-1);
   const fix = vwCaret(start ? o.right - 1 : o.left + 1, o.top + o.height / 2); if (!fix) return;
@@ -713,7 +719,7 @@ function vwPopPlace() {
   y = Math.min(Math.max(56, y), Math.max(56, d.height - h - 8));   // siempre dentro de la pantalla, aunque la anotación no se vea
   pp.style.left = x + 'px'; pp.style.top = y + 'px'; vwHandles();
 }
-function vwPopClose() { vwSaveComment(); VW.pop = null; document.querySelectorAll('#vw .vwhd').forEach(h => h.hidden = true); const pp = $('#vwPop'); if (pp) pp.hidden = true; document.querySelectorAll('#vw .on[data-a]').forEach(e => e.classList.remove('on')); }
+function vwPopClose() { vwSaveComment(); VW.pop = null; document.querySelectorAll('#vw .vwhd:not(.tsh)').forEach(h => h.hidden = true); const pp = $('#vwPop'); if (pp) pp.hidden = true; document.querySelectorAll('#vw .on[data-a]').forEach(e => e.classList.remove('on')); }
 function vwCmIn() { clearTimeout(VW.cmT); VW.cmT = setTimeout(vwSaveComment, 700); }
 function vwSaveComment() {   // el comentario se guarda al dejar de escribir (y al cerrar)
   clearTimeout(VW.cmT); const t = $('#vwCm'); if (!t || !VW.pop) return; const a = vwAnns().find(x => x.id === VW.pop); if (!a) return;
@@ -1269,7 +1275,7 @@ function vwReadMenu() {
    el EPUB (ep: sin lo que solo tiene el PDF). Todo se recuerda en el dispositivo, menos «Abrir los PDF» (Configuración, pdfTab) y la copia en el Drive normal (de cada PDF). */
 const VW_LITE_K = 'gp-vw-lite';
 const vwLitePref = () => { try { const v = localStorage.getItem(VW_LITE_K); return v === 'on' || v === 'off' ? v : 'auto'; } catch (e) { return 'auto'; } };
-function vwLiteSet(v) { try { localStorage.setItem(VW_LITE_K, v); } catch (e) {} if (VW.open) { VW.lite = vwLiteWant(); $('#vw').classList.toggle('lite', VW.lite); } }
+function vwLiteSet(v) { try { localStorage.setItem(VW_LITE_K, v); } catch (e) {} if (VW.open) { VW.lite = vwLiteWant(); $('#vw').classList.toggle('lite', VW.lite); if (VW.pop) vwHandles(); } }
 function vwSidePref(on) { try { localStorage.setItem('gp-vw-side', on ? '1' : '0'); } catch (e) {} }
 function vwCfgHtml(ep) {
   const back = ep ? 'epMoreBack()' : 'vwMoreBack()', me = ep ? 'epCfgMenu()' : 'vwCfgMenu()', b = (on, fn, t, ti) => `<button data-keep data-onclick="${fn};${me}"${ti ? ` title="${ti}"` : ''}>${tick(on)}${t}</button>`;
@@ -1282,6 +1288,7 @@ function vwCfgHtml(ep) {
     <hr><div class="ctxh">Aa Tamaño del texto de la interfaz</div><div class="epmrow">${UI_FZ.map(z => `<button data-keep class="${uiFz() === z ? 'on' : ''}" data-onclick="uiFzSet(${z});${me}">${Math.round(z * 100)} %</button>`).join('')}</div>
     <hr><div class="ctxh">📂 Al abrir</div>${desk ? `${b(db.settings.pdfTab !== 'app', "setCfg('pdfTab','tab')", 'Los PDF, en una pestaña nueva')}${b(db.settings.pdfTab === 'app', "setCfg('pdfTab','app')", 'Los PDF, dentro de la aplicación')}` : ''}${b(vwSideOn(), `vwSidePref(${vwSideOn() ? 0 : 1})`, 'Con el panel de anotaciones abierto (pantallas anchas)')}
     ${pf ? b(pdfVisOf(pf), 'vwVis()', '☁ Guardar este PDF también en mi Drive normal (con los subrayados)') : ''}
+    ${ep ? '' : `<hr><div class="ctxh">✋ Límites de un subrayado ya hecho (tiradores)</div>${[['auto', 'Fijos con el 🔒 candado o el ⚡ modo ligero'], ['on', 'Siempre fijos'], ['off', 'Siempre se pueden mover']].map(([v, t]) => b(vwHdLkPref() === v, `vwHdLkSet('${v}')`, t, 'Fijos: al tocar un subrayado no salen los tiradores, así no se alarga ni se acorta sin querer')).join('')}`}
     <hr><div class="ctxh">⚡ Rendimiento: modo ligero</div>${[['auto', 'Automático (móviles con poca memoria)'], ['on', 'Siempre'], ['off', 'Nunca']].map(([v, t]) => b(vwLitePref() === v, `vwLiteSet('${v}')`, t, 'Menos resolución y menos páginas en memoria: más fluido en móviles de gama baja')).join('')}
     ${desk ? `<hr><button data-keep data-onclick="${ep ? 'epKeysHelp()' : 'vwKeysHelp()'}">⌨ Atajos de teclado <small class="vwsub">? ›</small></button>` : ''}`;
 }
@@ -1295,7 +1302,7 @@ function vwTabPos(v) { VW.tbPos = v === 'l' || v === 'r' ? v : 'c'; vwRdSave(); 
 function vwLockSet(on, quiet) {
   on = !!on; if (on && !VW.flip) return toast('El candado del tamaño es para página a página (⋯ → 📖 Modo de lectura).', [], 2400);
   if (!!VW.zLock === on) return vwLockShow(); VW.zLock = on; if (on) VW.fit = false;   // se queda la escala exacta, también si cambia la ventana
-  vwLockShow(); if (!quiet) toast(on ? '🔒 Hoja fija: no cambia el tamaño ni se mueve; solo se pasa de página (y se queda la misma zona).' : '🔓 Tamaño libre: ya puedes acercar y alejar.', [], 2200);
+  vwLockShow(); if (VW.pop) vwHandles(); if (!quiet) toast(on ? '🔒 Hoja fija: no cambia el tamaño ni se mueve; solo se pasa de página (y se queda la misma zona).' : '🔓 Tamaño libre: ya puedes acercar y alejar.', [], 2200);
 }
 function vwLockShow() {
   const d = $('#vw'); if (!d) return; d.classList.toggle('zlock', !!VW.zLock);
