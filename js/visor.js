@@ -591,6 +591,20 @@ function vwCaret(x, y) {
   if (!n || n.nodeType !== 3 || !n.parentElement?.closest('.textLayer')) return null;
   return {n, o};
 }
+function vwCaretAny(x, y) {   // como vwCaret, pero también fuera de la pantalla (caretPositionFromPoint solo ve lo que está a la vista)
+  if (x >= 0 && y >= 0 && x < innerWidth && y < innerHeight) { const c = vwCaret(x, y); if (c) return c; }
+  const inR = (r, m = 1) => x >= r.left - m && x <= r.right + m && y >= r.top - m && y <= r.bottom + m, rg = document.createRange();
+  for (const tl of document.querySelectorAll('#vwPages .textLayer')) {
+    if (!inR(tl.getBoundingClientRect())) continue;
+    const w = document.createTreeWalker(tl, NodeFilter.SHOW_TEXT);
+    for (let n; (n = w.nextNode());) {
+      if (!n.data.length) continue; rg.selectNodeContents(n); if (!inR(rg.getBoundingClientRect(), 2)) continue;
+      for (let o = 0; o < n.data.length; o++) { rg.setStart(n, o); rg.setEnd(n, o + 1); const r = rg.getBoundingClientRect(); if (x < r.left + r.width / 2) return {n, o}; }
+      return {n, o: n.data.length};
+    }
+  }
+  return null;
+}
 const VW_WORD = /[\p{L}\p{N}_'’-]/u;
 function vwSnap(c, start) {   // lleva el punto al principio (o al final) de la palabra
   const t = c.n.data; let o = c.o;
@@ -599,16 +613,10 @@ function vwSnap(c, start) {   // lleva el punto al principio (o al final) de la 
 }
 function vwUndo() { vwSaveComment(); getSelection().removeAllRanges(); undo(); }
 /* Tiradores para alargar o acortar un subrayado por delante y por detrás: salen al tocarlo (con su ventanita) */
-/* v39.48: los tiradores se pueden bloquear (⚙ Ajustes del visor → ✋ Límites de un subrayado ya hecho) para no moverlos sin querer al tocar.
-   Por defecto («auto»), bloqueados con el 🔒 candado o con el ⚡ modo ligero; «on», siempre; «off», nunca. Se recuerda en el dispositivo. */
-const VW_HDLK_K = 'gp-vw-hdlk';
-const vwHdLkPref = () => { try { const v = localStorage.getItem(VW_HDLK_K); return v === 'on' || v === 'off' ? v : 'auto'; } catch (e) { return 'auto'; } };
-const vwHdLocked = () => { const p = vwHdLkPref(); return p === 'on' || p === 'auto' && (!!VW.zLock || !!VW.lite); };
-function vwHdLkSet(v) { try { localStorage.setItem(VW_HDLK_K, v); } catch (e) {} if (VW.open && VW.pop) vwHandles(); }
 function vwHandles() {
   const a = VW.pop && vwAnns().find(x => x.id === VW.pop), d = $('#vw'); let hs = d.querySelectorAll('.vwhd:not(.tsh)');   // .tsh: los de la selección nueva (táctil), aparte
   if (VW.ext) return;
-  const els = a && a.k === 'hl' && !vwHdLocked() ? [...document.querySelectorAll(`#vwPages .vwhl[data-a="${a.id}"]`)] : [];
+  const els = a && a.k === 'hl' ? [...document.querySelectorAll(`#vwPages .vwhl[data-a="${a.id}"]`)] : [];
   if (!els.length) { hs.forEach(h => h.hidden = true); return; }
   if (!hs.length) {
     for (const k of [0, 1]) { const h = document.createElement('div'); h.className = 'vwhd vwhd' + k; h.dataset.e = k; h.title = k ? 'Arrastra para alargar o acortar por detrás' : 'Arrastra para alargar o acortar por delante';
@@ -620,18 +628,19 @@ function vwHandles() {
   hs.forEach(h => h.hidden = false);
 }
 function vwHdDown(e) {
-  const h = e.currentTarget, a = vwAnns().find(x => x.id === VW.pop); if (!a || vwHdLocked()) return; e.preventDefault(); e.stopPropagation();
+  const h = e.currentTarget, a = vwAnns().find(x => x.id === VW.pop); if (!a) return; e.preventDefault(); e.stopPropagation();
   const R = [...document.querySelectorAll(`#vwPages .vwhl[data-a="${a.id}"]`)].map(x => x.getBoundingClientRect()); if (!R.length) return;
   const start = h.dataset.e === '0', o = start ? R.at(-1) : R[0], m = start ? R[0] : R.at(-1);
-  const fix = vwCaret(start ? o.right - 1 : o.left + 1, o.top + o.height / 2); if (!fix) return;
-  VW.ext = {id: a.id, start, fix, dx: e.clientX - (start ? m.left : m.right), dy: e.clientY - (m.top + m.height / 2), pid: e.pointerId, hx: parseFloat(h.style.left), hy: parseFloat(h.style.top), x: e.clientX, y: e.clientY};
+  const fix = vwCaretAny(start ? o.right - 1 : o.left + 1, o.top + o.height / 2); if (!fix) return;   // el otro extremo puede estar fuera de la pantalla (con zoom, sobre todo con el 🔒 candado, que no deja moverla)
+  VW.ext = {id: a.id, start, fix, touch: e.pointerType !== 'mouse', dx: e.clientX - (start ? m.left : m.right), dy: e.clientY - (m.top + m.height / 2), pid: e.pointerId, hx: parseFloat(h.style.left), hy: parseFloat(h.style.top), x: e.clientX, y: e.clientY};
   VW.drag = {kind: 'ext', id: -1}; h.setPointerCapture(e.pointerId); h.classList.add('drag'); $('#vwPop').hidden = true;
 }
 function vwHdMove(e) {
   const x = VW.ext; if (!x || x.pid !== e.pointerId) return; const h = e.currentTarget;
   h.style.left = x.hx + e.clientX - x.x + 'px'; h.style.top = x.hy + e.clientY - x.y + 'px';
-  const c = vwCaret(e.clientX - x.dx, e.clientY - x.dy); if (!c) return;
-  const ord = x.fix.n === c.n ? x.fix.o <= c.o : !!(x.fix.n.compareDocumentPosition(c.n) & Node.DOCUMENT_POSITION_FOLLOWING), [A, B] = ord ? [x.fix, c] : [c, x.fix];
+  let c = vwCaret(e.clientX - x.dx, e.clientY - x.dy); if (!c) return;
+  const ord = x.fix.n === c.n ? x.fix.o <= c.o : !!(x.fix.n.compareDocumentPosition(c.n) & Node.DOCUMENT_POSITION_FOLLOWING); if (x.touch) c = vwSnap(c, !ord);   // con el dedo, palabras enteras
+  const [A, B] = ord ? [x.fix, c] : [c, x.fix];
   const r = document.createRange(); r.setStart(A.n, A.o); r.setEnd(B.n, B.o); const s = getSelection(); s.removeAllRanges(); s.addRange(r);
 }
 function vwHdUp(e) {
@@ -1275,7 +1284,7 @@ function vwReadMenu() {
    el EPUB (ep: sin lo que solo tiene el PDF). Todo se recuerda en el dispositivo, menos «Abrir los PDF» (Configuración, pdfTab) y la copia en el Drive normal (de cada PDF). */
 const VW_LITE_K = 'gp-vw-lite';
 const vwLitePref = () => { try { const v = localStorage.getItem(VW_LITE_K); return v === 'on' || v === 'off' ? v : 'auto'; } catch (e) { return 'auto'; } };
-function vwLiteSet(v) { try { localStorage.setItem(VW_LITE_K, v); } catch (e) {} if (VW.open) { VW.lite = vwLiteWant(); $('#vw').classList.toggle('lite', VW.lite); if (VW.pop) vwHandles(); } }
+function vwLiteSet(v) { try { localStorage.setItem(VW_LITE_K, v); } catch (e) {} if (VW.open) { VW.lite = vwLiteWant(); $('#vw').classList.toggle('lite', VW.lite); } }
 function vwSidePref(on) { try { localStorage.setItem('gp-vw-side', on ? '1' : '0'); } catch (e) {} }
 function vwCfgHtml(ep) {
   const back = ep ? 'epMoreBack()' : 'vwMoreBack()', me = ep ? 'epCfgMenu()' : 'vwCfgMenu()', b = (on, fn, t, ti) => `<button data-keep data-onclick="${fn};${me}"${ti ? ` title="${ti}"` : ''}>${tick(on)}${t}</button>`;
@@ -1288,7 +1297,6 @@ function vwCfgHtml(ep) {
     <hr><div class="ctxh">Aa Tamaño del texto de la interfaz</div><div class="epmrow">${UI_FZ.map(z => `<button data-keep class="${uiFz() === z ? 'on' : ''}" data-onclick="uiFzSet(${z});${me}">${Math.round(z * 100)} %</button>`).join('')}</div>
     <hr><div class="ctxh">📂 Al abrir</div>${desk ? `${b(db.settings.pdfTab !== 'app', "setCfg('pdfTab','tab')", 'Los PDF, en una pestaña nueva')}${b(db.settings.pdfTab === 'app', "setCfg('pdfTab','app')", 'Los PDF, dentro de la aplicación')}` : ''}${b(vwSideOn(), `vwSidePref(${vwSideOn() ? 0 : 1})`, 'Con el panel de anotaciones abierto (pantallas anchas)')}
     ${pf ? b(pdfVisOf(pf), 'vwVis()', '☁ Guardar este PDF también en mi Drive normal (con los subrayados)') : ''}
-    ${ep ? '' : `<hr><div class="ctxh">✋ Límites de un subrayado ya hecho (tiradores)</div>${[['auto', 'Fijos con el 🔒 candado o el ⚡ modo ligero'], ['on', 'Siempre fijos'], ['off', 'Siempre se pueden mover']].map(([v, t]) => b(vwHdLkPref() === v, `vwHdLkSet('${v}')`, t, 'Fijos: al tocar un subrayado no salen los tiradores, así no se alarga ni se acorta sin querer')).join('')}`}
     <hr><div class="ctxh">⚡ Rendimiento: modo ligero</div>${[['auto', 'Automático (móviles con poca memoria)'], ['on', 'Siempre'], ['off', 'Nunca']].map(([v, t]) => b(vwLitePref() === v, `vwLiteSet('${v}')`, t, 'Menos resolución y menos páginas en memoria: más fluido en móviles de gama baja')).join('')}
     ${desk ? `<hr><button data-keep data-onclick="${ep ? 'epKeysHelp()' : 'vwKeysHelp()'}">⌨ Atajos de teclado <small class="vwsub">? ›</small></button>` : ''}`;
 }
@@ -1302,7 +1310,7 @@ function vwTabPos(v) { VW.tbPos = v === 'l' || v === 'r' ? v : 'c'; vwRdSave(); 
 function vwLockSet(on, quiet) {
   on = !!on; if (on && !VW.flip) return toast('El candado del tamaño es para página a página (⋯ → 📖 Modo de lectura).', [], 2400);
   if (!!VW.zLock === on) return vwLockShow(); VW.zLock = on; if (on) VW.fit = false;   // se queda la escala exacta, también si cambia la ventana
-  vwLockShow(); if (VW.pop) vwHandles(); if (!quiet) toast(on ? '🔒 Hoja fija: no cambia el tamaño ni se mueve; solo se pasa de página (y se queda la misma zona).' : '🔓 Tamaño libre: ya puedes acercar y alejar.', [], 2200);
+  vwLockShow(); if (!quiet) toast(on ? '🔒 Hoja fija: no cambia el tamaño ni se mueve; solo se pasa de página (y se queda la misma zona).' : '🔓 Tamaño libre: ya puedes acercar y alejar.', [], 2200);
 }
 function vwLockShow() {
   const d = $('#vw'); if (!d) return; d.classList.toggle('zlock', !!VW.zLock);

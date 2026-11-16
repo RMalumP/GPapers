@@ -1,6 +1,7 @@
-# Pruebas del visor (v39.48): los tiradores de un subrayado ya hecho se pueden dejar fijos (⚙ Ajustes del visor → ✋ Límites de un subrayado ya hecho).
-# Por defecto, fijos con el 🔒 candado o con el ⚡ modo ligero; también «siempre fijos» o «siempre se pueden mover».
-import sys, json, os, pathlib, subprocess, time
+# Pruebas del visor (v39.49): los tiradores de un subrayado ya hecho funcionan aunque su otro extremo quede fuera de la pantalla
+# (con zoom, sobre todo con el 🔒 candado, que no deja mover la hoja), con y sin modo ligero; con el dedo van por palabras enteras.
+import sys, json, os, pathlib, subprocess, time, base64, io, zipfile
+import sys, json, os, pathlib, subprocess, time, base64, io, zipfile
 from playwright.sync_api import sync_playwright
 folder = pathlib.Path(sys.argv[1] if len(sys.argv) > 1 else '.').resolve()
 n = fail = 0
@@ -9,53 +10,60 @@ def eq(name, got, want):
     n += 1
     if got != want: fail += 1; print('FALLA', name, '\n  got :', json.dumps(got, ensure_ascii=False), '\n  want:', json.dumps(want, ensure_ascii=False))
 PAPER = "(id, t, o = {}) => NEWF({id, title: t, authors: ['Pérez, Juan'], year: 2024, venue: '', type: 'articulo', doi: '', url: '', accessed: '', general: '', tagIds: [], notes: [], cites: {}, related: [], refTo: [], reading: 'por_leer', rating: 0, sectionIds: [], created: '2026-01-01T00:00:00.000Z', ...o})"
-FILE = "(async () => new File([await (await fetch('pruebas/prueba.pdf')).blob()], 'prueba.pdf', {type: 'application/pdf'}))()"
-PORT = 8814
-VIS = "[...document.querySelectorAll('#vw .vwhd:not(.tsh)')].filter(h => !h.hidden).length"
-MENU = "[...document.querySelectorAll('#vwMenu button, #vwMenu .ctxh')].map(b => b.textContent.trim())"
+MKPDF = """async NP => { const L = await vwPdfLib(), d = await L.PDFDocument.create(), f = await d.embedFont(L.StandardFonts.Helvetica);
+  for (let i = 0; i < NP; i++) { const p = d.addPage([595, 842]); for (let y = 780; y > 60; y -= 24) p.drawText(`Pagina ${i + 1} linea ${y} palabras para subrayar aqui`, {x: 60, y, size: 14, font: f}); }
+  return new File([await d.save()], 'tactil.pdf', {type: 'application/pdf'}); }"""
+def epub():
+    b = io.BytesIO(); z = zipfile.ZipFile(b, 'w')
+    z.writestr(zipfile.ZipInfo('mimetype'), 'application/epub+zip')
+    z.writestr('META-INF/container.xml', '<?xml version="1.0"?><container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container"><rootfiles><rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/></rootfiles></container>')
+    z.writestr('OEBPS/content.opf', '<?xml version="1.0" encoding="UTF-8"?><package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="uid"><metadata xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:title>Libro táctil</dc:title><dc:identifier id="uid">x</dc:identifier></metadata><manifest><item id="c1" href="c1.xhtml" media-type="application/xhtml+xml"/></manifest><spine><itemref idref="c1"/></spine></package>')
+    z.writestr('OEBPS/c1.xhtml', '<?xml version="1.0" encoding="UTF-8"?><html xmlns="http://www.w3.org/1999/xhtml"><head><title>x</title></head><body><h1>Uno</h1>' + ''.join(f'<p>Parrafo {k} con ballenas blancas y arpones afilados en el mar.</p>' for k in range(40)) + '</body></html>')
+    z.close(); return base64.b64encode(b.getvalue()).decode()
+EPF = f"(() => {{ const b = Uint8Array.from(atob('{epub()}'), c => c.charCodeAt(0)); return new File([b], 'libro.epub', {{type: 'application/epub+zip'}}); }})()"
+PORT = 8815
+WORD = """([txt, w]) => { const sp = [...document.querySelectorAll('#vw .vwp[data-i="0"] .textLayer span')].find(s => s.textContent.includes(txt)); const t = sp.firstChild, i = t.data.indexOf(w), r = document.createRange(); r.setStart(t, i + 1); r.setEnd(t, i + 2); const c = r.getBoundingClientRect(); return [c.left + c.width / 2, c.top + c.height / 2]; }"""
 with sync_playwright() as pw:
     kw = {'executable_path': '/opt/pw-browsers/chromium'} if os.path.exists('/opt/pw-browsers/chromium') else {}
     b = pw.chromium.launch(**kw); errs = []
     srv = subprocess.Popen([sys.executable, '-I', '-m', 'http.server', str(PORT), '-d', str(folder)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL); time.sleep(1)
-    c = b.new_context(viewport={'width': 1280, 'height': 800}, service_workers='block'); A = c.new_page(); A.on('pageerror', lambda e: errs.append(str(e))); A.add_init_script("window.ASK_AUTO = 'accept'")
-    A.goto(f'http://localhost:{PORT}/index.html'); A.wait_for_timeout(1000); A.evaluate(f"window.P = {PAPER}; 0")
-    A.evaluate(f"(async () => {{ localStorage.setItem('gp-vw-lite', 'off'); db.settings.pdfTab = 'app'; db.papers.length = 0; db.papers.push(P('p1', 'Paper con PDF', {{pdf: {{name: 'prueba.pdf'}}}})); PDF_FILES.set('p1', await {FILE}); markDirty(); render(); }})()")
-    A.evaluate("pdfOpen('p1', 1)"); A.wait_for_timeout(1800)
-    A.evaluate("""(() => { const sp = [...document.querySelectorAll('#vw .vwp[data-i="0"] .textLayer span')].sort((a, b) => b.textContent.length - a.textContent.length)[0], t = sp.firstChild;
-      const r = document.createRange(); r.setStart(t, 0); r.setEnd(t, Math.min(4, t.length)); getSelection().removeAllRanges(); getSelection().addRange(r); })()""")
-    A.wait_for_timeout(400); A.evaluate("vwSelColor(0)"); A.wait_for_timeout(1500)
-    t0 = A.evaluate("vwAnns()[0].t")
-    eq('por defecto: «auto»', A.evaluate("vwHdLkPref()"), 'auto')
-    A.evaluate("vwPopOpen(vwAnns()[0].id)"); A.wait_for_timeout(200)
-    eq('sin candado ni modo ligero, salen los dos tiradores', A.evaluate(VIS), 2)
-    A.evaluate("vwRdSet('flip', true)"); A.wait_for_timeout(600); A.evaluate("vwPopOpen(vwAnns()[0].id)"); A.wait_for_timeout(200)
-    eq('en página a página (sin candado) siguen saliendo', A.evaluate(VIS), 2)
-    A.evaluate("vwLockSet(true, true)"); A.wait_for_timeout(200)
-    eq('al poner el candado se esconden (con la ventanita abierta)', [A.evaluate(VIS), A.evaluate("!$('#vwPop').hidden")], [0, True])
-    A.evaluate("vwPopClose(); vwPopOpen(vwAnns()[0].id)"); A.wait_for_timeout(200)
-    eq('con candado, al tocar el subrayado no salen', A.evaluate(VIS), 0)
-    eq('aunque se llame al tirador a mano, no se mueve nada', A.evaluate("(() => { const h = document.querySelector('#vw .vwhd1:not(.tsh)'); vwHdDown({currentTarget: h, pointerId: 1, clientX: 0, clientY: 0, preventDefault() {}, stopPropagation() {}}); return !!VW.ext; })()"), False)
-    A.evaluate("vwLockSet(false, true)"); A.wait_for_timeout(200)
-    eq('al quitar el candado vuelven', A.evaluate(VIS), 2)
-    A.evaluate("vwLiteSet('on')"); A.wait_for_timeout(200)
-    eq('con el modo ligero, fijos', [A.evaluate("VW.lite"), A.evaluate(VIS)], [True, 0])
-    A.evaluate("vwLiteSet('off')"); A.wait_for_timeout(200)
-    eq('sin modo ligero, vuelven', A.evaluate(VIS), 2)
-    # ---- en ⚙ Ajustes del visor
-    A.click('#vw .vwh button[data-onclick^="vwMore"]'); A.wait_for_timeout(200); A.evaluate("vwCfgMenu()"); A.wait_for_timeout(150); m = A.evaluate(MENU)
-    eq('⚙ lleva la sección de los límites', any('Límites de un subrayado ya hecho' in x for x in m), True)
-    eq('y «auto» marcado', any(x.startswith('✓') and 'candado' in x and 'ligero' in x for x in m), True)
-    def pick(t):
-        ok = A.evaluate("t => { const b = [...document.querySelectorAll('#vwMenu button')].find(b => b.textContent.includes(t)); if (b) b.click(); return !!b; }", t); A.wait_for_timeout(150)
-        if not ok: eq('opción del menú: ' + t, False, True)
-    pick('Siempre fijos')
-    eq('«siempre fijos»: se guarda y se esconden', [A.evaluate("localStorage.getItem('gp-vw-hdlk')"), A.evaluate(VIS)], ['on', 0])
-    pick('Siempre se pueden mover'); A.evaluate("vwLockSet(true, true)"); A.wait_for_timeout(150)
-    eq('«siempre se pueden mover»: salen también con el candado', [A.evaluate("vwHdLkPref()"), A.evaluate(VIS)], ['off', 2])
-    A.evaluate("vwLockSet(false, true)"); pick('Fijos con el')
-    eq('y vuelta a «auto»', A.evaluate("vwHdLkPref()"), 'auto')
-    eq('el subrayado no ha cambiado', A.evaluate("vwAnns()[0].t"), t0)
-    A.evaluate("vwClose?.()")
+    def device(dev='Galaxy Tab S4', init=''):
+        c = b.new_context(**pw.devices[dev], service_workers='block')
+        p = c.new_page(); p.set_default_timeout(20000); p.on('pageerror', lambda e: errs.append(str(e))); p.add_init_script("window.ASK_AUTO = 'accept';" + init)
+        p.goto(f'http://localhost:{PORT}/index.html'); p.wait_for_timeout(1000); p.evaluate(f"window.P = {PAPER}; 0"); p.evaluate(f"window.MKPDF = {MKPDF}; 0")
+        cdp = c.new_cdp_session(p); return c, p, cdp
+    def touch(cdp, kind, x=0, y=0): cdp.send('Input.dispatchTouchEvent', {'type': kind, 'touchPoints': [] if kind == 'touchEnd' else [{'x': x, 'y': y}]})
+    def seed(p, NP=4, NA=0):
+        p.evaluate("""async ([NP, NA]) => { db.settings.pdfTab = 'app'; db.papers.length = 0; const ann = [];
+          for (let k = 0; k < NA; k++) { const pg = k % NP, y = 780 - 24 * ((k / NP | 0) % 28); ann.push({id: 'a' + k, k: 'hl', p: pg, c: '#ffd400', t: 't' + k, q: [60, y - 3, 400, y + 13], up: '2026-01-01T00:00:00Z'}); }
+          db.papers.push(P('p1', 'Tactil', {pdf: {name: 'tactil.pdf', ann}})); PDF_FILES.set('p1', await MKPDF(NP)); markDirty(); render(); }""", [NP, NA])
+        p.evaluate("pdfOpen('p1', 1)"); p.wait_for_timeout(1800)
+    # ---- Tablet Android (como la captura): sin menú de Chrome y con selección propia
+    cA, A, cdp = device()
+    for lab, lock, lite in [('sin candado', False, 'off'), ('con candado', True, 'off'), ('con candado y modo ligero', True, 'on')]:
+        cA, A, cdp = device('Pixel 7', f"localStorage.setItem('gp-vw-lite', '{lite}');"); seed(A, 4, 0)
+        A.evaluate("vwRdSet('flip', true)"); A.wait_for_timeout(800); A.evaluate("VW.fit = false; vwScaleSet(VW.scale * 2.5)"); A.wait_for_timeout(1500)
+        A.evaluate("""(() => { const sp = [...document.querySelectorAll('#vw .vwp[data-i="0"] .textLayer span')].find(s => s.textContent.includes('linea 708')); const t = sp.firstChild, r = document.createRange(); r.setStart(t, 0); r.setEnd(t, t.data.indexOf('aqui')); getSelection().removeAllRanges(); getSelection().addRange(r); vwFromSel(0); })()""")
+        A.wait_for_timeout(1000)
+        A.evaluate("""(() => { const l = [...document.querySelectorAll('#vw .vwhl')].at(-1).getBoundingClientRect(), sc = $('#vwScroll'); sc.scrollLeft += l.right - innerWidth + 60; sc.scrollTop += l.top - 300; })()""")
+        A.wait_for_timeout(800)
+        if lock: A.evaluate("vwLockSet(true, true)"); A.wait_for_timeout(300)
+        eq(lab + ': el principio del subrayado queda fuera de la pantalla', [A.evaluate("document.querySelector('#vw .vwhl').getBoundingClientRect().left") < 0, A.evaluate("[!!VW.zLock, !!VW.lite]")], [True, [lock, lite == 'on']])
+        A.evaluate("vwPopOpen(vwAnns()[0].id)"); A.wait_for_timeout(500)
+        eq(lab + ': salen los dos tiradores', A.evaluate("[...document.querySelectorAll('#vw .vwhd:not(.tsh)')].filter(h => !h.hidden).length"), 2)
+        h = A.evaluate("(r => [r.left + r.width/2, r.top + r.height/2])(document.querySelector('#vw .vwhd1:not(.tsh)').getBoundingClientRect())")
+        touch(cdp, 'touchStart', h[0], h[1]); A.wait_for_timeout(50)
+        for k in range(1, 7): touch(cdp, 'touchMove', h[0] - 25 * k, h[1]); A.wait_for_timeout(50)
+        touch(cdp, 'touchEnd'); A.wait_for_timeout(600)
+        eq(lab + ': el tirador de detrás lo acorta (por palabras enteras)', A.evaluate("[vwAnns().length, vwAnns()[0].t]"), [1, 'Pagina 1 linea 708 palabras para'])
+        eq(lab + ': la ventanita vuelve', A.evaluate("!$('#vwPop').hidden"), True)
+        if lock: eq(lab + ': y la hoja no se ha movido del sitio', A.evaluate("VW.zLock"), True)
+        cA.close()
+    # la opción de v39.48 (dejarlos fijos) ya no está
+    cA, A, cdp = device('Pixel 7'); seed(A, 2, 0)
+    A.click('#vw .vwh button[data-onclick^="vwMore"]'); A.wait_for_timeout(200); A.evaluate("vwCfgMenu()"); A.wait_for_timeout(150)
+    eq('⚙ ya no lleva «Límites de un subrayado ya hecho»', A.evaluate("$('#vwMenu').textContent.includes('Límites de un subrayado')"), False)
+    cA.close()
     eq('sin errores en la página', errs, [])
     srv.terminate(); b.close()
 print(f'{n - fail}/{n} pruebas correctas')

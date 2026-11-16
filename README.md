@@ -378,3 +378,9 @@ Todo en **⋯ del visor → 📖 Modo de lectura** (se recuerda en este disposit
   - **Siempre fijos** o **Siempre se pueden mover** (como antes). Se recuerda en el dispositivo (`gp-vw-hdlk`).
 - Subrayar texto nuevo sigue igual (con sus tiradores de selección).
 - Pruebas: `python3 pruebas/prueba_visor_tiradores.py .`
+
+## Visor: los tiradores de un subrayado ya hecho funcionan también con zoom y candado (v39.49)
+- **Arreglo**: con zoom, si el principio (o el final) de un subrayado quedaba fuera de la pantalla, su tirador no se podía arrastrar (el navegador solo localiza el texto que está a la vista). Pasaba sobre todo con el **🔒 candado**, que no deja mover la hoja para verlo entero, y en móviles con el modo ligero. Ahora el otro extremo se busca en la capa de texto aunque no se vea.
+- Con el dedo, el tirador va por **palabras enteras** (como al subrayar).
+- Se quita la opción de v39.48 («✋ Límites de un subrayado ya hecho»): los tiradores siempre se pueden mover.
+- Pruebas: `python3 pruebas/prueba_visor_tiradores.py .`
