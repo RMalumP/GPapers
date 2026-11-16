@@ -241,3 +241,10 @@ html.mv #epSel{position:fixed;gap:8px}html.mv #epSel .vwc{width:32px;height:32px
 .card.fover,.rw.fover{outline:3px dashed var(--pri);outline-offset:2px;background:color-mix(in srgb,var(--pri) 8%,var(--card))}
 #dlg.fover .pdfrow,#dlg .pdfrow.fover{outline:2px dashed var(--pri);outline-offset:3px;border-radius:6px;background:color-mix(in srgb,var(--pri) 8%,transparent)}
 .pdfrow .pdfdz{opacity:.65}
+/* v39.45: selección propia en táctil (js/visor.js, TS): el navegador no selecciona (ni saca su menú) y GPapers pinta la selección */
+#vw.tsel .textLayer,#vw.tsel .textLayer *,#ep.tsel #epDoc,#ep.tsel #epDoc *{-webkit-user-select:none;user-select:none}
+#vw,#ep{-webkit-touch-callout:none}
+.tsov{position:absolute;pointer-events:none;overflow:hidden;z-index:4}.tsov[hidden],.tsh[hidden]{display:none}
+.tsov i{position:absolute;background:color-mix(in srgb,var(--pri) 32%,transparent);border-radius:2px}
+/* v39.45: en táctil, los subrayados con transparencia en vez de «multiplicar» (mucho más barato para la gráfica de un móvil) */
+#vw.tsel:not(.night) .vwhl{mix-blend-mode:normal;opacity:.34}

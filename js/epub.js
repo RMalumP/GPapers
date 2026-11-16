@@ -175,8 +175,9 @@ function epBuild() {
   sc.addEventListener('scroll', () => { if (!EP.raf) EP.raf = requestAnimationFrame(() => { EP.raf = 0; epOnScroll(); }); }, {passive: true});
   for (const t of ['wheel', 'touchstart', 'pointerdown']) sc.addEventListener(t, () => { EP.moved = true; }, {passive: true});
   sc.addEventListener('touchstart', e => { const t = e.touches[0]; EP.tx = e.touches.length === 1 ? {x: t.clientX, y: t.clientY, t: Date.now()} : null; if (EP.auto) EP.autoHold = true; }, {passive: true});
-  sc.addEventListener('touchend', e => { EP.autoHold = false; if (EP.auto) EP.autoY = sc.scrollTop; const s = EP.tx; EP.tx = null; if (!s || !EP.paged || getSelection().toString()) return; const t = e.changedTouches[0], dx = t.clientX - s.x, dy = t.clientY - s.y;
+  sc.addEventListener('touchend', e => { EP.autoHold = false; if (EP.auto) EP.autoY = sc.scrollTop; const s = EP.tx; EP.tx = null; if (!s || !EP.paged || tsStr() || tsJust()) return; const t = e.changedTouches[0], dx = t.clientX - s.x, dy = t.clientY - s.y;
     if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5 && Date.now() - s.t < 800) { EP.swiped = Date.now(); epStep(dx < 0 ? 1 : -1); } }, {passive: true});
+  EP.ts = tsBind(d, sc, '#epDoc', {done: () => epSelShow()});
   sc.addEventListener('click', epClick);   // también en los márgenes (página a página: tocar a los lados)
   document.addEventListener('selectionchange', () => { if (EP.open) { clearTimeout(EP.selT); EP.selT = setTimeout(epSelShow, 250); } });
   new ResizeObserver(() => { if (!EP.open || !EP.secs.length) return; const a = EP.anchor || epLoc(); epLayout(); epGoLoc(a, true); }).observe(sc);
@@ -195,7 +196,7 @@ async function epOpen(src, file) {
   ep$('.vwt').textContent = ep$('.vwt').title = epTitle(); $('#epDoc').innerHTML = ''; $('#epLoad').hidden = false; $('#epLoad').textContent = 'Abriendo el EPUB…'; $('#epWhere').textContent = '';
   $('#epQ').value = ''; $('#epQn').textContent = ''; d.classList.remove('find', 'fs', 'conc'); epPopClose(); $('#epSel').hidden = true; ep$('.epnb').hidden = src?.kind !== 'paper';
   EP.side = !!VW.sideNext || !vwMv() && innerWidth > 1100 && vwSideOn() && epAnns().length > 0; if (VW.sideNext) EP.tab = 'ann'; VW.sideNext = false;
-  epSetApply(); epColorShow(); epCount(); if (!d.open) d.showModal(); epSideShow();
+  epSetApply(); epColorShow(); epCount(); d.classList.toggle('tsel', tsWant()); if (!d.open) d.showModal(); epSideShow();
   try {
     const bk = await epBook(file); if (gen !== EP.gen) return; EP.bk = bk;
     if (ep$('.vwt').textContent === 'EPUB' && bk.meta.title) ep$('.vwt').textContent = bk.meta.title;
@@ -336,8 +337,10 @@ function epClick(e) {
   const a = e.target.closest('a');
   if (a && a.dataset.go) { e.preventDefault(); const [i, f] = a.dataset.go.split('#'); if (a.classList.contains('epnr') && epNotePop(a, +i, f)) return; return epGoTo(+i, f); }
   if (a && a.target === '_blank') return;
-  const m = e.target.closest('mark.eph'); if (m && !getSelection().toString()) return epPopOpen(m.dataset.a);
-  if (getSelection().toString() || EP.swiped && Date.now() - EP.swiped < 400) return;
+  if (tsJust()) return;   // el toque que acaba de seleccionar (táctil)
+  if (tsStr() && $('#ep').classList.contains('tsel')) { tsClear(); $('#epSel').hidden = true; return; }   // táctil: tocar quita la selección (el navegador ya no lo hace)
+  const m = e.target.closest('mark.eph'); if (m && !tsStr()) return epPopOpen(m.dataset.a);
+  if (tsStr() || EP.swiped && Date.now() - EP.swiped < 400) return;
   if (EP.auto) { if (epConcTap()) return; const x = e.clientX / innerWidth; return x < .3 ? epAutoSpeed(-1) : x > .7 ? epAutoSpeed(1) : epAutoPause(); }
   if (!$('#epPop').hidden) return epPopClose();
   if (EP.paged) { const r = $('#epScroll').getBoundingClientRect(), x = (e.clientX - r.left) / r.width; if (x < .3) epStep(-1); else if (x > .7) epStep(1); }
@@ -400,7 +403,7 @@ function epFromSel(ci, comment) {   // subraya la selección (si cruza capítulo
   getSelection().removeAllRanges(); $('#epSel').hidden = true; if (!add.length) return;
   epMut(l => l.push(...add)); if (comment) setTimeout(() => epPopOpen(add[add.length - 1].id, true), 30);
 }
-function epColor(i) { EP.color = i; epColorShow(); if (EP.pop) epUpd(EP.pop, {c: VW_COLORS[i][0]}); else if (epSelRange()) epFromSel(i); }
+function epColor(i) { if (EP.pop) { epUpd(EP.pop, {c: VW_COLORS[i][0]}); if (annColOnly()) return; EP.color = i; epColorShow(); return; } EP.color = i; epColorShow(); if (epSelRange()) epFromSel(i); }
 function epColorShow() { document.querySelectorAll('#ep .vwtb .vwc').forEach(b => b.classList.toggle('on', +b.dataset.c === EP.color)); }
 function epSelColor(i) { EP.color = i; epColorShow(); epFromSel(i); }
 function epSelNote() { epFromSel(EP.color, true); }
@@ -423,7 +426,7 @@ function epSaveComment() {
   if (!a || (a.m || '') === v) return;
   epMut(l => { const x = l.find(y => y.id === a.id); if (x) { if (v) x.m = v; else delete x.m; x.up = vwNow(); } }, true); epDrawAnn();
 }
-function epPopColor(i) { const id = EP.pop; EP.color = i; epColorShow(); epUpd(id, {c: VW_COLORS[i][0]}); epPopOpen(id); }
+function epPopColor(i) { const id = EP.pop; if (!annColOnly()) { EP.color = i; epColorShow(); } epUpd(id, {c: VW_COLORS[i][0]}); epPopOpen(id); }
 async function epPopDel() { const id = EP.pop; if (!id) return; EP.pop = null; $('#epPop').hidden = true; epMut(l => { const i = l.findIndex(x => x.id === id); if (i >= 0) l.splice(i, 1); }); toast('Subrayado borrado.', [{t: 'Deshacer', fn: () => undo()}], 4000); }
 async function epPopCopy() { const a = epAnns().find(x => x.id === EP.pop); if (a?.t) { await clipText(a.t, $('#ep')); toast('Texto copiado.', [], 1500); } }
 function epToNote() {
@@ -598,7 +601,7 @@ function epReadMenu() {
     ${!EP.auto && s.mode === 'page' && s.two ? `${o(!s.one, "epSetPut('one',false)", '⏩ Pasar de dos en dos', '')}${o(s.one, "epSetPut('one',true)", '↪ Pasar de una en una (la derecha pasa a la izquierda)', '')}` : ''}
     <div class="vwhint">Página a página: toca a la izquierda o a la derecha (o desliza, o ← →) para pasar. La doble página necesita una pantalla ancha.</div><hr>
     <button data-onclick="${EP.auto ? 'epAutoStop()' : 'epAutoStart()'}">${EP.auto ? '⏹ Parar el desplazamiento automático' : '⏬ Desplazamiento automático'} <small class="vwsub">A</small></button>
-    <button data-onclick="epConcSet(${vwConcOn() ? 0 : 1})">${tick(vwConcOn())}🧘 Modo concentración <small class="vwsub">C</small></button>`);
+    <button data-onclick="epConcSet(${vwConcOn() ? 0 : 1})">${tick(vwConcOn())}🧘 Modo concentración <small class="vwsub">C</small></button>${annColMenu('epReadMenu()')}`);
 }
 function epMode(m) { if (EP.auto) epAutoStop(); const o = epSet(); o.mode = m === 'scroll' ? 'scroll' : 'page'; o.two = m === 'two'; try { localStorage.setItem(EP_SET_K, JSON.stringify(o)); } catch (e) {} epSetApply(true); }
 function epFicha() { const p = epPaperOf(); if (p) openPaper(p.id); }
