@@ -148,6 +148,13 @@ html.mv .vwhd{width:28px;height:28px}html.mv .vwhd0{margin-left:-28px}
 #vw.fs.tbh #vwTbTab{display:block;position:absolute;top:0;left:50%;transform:translateX(-50%);z-index:6;border-radius:0 0 10px 10px;border-top:0;padding:0 16px;min-height:22px;line-height:22px;font-size:calc(14px * var(--fz,1));opacity:.75}
 html.mv #vw.fs.tbh #vwTbTab{top:auto;bottom:0;border-radius:10px 10px 0 0;border-top:1px solid var(--bd);border-bottom:0}
 #vw.fs.fsbars .vwh{display:flex}#vw.fs.fsbars .vwtb{display:flex}#vw.fs.fsbars #vwTbTab{display:none}
+/* v39.43: la pestaña ▾ a un lado (⋯ → Modo de lectura) y el candado del tamaño (página a página): en la barra y, en pantalla completa, en una esquina casi transparente */
+#vw.fs.tbh.tabl #vwTbTab{left:10px;transform:none}#vw.fs.tbh.tabr #vwTbTab{left:auto;right:10px;transform:none}
+#vw .vwlk{display:none}#vw.flip .vwh .vwlk{display:inline-flex}
+#vw.zlock .vwz .vwib,#vw.zlock #vwZl{opacity:.45}
+#vw.fs.flip #vwLock{display:block;left:12px;bottom:12px;z-index:7;width:40px;height:40px;padding:0;font-size:calc(18px * var(--fz,1));line-height:38px;text-align:center;border-radius:99px;opacity:.3;cursor:pointer}
+#vw.fs.flip.tabl #vwLock{left:auto;right:12px}
+#vw.fs.flip #vwLock:hover,#vw.fs.flip #vwLock:focus-visible{opacity:.9}
 #vwPgTip{top:10px;left:50%;transform:translateX(-50%);padding:4px 12px;font-size:calc(13px * var(--fz,1));border-radius:99px;pointer-events:none;z-index:8}
 #vwPgTip[hidden],#vwCol[hidden]{display:none}
 #vwCol{display:flex;gap:6px;padding:8px;z-index:8}
