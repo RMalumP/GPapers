@@ -251,7 +251,7 @@ function epSet() {
   let o = {}; try { o = JSON.parse(localStorage.getItem(EP_SET_K) || '{}') || {}; } catch (e) {}
   const np = vwNightPref(), fs = Math.round(+o.fs);
   return {fs: fs >= 12 && fs <= 36 ? fs : 19, lh: [1.35, 1.6, 1.9].includes(o.lh) ? o.lh : 1.6, w: EP_W[o.w] ? o.w : 'm', font: o.font === 'sans' ? 'sans' : 'serif', just: !!o.just,
-    th: ['light', 'sepia', 'night', 'auto'].includes(o.th) ? o.th : np === 'on' ? 'night' : np === 'auto' ? 'auto' : 'light', mode: o.mode === 'page' ? 'page' : 'scroll', two: !!o.two};
+    th: ['light', 'sepia', 'night', 'auto'].includes(o.th) ? o.th : np === 'on' ? 'night' : np === 'auto' ? 'auto' : 'light', mode: o.mode === 'page' ? 'page' : 'scroll', two: !!o.two, one: !!o.one};
 }
 function epSetPut(k, v) { const o = epSet(); o[k] = v; try { localStorage.setItem(EP_SET_K, JSON.stringify(o)); } catch (e) {} epSetApply(true); }
 function epSetApply(keep) {
@@ -279,7 +279,7 @@ function epLayout() {
   const W = sc.clientWidth, H = sc.clientHeight, s = epSet(), N = EP.two && W >= 760 ? 2 : 1, max = EP_W[s.w] * s.fs;
   let G = Math.max(vwMv() ? 32 : 48, Math.round((W - N * max) / N)); G += G % 2;   // el hueco entre columnas son los dos márgenes
   doc.style.cssText = `width:${W - G}px;margin-left:${G / 2}px;height:${H}px;column-count:${N};column-gap:${G}px;--ep-ch:${Math.max(120, H - 72)}px`;
-  EP.pw = W;
+  EP.pw = W; EP.cols = N;
 }
 function epStarts() {   // dónde empieza cada capítulo (en el sentido del desplazamiento)
   if (!EP.paged) return EP.secs.map(s => s.offsetTop);
@@ -302,7 +302,8 @@ function epGoLoc(l, keepAnchor) {
 function epStep(d) {   // página a página: la siguiente o la anterior (en el modo seguido, una pantalla)
   const sc = $('#epScroll'); EP.moved = true;
   if (!EP.paged) return sc.scrollBy({top: d * sc.clientHeight * .9});
-  const W = EP.pw || sc.clientWidth, n = Math.round(sc.scrollLeft / W) + d, max = Math.max(0, Math.ceil(sc.scrollWidth / W - .02) - 1);
+  const P = EP.pw || sc.clientWidth, W = EP.cols === 2 && epSet().one ? P / 2 : P;   // doble página de una en una (v39.43): avanza una columna
+  const n = Math.round(sc.scrollLeft / W) + d, max = Math.max(0, Math.ceil((sc.scrollWidth - P) / W - .02));
   sc.scrollLeft = Math.max(0, Math.min(max, n)) * W; epOnScroll();
 }
 function epOnScroll(prog) {
@@ -594,6 +595,7 @@ function epReadMenu() {
   const s = epSet(), o = (on, fn, t, k) => `<button data-onclick="${fn}">${tick(on)}${t}${k ? ` <small class="vwsub">${k}</small>` : ''}</button>`;
   epMenu(EP.menuR, `<button data-keep data-onclick="epMoreBack()">‹ Volver</button><hr>
     ${o(!EP.auto && s.mode === 'scroll', "epMode('scroll')", '↕ Seguido (desplazar)', '')}${o(!EP.auto && s.mode === 'page' && !s.two, "epMode('page')", '📄 Página a página, con toques a los lados', 'P')}${o(!EP.auto && s.mode === 'page' && s.two, "epMode('two')", '📖 Doble página', 'D')}
+    ${!EP.auto && s.mode === 'page' && s.two ? `${o(!s.one, "epSetPut('one',false)", '⏩ Pasar de dos en dos', '')}${o(s.one, "epSetPut('one',true)", '↪ Pasar de una en una (la derecha pasa a la izquierda)', '')}` : ''}
     <div class="vwhint">Página a página: toca a la izquierda o a la derecha (o desliza, o ← →) para pasar. La doble página necesita una pantalla ancha.</div><hr>
     <button data-onclick="${EP.auto ? 'epAutoStop()' : 'epAutoStart()'}">${EP.auto ? '⏹ Parar el desplazamiento automático' : '⏬ Desplazamiento automático'} <small class="vwsub">A</small></button>
     <button data-onclick="epConcSet(${vwConcOn() ? 0 : 1})">${tick(vwConcOn())}🧘 Modo concentración <small class="vwsub">C</small></button>`);
