@@ -248,3 +248,5 @@ html.mv #epSel{position:fixed;gap:8px}html.mv #epSel .vwc{width:32px;height:32px
 .tsov i{position:absolute;background:color-mix(in srgb,var(--pri) 32%,transparent);border-radius:2px}
 /* v39.45: en táctil, los subrayados con transparencia en vez de «multiplicar» (mucho más barato para la gráfica de un móvil) */
 #vw.tsel:not(.night) .vwhl{mix-blend-mode:normal;opacity:.34}
+/* v39.46: con el candado la hoja no se mueve (ni arrastrando, ni con la rueda, ni con dos dedos): solo se pasa de página */
+#vw.zlock #vwScroll{touch-action:none}

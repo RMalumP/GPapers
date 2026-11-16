@@ -251,8 +251,9 @@ function vwKey(e) {
   if (mod || e.altKey) return;
   const sc = $('#vwScroll');
   if (k === ' ' && VW.auto) { e.preventDefault(); vwAutoPause(); }   // desplazamiento automático: la barra espaciadora pausa
-  else if (k === 'PageDown' || k === ' ' && !e.shiftKey) { e.preventDefault(); if (VW.flip && sc.scrollTop + sc.clientHeight >= sc.scrollHeight - 2) { vwStep(1); if (VW.zLock) sc.scrollTop = 0; } else sc.scrollBy(0, sc.clientHeight * .9); }
-  else if (k === 'PageUp' || k === ' ' && e.shiftKey) { e.preventDefault(); if (VW.flip && sc.scrollTop <= 0) { vwStep(-1); if (VW.zLock) sc.scrollTop = sc.scrollHeight; } else sc.scrollBy(0, -sc.clientHeight * .9); }
+  else if (VW.zLock && /^(PageDown|PageUp|ArrowDown|ArrowUp|ArrowRight|ArrowLeft| )$/.test(k)) { e.preventDefault(); vwStep(k === 'PageUp' || k === 'ArrowUp' || k === 'ArrowLeft' || k === ' ' && e.shiftKey ? -1 : 1); }   // candado (v39.46): la hoja no se mueve, las teclas solo pasan de página
+  else if (k === 'PageDown' || k === ' ' && !e.shiftKey) { e.preventDefault(); if (VW.flip && sc.scrollTop + sc.clientHeight >= sc.scrollHeight - 2) vwStep(1); else sc.scrollBy(0, sc.clientHeight * .9); }
+  else if (k === 'PageUp' || k === ' ' && e.shiftKey) { e.preventDefault(); if (VW.flip && sc.scrollTop <= 0) vwStep(-1); else sc.scrollBy(0, -sc.clientHeight * .9); }
   else if (k === 'ArrowRight' && sc.scrollWidth <= sc.clientWidth) { e.preventDefault(); vwStep(1); }
   else if (k === 'ArrowLeft' && sc.scrollWidth <= sc.clientWidth) { e.preventDefault(); vwStep(-1); }
   else if (k === 'Home') { e.preventDefault(); vwGo(0); } else if (k === 'End') { e.preventDefault(); vwGo(VW.pages.length - 1); }
@@ -318,7 +319,8 @@ function vwFitW(keep) {
   if (keep !== true || a) vwAnchorSet(a); clearTimeout(VW.zt); VW.zt = setTimeout(vwRerender, 120);
 }
 function vwZoomBy(f, focus) { if (vwLocked()) return; VW.fit = false; vwScaleSet(VW.scale * f, focus); }
-function vwWheel(e) { if (!e.ctrlKey && !e.metaKey) return; e.preventDefault(); vwZoomBy(Math.exp(-e.deltaY / 300), {x: e.clientX, y: e.clientY}); }
+function vwWheel(e) { if (!e.ctrlKey && !e.metaKey) { if (VW.zLock) e.preventDefault(); return; }   // candado: la rueda tampoco mueve la hoja
+  e.preventDefault(); vwZoomBy(Math.exp(-e.deltaY / 300), {x: e.clientX, y: e.clientY}); }
 function vwRerender() { for (const p of VW.pages) if (p.cv && Math.abs(p.rs - VW.scale) > .01) { p.rs = 0; VW.queue.add(p.i); } for (const p of VW.pages) p.tl?.update?.({viewport: p.proxy.getViewport({scale: VW.scale})}); vwPump(); }
 function vwObserve() {
   VW.io?.disconnect();
@@ -399,8 +401,8 @@ function vwTouch(e) {
   if (!VW.pinch) return;
   if (e.type === 'touchmove' && t.length === 2) {
     e.preventDefault(); const d = Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY), c = {x: (t[0].clientX + t[1].clientX) / 2, y: (t[0].clientY + t[1].clientY) / 2};
-    const sc = $('#vwScroll'); sc.scrollLeft -= c.x - VW.pinch.c.x; sc.scrollTop -= c.y - VW.pinch.c.y; VW.pinch.c = c;
-    if (VW.zLock) { if (Math.abs(d / VW.pinch.d - 1) > .1 && !VW.pinch.w) { VW.pinch.w = true; vwLocked(); } }   // candado: con dos dedos solo se mueve
+    const sc = $('#vwScroll'); if (!VW.zLock) { sc.scrollLeft -= c.x - VW.pinch.c.x; sc.scrollTop -= c.y - VW.pinch.c.y; } VW.pinch.c = c;   // candado: con dos dedos tampoco se mueve
+    if (VW.zLock) { if (Math.abs(d / VW.pinch.d - 1) > .1 && !VW.pinch.w) { VW.pinch.w = true; vwLocked(); } }
     else if (Math.abs(d / VW.pinch.d - 1) > .02 || VW.pinch.z) { VW.pinch.z = true; VW.fit = false; vwScaleSet(VW.pinch.s * d / VW.pinch.d, c); }
   } else if (e.type !== 'touchmove' && t.length < 2) { VW.pinch = null; clearTimeout(VW.zt); VW.zt = setTimeout(vwRerender, 60); }
 }
@@ -648,7 +650,7 @@ function vwDown(e) {
 }
 function vwMove(e) {
   if (VW.tap && Math.hypot(e.clientX - VW.tap.x, e.clientY - VW.tap.y) >= 8) clearTimeout(VW.lpT);
-  const pn = VW.pan; if (pn && pn.id === e.pointerId) { const sc = $('#vwScroll'); sc.scrollLeft = pn.l - (e.clientX - pn.x); sc.scrollTop = pn.t - (e.clientY - pn.y); return; }
+  const pn = VW.pan; if (pn && pn.id === e.pointerId) { if (VW.zLock) return; const sc = $('#vwScroll'); sc.scrollLeft = pn.l - (e.clientX - pn.x); sc.scrollTop = pn.t - (e.clientY - pn.y); return; }
   const g = VW.drag; if (!g || g.id !== e.pointerId) return;
   if (g.kind === 'hl') {
     const c = vwCaret(e.clientX, e.clientY); if (!c) return; g.a ||= c; if (!g.a) return;
@@ -1273,18 +1275,19 @@ function vwTabPos(v) { VW.tbPos = v === 'l' || v === 'r' ? v : 'c'; vwRdSave(); 
 
 /* Candado del tamaño (v39.43), en página a página: no deja cambiar el zoom (botones, Ctrl + rueda, pellizco, doble toque, «ajustar»)
    y, al pasar de página, se quedan el tamaño y la zona que veías. Botón 🔓/🔒 en la barra; en pantalla completa, en una esquina y casi transparente.
-   Dura mientras el PDF está abierto; salir de página a página (o cambiar a una o dos páginas) lo quita. */
+   Dura mientras el PDF está abierto; salir de página a página (o cambiar a una o dos páginas) lo quita.
+   v39.46: con el candado la hoja tampoco se mueve (ni con el dedo, ni con dos dedos, ni con la rueda; las teclas solo pasan de página). */
 function vwLockSet(on, quiet) {
   on = !!on; if (on && !VW.flip) return toast('El candado del tamaño es para página a página (⋯ → 📖 Modo de lectura).', [], 2400);
   if (!!VW.zLock === on) return vwLockShow(); VW.zLock = on; if (on) VW.fit = false;   // se queda la escala exacta, también si cambia la ventana
-  vwLockShow(); if (!quiet) toast(on ? '🔒 Tamaño fijo: no cambia con el zoom y, al pasar de página, se queda la misma zona.' : '🔓 Tamaño libre: ya puedes acercar y alejar.', [], 2200);
+  vwLockShow(); if (!quiet) toast(on ? '🔒 Hoja fija: no cambia el tamaño ni se mueve; solo se pasa de página (y se queda la misma zona).' : '🔓 Tamaño libre: ya puedes acercar y alejar.', [], 2200);
 }
 function vwLockShow() {
   const d = $('#vw'); if (!d) return; d.classList.toggle('zlock', !!VW.zLock);
   for (const b of d.querySelectorAll('.vwlk')) { b.textContent = VW.zLock ? '🔒' : '🔓'; b.title = (VW.zLock ? 'Tamaño bloqueado: toca para desbloquear' : 'Bloquear el tamaño: no cambia el zoom y, al pasar de página, se queda la misma zona') + ' (K)'; b.setAttribute('aria-pressed', VW.zLock ? 'true' : 'false'); }
 }
 function vwLockToggle() { vwLockSet(!VW.zLock); }
-function vwLocked() { if (!VW.zLock) return false; toast('🔒 El tamaño está bloqueado. Toca el candado para cambiarlo.', [], 1800); return true; }
+function vwLocked() { if (!VW.zLock) return false; toast('🔒 La hoja está bloqueada. Toca el candado para moverla o cambiar el tamaño.', [], 1800); return true; }
 function vwAutoMenu() {   // submenú del desplazamiento automático (v39.41): empezar o parar, velocidad y modo concentración
   vwMenu(VW.menuR, `<button data-keep data-onclick="vwReadMenu()">‹ Volver</button><hr>
     <button data-onclick="${VW.auto ? 'vwAutoStop()' : 'vwAutoStart()'}">${VW.auto ? '⏹ Parar el desplazamiento automático' : '▶ Empezar el desplazamiento automático'}</button>

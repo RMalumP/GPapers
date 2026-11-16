@@ -360,3 +360,7 @@ Todo en **⋯ del visor → 📖 Modo de lectura** (se recuerda en este disposit
 - **Al cambiar el color de un subrayado** (⋯ → 📖 Modo de lectura, en el PDF y en el EPUB): «🎯 Solo cambia ese subrayado» o «🖍 Ese y los siguientes» (por defecto, como antes: también pasa a ser el color para subrayar). Se recuerda en el dispositivo (`gp-ann-col`).
 - **Más fluido**: crear, cambiar o borrar un subrayado repinta solo su página (antes, todas las cercanas); en táctil los subrayados usan transparencia en vez de «multiplicar» (más barato para la gráfica); las anotaciones de otros programas se leen cuando el visor está quieto. **Modo ligero** automático en táctil con poca memoria (≤ 4 GB) o pocos núcleos (≤ 4): lienzos de como mucho 3 Mpx y al doble de la pantalla, 4 páginas pintadas en memoria y la capa de texto solo cerca de la que lees.
 - Pruebas: `python3 pruebas/prueba_visor_tactil.py .` (tablet Android, EPUB y un móvil con la CPU 6 veces más lenta).
+
+## Visor: con el candado la hoja tampoco se mueve (v39.46)
+- Con **🔒 candado** (página a página) la hoja queda **fija**: no cambia el tamaño y **tampoco se mueve** (ni arrastrando con el dedo, ni con dos dedos, ni con la rueda del ratón). Solo se pasa de página (toques a los lados, ← →, ↑ ↓, AvPág/RePág, espacio), y la página nueva sale en la misma zona. Para mover la hoja o cambiar el tamaño, se quita el candado.
+- Pruebas: `python3 pruebas/prueba_visor_pasar.py .`
