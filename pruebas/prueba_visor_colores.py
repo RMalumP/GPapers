@@ -61,7 +61,7 @@ with sync_playwright() as pw:
     A.evaluate(SEL + "('linea 780')"); A.wait_for_timeout(500)
     eq('la barra de la selección lleva ⋯', A.evaluate("!$('#vwSel').hidden && !!$('#vwSel [data-onclick^=\"lnSelMore\"]')"), True)
     A.click('#vwSel [data-onclick^="lnSelMore"]'); A.wait_for_timeout(200)
-    eq('⋯: copiar con la cita, definición, traducir y Académico', A.evaluate("[...$('#vwMenu').querySelectorAll('button')].map(b => b.textContent)"), ['❝ Copiar con la cita', '📖 Definición (RAE)', '📖 Definition (Cambridge)', '🌐 Traducir al español', '🎓 Buscar en Google Académico'])
+    eq('⋯: copiar con la cita, definición, traducir y Académico', A.evaluate("[...$('#vwMenu').querySelectorAll('button')].map(b => b.textContent)"), ['❝ Copiar con la cita', 'U̲ Subrayar con una línea', 'S̶ Tachar', '📖 Definición (RAE)', '📖 Definition (Cambridge)', '🌐 Traducir al español', '🎓 Buscar en Google Académico'])
     A.click('#vwMenu button:has-text("Copiar con la cita")'); A.wait_for_timeout(200)
     eq('copia «…» (autores, año, página)', A.evaluate("CLIP.at(-1)"), '«ballena» (Pérez y Gómez, 2024, p. 2)')
     A.evaluate(SEL + "('linea 756')"); A.wait_for_timeout(300); A.evaluate("lnSelMore(false)"); A.evaluate("lnSelWeb('rae'); lnSelWeb('tr')")

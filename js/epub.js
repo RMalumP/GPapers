@@ -375,7 +375,7 @@ const epAQ = a => [Math.round(a.q[0]), Math.round(a.q[2])];   // [inicio, fin] d
 function epDrawAnn() {
   const by = new Map(); for (const a of epAnns()) { if (a.k !== 'hl' || !EP.secs[a.p]) continue; (by.get(a.p) || by.set(a.p, []).get(a.p)).push(a); }
   EP.secs.forEach((sec, i) => { const L = by.get(i); if (!L && !sec.querySelector('mark.eph')) return; const keepF = sec.querySelector('mark.epfh'); if (keepF) epUnwrap(sec, 'epfh'); epUnwrap(sec, 'eph');
-    for (const a of L || []) { const [s, e] = epAQ(a); epWrap(sec, s, e, () => { const m = document.createElement('mark'); m.className = 'eph' + (a.m ? ' cm' : ''); m.dataset.a = a.id; m.style.setProperty('--c', a.c); if (a.m) m.title = a.m.slice(0, 300); return m; }); }
+    for (const a of L || []) { const [s, e] = epAQ(a); epWrap(sec, s, e, () => { const m = document.createElement('mark'); m.className = 'eph' + (a.m ? ' cm' : '') + (a.s === 'u' ? ' u' : a.s === 'x' ? ' x' : ''); m.dataset.a = a.id; m.style.setProperty('--c', a.c); if (a.m) m.title = a.m.slice(0, 300); return m; }); }
     if (keepF) epFindMark(); });
   epCount(); if (EP.side && EP.tab === 'ann') epSideDraw();
 }
@@ -392,7 +392,7 @@ function epSelShow() {
   if (EP.auto && !EP.autoPaused) epAutoPause(true);
   b.hidden = false; const rs = r.getClientRects(), last = rs[rs.length - 1] || r.getBoundingClientRect(); epPlace(b, last);
 }
-function epFromSel(ci, comment) {   // subraya la selección (si cruza capítulos, un subrayado por capítulo)
+function epFromSel(ci, comment, style) {   // subraya la selección (si cruza capítulos, un subrayado por capítulo)
   const r = epSelRange(); if (!r) return; const secOf = n => (n.nodeType === 1 ? n : n.parentElement)?.closest('section.epc');
   const s0 = secOf(r.startContainer), s1 = secOf(r.endContainer); if (!s0 || !s1) return;
   const i0 = +s0.dataset.i, i1 = +s1.dataset.i, now = vwNow(), add = [];
@@ -400,7 +400,7 @@ function epFromSel(ci, comment) {   // subraya la selección (si cruza capítulo
     const sec = EP.secs[i], a = i === i0 ? epOff(sec, r.startContainer, r.startOffset) : 0, b = i === i1 ? epOff(sec, r.endContainer, r.endOffset) : EP.len[i]; if (b <= a) continue;
     let t = ''; for (const [n, o] of epTexts(sec)) { const s = Math.max(a, o), e = Math.min(b, o + n.length); if (s < e) t += n.data.slice(s - o, e - o); }
     t = t.replace(/\s+/g, ' ').trim(); if (!t) continue;
-    add.push({id: uid(), k: 'hl', p: i, q: [a, -a, b, -a], c: VW_COLORS[ci][0], t: t.slice(0, 4000), at: now, up: now});
+    add.push({id: uid(), k: 'hl', p: i, q: [a, -a, b, -a], c: VW_COLORS[ci][0], ...(style ? {s: style} : {}), t: t.slice(0, 4000), at: now, up: now});
   }
   getSelection().removeAllRanges(); $('#epSel').hidden = true; if (!add.length) return;
   epMut(l => l.push(...add)); if (comment) setTimeout(() => epPopOpen(add[add.length - 1].id, true), 30);
@@ -416,7 +416,7 @@ function epPopOpen(id, focus) {
   const a = epAnns().find(x => x.id === id), pp = $('#epPop'); if (!a || !pp) return; epSaveComment(); EP.pop = id;
   pp.innerHTML = `<div class="vwpoph"><span class="vwk">🖍 Subrayado · cap. ${a.p + 1}${annLbl(a.c) ? ' · ' + esc(annLbl(a.c)) : ''}</span><span class="vwcs">${VW_COLORS.map(([c, t], i) => `<button class="vwc${a.c === c ? ' on' : ''}" style="--c:${c}" title="${t}" aria-label="${t}" data-onclick="epPopColor(${i})"></button>`).join('')}</span><button class="vwib" data-onclick="epPopClose()" aria-label="Cerrar">✕</button></div>
     ${a.t ? `<blockquote class="vwq">${esc(a.t)}</blockquote>` : ''}<textarea id="epCm" placeholder="Comentario…" data-oninput="epCmIn()">${esc(a.m || '')}</textarea>
-    <div class="row vwpopb"><button data-onclick="epPopCopy()">📋 Copiar</button>${EP.src?.kind === 'paper' ? '<button data-onclick="epToNote()" title="Añade el texto y el comentario a las notas del paper">📝 A las notas</button>' : ''}<button class="danger" data-onclick="epPopDel()">🗑 Borrar</button></div>`;
+    <div class="row vwpopb">${lnStyRow(a, 'epPopStyle')}<button data-onclick="epPopCopy()">📋 Copiar</button>${EP.src?.kind === 'paper' ? '<button data-onclick="epToNote()" title="Añade el texto y el comentario a las notas del paper">📝 A las notas</button>' : ''}<button class="danger" data-onclick="epPopDel()">🗑 Borrar</button></div>`;
   pp.hidden = false; const m = $('#epDoc').querySelector(`mark[data-a="${id}"]`); if (m) { epShow(m); epPlace(pp, m.getBoundingClientRect()); } else { pp.style.left = '50%'; pp.style.top = '30%'; }
   document.querySelectorAll('#ep mark.eph.on').forEach(x => x.classList.remove('on')); document.querySelectorAll(`#ep mark[data-a="${id}"]`).forEach(x => x.classList.add('on'));
   if (focus) $('#epCm').focus({preventScroll: true}); if (EP.side && EP.tab === 'ann') epSideDraw();

@@ -139,7 +139,7 @@ function annClean(l) {   // el mismo orden de campos siempre: normalizar dos vec
     if (seen.has(a.id) || !ANN_K.has(a.k) || !Number.isInteger(a.p) || a.p < 0 || a.p > 99999) continue;
     const q = Array.isArray(a.q) ? a.q.filter(Number.isFinite).slice(0, 800) : []; if (!q.length || q.length % 4) continue;
     seen.add(a.id); const t = annStr(a.t, 4000), m = annStr(a.m, 20000), src = annStr(a.src, 60);
-    out.push({id: a.id, k: a.k, p: a.p, q: q.map(x => Math.round(x * 100) / 100), c: HEX_RX.test(a.c) ? a.c.toLowerCase() : '#ffd400', ...(t ? {t} : {}), ...(m ? {m} : {}), ...(src ? {src} : {}), at: annStr(a.at, 40), up: annStr(a.up, 40)});
+    out.push({id: a.id, k: a.k, p: a.p, q: q.map(x => Math.round(x * 100) / 100), c: HEX_RX.test(a.c) ? a.c.toLowerCase() : '#ffd400', ...(a.k === 'hl' && (a.s === 'u' || a.s === 'x') ? {s: a.s} : {}), ...(t ? {t} : {}), ...(m ? {m} : {}), ...(src ? {src} : {}), at: annStr(a.at, 40), up: annStr(a.up, 40)});
     if (out.length >= 5000) break;
   }
   return out;

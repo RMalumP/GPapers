@@ -113,7 +113,7 @@ async function vwOpen(src, file) {
     const kept = vwKeepTake(src, file);   // reabrir el mismo PDF poco después de cerrarlo: ya está leído
     const doc = kept ? kept.doc : await vwLoadDoc(L, file); if (gen !== VW.gen) { if (!kept) doc.destroy(); else vwKeepPut(kept); return; }
     if (kept) VW.find.txt = kept.txt;
-    VW.doc = doc; const p1 = await doc.getPage(1), v1 = p1.getViewport({scale: 1}), szc = vwSzGet(src, file, doc.numPages);
+    VW.doc = doc; VW.rot = vwRotMap(); const p1 = await doc.getPage(1), v1 = p1.getViewport({scale: 1, rotation: ((p1.rotate || 0) + vwRot(0)) % 360}), szc = Object.keys(VW.rot).length ? null : vwSzGet(src, file, doc.numPages);
     VW.pages = Array.from({length: doc.numPages}, (_, i) => { const c = szc?.[i]; return {i, w: c ? c[0] : v1.width, h: c ? c[1] : v1.height, vp1: i ? null : v1, proxy: i ? null : p1, el: null, cv: null, rs: 0, tl: null, sized: !i}; });
     VW.szOk = !!szc;
     $('#vwLoad').hidden = true; $('#vwPn').textContent = '/ ' + doc.numPages; $('#vwPg').max = doc.numPages;
@@ -123,7 +123,8 @@ async function vwOpen(src, file) {
     const pf = vwHolders()[0], start = Math.min(doc.numPages, Math.max(1, pdfPage(pf?.page) || 1)) - 1; VW.startPage = start;
     if (start) vwGo(start, true); vwPosRestore(start); vwObserve(); vwDrawAnn(); vwBmDraw(); vwOnScroll();
     if (start) toast(`Sigues en la página ${start + 1}, donde lo dejaste.`, [{t: '⏮ Ir al principio', fn: () => vwGo(0)}], 3500);
-    if (!VW.szOk) vwSizes(gen); vwIdle(() => vwForeign(gen));   // v39.45: las anotaciones de otros programas, cuando el visor está quieto if (VW.crop) vwCropCalc(gen);
+    if (!VW.szOk) vwSizes(gen); vwIdle(() => vwForeign(gen));   // v39.45: las anotaciones de otros programas, cuando el visor está quieto
+    if (VW.crop) vwCropCalc(gen);   // v39.52: el recorte, también al volver a abrir (se había quedado dentro del comentario de arriba)
   } catch (e) {
     if (gen !== VW.gen) return; console.error(e);
     $('#vwLoad').innerHTML = `${e.name === 'PasswordException' ? 'El PDF está protegido con contraseña.' : 'No se pudo abrir el PDF' + (e.message ? ': ' + esc(e.message) : '.')} <button data-onclick="vwNative()">Abrir con el visor del navegador</button>`;
@@ -190,7 +191,7 @@ function vwSzGet(src, file, n) {
     const out = []; for (const [c, w, h] of r.t) for (let j = 0; j < c; j++) out.push([w, h]); return out.length === n ? out : null; } catch (e) { return null; }
 }
 function vwSzPut() {
-  if (!VW.src || !VW.file || !VW.pages.length) return; const t = [];
+  if (!VW.src || !VW.file || !VW.pages.length || Object.keys(VW.rot || {}).length) return; const t = [];   // con páginas giradas no se guardan
   for (const p of VW.pages) { const w = Math.round(p.w * 100) / 100, h = Math.round(p.h * 100) / 100, l = t[t.length - 1]; if (l && l[1] === w && l[2] === h) l[0]++; else t.push([1, w, h]); }
   try { const o = JSON.parse(localStorage.getItem(VW_SZ_K) || '{}'), k = vwSrcKey(VW.src); delete o[k]; if (t.length > 400) return;   // un PDF con tamaños muy variados no se guarda
     o[k] = {n: VW.pages.length, s: VW.file.size, t}; const ks = Object.keys(o); for (const x of ks.slice(0, Math.max(0, ks.length - 40))) delete o[x];
@@ -294,7 +295,7 @@ async function vwSizes(gen) {   // el tamaño real de cada página (casi siempre
   for (const p of VW.pages) {
     if (gen !== VW.gen) return; if (p.sized) continue;
     try { p.proxy ||= await VW.doc.getPage(p.i + 1); } catch (e) { return; } if (gen !== VW.gen) return;
-    const v = p.vp1 = p.proxy.getViewport({scale: 1}); p.sized = true;
+    const v = p.vp1 = vwGV(p, {scale: 1}); p.sized = true;
     if (Math.abs(v.width - p.w) > .5 || Math.abs(v.height - p.h) > .5) { const a = vwAnchor(); p.w = v.width; p.h = v.height; vwSize(p); vwAnchorSet(a); if (VW.fit) vwFitW(true); }
     if (p.i % 20 === 19) await new Promise(r => setTimeout(r, 0));
   }
@@ -323,7 +324,7 @@ function vwFitW(keep) {
 function vwZoomBy(f, focus) { if (vwLocked()) return; VW.fit = false; vwScaleSet(VW.scale * f, focus); }
 function vwWheel(e) { if (!e.ctrlKey && !e.metaKey) { if (VW.zLock) e.preventDefault(); return; }   // candado: la rueda tampoco mueve la hoja
   e.preventDefault(); vwZoomBy(Math.exp(-e.deltaY / 300), {x: e.clientX, y: e.clientY}); }
-function vwRerender() { for (const p of VW.pages) if (p.cv && Math.abs(p.rs - VW.scale) > .01) { p.rs = 0; VW.queue.add(p.i); } for (const p of VW.pages) p.tl?.update?.({viewport: p.proxy.getViewport({scale: VW.scale})}); vwPump(); }
+function vwRerender() { for (const p of VW.pages) if (p.cv && Math.abs(p.rs - VW.scale) > .01) { p.rs = 0; VW.queue.add(p.i); } for (const p of VW.pages) p.tl?.update?.({viewport: vwGV(p, {scale: VW.scale})}); vwPump(); }
 function vwObserve() {
   VW.io?.disconnect();
   VW.io = new IntersectionObserver(es => { for (const e of es) { const i = +e.target.dataset.i, p = VW.pages[i]; p.vis = e.isIntersecting; if (e.isIntersecting) { VW.queue.add(i); if (p.annWait) vwAnnFetch(p); } } vwPump(); vwFree(); },
@@ -347,9 +348,9 @@ const vwLiteWant = () => { const p = vwLitePref(); return p === 'on' || p === 'a
 async function vwRender(p, gen) {
   try {
     p.proxy ||= await VW.doc.getPage(p.i + 1); if (gen !== VW.gen) return; lnLoad(p);   // v39.50: los enlaces de la página
-    if (!p.sized) { p.vp1 = p.proxy.getViewport({scale: 1}); p.sized = true; if (Math.abs(p.vp1.width - p.w) > .5 || Math.abs(p.vp1.height - p.h) > .5) { p.w = p.vp1.width; p.h = p.vp1.height; vwSize(p); } }
+    if (!p.sized) { p.vp1 = vwGV(p, {scale: 1}); p.sized = true; if (Math.abs(p.vp1.width - p.w) > .5 || Math.abs(p.vp1.height - p.h) > .5) { p.w = p.vp1.width; p.h = p.vp1.height; vwSize(p); } }
     if (p.annWait) vwAnnPage(p);
-    const s = VW.scale, vp = p.proxy.getViewport({scale: s}), max = vwMaxPx();
+    const s = VW.scale, vp = vwGV(p, {scale: s}), max = vwMaxPx();
     let os = Math.min(devicePixelRatio || 1, VW.lite ? 2 : 3); if (vp.width * vp.height * os * os > max) os = Math.sqrt(max / (vp.width * vp.height));
     const cv = document.createElement('canvas'); cv.width = Math.floor(vp.width * os); cv.height = Math.floor(vp.height * os); cv.className = 'vwcv';
     const L = PDFJS, task = p.task = p.proxy.render({canvasContext: cv.getContext('2d', {alpha: false}), viewport: vp, transform: os !== 1 ? [os, 0, 0, os, 0, 0] : null,
@@ -413,11 +414,11 @@ function vwTouch(e) {
 const vwPageOf = el => el?.closest?.('.vwp') ? VW.pages[+el.closest('.vwp').dataset.i] : null;
 function vwPageAt(x, y) { for (const p of VW.pages) { const r = vwVisRect(p); if (y >= r.top && y <= r.bottom && x >= r.left && x <= r.right) return p; } return null; }
 function vwToPdf(p, cx, cy) {   // punto de la pantalla → espacio del PDF
-  const r = p.el.getBoundingClientRect(), k = p.w / r.width, v = p.vp1 || p.proxy?.getViewport({scale: 1});
+  const r = p.el.getBoundingClientRect(), k = p.w / r.width, v = p.vp1 || (p.proxy ? vwGV(p, {scale: 1}) : null);
   return v.convertToPdfPoint((cx - r.left) * k, (cy - r.top) * k);
 }
 function vwRectToPdf(p, l, t, rr, b) { const a = vwToPdf(p, l, t), c = vwToPdf(p, rr, b); return [Math.min(a[0], c[0]), Math.min(a[1], c[1]), Math.max(a[0], c[0]), Math.max(a[1], c[1])]; }
-const vwVp = p => p.vp1 ||= p.proxy?.getViewport({scale: 1}) || null;   // la geometría de la página (null: aún no se ha pedido a PDF.js)
+const vwVp = p => p.vp1 ||= (p.proxy ? vwGV(p, {scale: 1}) : null);   // la geometría de la página (null: aún no se ha pedido a PDF.js)
 function vwBoxes(p, q, near) {   // rectángulos del PDF → cajas en puntos de la página como se ve (origen arriba a la izquierda). near: si la página aún no se ha leído, con la de la primera (para ordenar o ir a ella)
   const v = vwVp(p) || (near ? VW.pages[0]?.vp1 : null); if (!v) return [];
   const out = []; for (let k = 0; k + 3 < q.length; k += 4) { const [x1, y1, x2, y2] = v.convertToViewportRectangle([q[k], q[k + 1], q[k + 2], q[k + 3]]); out.push({x: Math.min(x1, x2), y: Math.min(y1, y2), w: Math.abs(x2 - x1), h: Math.abs(y2 - y1)}); }
@@ -440,10 +441,10 @@ function vwAnnPage(p) {
   if (!L.length) { p.annWait = false; p.annSig = ''; if (layer.childElementCount) layer.innerHTML = ''; return; }
   if (!vwVp(p)) { p.annWait = true; if (p.vis) vwAnnFetch(p); return; }
   p.annWait = false;
-  const sig = JSON.stringify(L.map(a => [a.id, a.k, a.c, a.m || '', a.q, VW.pop === a.id]));   // v39.45: si no cambió nada en esta página, no se repinta (crear o cambiar uno repinta solo su página)
+  const sig = JSON.stringify(L.map(a => [a.id, a.k, a.c, a.s || '', a.m || '', a.q, VW.pop === a.id]));   // v39.45: si no cambió nada en esta página, no se repinta (crear o cambiar uno repinta solo su página)
   if (sig === p.annSig && layer.childElementCount) return; p.annSig = sig;
   layer.innerHTML = L.map(a => { const B = vwBoxes(p, a.q); return a.k === 'note' ? B.slice(0, 1).map(b => `<button class="vwnote" data-a="${a.id}" style="left:${vwPx(b.x)};top:${vwPx(b.y)};--c:${a.c}" title="${esc(a.m || 'Nota')}" aria-label="Nota">🗒</button>`).join('')
-    : B.map(b => `<i class="vwhl${a.k === 'area' ? ' area' : ''}${a.m ? ' cm' : ''}${VW.pop === a.id ? ' on' : ''}" data-a="${a.id}" style="left:${vwPx(b.x)};top:${vwPx(b.y)};width:${vwPx(b.w)};height:${vwPx(b.h)};--c:${a.c}"></i>`).join('')
+    : B.map(b => `<i class="vwhl${a.k === 'area' ? ' area' : a.s === 'u' ? ' u' : a.s === 'x' ? ' x' : ''}${a.m ? ' cm' : ''}${VW.pop === a.id ? ' on' : ''}" data-a="${a.id}" style="left:${vwPx(b.x)};top:${vwPx(b.y)};width:${vwPx(b.w)};height:${vwPx(b.h)};--c:${a.c}"></i>`).join('')
       + (a.m ? (b => b ? `<i class="vwcmk" data-a="${a.id}" style="left:calc(${vwPx(b.x + b.w)} + 2px);top:${vwPx(b.y)};--c:${a.c}" title="${esc(a.m)}">💬</i>` : '')(B.at(-1)) : ''); }).join('');   // 💬: tiene comentario (se toca para verlo)
 }
 function vwAnnFetch(p) {   // pide a PDF.js la geometría de la página (una sola vez) y pinta solo sus subrayados
@@ -479,10 +480,10 @@ function vwRangeAnn(r) {   // los rectángulos de la selección, por página y j
   return out;
 }
 const vwClean = t => String(t || '').replace(/\s+/g, ' ').replace(/(\w)- (\w)/g, '$1$2').trim();
-function vwFromSel(color, comment) {
+function vwFromSel(color, comment, style) {
   const r = vwSelRange(); if (!r) return null; const parts = vwRangeAnn(r), t = vwClean(r.toString()).slice(0, 4000); if (!parts.length) return null;
   getSelection().removeAllRanges(); $('#vwSel').hidden = true; const now = vwNow(), ids = [];
-  vwMut(l => { for (const x of parts) { const id = ids[parts.indexOf(x)] ||= uid(); l.push({id, k: 'hl', p: x.p, q: x.q, c: VW_COLORS[color][0], ...(t ? {t} : {}), at: now, up: now}); } });
+  vwMut(l => { for (const x of parts) { const id = ids[parts.indexOf(x)] ||= uid(); l.push({id, k: 'hl', p: x.p, q: x.q, c: VW_COLORS[color][0], ...(style ? {s: style} : {}), ...(t ? {t} : {}), at: now, up: now}); } });
   if (comment) vwPopOpen(ids[0], true); else vwFlash(ids[0]);
   return ids[0];
 }
@@ -717,7 +718,7 @@ function vwPopOpen(id, focus) {
   pp.innerHTML = `<div class="vwpoph"><span class="vwk">${a.k === 'note' ? '🗒 Nota' : a.k === 'area' ? '▭ Zona' : '🖍 Subrayado'} · p. ${a.p + 1}${annLbl(a.c) ? ' · ' + esc(annLbl(a.c)) : ''}</span><span class="vwcs">${VW_COLORS.map(([c, t], i) => `<button class="vwc${a.c === c ? ' on' : ''}" style="--c:${c}" title="${t}" aria-label="Color ${t}" data-onclick="vwPopColor(${i})"></button>`).join('')}</span><button class="vwib" data-onclick="vwPopClose()" aria-label="Cerrar">✕</button></div>
     ${a.t ? `<blockquote class="vwq">${esc(a.t.length > 400 ? a.t.slice(0, 400) + '…' : a.t)}</blockquote>` : ''}
     <textarea id="vwCm" rows="3" placeholder="${a.k === 'note' ? 'Escribe la nota…' : 'Comentario (opcional)…'}" data-oninput="vwCmIn()">${esc(a.m || '')}</textarea>
-    <div class="row vwpopb">${a.t ? '<button data-onclick="vwPopCopy()" title="Copiar el texto subrayado">📋 Copiar</button>' : ''}${P ? '<button data-onclick="vwToNote()" title="Añadir a las notas del paper, con la página, para citarlo">📝 A las notas</button>' : ''}<button class="danger" data-onclick="vwPopDel()">🗑 Borrar</button></div>`;
+    <div class="row vwpopb">${a.k === 'hl' ? lnStyRow(a, 'vwPopStyle') : ''}${a.t ? '<button data-onclick="vwPopCopy()" title="Copiar el texto subrayado">📋 Copiar</button>' : ''}${P ? '<button data-onclick="vwToNote()" title="Añadir a las notas del paper, con la página, para citarlo">📝 A las notas</button>' : ''}<button class="danger" data-onclick="vwPopDel()">🗑 Borrar</button></div>`;
   pp.hidden = false; vwPopPlace(); document.querySelectorAll('#vw .on[data-a]').forEach(e => e.classList.remove('on')); document.querySelectorAll(`#vw [data-a="${id}"]`).forEach(e => e.classList.add('on'));
   if (focus) setTimeout(() => $('#vwCm')?.focus(), 30);
   vwHandles();
@@ -820,7 +821,7 @@ async function vwThumb(b) {   // miniatura de una página (pequeña: poca memori
   const i = +b.dataset.i, p = VW.pages[i], gen = VW.gen; if (!p) return;
   try {
     p.proxy ||= await VW.doc.getPage(i + 1); if (gen !== VW.gen) return;
-    const W = 110 * Math.min(devicePixelRatio || 1, 2), vp = p.proxy.getViewport({scale: W / p.proxy.getViewport({scale: 1}).width});
+    const W = 110 * Math.min(devicePixelRatio || 1, 2), vp = vwGV(p, {scale: W / vwGV(p, {scale: 1}).width});
     const cv = document.createElement('canvas'); cv.width = Math.floor(vp.width); cv.height = Math.floor(vp.height);
     await p.proxy.render({canvasContext: cv.getContext('2d', {alpha: false}), viewport: vp, pageColors: vwPC()}).promise; if (gen !== VW.gen) return;
     b.querySelector('.vwtc0')?.replaceWith(cv);
@@ -859,7 +860,7 @@ async function vwForeign(gen) {
         else q.push(...a.rect);
         const c = a.color ? '#' + [...a.color].map(v => v.toString(16).padStart(2, '0')).join('') : '#ffd400';
         out.push({id: a.id, p: p.i, sub: VW_FSUB[a.subtype], k: a.subtype === 'Text' || a.subtype === 'FreeText' ? 'note' : /Highlight|Underline|StrikeOut|Squiggly/.test(a.subtype) ? 'hl' : 'area',
-          q: a.subtype === 'Text' ? [a.rect[0], a.rect[3], a.rect[0], a.rect[3]] : q, c, m: a.contentsObj?.str || '', who: a.titleObj?.str || ''}); }
+          q: a.subtype === 'Text' ? [a.rect[0], a.rect[3], a.rect[0], a.rect[3]] : q, c, ...(a.subtype === 'Underline' ? {s: 'u'} : a.subtype === 'StrikeOut' ? {s: 'x'} : {}), m: a.contentsObj?.str || '', who: a.titleObj?.str || ''}); }
     } catch (e) {}
     if (p.i % (VW.lite ? 3 : 10) === (VW.lite ? 2 : 9)) await new Promise(r => vwIdle(r));
   }
@@ -893,7 +894,7 @@ function vwNear(hex) {   // el color de la paleta más parecido
 }
 function vwImport(ids) {   // ids: solo esas (si no, todas las que traía el PDF)
   const mine = vwAnns(), L = (VW.foreign || []).filter(f => !f.dup && !mine.some(a => a.src === f.id) && (!ids || ids.includes(f.id))); if (!L.length) return;
-  const now = vwNow(); vwMut(l => { for (const f of L) l.push({id: uid(), k: f.k, p: f.p, q: f.q.map(v => Math.round(v * 100) / 100), c: vwNear(f.c), ...(f.m ? {m: f.m} : {}), src: String(f.id).slice(0, 60), at: now, up: now}); });
+  const now = vwNow(); vwMut(l => { for (const f of L) l.push({id: uid(), k: f.k, p: f.p, q: f.q.map(v => Math.round(v * 100) / 100), c: vwNear(f.c), ...(f.s ? {s: f.s} : {}), ...(f.m ? {m: f.m} : {}), src: String(f.id).slice(0, 60), at: now, up: now}); });
   vwHideDups(); toast(`${L.length} ${L.length === 1 ? 'anotación ahora es editable' : 'anotaciones ahora son editables'}.`, [], 3000);
 }
 
@@ -926,7 +927,7 @@ function vwFindGo(j) {   // a un resultado (también desde la lista del panel, v
   document.querySelectorAll('#vw .vwfh.cur').forEach(e => e.classList.remove('cur')); vwFindMark(p); document.querySelectorAll(`#vw .vwfh[data-h="${j}"]`).forEach(e => e.classList.add('cur'));
 }
 function vwHitBoxes(p, h) {   // cajas aproximadas de un resultado (por trozo de texto, recortadas en proporción a las letras)
-  const v = p.vp1 || p.proxy?.getViewport({scale: 1}); if (!v) return []; const by = new Map();
+  const v = p.vp1 || (p.proxy ? vwGV(p, {scale: 1}) : null); if (!v) return []; const by = new Map();
   for (let k = h.k; k < h.k + h.n; k++) { const m = h.map[k]; if (!m) continue; const [it, a, b] = m, o = by.get(it); if (o) o[1] = b; else by.set(it, [a, b]); }
   const out = []; for (const [it, [a, b]] of by) {
     const t = it.transform, fh = Math.hypot(t[2], t[3]) || it.height || 10, x = t[4] + it.width * a, w = it.width * (b - a);
@@ -1047,8 +1048,14 @@ async function vwPdfOut(file, anns) {
       const q = [], ops = ['/GS0 gs', `${C.map(f3).join(' ')} rg`]; let x1 = Infinity, y1 = Infinity, x2 = -Infinity, y2 = -Infinity;
       for (let k = 0; k + 3 < a.q.length; k += 4) { const [l, b, r, t] = a.q.slice(k, k + 4); q.push(l, t, r, t, l, b, r, b); ops.push(`${f3(l)} ${f3(b)} ${f3(r - l)} ${f3(t - b)} re f`); x1 = Math.min(x1, l); y1 = Math.min(y1, b); x2 = Math.max(x2, r); y2 = Math.max(y2, t); }
       rect = [x1, y1, x2, y2];
+      if (a.k === 'hl' && (a.s === 'u' || a.s === 'x')) {   // v39.52: línea debajo o tachado
+        const ln = [`${C.map(f3).join(' ')} RG`]; for (let k = 0; k + 3 < a.q.length; k += 4) { const [l, b, r, t] = a.q.slice(k, k + 4), h = t - b, y = a.s === 'u' ? b + h * .08 : b + h * .45; ln.push(`${f3(Math.max(.6, h * .07))} w ${f3(l)} ${f3(y)} m ${f3(r)} ${f3(y)} l S`); }
+        const ap = ctx.register(ctx.stream(ln.join('\n'), {Type: 'XObject', Subtype: 'Form', BBox: rect}));
+        dict = {...base, Subtype: a.s === 'u' ? 'Underline' : 'StrikeOut', Rect: rect, QuadPoints: q, Subj: T(a.s === 'u' ? 'Subrayado' : 'Tachado'), AP: {N: ap}, ...(a.m ? {Contents: T(a.m)} : {})};
+      } else {
       const ap = ctx.register(ctx.stream(ops.join('\n'), {Type: 'XObject', Subtype: 'Form', BBox: rect, Resources: {ExtGState: {GS0: {Type: 'ExtGState', CA: 1, ca: 1, BM: 'Multiply'}}}}));
       dict = {...base, Subtype: 'Highlight', Rect: rect, QuadPoints: q, CA: 1, Subj: T(a.k === 'area' ? 'Zona' : 'Resaltado'), AP: {N: ap}, ...(a.m ? {Contents: T(a.m)} : {})};
+      }
     }
     const ref = ctx.register(ctx.obj(dict)); pg.node.addAnnot(ref);
     if (a.m) {   // ventana del comentario (cerrada), como en Acrobat y Foxit
@@ -1161,7 +1168,7 @@ async function vwDetail() {
     try { p.dtask?.cancel(); } catch (e) {}
     const cv = document.createElement('canvas'); cv.width = Math.floor(w * os); cv.height = Math.floor(h * os); cv.className = 'vwdet'; cv.dataset.k = k;
     cv.style.cssText = `left:${Math.floor(x0)}px;top:${Math.floor(y0)}px;width:${w}px;height:${h}px`;
-    const vp = p.proxy.getViewport({scale: s}), task = p.dtask = p.proxy.render({canvasContext: cv.getContext('2d', {alpha: false}), viewport: vp, transform: [os, 0, 0, os, -Math.floor(x0) * os, -Math.floor(y0) * os], annotationMode: PDFJS.AnnotationMode.ENABLE_STORAGE, pageColors: vwPC()});
+    const vp = vwGV(p, {scale: s}), task = p.dtask = p.proxy.render({canvasContext: cv.getContext('2d', {alpha: false}), viewport: vp, transform: [os, 0, 0, os, -Math.floor(x0) * os, -Math.floor(y0) * os], annotationMode: PDFJS.AnnotationMode.ENABLE_STORAGE, pageColors: vwPC()});
     try { await task.promise; } catch (e) { continue; } p.dtask = null;
     if (gen !== VW.gen || Math.abs(VW.scale - s) > .001 || !p.cv) return;
     p.det?.remove(); p.cv.after(cv); p.det = cv;
@@ -1284,7 +1291,9 @@ function vwReadMenu() {
     <button data-onclick="vwRdSet('flip',1)">${tick(VW.flip)}👆 Página a página, con toques a los lados</button>
     ${VW.flip ? `<button data-onclick="vwLockSet(${VW.zLock ? 0 : 1})" title="No deja cambiar el zoom y, al pasar de página, se queda el mismo tamaño y la misma zona">${tick(VW.zLock)}🔒 Candado del tamaño <small class="vwsub">K</small></button>` : ''}
     <hr><button data-keep data-onclick="vwAutoMenu()">⏬ Desplazamiento automático <small class="vwsub">${VW.auto ? (VW.autoPaused ? 'en pausa' : 'en marcha') : 'parado'}${vwConcOn() ? ' · concentración' : ''} ›</small></button>
-    <hr><button data-onclick="vwRdSet('crop',${VW.crop ? 0 : 1})" title="Quita los márgenes en blanco de las páginas para que el texto se vea más grande">${tick(VW.crop)}✂ Recortar los márgenes (automático)</button>
+    <hr><button data-onclick="vwRdSet('crop',${VW.crop ? 0 : 1})" title="Quita los márgenes en blanco de las páginas para que el texto se vea más grande">${tick(VW.crop)}✂ Recortar los márgenes${VW.cropM?.hand ? ' (a mano)' : ' (automático)'}</button>
+    ${VW.crop ? '<button data-keep data-onclick="lnCropMenu()">✂ Ajustar el recorte… <small class="vwsub">›</small></button>' : ''}
+    <hr><button data-keep data-onclick="lnRotate(VW.cur);vwReadMenu()">↻ Girar la página ${VW.cur + 1}${vwRot(VW.cur) ? ` <small class="vwsub">${vwRot(VW.cur)}°</small>` : ''}</button><button data-keep data-onclick="lnRotate('*');vwReadMenu()">↻ Girar todas las páginas</button>${Object.keys(VW.rot || {}).length ? '<button data-keep data-onclick="lnRotate(null);vwReadMenu()">↺ Quitar los giros</button>' : ''}
 `);
 }
 /* ⚙ Ajustes del visor (v39.47, ⋯ → ⚙): lo que se elige una vez y se olvida, fuera de los submenús de lectura. Mismo panel en el PDF y en
@@ -1424,12 +1433,13 @@ function vwInkBox(img) {   // el rectángulo con tinta de una página pintada en
   return x1 < 0 ? null : {x0, y0, x1: x1 + 1, y1: y1 + 1};
 }
 async function vwCropCalc(gen, show) {
+  const cs = lnCropSaved(); if (cs) { VW.cropM = {...cs, any: cs.t + cs.b + cs.l + cs.r > .5, hand: true}; if (VW.crop) vwCropShow(true); return; }   // v39.52: el que ajustaste a mano
   const N = VW.pages.length; if (!N || !VW.doc) return; const S = Math.min(N, 9);
   const idx = [...new Set(Array.from({length: S}, (_, k) => Math.round(k * (N - 1) / Math.max(1, S - 1))))], M = {t: [], r: [], b: [], l: []};
   for (const i of idx) {
     const p = VW.pages[i];
     try { p.proxy ||= await VW.doc.getPage(i + 1); } catch (e) { continue; } if (gen !== VW.gen) return;
-    const v1 = p.proxy.getViewport({scale: 1}), k = 200 / v1.width, vp = p.proxy.getViewport({scale: k});
+    const v1 = vwGV(p, {scale: 1}), k = 200 / v1.width, vp = vwGV(p, {scale: k});
     const cv = document.createElement('canvas'); cv.width = Math.ceil(vp.width); cv.height = Math.ceil(vp.height); const ctx = cv.getContext('2d', {alpha: false, willReadFrequently: true});
     try { await p.proxy.render({canvasContext: ctx, viewport: vp}).promise; } catch (e) { continue; } if (gen !== VW.gen) return;
     const b = vwInkBox(ctx.getImageData(0, 0, cv.width, cv.height)); cv.width = cv.height = 0; if (!b) continue;

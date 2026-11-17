@@ -109,7 +109,7 @@ async function lnPrev(t, R) {   // la vista previa del destino: el trozo de la p
   pp.hidden = false; lnPlace(pp, R, $('#vw'));
   try {
     const box = pp.querySelector('.lncv'), W = Math.max(200, box.clientWidth), c = await lnCol(p, t);
-    const s = Math.min(2, W / c.w), dpr = Math.min(devicePixelRatio || 1, 2), vp = p.proxy.getViewport({scale: s * dpr, offsetX: -c.x * s * dpr, offsetY: -c.y * s * dpr});
+    const s = Math.min(2, W / c.w), dpr = Math.min(devicePixelRatio || 1, 2), vp = vwGV(p, {scale: s * dpr, offsetX: -c.x * s * dpr, offsetY: -c.y * s * dpr});
     const cv = document.createElement('canvas'); cv.width = Math.ceil(c.w * s * dpr); cv.height = Math.ceil(c.h * s * dpr); cv.style.width = Math.round(c.w * s) + 'px';
     await p.proxy.render({canvasContext: cv.getContext('2d', {alpha: false}), viewport: vp, pageColors: vwPC()}).promise;
     if (gen !== VW.gen || LN.t !== t) return; box.replaceChildren(cv); lnPlace(pp, R, $('#vw'));
@@ -263,6 +263,7 @@ function lnSelMore(ep) {
   LN.sel = {t: t.slice(0, 4000), pg, ep}; const w = t.split(/\s+/).filter(Boolean).length, one = w > 0 && w <= 3;
   const m = ep ? epMenu : vwMenu; if (ep) EP.menuR = bar; else VW.menuR = bar;
   m(bar, `<button data-onclick="lnSelCite()" title="«…» (autor, año, página): para pegarlo en un trabajo">❝ Copiar con la cita</button>
+    <button data-onmousedown="event.preventDefault()" data-onclick="lnSelStyle('u')" title="Con el color elegido, una línea debajo en vez de resaltar">U̲ Subrayar con una línea</button><button data-onmousedown="event.preventDefault()" data-onclick="lnSelStyle('x')">S̶ Tachar</button>
     ${one ? `<button data-onclick="lnSelWeb('rae')">📖 Definición (RAE)</button><button data-onclick="lnSelWeb('cam')">📖 Definition (Cambridge)</button>` : ''}
     <button data-onclick="lnSelWeb('tr')">🌐 Traducir al español</button><button data-onclick="lnSelWeb('sch')">🎓 Buscar en Google Académico</button>
     <div class="vwhint">Lo de fuera se abre en una pestaña nueva y envía solo el texto elegido.</div>`);
@@ -310,3 +311,60 @@ function lnPaceTick() {   // cada 5 s: cuánto tiempo pasas en cada página (o c
   lnLeftShow();
 }
 setInterval(lnPaceTick, 5000);
+
+/* ===== Subrayado con línea y tachado, recorte a mano y girar páginas (v39.52) =====
+   · Estilo de un subrayado (campo «s» de la anotación: 'u' línea debajo, 'x' tachado; sin él, resaltado como siempre). Se cambia en la
+     ventanita de cada subrayado (🖍 U̲ S̶) o se elige al crear desde ⋯ de la barra de la selección. En el PDF anotado salen como
+     Underline y StrikeOut (Acrobat, Foxit), y los que traía el PDF se traen con su estilo. También en el EPUB.
+   · ✂ Ajustar el recorte (⋯ → 📖 Modo de lectura, con el recorte puesto): cuatro barras (arriba, abajo, izquierda, derecha) para
+     corregir el automático. Se guarda por PDF en este dispositivo (gp-vw-crop); «↺ Automático» lo quita.
+   · ↻ Girar (⋯ → 📖 Modo de lectura): esta página o todas, de 90 en 90 grados (tablas apaisadas, escaneos de lado). Se guarda por PDF
+     en este dispositivo (gp-vw-rot); los subrayados siguen en su sitio (van en coordenadas del PDF). */
+const LN_STY = {u: 'U̲ Línea debajo', x: 'S̶ Tachado'};
+function vwPopStyle(s) { const id = VW.pop; if (!id) return; vwMut(l => { const a = l.find(x => x.id === id); if (!a) return; if (s) a.s = s; else delete a.s; a.up = vwNow(); }); vwPopOpen(id); }
+function epPopStyle(s) { const id = EP.pop; if (!id) return; epMut(l => { const a = l.find(x => x.id === id); if (!a) return; if (s) a.s = s; else delete a.s; a.up = vwNow(); }); epPopOpen(id); }
+const lnStyRow = (a, fn) => `<span class="lnsty" role="group" aria-label="Estilo">${[['', '🖍', 'Resaltado'], ['u', 'U̲', 'Línea debajo'], ['x', 'S̶', 'Tachado']].map(([s, i, t]) => `<button class="${(a.s || '') === s ? 'on' : ''}" title="${t}" aria-label="${t}" data-onclick="${fn}('${s}')">${i}</button>`).join('')}</span>`;
+function lnSelStyle(s) { const x = LN.sel; if (!x) return; if (x.ep) epFromSel(EP.color, false, s); else vwFromSel(VW.color, false, s); }
+
+/* ---- Recorte a mano ---- */
+const LN_CROP_K = 'gp-vw-crop', LN_ROT_K = 'gp-vw-rot';
+const lnStore = k => { try { return JSON.parse(localStorage.getItem(k) || '{}') || {}; } catch (e) { return {}; } };
+function lnStorePut(k, key, v) { try { const o = lnStore(k); delete o[key]; if (v) o[key] = v; const ks = Object.keys(o); for (const x of ks.slice(0, Math.max(0, ks.length - 60))) delete o[x]; localStorage.setItem(k, JSON.stringify(o)); } catch (e) {} }
+function lnCropSaved() { const c = VW.src && lnStore(LN_CROP_K)[vwSrcKey(VW.src)]; return c && ['t', 'r', 'b', 'l'].every(k => Number.isFinite(c[k]) && c[k] >= 0) ? c : null; }
+function lnCropMenu() {
+  if (!VW.crop) return; const c = VW.cropM || {t: 0, r: 0, b: 0, l: 0}, p0 = VW.pages[0]; if (!p0) return;
+  const row = (k, t, max) => `<label class="lncrop"><span>${t}</span><input type="range" min="0" max="${Math.round(max)}" step="1" value="${Math.round(c[k] || 0)}" data-oninput="lnCropSet('${k}',this.value)" aria-label="${t}"></label>`;
+  vwMenu(VW.menuR, `<button data-keep data-onclick="vwReadMenu()">‹ Volver</button><hr><div class="ctxh">✂ Ajustar el recorte de este PDF</div>
+    ${row('t', 'Arriba', p0.h * .4)}${row('b', 'Abajo', p0.h * .4)}${row('l', 'Izquierda', p0.w * .4)}${row('r', 'Derecha', p0.w * .4)}
+    <button data-keep data-onclick="lnCropAuto()">↺ Volver al recorte automático</button><div class="vwhint">Se guarda para este PDF en este dispositivo.</div>`);
+}
+function lnCropSet(k, v) {
+  const c = {...(VW.cropM || {t: 0, r: 0, b: 0, l: 0})}; c[k] = Math.max(0, +v || 0); c.any = c.t + c.b + c.l + c.r > 0.5; c.hand = true; VW.cropM = c;
+  lnStorePut(LN_CROP_K, vwSrcKey(VW.src), {t: c.t, r: c.r, b: c.b, l: c.l}); clearTimeout(LN.cropT); LN.cropT = setTimeout(() => vwCropShow(true), 60);
+}
+function lnCropAuto() { lnStorePut(LN_CROP_K, vwSrcKey(VW.src), null); VW.cropM = null; vwCropCalc(VW.gen, true).then(() => { if (!$('#vwMenu').hidden) lnCropMenu(); }); }
+
+/* ---- Girar páginas ---- */
+const vwRotMap = () => (VW.src && lnStore(LN_ROT_K)[vwSrcKey(VW.src)]) || {};
+const vwRot = i => (((VW.rot?.['*'] || 0) + (VW.rot?.[i] || 0)) % 360 + 360) % 360;
+const vwGV = (p, o) => p.proxy.getViewport({...o, rotation: ((p.proxy.rotate || 0) + vwRot(p.i)) % 360});   // la página como se ve, con su giro
+function lnRotate(which) {   // which: número de página, '*' (todas) o null (quitar los giros)
+  const R = {...(VW.rot || {})}; if (which == null) for (const k in R) delete R[k]; else { R[which] = ((R[which] || 0) + 90) % 360; if (!R[which]) delete R[which]; }
+  VW.rot = R; lnStorePut(LN_ROT_K, vwSrcKey(VW.src), Object.keys(R).length ? R : null); lnRotApply();
+}
+function lnRotApply() {   // vuelve a medir y pintar las páginas con su giro (los subrayados y la búsqueda se recolocan solos)
+  if (!VW.pages.length) return; const i0 = VW.cur;
+  for (const p of VW.pages) {
+    if (!p.proxy) { if (vwRot(p.i)) VW.doc.getPage(p.i + 1).then(pr => { p.proxy ||= pr; lnRotPage(p); }); continue; }
+    lnRotPage(p);
+  }
+  if (VW.fit) vwFitW(true); vwGo(i0, true); vwPump();
+}
+function lnRotPage(p) {
+  const v = vwGV(p, {scale: 1}); if (p.vp1 && p.vp1.rotation === v.rotation) return;
+  p.vp1 = v; p.sized = true; p.w = v.width; p.h = v.height; vwSize(p); p.annSig = '';
+  if (p.task) try { p.task.cancel(); } catch (e) {}
+  if (p.cv) { p.cv.width = p.cv.height = 0; p.cv.remove(); p.cv = null; } p.rs = 0; p.det?.remove(); p.det = null;
+  if (p.tl) { p.tl.cancel?.(); p.el.querySelector('.textLayer')?.remove(); p.tl = null; }
+  vwAnnPage(p); if (VW.find.q) vwFindMark(p); if (p.vis) VW.queue.add(p.i);
+}

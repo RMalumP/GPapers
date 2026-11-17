@@ -403,3 +403,10 @@ También en `js/lectura.js`, y otra vez sin botones fijos nuevos.
 - **📜 Sepia en el PDF** (⚙ → 🌙 Modo noche y sepia: normal, sepia, noche o como el sistema). Como la noche, cambia el papel y el color del texto; las imágenes no se tocan.
 - **⏱ Tiempo que falta**: «≈ 12 min» junto al número de páginas (en pantallas anchas), en el aviso de página de la pantalla completa y junto al capítulo del EPUB. Se calcula con **tu ritmo** en este dispositivo: el tiempo que pasas en cada página antes de pasar a la siguiente (`gp-vw-pace`, segundos por página) o las letras que avanzas por minuto en el EPUB (`gp-ep-pace`), contando solo mientras lees (has tocado algo hace menos de 2 min o va el automático). Se quita en ⚙ → ⏱ (`gp-vw-left`).
 - Pruebas: `python3 pruebas/prueba_visor_colores.py .`
+
+## Visor: subrayar con línea o tachar, recorte a mano y girar páginas (v39.52)
+- **U̲ Línea debajo y S̶ Tachado**: además del resaltado de siempre, un subrayado puede ser una línea bajo el texto o un tachado. Se cambia en la ventanita de cada subrayado (🖍 U̲ S̶) o se elige al crear, en ⋯ de la barra de la selección. En el **PDF anotado** salen como subrayado y tachado de verdad (los ven Acrobat, Foxit y los demás), y los que ya traía el PDF se importan con su estilo. También en el EPUB.
+- **✂ Ajustar el recorte** (⋯ → 📖 Modo de lectura, con el recorte de márgenes puesto): cuatro barras (arriba, abajo, izquierda y derecha) para corregir el recorte automático cuando se come algo o deja demasiado margen. Se guarda para ese PDF en este dispositivo (`gp-vw-crop`); «↺ Volver al recorte automático» lo quita.
+- **↻ Girar** (⋯ → 📖 Modo de lectura): esta página o todas, de 90 en 90 grados, para tablas apaisadas o escaneos de lado. Se guarda para ese PDF en este dispositivo (`gp-vw-rot`); los subrayados y la búsqueda siguen en su sitio.
+- **Arreglo**: al volver a abrir un PDF con el recorte de márgenes puesto, el recorte no se aplicaba hasta tocar algo.
+- Pruebas: `python3 pruebas/prueba_visor_giro.py .`
