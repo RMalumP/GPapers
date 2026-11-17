@@ -55,9 +55,9 @@ function vwBuild() {
   const sw = VW_COLORS.map(([c, t], i) => `<button class="vwc" data-c="${i}" style="--c:${c}" title="${t}" aria-label="Color ${t}" data-onclick="vwColor(${i})"></button>`).join('');
   document.body.insertAdjacentHTML('beforeend', `<dialog id="vw" aria-label="Visor de PDF">
     <div class="vwh"><button class="vwib" data-onclick="vwClose()" title="Volver a la lista (Esc)" aria-label="Volver">←</button><b class="vwt"></b>
-      <span class="vwpg"><input id="vwPg" type="number" min="1" aria-label="Página" data-onchange="vwGoN(this.value)" data-onkeydown="onEnter(event,vwGoN,this.value)"><span id="vwPn"></span></span>
+      <span class="vwpg"><input id="vwPg" type="number" min="1" aria-label="Página" data-onchange="vwGoN(this.value)" data-onkeydown="onEnter(event,vwGoN,this.value)"><span id="vwPn"></span></span><small id="vwLeft" class="lnleft" hidden></small>
       <span class="vwz"><button class="vwib" data-onclick="vwZoomBy(0.8333)" title="Alejar (Ctrl + −)" aria-label="Alejar">−</button><button id="vwZl" class="vwzl" data-onclick="vwFitW()" title="Ajustar al ancho">100 %</button><button class="vwib" data-onclick="vwZoomBy(1.2)" title="Acercar (Ctrl + +)" aria-label="Acercar">＋</button></span>
-      <span class="vwf"><input id="vwQ" type="search" placeholder="Buscar en el PDF" aria-label="Buscar en el PDF" data-onkeydown="vwFindKey(event)" data-oninput="vwFindReset()"><span id="vwQn"></span></span>
+      <span class="vwf"><input id="vwQ" type="search" placeholder="Buscar en el PDF" aria-label="Buscar en el PDF" data-onkeydown="vwFindKey(event)" data-oninput="vwFindReset()"><span id="vwQn"></span><button class="vwib vwqL" id="vwQL" hidden data-onclick="vwPanel('find')" title="Ver todos los resultados, con su frase" aria-label="Lista de resultados">☰</button></span>
       <button class="vwib vwfb" data-onclick="vwFindToggle()" title="Buscar (Ctrl+F)" aria-label="Buscar">🔍</button>
       <button class="vwib vwlk" data-onclick="vwLockToggle()" title="Bloquear el tamaño (K)" aria-label="Bloquear el tamaño" aria-pressed="false">🔓</button>
       <button class="vwib" data-onclick="vwFs(true)" title="Pantalla completa" aria-label="Pantalla completa">⛶</button>
@@ -75,7 +75,7 @@ function vwBuild() {
       <button class="vwm vwfsb" data-onclick="vwFs(false)" title="Salir de pantalla completa (Esc o «atrás»)"><span>⛶</span><small>Salir</small></button>
       <button class="vwm vwsb" data-onclick="vwPanel('ann')" title="Subrayados, notas y comentarios"><span>💬</span><small>Anotaciones</small><b id="vwAn"></b></button></div>
     <div class="vwbody"><div id="vwScroll" tabindex="-1"><div id="vwPages"></div><p id="vwLoad" class="vwload">Abriendo el PDF…</p></div><aside id="vwSide" hidden></aside></div>
-    <div id="vwSel" class="vwfloat" hidden>${sw.replace(/vwColor/g, 'vwSelColor')}<button class="vwib" data-onclick="vwSelNote()" title="Subrayar y comentar" aria-label="Subrayar y comentar">💬</button><button class="vwib" data-onclick="vwSelCopy()" title="Copiar el texto" aria-label="Copiar">📋</button></div>
+    <div id="vwSel" class="vwfloat" hidden data-onmousedown="event.preventDefault()">${sw.replace(/vwColor/g, 'vwSelColor')}<button class="vwib" data-onclick="vwSelNote()" title="Subrayar y comentar" aria-label="Subrayar y comentar">💬</button><button class="vwib" data-onclick="vwSelCopy()" title="Copiar el texto" aria-label="Copiar">📋</button><button class="vwib" data-onclick="lnSelMore(false)" title="Más: copiar con la cita, definición, traducir…" aria-label="Más">⋯</button></div>
     <div id="vwPop" class="vwfloat vwpop" hidden></div>
     <button id="vwTbTab" class="vwfloat" data-onclick="vwTbHide(false)" title="Sacar la barra de herramientas" aria-label="Sacar la barra">▾</button>
     <button id="vwLock" class="vwfloat vwlk" data-onclick="vwLockToggle()" title="Bloquear el tamaño (K)" aria-label="Bloquear el tamaño" aria-pressed="false">🔓</button>
@@ -90,7 +90,7 @@ function vwBuild() {
   sc.addEventListener('wheel', vwWheel, {passive: false});
   for (const t of ['touchstart', 'touchmove', 'touchend', 'touchcancel']) sc.addEventListener(t, vwTouch, {passive: false});
   VW.ts = tsBind(d, sc, '.textLayer', {can: () => VW.mode === 'sel' && !VW.pinch, start: () => { VW.tap = null; clearTimeout(VW.lpT); }, done: vwSelShow});
-  sc.addEventListener('pointerdown', vwDown); sc.addEventListener('pointermove', vwMove); sc.addEventListener('pointerup', vwUp); sc.addEventListener('pointercancel', vwUp);
+  sc.addEventListener('pointerdown', vwDown); sc.addEventListener('pointermove', vwMove); sc.addEventListener('pointermove', lnHover); sc.addEventListener('pointerup', vwUp); sc.addEventListener('pointercancel', vwUp);
   document.addEventListener('selectionchange', () => { if (VW.open) { clearTimeout(VW.selT); VW.selT = setTimeout(vwSelShow, VW.mode === 'sel' ? 250 : 0); } });
   new ResizeObserver(() => { if (VW.open && VW.fit && VW.pages.length) vwFitW(true); }).observe(sc);
   window.addEventListener('popstate', e => {
@@ -105,15 +105,15 @@ async function vwOpen(src, file) {
   const d = $('#vw'); vw$('.vwt').textContent = vwTitle(); vw$('.vwt').title = vwTitle(); $('#vwPages').innerHTML = ''; $('#vwLoad').hidden = false; $('#vwLoad').textContent = 'Abriendo el PDF…';
   $('#vwQ').value = ''; $('#vwQn').textContent = ''; vwPopClose(); $('#vwSel').hidden = true; if (VW.sideNext) VW.tab = 'ann'; VW.side = VW.sideNext || !document.documentElement.classList.contains('mv') && innerWidth > 1100 && vwSideOn(); VW.sideNext = false; vwSideShow();
   vw$('.vwnb').hidden = src?.kind !== 'paper';
-  Object.assign(VW, vwRdGet(), {cropM: null, zLock: false}); vwRdClass(); vwCropShow(); VW.night = vwNightOn(); d.classList.toggle('night', VW.night); d.classList.toggle('tsel', tsWant()); VW.lite = vwLiteWant(); d.classList.toggle('lite', VW.lite); VW.toc = null; VW.thIo?.disconnect();
-  if (!d.open) d.showModal(); vwModeShow(); vwColorShow(); vwCount();
+  Object.assign(VW, vwRdGet(), {cropM: null, zLock: false}); vwRdClass(); vwCropShow(); VW.theme = vwTheme(); VW.night = VW.theme === 'night'; d.classList.toggle('night', VW.night); d.classList.toggle('sepia', VW.theme === 'sepia'); lnLblApply(); d.classList.toggle('tsel', tsWant()); VW.lite = vwLiteWant(); d.classList.toggle('lite', VW.lite); VW.toc = null; VW.thIo?.disconnect();
+  if (!d.open) d.showModal(); vwModeShow(); vwColorShow(); vwCount(); lnClose(); lnBackClear(); $('#vwQL').hidden = true; wlPoke(); if (P2.doc) p2Close();
   if (!VW.pushed && !VW_TAB) { try { history.pushState({vw: 1}, ''); VW.pushed = true; } catch (e) {} }   // el botón «atrás» del móvil cierra el visor
   try {
     const L = await vwLib(); if (gen !== VW.gen) return;
     const kept = vwKeepTake(src, file);   // reabrir el mismo PDF poco después de cerrarlo: ya está leído
     const doc = kept ? kept.doc : await vwLoadDoc(L, file); if (gen !== VW.gen) { if (!kept) doc.destroy(); else vwKeepPut(kept); return; }
     if (kept) VW.find.txt = kept.txt;
-    VW.doc = doc; const p1 = await doc.getPage(1), v1 = p1.getViewport({scale: 1}), szc = vwSzGet(src, file, doc.numPages);
+    VW.doc = doc; VW.rot = vwRotMap(); const p1 = await doc.getPage(1), v1 = p1.getViewport({scale: 1, rotation: ((p1.rotate || 0) + vwRot(0)) % 360}), szc = Object.keys(VW.rot).length ? null : vwSzGet(src, file, doc.numPages);
     VW.pages = Array.from({length: doc.numPages}, (_, i) => { const c = szc?.[i]; return {i, w: c ? c[0] : v1.width, h: c ? c[1] : v1.height, vp1: i ? null : v1, proxy: i ? null : p1, el: null, cv: null, rs: 0, tl: null, sized: !i}; });
     VW.szOk = !!szc;
     $('#vwLoad').hidden = true; $('#vwPn').textContent = '/ ' + doc.numPages; $('#vwPg').max = doc.numPages;
@@ -123,7 +123,8 @@ async function vwOpen(src, file) {
     const pf = vwHolders()[0], start = Math.min(doc.numPages, Math.max(1, pdfPage(pf?.page) || 1)) - 1; VW.startPage = start;
     if (start) vwGo(start, true); vwPosRestore(start); vwObserve(); vwDrawAnn(); vwBmDraw(); vwOnScroll();
     if (start) toast(`Sigues en la página ${start + 1}, donde lo dejaste.`, [{t: '⏮ Ir al principio', fn: () => vwGo(0)}], 3500);
-    if (!VW.szOk) vwSizes(gen); vwIdle(() => vwForeign(gen));   // v39.45: las anotaciones de otros programas, cuando el visor está quieto if (VW.crop) vwCropCalc(gen);
+    if (!VW.szOk) vwSizes(gen); vwIdle(() => vwForeign(gen));   // v39.45: las anotaciones de otros programas, cuando el visor está quieto
+    if (VW.crop) vwCropCalc(gen);   // v39.52: el recorte, también al volver a abrir (se había quedado dentro del comentario de arriba)
   } catch (e) {
     if (gen !== VW.gen) return; console.error(e);
     $('#vwLoad').innerHTML = `${e.name === 'PasswordException' ? 'El PDF está protegido con contraseña.' : 'No se pudo abrir el PDF' + (e.message ? ': ' + esc(e.message) : '.')} <button data-onclick="vwNative()">Abrir con el visor del navegador</button>`;
@@ -149,10 +150,10 @@ function vwAskPass(wrong) {   // contraseña de un PDF protegido
 async function vwClose(fromPop, keepHist) {
   if (!VW.open) return; vwAutoStop(); if (VW.fs) vwFs(false); vwSaveComment(); vwNotesClose(true);
   const src = VW.src; vwPageSave(true);
-  VW.open = false; VW.gen++; VW.io?.disconnect(); VW.queue.clear();
+  if (!SAY.ep) sayStop(true); p2Close(); VW.open = false; VW.gen++; VW.io?.disconnect(); VW.queue.clear();
   for (const p of VW.pages) { try { p.task?.cancel(); } catch (e) {} p.proxy?.cleanup(); }
   if (VW.doc && src && VW.file) vwKeepPut({key: vwSrcKey(src), size: VW.file.size, doc: VW.doc, txt: VW.find.txt}); else try { VW.doc?.destroy(); } catch (e) {}
-  VW.doc = null; VW.pages = []; VW.file = null; $('#vwPages').innerHTML = ''; vwPopClose(); $('#vwSel').hidden = true;
+  VW.doc = null; VW.pages = []; VW.file = null; $('#vwPages').innerHTML = ''; vwPopClose(); $('#vwSel').hidden = true; lnClose(); lnBackClear(); wlSync();
   if (!keepHist) { const d = $('#vw'); if (d.open) d.close(); }
   if (VW.pushed && !fromPop && !keepHist) { VW.pushed = false; history.back(); }
   if (RENDER_VW) { RENDER_VW = false; render(); } else if (src?.kind === 'paper' && db.papers.some(p => p.id === src.id)) renderPaper(src.id);
@@ -190,7 +191,7 @@ function vwSzGet(src, file, n) {
     const out = []; for (const [c, w, h] of r.t) for (let j = 0; j < c; j++) out.push([w, h]); return out.length === n ? out : null; } catch (e) { return null; }
 }
 function vwSzPut() {
-  if (!VW.src || !VW.file || !VW.pages.length) return; const t = [];
+  if (!VW.src || !VW.file || !VW.pages.length || Object.keys(VW.rot || {}).length) return; const t = [];   // con páginas giradas no se guardan
   for (const p of VW.pages) { const w = Math.round(p.w * 100) / 100, h = Math.round(p.h * 100) / 100, l = t[t.length - 1]; if (l && l[1] === w && l[2] === h) l[0]++; else t.push([1, w, h]); }
   try { const o = JSON.parse(localStorage.getItem(VW_SZ_K) || '{}'), k = vwSrcKey(VW.src); delete o[k]; if (t.length > 400) return;   // un PDF con tamaños muy variados no se guarda
     o[k] = {n: VW.pages.length, s: VW.file.size, t}; const ks = Object.keys(o); for (const x of ks.slice(0, Math.max(0, ks.length - 40))) delete o[x];
@@ -230,6 +231,8 @@ async function vwOther(ann) {   // abrir en otra app: el menú «Compartir» del
 function vwEsc() {
   if (vwConcTap()) return;   // modo concentración: Esc saca las barras
   const m = $('#vwMenu'); if (m && !m.hidden) { m.hidden = true; return $('#vwMoreB').focus(); }   // un menú abierto: Esc lo cierra (no el visor)
+  if (lnShown()) return lnClose();
+  if (SAY.on && !SAY.ep) return sayStop();
   if (!$('#vwCol').hidden) return vwColClose();
   if (VW.fs) return vwFs(false);
   if (vwDocked()) return vwNotesClose();
@@ -248,6 +251,7 @@ function vwKey(e) {
   if (inText) return;
   if (mod && (k === 'z' || k === 'Z')) { e.preventDefault(); vwSaveComment(); return e.shiftKey ? redo() : undo(); }
   if (mod && (k === 'y')) { e.preventDefault(); return redo(); }
+  if (e.altKey && k === 'ArrowLeft' && LN.back.length) { e.preventDefault(); return lnBack(); }   // v39.50: volver después de un enlace
   if (mod || e.altKey) return;
   const sc = $('#vwScroll');
   if (k === ' ' && VW.auto) { e.preventDefault(); vwAutoPause(); }   // desplazamiento automático: la barra espaciadora pausa
@@ -278,7 +282,7 @@ function vwKeysHelp() {
   if (!VW.menuR) VW.menuR = $('#vwMoreB').getBoundingClientRect();
   const kb = s => s.split(' ').map(x => `<kbd>${esc(x)}</kbd>`).join(' '), row = (k, t) => `<tr><td>${kb(k)}</td><td>${esc(t)}</td></tr>`;
   const fixed = [['Ctrl+F', 'Buscar en el PDF'], ['Ctrl++ Ctrl+−', 'Zoom'], ['Ctrl+0', 'Ajustar al ancho'], ['Ctrl+Z', 'Deshacer'], ['← →', 'Página (o par) anterior y siguiente'], ['RePág AvPág', 'Pantalla anterior y siguiente'], ['Inicio Fin', 'Primera y última página'],
-    ['Espacio', 'Bajar una pantalla (con el automático: pausa)'], ['↑ ↓', 'Con el automático: más deprisa o más despacio'], ['B', 'Marcar o quitar el marcador'], ['[ ]', 'Marcador anterior y siguiente'], ['Supr', 'Borrar la anotación abierta'], ['Esc', 'Cerrar (o salir de pantalla completa)']];
+    ['Espacio', 'Bajar una pantalla (con el automático: pausa)'], ['↑ ↓', 'Con el automático: más deprisa o más despacio'], ['B', 'Marcar o quitar el marcador'], ['Alt+←', 'Volver a donde estabas (después de un enlace)'], ['[ ]', 'Marcador anterior y siguiente'], ['Supr', 'Borrar la anotación abierta'], ['Esc', 'Cerrar (o salir de pantalla completa)']];
   vwMenu(VW.menuR, `<button data-keep data-onclick="vwMoreBack()">‹ Volver</button><hr><div class="ctxh">⌨ Atajos de teclado del visor</div>
     <table class="vwkeys">${fixed.map(([k, t]) => row(k, t)).join('')}${Object.entries(VW_KEYS).map(([k, [t]]) => row(k.toUpperCase(), t)).join('')}</table>
     <div class="vwhint">Las letras funcionan fuera de los campos de texto. El tamaño del texto de la interfaz se cambia en Configuración → Apariencia (y con ${esc(db.settings.shortcuts.uiBig || '—')} / ${esc(db.settings.shortcuts.uiSmall || '—')}).</div>`);
@@ -292,7 +296,7 @@ async function vwSizes(gen) {   // el tamaño real de cada página (casi siempre
   for (const p of VW.pages) {
     if (gen !== VW.gen) return; if (p.sized) continue;
     try { p.proxy ||= await VW.doc.getPage(p.i + 1); } catch (e) { return; } if (gen !== VW.gen) return;
-    const v = p.vp1 = p.proxy.getViewport({scale: 1}); p.sized = true;
+    const v = p.vp1 = vwGV(p, {scale: 1}); p.sized = true;
     if (Math.abs(v.width - p.w) > .5 || Math.abs(v.height - p.h) > .5) { const a = vwAnchor(); p.w = v.width; p.h = v.height; vwSize(p); vwAnchorSet(a); if (VW.fit) vwFitW(true); }
     if (p.i % 20 === 19) await new Promise(r => setTimeout(r, 0));
   }
@@ -321,7 +325,7 @@ function vwFitW(keep) {
 function vwZoomBy(f, focus) { if (vwLocked()) return; VW.fit = false; vwScaleSet(VW.scale * f, focus); }
 function vwWheel(e) { if (!e.ctrlKey && !e.metaKey) { if (VW.zLock) e.preventDefault(); return; }   // candado: la rueda tampoco mueve la hoja
   e.preventDefault(); vwZoomBy(Math.exp(-e.deltaY / 300), {x: e.clientX, y: e.clientY}); }
-function vwRerender() { for (const p of VW.pages) if (p.cv && Math.abs(p.rs - VW.scale) > .01) { p.rs = 0; VW.queue.add(p.i); } for (const p of VW.pages) p.tl?.update?.({viewport: p.proxy.getViewport({scale: VW.scale})}); vwPump(); }
+function vwRerender() { for (const p of VW.pages) if (p.cv && Math.abs(p.rs - VW.scale) > .01) { p.rs = 0; VW.queue.add(p.i); } for (const p of VW.pages) p.tl?.update?.({viewport: vwGV(p, {scale: VW.scale})}); vwPump(); }
 function vwObserve() {
   VW.io?.disconnect();
   VW.io = new IntersectionObserver(es => { for (const e of es) { const i = +e.target.dataset.i, p = VW.pages[i]; p.vis = e.isIntersecting; if (e.isIntersecting) { VW.queue.add(i); if (p.annWait) vwAnnFetch(p); } } vwPump(); vwFree(); },
@@ -344,10 +348,10 @@ const vwMaxPx = () => VW.lite ? 3e6 : document.documentElement.classList.contain
 const vwLiteWant = () => { const p = vwLitePref(); return p === 'on' || p === 'auto' && tsWant() && ((navigator.deviceMemory || 8) <= 4 || (navigator.hardwareConcurrency || 8) <= 4 || !!window.VW_LITE); };   // los móviles cierran la pestaña con lienzos enormes
 async function vwRender(p, gen) {
   try {
-    p.proxy ||= await VW.doc.getPage(p.i + 1); if (gen !== VW.gen) return;
-    if (!p.sized) { p.vp1 = p.proxy.getViewport({scale: 1}); p.sized = true; if (Math.abs(p.vp1.width - p.w) > .5 || Math.abs(p.vp1.height - p.h) > .5) { p.w = p.vp1.width; p.h = p.vp1.height; vwSize(p); } }
+    p.proxy ||= await VW.doc.getPage(p.i + 1); if (gen !== VW.gen) return; lnLoad(p);   // v39.50: los enlaces de la página
+    if (!p.sized) { p.vp1 = vwGV(p, {scale: 1}); p.sized = true; if (Math.abs(p.vp1.width - p.w) > .5 || Math.abs(p.vp1.height - p.h) > .5) { p.w = p.vp1.width; p.h = p.vp1.height; vwSize(p); } }
     if (p.annWait) vwAnnPage(p);
-    const s = VW.scale, vp = p.proxy.getViewport({scale: s}), max = vwMaxPx();
+    const s = VW.scale, vp = vwGV(p, {scale: s}), max = vwMaxPx();
     let os = Math.min(devicePixelRatio || 1, VW.lite ? 2 : 3); if (vp.width * vp.height * os * os > max) os = Math.sqrt(max / (vp.width * vp.height));
     const cv = document.createElement('canvas'); cv.width = Math.floor(vp.width * os); cv.height = Math.floor(vp.height * os); cv.className = 'vwcv';
     const L = PDFJS, task = p.task = p.proxy.render({canvasContext: cv.getContext('2d', {alpha: false}), viewport: vp, transform: os !== 1 ? [os, 0, 0, os, 0, 0] : null,
@@ -411,11 +415,11 @@ function vwTouch(e) {
 const vwPageOf = el => el?.closest?.('.vwp') ? VW.pages[+el.closest('.vwp').dataset.i] : null;
 function vwPageAt(x, y) { for (const p of VW.pages) { const r = vwVisRect(p); if (y >= r.top && y <= r.bottom && x >= r.left && x <= r.right) return p; } return null; }
 function vwToPdf(p, cx, cy) {   // punto de la pantalla → espacio del PDF
-  const r = p.el.getBoundingClientRect(), k = p.w / r.width, v = p.vp1 || p.proxy?.getViewport({scale: 1});
+  const r = p.el.getBoundingClientRect(), k = p.w / r.width, v = p.vp1 || (p.proxy ? vwGV(p, {scale: 1}) : null);
   return v.convertToPdfPoint((cx - r.left) * k, (cy - r.top) * k);
 }
 function vwRectToPdf(p, l, t, rr, b) { const a = vwToPdf(p, l, t), c = vwToPdf(p, rr, b); return [Math.min(a[0], c[0]), Math.min(a[1], c[1]), Math.max(a[0], c[0]), Math.max(a[1], c[1])]; }
-const vwVp = p => p.vp1 ||= p.proxy?.getViewport({scale: 1}) || null;   // la geometría de la página (null: aún no se ha pedido a PDF.js)
+const vwVp = p => p.vp1 ||= (p.proxy ? vwGV(p, {scale: 1}) : null);   // la geometría de la página (null: aún no se ha pedido a PDF.js)
 function vwBoxes(p, q, near) {   // rectángulos del PDF → cajas en puntos de la página como se ve (origen arriba a la izquierda). near: si la página aún no se ha leído, con la de la primera (para ordenar o ir a ella)
   const v = vwVp(p) || (near ? VW.pages[0]?.vp1 : null); if (!v) return [];
   const out = []; for (let k = 0; k + 3 < q.length; k += 4) { const [x1, y1, x2, y2] = v.convertToViewportRectangle([q[k], q[k + 1], q[k + 2], q[k + 3]]); out.push({x: Math.min(x1, x2), y: Math.min(y1, y2), w: Math.abs(x2 - x1), h: Math.abs(y2 - y1)}); }
@@ -438,10 +442,10 @@ function vwAnnPage(p) {
   if (!L.length) { p.annWait = false; p.annSig = ''; if (layer.childElementCount) layer.innerHTML = ''; return; }
   if (!vwVp(p)) { p.annWait = true; if (p.vis) vwAnnFetch(p); return; }
   p.annWait = false;
-  const sig = JSON.stringify(L.map(a => [a.id, a.k, a.c, a.m || '', a.q, VW.pop === a.id]));   // v39.45: si no cambió nada en esta página, no se repinta (crear o cambiar uno repinta solo su página)
+  const sig = JSON.stringify(L.map(a => [a.id, a.k, a.c, a.s || '', a.m || '', a.q, a.g?.length || 0, VW.pop === a.id]));   // v39.45: si no cambió nada en esta página, no se repinta (crear o cambiar uno repinta solo su página)
   if (sig === p.annSig && layer.childElementCount) return; p.annSig = sig;
   layer.innerHTML = L.map(a => { const B = vwBoxes(p, a.q); return a.k === 'note' ? B.slice(0, 1).map(b => `<button class="vwnote" data-a="${a.id}" style="left:${vwPx(b.x)};top:${vwPx(b.y)};--c:${a.c}" title="${esc(a.m || 'Nota')}" aria-label="Nota">🗒</button>`).join('')
-    : B.map(b => `<i class="vwhl${a.k === 'area' ? ' area' : ''}${a.m ? ' cm' : ''}${VW.pop === a.id ? ' on' : ''}" data-a="${a.id}" style="left:${vwPx(b.x)};top:${vwPx(b.y)};width:${vwPx(b.w)};height:${vwPx(b.h)};--c:${a.c}"></i>`).join('')
+    : (a.k === 'ink' ? lnInkSvg(p, a) : '') + B.map(b => `<i class="vwhl${a.k === 'ink' ? ' ink' : a.k === 'area' ? ' area' : a.s === 'u' ? ' u' : a.s === 'x' ? ' x' : ''}${a.m ? ' cm' : ''}${VW.pop === a.id ? ' on' : ''}" data-a="${a.id}" style="left:${vwPx(b.x)};top:${vwPx(b.y)};width:${vwPx(b.w)};height:${vwPx(b.h)};--c:${a.c}"></i>`).join('')
       + (a.m ? (b => b ? `<i class="vwcmk" data-a="${a.id}" style="left:calc(${vwPx(b.x + b.w)} + 2px);top:${vwPx(b.y)};--c:${a.c}" title="${esc(a.m)}">💬</i>` : '')(B.at(-1)) : ''); }).join('');   // 💬: tiene comentario (se toca para verlo)
 }
 function vwAnnFetch(p) {   // pide a PDF.js la geometría de la página (una sola vez) y pinta solo sus subrayados
@@ -477,10 +481,10 @@ function vwRangeAnn(r) {   // los rectángulos de la selección, por página y j
   return out;
 }
 const vwClean = t => String(t || '').replace(/\s+/g, ' ').replace(/(\w)- (\w)/g, '$1$2').trim();
-function vwFromSel(color, comment) {
+function vwFromSel(color, comment, style) {
   const r = vwSelRange(); if (!r) return null; const parts = vwRangeAnn(r), t = vwClean(r.toString()).slice(0, 4000); if (!parts.length) return null;
   getSelection().removeAllRanges(); $('#vwSel').hidden = true; const now = vwNow(), ids = [];
-  vwMut(l => { for (const x of parts) { const id = ids[parts.indexOf(x)] ||= uid(); l.push({id, k: 'hl', p: x.p, q: x.q, c: VW_COLORS[color][0], ...(t ? {t} : {}), at: now, up: now}); } });
+  vwMut(l => { for (const x of parts) { const id = ids[parts.indexOf(x)] ||= uid(); l.push({id, k: 'hl', p: x.p, q: x.q, c: VW_COLORS[color][0], ...(style ? {s: style} : {}), ...(t ? {t} : {}), at: now, up: now}); } });
   if (comment) vwPopOpen(ids[0], true); else vwFlash(ids[0]);
   return ids[0];
 }
@@ -576,7 +580,7 @@ function tsClear() { getSelection().removeAllRanges(); }
 
 /* ---- Herramientas: seleccionar, subrayar arrastrando, zona y nota ---- */
 function vwMode(m) { VW.mode = VW.mode === m && m !== 'sel' ? 'sel' : m; vwModeShow(); getSelection().removeAllRanges(); $('#vwSel').hidden = true; }
-function vwModeShow() { document.querySelectorAll('#vw .vwm[data-m]').forEach(b => b.classList.toggle('on', b.dataset.m === VW.mode)); $('#vw').dataset.mode = VW.mode; }
+function vwModeShow() { document.querySelectorAll('#vw .vwm[data-m]').forEach(b => b.classList.toggle('on', b.dataset.m === VW.mode)); $('#vw').dataset.mode = VW.mode; lnInkShow(); }
 /* Al cambiar el color de un subrayado (v39.45, ⋯ → 📖 Modo de lectura, PDF y EPUB): «ese y los siguientes» (como siempre: también pasa a ser
    el color para subrayar) o «solo ese» (el color para subrayar no cambia). Se recuerda en el dispositivo (gp-ann-col). */
 const ANN_COL_K = 'gp-ann-col';
@@ -658,6 +662,7 @@ function vwDown(e) {
   if (VW.mode === 'hl') { const c = vwCaret(e.clientX, e.clientY), sc = $('#vwScroll');
     if (e.pointerType !== 'mouse' && !e.target.closest('.textLayer span')) { VW.pan = {x: e.clientX, y: e.clientY, l: sc.scrollLeft, t: sc.scrollTop, id: e.pointerId}; e.preventDefault(); try { sc.setPointerCapture(e.pointerId); } catch (er) {} return; }   // con el dedo fuera del texto (márgenes, huecos): mueve la página
     VW.drag = {kind: 'hl', p, a: c, x: e.clientX, y: e.clientY, id: e.pointerId, touch: e.pointerType !== 'mouse'}; e.preventDefault(); $('#vwScroll').setPointerCapture(e.pointerId); getSelection().removeAllRanges(); }
+  else if (VW.mode === 'ink') lnInkDown(e, p);
   else if (VW.mode === 'area') { VW.drag = {kind: 'area', p, x: e.clientX, y: e.clientY, id: e.pointerId}; e.preventDefault(); $('#vwScroll').setPointerCapture(e.pointerId); }
   else VW.tap = {x: e.clientX, y: e.clientY, t: Date.now()};
   if (VW.fs && !e.target.closest('.textLayer span')) { clearTimeout(VW.lpT); const x = e.clientX, y = e.clientY; VW.lpT = setTimeout(() => { if (VW.tap && !VW.drag) { VW.tap = null; vwBars(); } }, 550); }
@@ -671,7 +676,8 @@ function vwMove(e) {
     const r = document.createRange(), s = getSelection(), ord = g.a.n === c.n ? g.a.o <= c.o : !!(g.a.n.compareDocumentPosition(c.n) & Node.DOCUMENT_POSITION_FOLLOWING);
     let [A, B] = ord ? [g.a, c] : [c, g.a]; if (g.touch) { A = vwSnap(A, true); B = vwSnap(B, false); }   // con el dedo, palabras enteras (luego se afina con los tiradores)
     r.setStart(A.n, A.o); r.setEnd(B.n, B.o); s.removeAllRanges(); s.addRange(r);
-  } else if (g.kind === 'area') {
+  } else if (g.kind === 'ink') lnInkMove(e, g);
+  else if (g.kind === 'area') {
     let box = $('#vwBox'); if (!box) { box = document.createElement('div'); box.id = 'vwBox'; document.body.append(box); }
     const d = $('#vw'); if (box.parentElement !== d) d.append(box);
     Object.assign(box.style, {left: Math.min(g.x, e.clientX) + 'px', top: Math.min(g.y, e.clientY) + 'px', width: Math.abs(e.clientX - g.x) + 'px', height: Math.abs(e.clientY - g.y) + 'px', '--c': VW_COLORS[VW.color][0]});
@@ -680,9 +686,10 @@ function vwMove(e) {
 function vwUp(e) {
   clearTimeout(VW.lpT);
   const pn = VW.pan; if (pn && pn.id === e.pointerId) { VW.pan = null; const hp = !!VW.pop; if (e.type !== 'pointercancel' && Math.hypot(e.clientX - pn.x, e.clientY - pn.y) < 8 && !vwConcTap() && !vwTapAt(e.clientX, e.clientY) && !vwReadTap(e.clientX, hp)) vwEmptyTap(e.clientX, e.clientY); return; }
-  const g = VW.drag; if (e.type === 'pointercancel') { VW.drag = null; VW.tap = null; $('#vwBox')?.remove(); return; }
+  const g = VW.drag; if (e.type === 'pointercancel') { if (g?.kind === 'ink') lnInkUp(g, true); VW.drag = null; VW.tap = null; $('#vwBox')?.remove(); return; }
   if (g && g.id === e.pointerId) {
     VW.drag = null; $('#vwBox')?.remove();
+    if (g.kind === 'ink') return lnInkUp(g);
     if (g.kind === 'hl') { if (vwSelRange()) vwFromSel(VW.color); else vwTapAt(e.clientX, e.clientY); return; }
     if (g.kind === 'area') {
       const p = g.p, pr = vwVisRect(p), cl = (v, a, b) => Math.min(b, Math.max(a, v));
@@ -697,7 +704,7 @@ function vwUp(e) {
     const n = e.target.closest?.('.vwnote'); if (n) return vwPopOpen(n.dataset.a);
     if (VW.mode === 'note') { const p = vwPageAt(e.clientX, e.clientY); if (!p) return; const [x, y] = vwToPdf(p, e.clientX, e.clientY), id = uid(), now = vwNow();
       vwAdd({id, k: 'note', p: p.i, q: [x, y, x, y], c: VW_COLORS[VW.color][0], at: now, up: now}); return vwPopOpen(id, true); }
-    if (!vwSelRange()) { const hp = !!VW.pop; if (vwTapAt(e.clientX, e.clientY) || vwReadTap(e.clientX, hp)) return; vwEmptyTap(e.clientX, e.clientY); }
+    if (!vwSelRange()) { const hp = !!VW.pop; if (VW.mode === 'sel' && lnTap(e.clientX, e.clientY) || vwTapAt(e.clientX, e.clientY) || vwReadTap(e.clientX, hp)) return; vwEmptyTap(e.clientX, e.clientY); }
     else if ($('#vw').classList.contains('tsel') && !tsJust()) { tsClear(); $('#vwSel').hidden = true; }   // táctil: tocar fuera quita la selección (el navegador ya no lo hace)
   }
 }
@@ -712,10 +719,10 @@ function vwTapAt(x, y) {   // tocar un subrayado o una zona abre su ventanita
 function vwPopOpen(id, focus) {
   vwSaveComment(); const a = vwAnns().find(x => x.id === id); if (!a) return;
   VW.pop = id; const pp = $('#vwPop'), paper = vwPaper(), P = paper && db.papers.find(p => p.id === paper.id);
-  pp.innerHTML = `<div class="vwpoph"><span class="vwk">${a.k === 'note' ? '🗒 Nota' : a.k === 'area' ? '▭ Zona' : '🖍 Subrayado'} · p. ${a.p + 1}</span><span class="vwcs">${VW_COLORS.map(([c, t], i) => `<button class="vwc${a.c === c ? ' on' : ''}" style="--c:${c}" title="${t}" aria-label="Color ${t}" data-onclick="vwPopColor(${i})"></button>`).join('')}</span><button class="vwib" data-onclick="vwPopClose()" aria-label="Cerrar">✕</button></div>
+  pp.innerHTML = `<div class="vwpoph"><span class="vwk">${a.k === 'note' ? '🗒 Nota' : a.k === 'area' ? '▭ Zona' : a.k === 'ink' ? '✏ Trazo a mano' : '🖍 Subrayado'} · p. ${a.p + 1}${annLbl(a.c) ? ' · ' + esc(annLbl(a.c)) : ''}</span><span class="vwcs">${VW_COLORS.map(([c, t], i) => `<button class="vwc${a.c === c ? ' on' : ''}" style="--c:${c}" title="${t}" aria-label="Color ${t}" data-onclick="vwPopColor(${i})"></button>`).join('')}</span><button class="vwib" data-onclick="vwPopClose()" aria-label="Cerrar">✕</button></div>
     ${a.t ? `<blockquote class="vwq">${esc(a.t.length > 400 ? a.t.slice(0, 400) + '…' : a.t)}</blockquote>` : ''}
     <textarea id="vwCm" rows="3" placeholder="${a.k === 'note' ? 'Escribe la nota…' : 'Comentario (opcional)…'}" data-oninput="vwCmIn()">${esc(a.m || '')}</textarea>
-    <div class="row vwpopb">${a.t ? '<button data-onclick="vwPopCopy()" title="Copiar el texto subrayado">📋 Copiar</button>' : ''}${P ? '<button data-onclick="vwToNote()" title="Añadir a las notas del paper, con la página, para citarlo">📝 A las notas</button>' : ''}<button class="danger" data-onclick="vwPopDel()">🗑 Borrar</button></div>`;
+    <div class="row vwpopb">${a.k === 'hl' ? lnStyRow(a, 'vwPopStyle') : ''}${a.t ? '<button data-onclick="vwPopCopy()" title="Copiar el texto subrayado">📋 Copiar</button>' : ''}${P ? '<button data-onclick="vwToNote()" title="Añadir a las notas del paper, con la página, para citarlo">📝 A las notas</button>' : ''}<button class="danger" data-onclick="vwPopDel()">🗑 Borrar</button></div>`;
   pp.hidden = false; vwPopPlace(); document.querySelectorAll('#vw .on[data-a]').forEach(e => e.classList.remove('on')); document.querySelectorAll(`#vw [data-a="${id}"]`).forEach(e => e.classList.add('on'));
   if (focus) setTimeout(() => $('#vwCm')?.focus(), 30);
   vwHandles();
@@ -746,7 +753,7 @@ async function vwPopCopy() { const a = vwAnns().find(x => x.id === VW.pop); if (
 /* ---- Panel de anotaciones: lista por página, filtros, ir a cada una ---- */
 const vwSideOn = () => { try { return localStorage.getItem('gp-vw-side') !== '0'; } catch (e) { return true; } };
 function vwSide(on) { VW.side = on ?? !VW.side; try { localStorage.setItem('gp-vw-side', VW.side ? '1' : '0'); } catch (e) {} vwSideShow(); }
-function vwSideShow() { const s = $('#vwSide'); s.hidden = !VW.side; $('#vw').classList.toggle('side', VW.side); document.querySelector('#vw .vwsb')?.classList.toggle('on', VW.side && VW.tab === 'ann'); document.querySelector('#vw .vwtc')?.classList.toggle('on', VW.side && VW.tab !== 'ann'); if (VW.side) vwSideDraw(); else VW.thIo?.disconnect(); }
+function vwSideShow() { const s = $('#vwSide'); s.hidden = !VW.side; $('#vw').classList.toggle('side', VW.side); document.querySelector('#vw .vwsb')?.classList.toggle('on', VW.side && VW.tab === 'ann'); document.querySelector('#vw .vwtc')?.classList.toggle('on', VW.side && (VW.tab === 'toc' || VW.tab === 'th')); if (VW.side) vwSideDraw(); else VW.thIo?.disconnect(); }
 const VW_TABS = [['ann', '💬 Anotaciones'], ['toc', '📑 Índice'], ['th', '▦ Páginas']];
 function vwPanel(t) { if (VW.side && VW.tab === t) return vwSide(false); VW.tab = t; VW.side ? vwSideShow() : vwSide(true); }
 function vwTab(t) { VW.tab = t; vwSideShow(); }
@@ -754,20 +761,22 @@ const vwKindOf = a => a.k === 'note' ? 'note' : 'hl';   // las notas 🗒, apart
 const vwSideList = () => { const f = VW.filt, k = VW.kind; const T = new Map(); return vwAnns().filter(a => (!f || (f === 'cm' ? a.m : a.c === f)) && (!k || vwKindOf(a) === k)).map(a => (T.set(a, vwTop(a)), a)).sort((a, b) => a.p - b.p || T.get(a) - T.get(b)); };   // la altura, una vez por anotación
 function vwSideDraw() {
   const s = $('#vwSide'), t = VW.tab || 'ann';
-  const head = `<div class="vwst" role="tablist">${VW_TABS.map(([k, n]) => `<button role="tab" aria-selected="${t === k}" class="${t === k ? 'on' : ''}" data-onclick="vwTab('${k}')">${n}</button>`).join('')}<button class="vwib" data-onclick="vwSide(false)" aria-label="Cerrar el panel">✕</button></div>`;
+  const tabs = VW.find.hits.length || t === 'find' ? [...VW_TABS, ['find', `🔍 ${VW.find.hits.length || ''}`]] : VW_TABS;   // v39.50: los resultados de la búsqueda, solo si hay
+  const head = `<div class="vwst" role="tablist">${tabs.map(([k, n]) => `<button role="tab" aria-selected="${t === k}" class="${t === k ? 'on' : ''}${k === 'find' ? ' lntab' : ''}" data-onclick="vwTab('${k}')">${n}</button>`).join('')}<button class="vwib" data-onclick="vwSide(false)" aria-label="Cerrar el panel">✕</button></div>`;
   if (t === 'toc') return vwTocDraw(s, head);
   if (t === 'th') return vwThDraw(s, head);
+  if (t === 'find') return lnFindDraw(s, head);
   vwAnnDraw(s, head);
 }
 function vwAnnDraw(s, head) {
   const all = vwAnns(), f = VW.filt, k = VW.kind || '', L = vwSideList(), nH = all.filter(a => vwKindOf(a) === 'hl').length, nN = all.length - nH;
   const fr = VW.foreign || [], frV = fr.filter(x => !x.dup && !all.some(a => a.src === x.id));
   const pk = VW.pick, n = pk?.size || 0;
-  const item = a => `<button class="vwi${VW.pop === a.id || pk?.has(a.id) ? ' on' : ''}" style="--c:${a.c}" data-onclick="vwPick('${a.id}')"${pk ? ` aria-pressed="${pk.has(a.id)}"` : ''}><small>${pk ? (pk.has(a.id) ? '☑ ' : '☐ ') : ''}p. ${a.p + 1} · ${a.k === 'note' ? '🗒 Nota' : a.k === 'area' ? '▭ Zona' : '🖍'}</small>${a.t ? `<span class="vwit">${esc(a.t.length > 220 ? a.t.slice(0, 220) + '…' : a.t)}</span>` : ''}${a.m ? `<span class="vwim">💬 ${esc(a.m.length > 300 ? a.m.slice(0, 300) + '…' : a.m)}</span>` : ''}</button>`;
+  const item = a => `<button class="vwi${VW.pop === a.id || pk?.has(a.id) ? ' on' : ''}" style="--c:${a.c}" data-onclick="vwPick('${a.id}')"${pk ? ` aria-pressed="${pk.has(a.id)}"` : ''}><small>${pk ? (pk.has(a.id) ? '☑ ' : '☐ ') : ''}p. ${a.p + 1} · ${a.k === 'note' ? '🗒 Nota' : a.k === 'area' ? '▭ Zona' : a.k === 'ink' ? '✏ Trazo' : '🖍'}</small>${a.t ? `<span class="vwit">${esc(a.t.length > 220 ? a.t.slice(0, 220) + '…' : a.t)}</span>` : ''}${a.m ? `<span class="vwim">💬 ${esc(a.m.length > 300 ? a.m.slice(0, 300) + '…' : a.m)}</span>` : ''}</button>`;
   const grp = !k && nH && nN ? [['hl', '🖍 Subrayados'], ['note', '🗒 Notas']].map(([g, n]) => { const G = L.filter(a => vwKindOf(a) === g); return G.length ? `<h4 class="vwgh">${n} (${G.length})</h4>${G.map(item).join('')}` : ''; }).join('') : L.map(item).join('');
   s.innerHTML = `${head}<div class="vwsh">${all.length ? `<span class="vwkd" role="group" aria-label="Tipo"><button class="${k ? '' : 'on'}" data-onclick="vwKind('')">Todas ${all.length}</button><button class="${k === 'hl' ? 'on' : ''}" data-onclick="vwKind('hl')" title="Subrayados y zonas">🖍 Subrayados ${nH}</button><button class="${k === 'note' ? 'on' : ''}" data-onclick="vwKind('note')" title="Notas adhesivas">🗒 Notas ${nN}</button></span><button class="vwpk${pk ? ' on' : ''}" data-onclick="vwPickToggle()" title="Elegir varias para borrarlas, copiarlas o llevarlas a las notas">${pk ? '✓ Elegir' : '☐ Elegir'}</button>` : '<b>Anotaciones</b>'}</div>
     ${pk ? `<div class="vwpkb"><button data-onclick="vwPickAll()">${L.length && L.every(a => pk.has(a.id)) ? '☐ Ninguna' : '☑ Todas las de la lista'}</button><button class="danger" data-onclick="vwPickDel()" ${n ? '' : 'disabled'}>🗑 Borrar${n ? ` (${n})` : ''}</button></div>` : ''}
-    <div class="vwsf"><button class="${f ? '' : 'on'}" data-onclick="vwFilt('')">Todas</button>${VW_COLORS.filter(([c]) => all.some(a => a.c === c)).map(([c, t]) => `<button class="vwc${f === c ? ' on' : ''}" style="--c:${c}" title="Solo ${t.toLowerCase()}" data-onclick="vwFilt('${c}')"></button>`).join('')}<button class="${f === 'cm' ? 'on' : ''}" data-onclick="vwFilt('cm')" title="Solo las que tienen comentario">💬</button></div>
+    <div class="vwsf"><button class="${f ? '' : 'on'}" data-onclick="vwFilt('')">Todas</button>${annFiltChips(all, f, 'vwFilt')}<button class="${f === 'cm' ? 'on' : ''}" data-onclick="vwFilt('cm')" title="Solo las que tienen comentario">💬</button></div>
     <div class="vwsl">${L.length ? grp
       : `<p class="empty">${all.length ? 'Ninguna con este filtro.' : 'Aún no hay anotaciones. Selecciona texto y elige un color, o usa 🖍 Subrayar, ▭ Zona o 🗒 Nota.'}</p>`}</div>
     ${frV.length ? `<details class="vwfr"><summary>${frV.length} ${frV.length === 1 ? 'anotación que ya traía' : 'anotaciones que ya traía'} el PDF</summary>${frV.slice(0, 300).map(x => `<button class="vwi" style="--c:${x.c}" data-onclick="vwGoForeign('${x.id}')"><small>p. ${x.p + 1} · ${esc(x.sub)}${x.who ? ' · ' + esc(x.who) : ''}</small>${x.m ? `<span class="vwim">${esc(x.m.slice(0, 300))}</span>` : ''}</button>`).join('')}<button class="pri" data-onclick="vwImport()" title="Pasan a ser tuyas: se pueden cambiar, comentar y sincronizar">Hacerlas editables</button></details>` : ''}
@@ -789,7 +798,7 @@ async function vwPickDel() {   // borra de una vez las elegidas (un solo «Desha
 
 /* ---- Índice del PDF y miniaturas de las páginas ---- */
 const vwMv = () => document.documentElement.classList.contains('mv');
-function vwGoSide(i) { if (!VW.pages[i]) return; vwGo(i); if (vwMv()) vwSide(false); }   // en el móvil el panel tapa la página: se cierra
+function vwGoSide(i) { if (!VW.pages[i]) return; if (i !== VW.cur) lnPush(); vwGo(i); if (vwMv()) vwSide(false); }   // en el móvil el panel tapa la página: se cierra
 async function vwTocGet() {
   const doc = VW.doc; if (!doc) return null; if (VW.toc && VW.toc.doc === doc) return VW.toc.L;
   const ol = await doc.getOutline().catch(() => null);
@@ -816,7 +825,7 @@ async function vwThumb(b) {   // miniatura de una página (pequeña: poca memori
   const i = +b.dataset.i, p = VW.pages[i], gen = VW.gen; if (!p) return;
   try {
     p.proxy ||= await VW.doc.getPage(i + 1); if (gen !== VW.gen) return;
-    const W = 110 * Math.min(devicePixelRatio || 1, 2), vp = p.proxy.getViewport({scale: W / p.proxy.getViewport({scale: 1}).width});
+    const W = 110 * Math.min(devicePixelRatio || 1, 2), vp = vwGV(p, {scale: W / vwGV(p, {scale: 1}).width});
     const cv = document.createElement('canvas'); cv.width = Math.floor(vp.width); cv.height = Math.floor(vp.height);
     await p.proxy.render({canvasContext: cv.getContext('2d', {alpha: false}), viewport: vp, pageColors: vwPC()}).promise; if (gen !== VW.gen) return;
     b.querySelector('.vwtc0')?.replaceWith(cv);
@@ -827,11 +836,11 @@ function vwThCur() { const b = document.querySelector('#vwSide .vwth'); if (!b) 
 /* ---- Modo noche: fondo oscuro y letra clara; las imágenes del PDF no se tocan ---- */
 const vwNightPref = () => { try { return localStorage.getItem('gp-vw-night') || 'off'; } catch (e) { return 'off'; } };
 const vwNightOn = () => { const p = vwNightPref(); return p === 'on' || p === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches; };
-const vwPC = () => VW.night ? {background: '#1c1e23', foreground: '#dcdde1'} : null;
+const vwPC = () => VW.night ? {background: '#1c1e23', foreground: '#dcdde1'} : VW.theme === 'sepia' ? {background: '#f4ecd8', foreground: '#433422'} : null;   // v39.51: también sepia
 function vwNight(v) { try { localStorage.setItem('gp-vw-night', v); } catch (e) {} vwNightApply(); }
 function vwNightApply() {
-  const on = vwNightOn(); if (!VW.open || VW.night === on) return; VW.night = on; $('#vw').classList.toggle('night', on);
-  VW.pages.forEach(p => { if (p.cv) { p.rs = 0; VW.queue.add(p.i); } }); vwPump(); if (VW.side && VW.tab === 'th') vwSideDraw();
+  const th = vwTheme(); if (!VW.open || VW.theme === th) return; VW.theme = th; VW.night = th === 'night'; $('#vw').classList.toggle('night', VW.night); $('#vw').classList.toggle('sepia', th === 'sepia');
+  VW.pages.forEach(p => { if (p.cv) { p.rs = 0; VW.queue.add(p.i); } }); vwPump(); if (VW.side && VW.tab === 'th') vwSideDraw(); p2Redraw();
 }
 try { matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => vwNightApply()); } catch (e) {}
 function vwJump(id) {
@@ -854,8 +863,8 @@ async function vwForeign(gen) {
         if (qp) for (let k = 0; k + 7 < qp.length; k += 8) { const xs = [qp[k], qp[k + 2], qp[k + 4], qp[k + 6]], ys = [qp[k + 1], qp[k + 3], qp[k + 5], qp[k + 7]]; q.push(Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)); }
         else q.push(...a.rect);
         const c = a.color ? '#' + [...a.color].map(v => v.toString(16).padStart(2, '0')).join('') : '#ffd400';
-        out.push({id: a.id, p: p.i, sub: VW_FSUB[a.subtype], k: a.subtype === 'Text' || a.subtype === 'FreeText' ? 'note' : /Highlight|Underline|StrikeOut|Squiggly/.test(a.subtype) ? 'hl' : 'area',
-          q: a.subtype === 'Text' ? [a.rect[0], a.rect[3], a.rect[0], a.rect[3]] : q, c, m: a.contentsObj?.str || '', who: a.titleObj?.str || ''}); }
+        out.push({id: a.id, p: p.i, sub: VW_FSUB[a.subtype], k: a.subtype === 'Text' || a.subtype === 'FreeText' ? 'note' : /Highlight|Underline|StrikeOut|Squiggly/.test(a.subtype) ? 'hl' : a.subtype === 'Ink' && a.inkLists?.length ? 'ink' : 'area', ...(a.subtype === 'Ink' && a.inkLists?.length ? {g: a.inkLists.slice(0, 60).map(s => [...s].slice(0, 2000))} : {}),
+          q: a.subtype === 'Text' ? [a.rect[0], a.rect[3], a.rect[0], a.rect[3]] : q, c, ...(a.subtype === 'Underline' ? {s: 'u'} : a.subtype === 'StrikeOut' ? {s: 'x'} : {}), m: a.contentsObj?.str || '', who: a.titleObj?.str || ''}); }
     } catch (e) {}
     if (p.i % (VW.lite ? 3 : 10) === (VW.lite ? 2 : 9)) await new Promise(r => vwIdle(r));
   }
@@ -889,13 +898,13 @@ function vwNear(hex) {   // el color de la paleta más parecido
 }
 function vwImport(ids) {   // ids: solo esas (si no, todas las que traía el PDF)
   const mine = vwAnns(), L = (VW.foreign || []).filter(f => !f.dup && !mine.some(a => a.src === f.id) && (!ids || ids.includes(f.id))); if (!L.length) return;
-  const now = vwNow(); vwMut(l => { for (const f of L) l.push({id: uid(), k: f.k, p: f.p, q: f.q.map(v => Math.round(v * 100) / 100), c: vwNear(f.c), ...(f.m ? {m: f.m} : {}), src: String(f.id).slice(0, 60), at: now, up: now}); });
+  const now = vwNow(); vwMut(l => { for (const f of L) l.push({id: uid(), k: f.k, p: f.p, q: f.q.map(v => Math.round(v * 100) / 100), c: vwNear(f.c), ...(f.s ? {s: f.s} : {}), ...(f.g ? {g: f.g.map(s => s.map(v => Math.round(v * 10) / 10))} : {}), ...(f.m ? {m: f.m} : {}), src: String(f.id).slice(0, 60), at: now, up: now}); });
   vwHideDups(); toast(`${L.length} ${L.length === 1 ? 'anotación ahora es editable' : 'anotaciones ahora son editables'}.`, [], 3000);
 }
 
 /* ---- Buscar en el PDF ---- */
 function vwFindToggle(on) { VW.findOpen = on ?? !VW.findOpen; $('#vw').classList.toggle('find', VW.findOpen); if (VW.findOpen) { $('#vwQ').focus(); $('#vwQ').select(); } else { vwFindReset(true); } }
-function vwFindReset(clear) { VW.find.hits = []; VW.find.i = -1; $('#vwQn').textContent = ''; document.querySelectorAll('#vw .vwfh').forEach(e => e.remove()); if (clear) { $('#vwQ').value = ''; VW.find.q = ''; } }
+function vwFindReset(clear) { const had = VW.find.hits.length; VW.find.hits = []; VW.find.i = -1; $('#vwQn').textContent = ''; if (had || clear) lnFindUi(); document.querySelectorAll('#vw .vwfh').forEach(e => e.remove()); if (clear) { $('#vwQ').value = ''; VW.find.q = ''; } }
 async function vwFindKey(e) { if (e.key === 'Enter') { e.preventDefault(); await vwFind(e.shiftKey ? -1 : 1); } else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); vwFindToggle(false); } }
 async function vwPageText(p) {   // texto de una página y, para cada letra, el trozo de texto de donde viene
   if (VW.find.txt.has(p.i)) return VW.find.txt.get(p.i);
@@ -909,17 +918,20 @@ async function vwFind(dir) {
     VW.find.q = q; VW.find.hits = []; VW.find.i = -1; $('#vwQn').textContent = 'Buscando…'; const gen = VW.gen;
     for (const p of VW.pages) { if (gen !== VW.gen || VW.find.q !== q) return; const {s, map} = await vwPageText(p); let k = s.indexOf(q);
       while (k >= 0) { VW.find.hits.push({p: p.i, k, n: q.length, map}); k = s.indexOf(q, k + 1); } }
-    VW.find.i = -1; document.querySelectorAll('#vw .vwfh').forEach(e => e.remove()); VW.pages.forEach(p => p.tl && vwFindMark(p));
+    VW.find.i = -1; document.querySelectorAll('#vw .vwfh').forEach(e => e.remove()); VW.pages.forEach(p => p.tl && vwFindMark(p)); lnFindUi();
   }
   const H = VW.find.hits; if (!H.length) { $('#vwQn').textContent = 'Sin resultados'; return; }
-  if (VW.find.i < 0) { const j = H.findIndex(h => h.p >= VW.cur); VW.find.i = dir > 0 ? (j < 0 ? 0 : j) : (j <= 0 ? H.length - 1 : j - 1); }
-  else VW.find.i = (VW.find.i + dir + H.length) % H.length;
-  const h = H[VW.find.i], p = VW.pages[h.p]; $('#vwQn').textContent = `${VW.find.i + 1} de ${H.length}`;
+  let j; if (VW.find.i < 0) { j = H.findIndex(h => h.p >= VW.cur); j = dir > 0 ? (j < 0 ? 0 : j) : (j <= 0 ? H.length - 1 : j - 1); }
+  else j = (VW.find.i + dir + H.length) % H.length;
+  vwFindGo(j); if (VW.side && VW.tab === 'find') lnFindCur();
+}
+function vwFindGo(j) {   // a un resultado (también desde la lista del panel, v39.50)
+  const H = VW.find.hits, h = H[j]; if (!h) return; VW.find.i = j; const p = VW.pages[h.p]; $('#vwQn').textContent = `${j + 1} de ${H.length}`;
   const b = vwHitBoxes(p, h)[0]; vwShowAt(p, b ? b.y : 0);
-  document.querySelectorAll('#vw .vwfh.cur').forEach(e => e.classList.remove('cur')); vwFindMark(p); document.querySelectorAll(`#vw .vwfh[data-h="${VW.find.i}"]`).forEach(e => e.classList.add('cur'));
+  document.querySelectorAll('#vw .vwfh.cur').forEach(e => e.classList.remove('cur')); vwFindMark(p); document.querySelectorAll(`#vw .vwfh[data-h="${j}"]`).forEach(e => e.classList.add('cur'));
 }
 function vwHitBoxes(p, h) {   // cajas aproximadas de un resultado (por trozo de texto, recortadas en proporción a las letras)
-  const v = p.vp1 || p.proxy?.getViewport({scale: 1}); if (!v) return []; const by = new Map();
+  const v = p.vp1 || (p.proxy ? vwGV(p, {scale: 1}) : null); if (!v) return []; const by = new Map();
   for (let k = h.k; k < h.k + h.n; k++) { const m = h.map[k]; if (!m) continue; const [it, a, b] = m, o = by.get(it); if (o) o[1] = b; else by.set(it, [a, b]); }
   const out = []; for (const [it, [a, b]] of by) {
     const t = it.transform, fh = Math.hypot(t[2], t[3]) || it.height || 10, x = t[4] + it.width * a, w = it.width * (b - a);
@@ -936,7 +948,7 @@ function vwFindMark(p) {
 /* ---- Más: descargar, ficha del paper, abrir con el navegador, dónde se guarda ---- */
 function vwMore(e) {
   e.stopPropagation(); const r = VW.menuR = e.currentTarget.getBoundingClientRect(), paper = vwPaper(), P = paper && db.papers.find(p => p.id === paper.id), pf = vwHolders()[0];
-  vwMenu(r, `<button data-keep data-onclick="vwReadMenu()">📖 Modo de lectura <small class="vwsub">${esc(vwRdSum())} ›</small></button><button data-keep data-onclick="vwBmMenu()">🔖 Marcadores <small class="vwsub">${vwBms().length || 'ninguno'} ›</small></button><button data-keep data-onclick="vwCfgMenu()">⚙ Ajustes del visor <small class="vwsub">›</small></button><hr><button data-onclick="vwOut()">⬇ Descargar el PDF con las anotaciones</button>${vwAnns().length ? '<button data-onclick="vwMd()">⬇ Resumen de subrayados y comentarios (.md)</button>' : ''}
+  vwMenu(r, `<button data-keep data-onclick="vwReadMenu()">📖 Modo de lectura <small class="vwsub">${esc(vwRdSum())} ›</small></button><button data-keep data-onclick="vwBmMenu()">🔖 Marcadores <small class="vwsub">${vwBms().length || 'ninguno'} ›</small></button><button data-keep data-onclick="vwCfgMenu()">⚙ Ajustes del visor <small class="vwsub">›</small></button><hr><button data-onclick="lnInkMode()" title="Dibujar o escribir a mano sobre la página (con el dedo, el lápiz o el ratón)">${tick(VW.mode === 'ink')}✏ Lápiz</button>${p2MenuBtn()}<hr><button data-onclick="vwOut()">⬇ Descargar el PDF con las anotaciones</button>${vwAnns().length ? '<button data-onclick="vwMd()">⬇ Resumen de subrayados y comentarios (.md)</button>' : ''}
     ${vwCanShare() ? `<button data-onclick="vwOther(false)">📲 Abrir en otra app…</button>${vwAnns().length ? '<button data-onclick="vwOther(true)">📲 Abrir en otra app, con las anotaciones…</button>' : ''}` : ''}
     <button data-onclick="vwNative()">↗ Abrir con el visor del navegador</button>${vwAnns().length && !vwCanShare() ? '<button data-onclick="vwOther(true)">↗ Abrir con el visor del navegador, con las anotaciones</button>' : ''}
     ${P && !$('#dlg').open ? '<button data-onclick="vwFicha()">📝 Ficha del paper</button>' : ''}${VW.src?.kind === 'inbox' ? '<button data-onclick="vwCite()">＋ Crear la cita de este PDF</button>' : ''}
@@ -954,7 +966,7 @@ const vwDocked = () => $('#dlg').open && $('#dlg').classList.contains('vwdock');
 function vwNotes() {
   const d = $('#dlg');
   if (vwDocked()) { if (d.classList.contains('vwhide')) { d.classList.remove('vwhide'); return d.querySelector('.ned')?.focus(); } return vwSplitOk() ? vwNotesClose() : vwNotesHide(); }
-  const p = vwPaper(); if (!p || d.open) return;
+  const p = vwPaper(); if (!p || d.open) return; if (P2.doc) p2Close(true);
   VW.dlgNext = d.nextSibling; d.classList.add('vwdock'); vw$('.vwbody').insertBefore(d, $('#vwSide'));
   vw$('.vwbody').insertBefore(vwSplitEl(), d); vwSplitSet(vwSplitGet()); $('#vw').classList.add('vwdk'); vwSplitMode();
   if (VW.side && (vwMv() || innerWidth < 1500)) { VW.side = false; vwSideShow(); }   // sin el panel de anotaciones: el PDF necesita su mitad
@@ -1000,9 +1012,9 @@ function vwVis() {
   vwSatPush(); if (on) pdfVisAsk(); toast(on ? 'Se guardará una copia con los subrayados en la carpeta «GPapers» de tu Drive.' : 'Este PDF ya no se copiará a tu Drive normal (la copia que ya esté allí no se borra).', [], 4500);
 }
 function vwMd() {   // resumen en Markdown
-  const L = [...vwAnns()].sort((a, b) => a.p - b.p || vwTop(a) - vwTop(b)), name = VW_COLORS.reduce((o, [c, t]) => (o[c] = t, o), {});
+  const L = [...vwAnns()].sort((a, b) => a.p - b.p || vwTop(a) - vwTop(b)), name = new Proxy({}, {get: (_, c) => annColName(c)});
   const p = vwPaper(), head = p ? `# ${vwTitle()}\n\n${p.authors?.length ? p.authors.join('; ') + (p.year ? ` (${p.year})` : '') + '\n\n' : ''}` : `# ${vwTitle()}\n\n`;
-  const md = head + L.map(a => `- **p. ${a.p + 1}** · ${a.k === 'note' ? 'Nota' : a.k === 'area' ? 'Zona' : 'Subrayado'} (${name[a.c] || a.c})${a.t ? `\n  > ${a.t.replace(/\n/g, ' ')}` : ''}${a.m ? `\n  ${a.m.replace(/\n/g, '\n  ')}` : ''}`).join('\n') + '\n';
+  const md = head + L.map(a => `- **p. ${a.p + 1}** · ${a.k === 'note' ? 'Nota' : a.k === 'area' ? 'Zona' : a.k === 'ink' ? 'Trazo a mano' : 'Subrayado'} (${name[a.c] || a.c})${a.t ? `\n  > ${a.t.replace(/\n/g, ' ')}` : ''}${a.m ? `\n  ${a.m.replace(/\n/g, '\n  ')}` : ''}`).join('\n') + '\n';
   download(md, (vwTitle().replace(/[\\/:*?"<>|]+/g, ' ').slice(0, 80).trim() || 'anotaciones') + ' - anotaciones.md', 'text/markdown');
 }
 async function vwOut() {   // el PDF con las anotaciones dentro, para Acrobat, Foxit o enviarlo
@@ -1036,12 +1048,22 @@ async function vwPdfOut(file, anns) {
       const [x, y] = a.q; rect = [x, y - 20, x + 20, y];
       const ap = ctx.register(ctx.stream(`${C.map(f3).join(' ')} rg 0.35 0.3 0.1 RG 0.8 w 1 1 18 18 re B 1 w 4.5 14 m 15.5 14 l 4.5 10 m 15.5 10 l 4.5 6 m 12 6 l S`, {Type: 'XObject', Subtype: 'Form', BBox: [0, 0, 20, 20]}));
       dict = {...base, Subtype: 'Text', Rect: rect, Name: 'Comment', Open: false, F: 28, Subj: T('Nota'), Contents: T(a.m || ''), AP: {N: ap}};
+    } else if (a.k === 'ink') {   // v39.53: trazos a mano
+      const [l, b, r, t] = a.q, wd = LN_INK_W; rect = [l - wd, b - wd, r + wd, t + wd];
+      const ap = ctx.register(ctx.stream([`${C.map(f3).join(' ')} RG ${f3(wd)} w 1 J 1 j`, ...a.g.map(s => s.map((v, j) => j % 2 ? `${f3(v)} ${j === 1 ? 'm' : 'l'}` : f3(v)).join(' ') + ' S')].join('\n'), {Type: 'XObject', Subtype: 'Form', BBox: rect}));
+      dict = {...base, Subtype: 'Ink', Rect: rect, InkList: a.g, BS: {W: wd, S: N('S')}, Subj: T('Trazo a mano'), AP: {N: ap}, ...(a.m ? {Contents: T(a.m)} : {})};
     } else {
       const q = [], ops = ['/GS0 gs', `${C.map(f3).join(' ')} rg`]; let x1 = Infinity, y1 = Infinity, x2 = -Infinity, y2 = -Infinity;
       for (let k = 0; k + 3 < a.q.length; k += 4) { const [l, b, r, t] = a.q.slice(k, k + 4); q.push(l, t, r, t, l, b, r, b); ops.push(`${f3(l)} ${f3(b)} ${f3(r - l)} ${f3(t - b)} re f`); x1 = Math.min(x1, l); y1 = Math.min(y1, b); x2 = Math.max(x2, r); y2 = Math.max(y2, t); }
       rect = [x1, y1, x2, y2];
+      if (a.k === 'hl' && (a.s === 'u' || a.s === 'x')) {   // v39.52: línea debajo o tachado
+        const ln = [`${C.map(f3).join(' ')} RG`]; for (let k = 0; k + 3 < a.q.length; k += 4) { const [l, b, r, t] = a.q.slice(k, k + 4), h = t - b, y = a.s === 'u' ? b + h * .08 : b + h * .45; ln.push(`${f3(Math.max(.6, h * .07))} w ${f3(l)} ${f3(y)} m ${f3(r)} ${f3(y)} l S`); }
+        const ap = ctx.register(ctx.stream(ln.join('\n'), {Type: 'XObject', Subtype: 'Form', BBox: rect}));
+        dict = {...base, Subtype: a.s === 'u' ? 'Underline' : 'StrikeOut', Rect: rect, QuadPoints: q, Subj: T(a.s === 'u' ? 'Subrayado' : 'Tachado'), AP: {N: ap}, ...(a.m ? {Contents: T(a.m)} : {})};
+      } else {
       const ap = ctx.register(ctx.stream(ops.join('\n'), {Type: 'XObject', Subtype: 'Form', BBox: rect, Resources: {ExtGState: {GS0: {Type: 'ExtGState', CA: 1, ca: 1, BM: 'Multiply'}}}}));
       dict = {...base, Subtype: 'Highlight', Rect: rect, QuadPoints: q, CA: 1, Subj: T(a.k === 'area' ? 'Zona' : 'Resaltado'), AP: {N: ap}, ...(a.m ? {Contents: T(a.m)} : {})};
+      }
     }
     const ref = ctx.register(ctx.obj(dict)); pg.node.addAnnot(ref);
     if (a.m) {   // ventana del comentario (cerrada), como en Acrobat y Foxit
@@ -1154,7 +1176,7 @@ async function vwDetail() {
     try { p.dtask?.cancel(); } catch (e) {}
     const cv = document.createElement('canvas'); cv.width = Math.floor(w * os); cv.height = Math.floor(h * os); cv.className = 'vwdet'; cv.dataset.k = k;
     cv.style.cssText = `left:${Math.floor(x0)}px;top:${Math.floor(y0)}px;width:${w}px;height:${h}px`;
-    const vp = p.proxy.getViewport({scale: s}), task = p.dtask = p.proxy.render({canvasContext: cv.getContext('2d', {alpha: false}), viewport: vp, transform: [os, 0, 0, os, -Math.floor(x0) * os, -Math.floor(y0) * os], annotationMode: PDFJS.AnnotationMode.ENABLE_STORAGE, pageColors: vwPC()});
+    const vp = vwGV(p, {scale: s}), task = p.dtask = p.proxy.render({canvasContext: cv.getContext('2d', {alpha: false}), viewport: vp, transform: [os, 0, 0, os, -Math.floor(x0) * os, -Math.floor(y0) * os], annotationMode: PDFJS.AnnotationMode.ENABLE_STORAGE, pageColors: vwPC()});
     try { await task.promise; } catch (e) { continue; } p.dtask = null;
     if (gen !== VW.gen || Math.abs(VW.scale - s) > .001 || !p.cv) return;
     p.det?.remove(); p.cv.after(cv); p.det = cv;
@@ -1202,7 +1224,7 @@ function vwFs(on) {
    la barra sigue ocupando su sitio, como siempre; desde que se oculta, flota (clase tbx) hasta salir. */
 function vwTbHide(h) { const d = $('#vw'); VW.tbHide = h; d.classList.toggle('tbh', h); if (h) d.classList.add('tbx'); }
 function vwBars() { const d = $('#vw'); d.classList.add('fsbars'); d.style.setProperty('--vwhh', (vw$('.vwh')?.offsetHeight || 49) + 'px'); clearTimeout(VW.barT); VW.barT = setTimeout(() => d.classList.remove('fsbars'), 3000); }
-function vwPgTip() { const t = $('#vwPgTip'); if (!VW.pages.length) return; VW.tipPg = VW.cur; t.textContent = `Página ${VW.cur + 1} de ${VW.pages.length}`; t.hidden = false; clearTimeout(VW.pgT); VW.pgT = setTimeout(() => t.hidden = true, 3000); }
+function vwPgTip() { const t = $('#vwPgTip'); if (!VW.pages.length) return; VW.tipPg = VW.cur; const lf = lnLeftOn() && lnLeftPdf(); t.textContent = `Página ${VW.cur + 1} de ${VW.pages.length}${lf ? ' · ' + lf : ''}`; t.hidden = false; clearTimeout(VW.pgT); VW.pgT = setTimeout(() => t.hidden = true, 3000); }
 function vwTaps(x, y) {   // toques seguidos en una zona vacía: 2 → colores, 3 → barras
   const now = Date.now(), L = VW.taps = (VW.taps || []).filter(t => now - t.t < 450 && Math.hypot(t.x - x, t.y - y) < 40); L.push({x, y, t: now});
   clearTimeout(VW.tapT);
@@ -1277,7 +1299,9 @@ function vwReadMenu() {
     <button data-onclick="vwRdSet('flip',1)">${tick(VW.flip)}👆 Página a página, con toques a los lados</button>
     ${VW.flip ? `<button data-onclick="vwLockSet(${VW.zLock ? 0 : 1})" title="No deja cambiar el zoom y, al pasar de página, se queda el mismo tamaño y la misma zona">${tick(VW.zLock)}🔒 Candado del tamaño <small class="vwsub">K</small></button>` : ''}
     <hr><button data-keep data-onclick="vwAutoMenu()">⏬ Desplazamiento automático <small class="vwsub">${VW.auto ? (VW.autoPaused ? 'en pausa' : 'en marcha') : 'parado'}${vwConcOn() ? ' · concentración' : ''} ›</small></button>
-    <hr><button data-onclick="vwRdSet('crop',${VW.crop ? 0 : 1})" title="Quita los márgenes en blanco de las páginas para que el texto se vea más grande">${tick(VW.crop)}✂ Recortar los márgenes (automático)</button>
+    <hr><button data-onclick="vwRdSet('crop',${VW.crop ? 0 : 1})" title="Quita los márgenes en blanco de las páginas para que el texto se vea más grande">${tick(VW.crop)}✂ Recortar los márgenes${VW.cropM?.hand ? ' (a mano)' : ' (automático)'}</button>
+    ${VW.crop ? '<button data-keep data-onclick="lnCropMenu()">✂ Ajustar el recorte… <small class="vwsub">›</small></button>' : ''}
+    <hr><button data-keep data-onclick="lnRotate(VW.cur);vwReadMenu()">↻ Girar la página ${VW.cur + 1}${vwRot(VW.cur) ? ` <small class="vwsub">${vwRot(VW.cur)}°</small>` : ''}</button><button data-keep data-onclick="lnRotate('*');vwReadMenu()">↻ Girar todas las páginas</button>${Object.keys(VW.rot || {}).length ? '<button data-keep data-onclick="lnRotate(null);vwReadMenu()">↺ Quitar los giros</button>' : ''}${sayCan() ? '<hr>' + sayMenuBtn(false) : ''}
 `);
 }
 /* ⚙ Ajustes del visor (v39.47, ⋯ → ⚙): lo que se elige una vez y se olvida, fuera de los submenús de lectura. Mismo panel en el PDF y en
@@ -1293,7 +1317,8 @@ function vwCfgHtml(ep) {
     <div class="ctxh">🖍 Al cambiar el color de un subrayado</div>${b(annColOnly(), 'annColSet(1)', '🎯 Solo cambia ese subrayado')}${b(!annColOnly(), 'annColSet(0)', 'Ese y los siguientes (también el color para subrayar)')}
     ${ep ? '' : `<hr><div class="ctxh">👆 Gestos de zoom</div>${b(VW.zPinch, `vwRdSet('zPinch',${VW.zPinch ? 0 : 1})`, '🤏 Pellizcar con dos dedos')}${b(VW.zDbl, `vwRdSet('zDbl',${VW.zDbl ? 0 : 1})`, '👆 Doble toque: acercar y volver a ajustar', 'En pantalla completa el doble toque sigue sacando los colores')}
     <hr><div class="ctxh">⛶ Pantalla completa: pestaña ▾ de la barra oculta</div>${[['l', '◧ A la izquierda'], ['c', '▣ En el centro'], ['r', '◨ A la derecha']].map(([v, t]) => b(VW.tbPos === v, `vwTabPos('${v}')`, t)).join('')}
-    <hr><div class="ctxh">🌙 Modo noche</div>${[['off', 'No'], ['on', 'Sí'], ['auto', 'Como el sistema (modo oscuro)']].map(([v, t]) => b(vwNightPref() === v, `vwNight('${v}')`, t)).join('')}`}
+    <hr><div class="ctxh">🌙 Modo noche y sepia</div>${[['off', '☀ Normal'], ['sepia', '📜 Sepia (más cálido)'], ['on', '🌙 Noche'], ['auto', 'Como el sistema (noche con el modo oscuro)']].map(([v, t]) => b(vwNightPref() === v, `vwNight('${v}')`, t)).join('')}`}
+    ${rdCfgHtml(b, ep)}
     <hr><div class="ctxh">Aa Tamaño del texto de la interfaz</div><div class="epmrow">${UI_FZ.map(z => `<button data-keep class="${uiFz() === z ? 'on' : ''}" data-onclick="uiFzSet(${z});${me}">${Math.round(z * 100)} %</button>`).join('')}</div>
     <hr><div class="ctxh">📂 Al abrir</div>${desk ? `${b(db.settings.pdfTab !== 'app', "setCfg('pdfTab','tab')", 'Los PDF, en una pestaña nueva')}${b(db.settings.pdfTab === 'app', "setCfg('pdfTab','app')", 'Los PDF, dentro de la aplicación')}` : ''}${b(vwSideOn(), `vwSidePref(${vwSideOn() ? 0 : 1})`, 'Con el panel de anotaciones abierto (pantallas anchas)')}
     ${pf ? b(pdfVisOf(pf), 'vwVis()', '☁ Guardar este PDF también en mi Drive normal (con los subrayados)') : ''}
@@ -1362,7 +1387,7 @@ function vwConcShow() {
 }
 function vwConcTap() { if (!vwConcHidden()) return false; vwAutoPause(true); return true; }   // con las barras ocultas, un toque solo las saca
 function vwAutoShow() {
-  vwConcShow(); const b = vwAutoBar(); b.hidden = !VW.auto; if (!VW.auto) return;
+  vwConcShow(); wlSync(); const b = vwAutoBar(); b.hidden = !VW.auto; if (!VW.auto) return;
   b.querySelector('.vwcb').classList.toggle('on', vwConcOn()); $('#vwAutoR').value = VW.autoLv; $('#vwAutoV').textContent = vwAutoFmt(VW.autoLv); b.classList.toggle('paused', !!VW.autoPaused);
   const p = b.querySelector('.vwap'); p.textContent = VW.autoPaused ? '▶' : '⏸'; p.title = (VW.autoPaused ? 'Seguir' : 'Pausa') + ' (barra espaciadora, o toque en el centro de la página)'; p.ariaLabel = VW.autoPaused ? 'Seguir' : 'Pausa';
 }
@@ -1416,12 +1441,13 @@ function vwInkBox(img) {   // el rectángulo con tinta de una página pintada en
   return x1 < 0 ? null : {x0, y0, x1: x1 + 1, y1: y1 + 1};
 }
 async function vwCropCalc(gen, show) {
+  const cs = lnCropSaved(); if (cs) { VW.cropM = {...cs, any: cs.t + cs.b + cs.l + cs.r > .5, hand: true}; if (VW.crop) vwCropShow(true); return; }   // v39.52: el que ajustaste a mano
   const N = VW.pages.length; if (!N || !VW.doc) return; const S = Math.min(N, 9);
   const idx = [...new Set(Array.from({length: S}, (_, k) => Math.round(k * (N - 1) / Math.max(1, S - 1))))], M = {t: [], r: [], b: [], l: []};
   for (const i of idx) {
     const p = VW.pages[i];
     try { p.proxy ||= await VW.doc.getPage(i + 1); } catch (e) { continue; } if (gen !== VW.gen) return;
-    const v1 = p.proxy.getViewport({scale: 1}), k = 200 / v1.width, vp = p.proxy.getViewport({scale: k});
+    const v1 = vwGV(p, {scale: 1}), k = 200 / v1.width, vp = vwGV(p, {scale: k});
     const cv = document.createElement('canvas'); cv.width = Math.ceil(vp.width); cv.height = Math.ceil(vp.height); const ctx = cv.getContext('2d', {alpha: false, willReadFrequently: true});
     try { await p.proxy.render({canvasContext: ctx, viewport: vp}).promise; } catch (e) { continue; } if (gen !== VW.gen) return;
     const b = vwInkBox(ctx.getImageData(0, 0, cv.width, cv.height)); cv.width = cv.height = 0; if (!b) continue;

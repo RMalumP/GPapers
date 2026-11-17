@@ -68,6 +68,8 @@ with sync_playwright() as pw:
     A.evaluate("epPopClose()")
     # ---- enlace interno
     A.evaluate("EP.secs[0].querySelectorAll('a')[1].click()"); A.wait_for_timeout(150)
+    eq('el enlace interno enseña antes una vista previa (v39.50)', A.evaluate("[!$('#epLk').hidden, epLoc().i]"), [True, 0])
+    A.evaluate("lnEpGoPrev()"); A.wait_for_timeout(150)
     eq('el enlace interno lleva al arpón (capítulo 2)', A.evaluate("[epLoc().i, Math.abs(document.getElementById('ep1-arpon').getBoundingClientRect().top - $('#epScroll').getBoundingClientRect().top) < 60]"), [1, True])
     # ---- subrayar
     A.evaluate("""(() => { const sec = EP.secs[1], h = sec.querySelector('#ep1-arpon').nextElementSibling.firstChild, r = document.createRange(); r.setStart(h, 3); r.setEnd(h, 22);

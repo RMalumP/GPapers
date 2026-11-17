@@ -45,7 +45,7 @@ with sync_playwright() as pw:
     A.evaluate("$('#dlg').close()"); A.wait_for_timeout(200)
     # pantalla completa
     A.evaluate("vwFs(true)"); A.wait_for_timeout(300)
-    eq('pantalla completa: sin barra del título, con la de herramientas', A.evaluate("[getComputedStyle(document.querySelector('#vw .vwh')).display, getComputedStyle(document.querySelector('#vw .vwtb')).display, !$('#vwPgTip').hidden, $('#vwPgTip').textContent]"), ['none', 'flex', True, 'Página 1 de 3'])
+    eq('pantalla completa: sin barra del título, con la de herramientas', A.evaluate("[getComputedStyle(document.querySelector('#vw .vwh')).display, getComputedStyle(document.querySelector('#vw .vwtb')).display, !$('#vwPgTip').hidden, $('#vwPgTip').textContent.split(' · ')[0]]"), ['none', 'flex', True, 'Página 1 de 3'])
     A.evaluate("vwTbHide(true)"); A.wait_for_timeout(100)
     eq('la barra se oculta y queda la pestaña ▾', A.evaluate("[getComputedStyle(document.querySelector('#vw .vwtb')).display, getComputedStyle($('#vwTbTab')).display]"), ['none', 'block'])
     gap = A.evaluate("(() => { const r = VW.pages[0].el.getBoundingClientRect(); return [r.left + 3, r.top + 3]; })()")

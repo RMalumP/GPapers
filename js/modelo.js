@@ -127,9 +127,9 @@ function NEWF(p) {   // rellena los campos nuevos de un paper (JSON antiguo, imp
 /* ===== PDF: subrayados, comentarios y notas (visor, js/visor.js) =====
    Cada PDF (de un paper, o de la bandeja «PDF por citar») lleva sus anotaciones en «ann»: van con la biblioteca, así se sincronizan con Drive,
    se deshacen y se copian como todo lo demás. Coordenadas en el espacio del PDF (puntos, origen abajo a la izquierda), como las anotaciones del propio PDF:
-   {id, k: 'hl' (subrayado de texto) | 'area' (zona, para escaneados) | 'note' (nota en un punto), p: página desde 0, q: [x1, y1, x2, y2, …] (un rectángulo por línea),
+   {id, k: 'hl' (subrayado de texto) | 'area' (zona, para escaneados) | 'note' (nota en un punto) | 'ink' (trazos a mano, v39.53: g = [[x, y, x, y…], …] en el espacio del PDF; q, el rectángulo que los encierra), p: página desde 0, q: [x1, y1, x2, y2, …] (un rectángulo por línea),
     c: color, t: texto subrayado, m: comentario, src: id de la anotación del PDF de la que viene (al importarla), at: creada, up: cambiada}. */
-const ANN_K = new Set(['hl', 'area', 'note']), HEX_RX = /^#[0-9a-f]{6}$/i;
+const ANN_K = new Set(['hl', 'area', 'note', 'ink']), HEX_RX = /^#[0-9a-f]{6}$/i;
 const annStr = (v, n) => typeof v === 'string' ? v.slice(0, n) : '';
 function annClean(l) {   // el mismo orden de campos siempre: normalizar dos veces da lo mismo (la sincronización compara el JSON)
   if (!Array.isArray(l)) return []; const seen = new Set(), out = [];
@@ -138,8 +138,10 @@ function annClean(l) {   // el mismo orden de campos siempre: normalizar dos vec
     if (!ID_RX.test(a.id)) a.id = idFix(a.id);
     if (seen.has(a.id) || !ANN_K.has(a.k) || !Number.isInteger(a.p) || a.p < 0 || a.p > 99999) continue;
     const q = Array.isArray(a.q) ? a.q.filter(Number.isFinite).slice(0, 800) : []; if (!q.length || q.length % 4) continue;
+    const g = a.k === 'ink' && Array.isArray(a.g) ? a.g.filter(s => Array.isArray(s) && s.length >= 2).slice(0, 60).map(s => s.filter(Number.isFinite).slice(0, 2000)).filter(s => s.length >= 2 && !(s.length % 2)).map(s => s.map(x => Math.round(x * 10) / 10)) : null;
+    if (a.k === 'ink' && !g?.length) continue;
     seen.add(a.id); const t = annStr(a.t, 4000), m = annStr(a.m, 20000), src = annStr(a.src, 60);
-    out.push({id: a.id, k: a.k, p: a.p, q: q.map(x => Math.round(x * 100) / 100), c: HEX_RX.test(a.c) ? a.c.toLowerCase() : '#ffd400', ...(t ? {t} : {}), ...(m ? {m} : {}), ...(src ? {src} : {}), at: annStr(a.at, 40), up: annStr(a.up, 40)});
+    out.push({id: a.id, k: a.k, p: a.p, q: q.map(x => Math.round(x * 100) / 100), c: HEX_RX.test(a.c) ? a.c.toLowerCase() : '#ffd400', ...(a.k === 'hl' && (a.s === 'u' || a.s === 'x') ? {s: a.s} : {}), ...(g ? {g} : {}), ...(t ? {t} : {}), ...(m ? {m} : {}), ...(src ? {src} : {}), at: annStr(a.at, 40), up: annStr(a.up, 40)});
     if (out.length >= 5000) break;
   }
   return out;

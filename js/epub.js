@@ -149,8 +149,8 @@ function epBuild() {
   const sw = fn => VW_COLORS.map(([c, t], i) => `<button class="vwc" data-c="${i}" style="--c:${c}" title="${t}" aria-label="Color ${t}" data-onclick="${fn}(${i})"></button>`).join('');
   document.body.insertAdjacentHTML('beforeend', `<dialog id="ep" aria-label="Lector de EPUB">
     <div class="vwh"><button class="vwib" data-onclick="epClose()" title="Volver a la lista (Esc)" aria-label="Volver">←</button><b class="vwt"></b>
-      <span id="epWhere" class="epw"></span>
-      <span class="vwf"><input id="epQ" type="search" placeholder="Buscar en el libro" aria-label="Buscar en el libro" data-onkeydown="epFindKey(event)" data-oninput="epFindReset()"><span id="epQn"></span></span>
+      <span id="epWhere" class="epw"></span><span id="epLeft" class="epw lnleft"></span>
+      <span class="vwf"><input id="epQ" type="search" placeholder="Buscar en el libro" aria-label="Buscar en el libro" data-onkeydown="epFindKey(event)" data-oninput="epFindReset()"><span id="epQn"></span><button class="vwib vwqL" id="epQL" hidden data-onclick="epPanel('find')" title="Ver todos los resultados, con su frase" aria-label="Lista de resultados">☰</button></span>
       <button class="vwib vwfb" data-onclick="epFindToggle()" title="Buscar (Ctrl+F)" aria-label="Buscar">🔍</button>
       <button class="vwib epaa" id="epAaB" data-onclick="epTypoMenu(event)" title="Texto: tamaño, letra, interlineado, ancho y colores" aria-label="Texto">Aa</button>
       <button class="vwib" data-onclick="epFs(true)" title="Pantalla completa (F)" aria-label="Pantalla completa">⛶</button>
@@ -166,7 +166,7 @@ function epBuild() {
     <div class="vwbody"><div id="epScroll" tabindex="-1"><div id="epDoc"></div></div><p id="epLoad" class="vwload">Abriendo el EPUB…</p><aside id="epSide" hidden></aside>
       <button id="epFsX" class="vwfloat vwib" data-onclick="epFs(false)" title="Salir de pantalla completa (Esc)" aria-label="Salir de pantalla completa">✕</button></div>
     <div class="epfoot"><input id="epBar" type="range" min="0" max="1000" value="0" aria-label="Posición en el libro" data-oninput="epBarTip(this.value)" data-onchange="epBarGo(this.value)"><span id="epPct"></span></div>
-    <div id="epSel" class="vwfloat" hidden>${sw('epSelColor')}<button class="vwib" data-onclick="epSelNote()" title="Subrayar y comentar" aria-label="Subrayar y comentar">💬</button><button class="vwib" data-onclick="epSelCopy()" title="Copiar el texto" aria-label="Copiar">📋</button></div>
+    <div id="epSel" class="vwfloat" hidden data-onmousedown="event.preventDefault()">${sw('epSelColor')}<button class="vwib" data-onclick="epSelNote()" title="Subrayar y comentar" aria-label="Subrayar y comentar">💬</button><button class="vwib" data-onclick="epSelCopy()" title="Copiar el texto" aria-label="Copiar">📋</button><button class="vwib" data-onclick="lnSelMore(true)" title="Más: copiar con la cita, definición, traducir…" aria-label="Más">⋯</button></div>
     <div id="epPop" class="vwfloat vwpop" hidden></div></dialog>`);
   const d = $('#ep'), sc = $('#epScroll');
   d.addEventListener('cancel', e => { e.preventDefault(); epEsc(); });
@@ -196,7 +196,8 @@ async function epOpen(src, file) {
   ep$('.vwt').textContent = ep$('.vwt').title = epTitle(); $('#epDoc').innerHTML = ''; $('#epLoad').hidden = false; $('#epLoad').textContent = 'Abriendo el EPUB…'; $('#epWhere').textContent = '';
   $('#epQ').value = ''; $('#epQn').textContent = ''; d.classList.remove('find', 'fs', 'conc'); epPopClose(); $('#epSel').hidden = true; ep$('.epnb').hidden = src?.kind !== 'paper';
   EP.side = !!VW.sideNext || !vwMv() && innerWidth > 1100 && vwSideOn() && epAnns().length > 0; if (VW.sideNext) EP.tab = 'ann'; VW.sideNext = false;
-  epSetApply(); epColorShow(); epCount(); d.classList.toggle('tsel', tsWant()); if (!d.open) d.showModal(); epSideShow();
+  epSetApply(); epColorShow(); epCount(); lnLblApply(); d.classList.toggle('tsel', tsWant()); if (!d.open) d.showModal(); epSideShow();
+  EP.txt = null; LN.ep = []; LN.epFindQ = null; lnClose(); lnEpBackShow(); $('#epQL').hidden = true; wlPoke();
   try {
     const bk = await epBook(file); if (gen !== EP.gen) return; EP.bk = bk;
     if (ep$('.vwt').textContent === 'EPUB' && bk.meta.title) ep$('.vwt').textContent = bk.meta.title;
@@ -221,10 +222,10 @@ async function epOpen(src, file) {
   }
 }
 function epClose(keep) {
-  if (!EP.open) return; epAutoStop(); if (EP.fs) epFs(false); epSaveComment(); epPosSave(true);
+  if (!EP.open) return; epAutoStop(); if (SAY.ep) sayStop(true); if (EP.fs) epFs(false); epSaveComment(); epPosSave(true);
   const src = EP.src; EP.open = false; EP.gen++;
   EP.urls.forEach(u => URL.revokeObjectURL(u)); Object.assign(EP, {urls: [], secs: [], bk: null, file: null, starts: null});
-  $('#epDoc').innerHTML = ''; epPopClose(); $('#epSel').hidden = true; const m = $('#epMenu'); if (m) m.hidden = true;
+  $('#epDoc').innerHTML = ''; epPopClose(); $('#epSel').hidden = true; const m = $('#epMenu'); if (m) m.hidden = true; lnClose(); LN.ep = []; lnEpBackShow(); EP.txt = null; wlSync();
   if (!keep) { const d = $('#ep'); if (d.open) d.close(); }
   if (src?.kind === 'paper' && db.papers.some(p => p.id === src.id)) renderPaper(src.id);
   if (src?.kind === 'inbox') inboxDraw();
@@ -335,7 +336,8 @@ function epShow(el) {   // lleva a la vista un elemento (un subrayado, un result
 /* ---- Toques y enlaces ---- */
 function epClick(e) {
   const a = e.target.closest('a');
-  if (a && a.dataset.go) { e.preventDefault(); const [i, f] = a.dataset.go.split('#'); if (a.classList.contains('epnr') && epNotePop(a, +i, f)) return; return epGoTo(+i, f); }
+  if (a && a.dataset.go) { e.preventDefault(); lnClose(); return lnEpLink(a); }   // v39.50: vista previa y «↩ Volver»
+  if (lnShown()) return lnClose();
   if (a && a.target === '_blank') return;
   if (tsJust()) return;   // el toque que acaba de seleccionar (táctil)
   if (tsStr() && $('#ep').classList.contains('tsel')) { tsClear(); $('#epSel').hidden = true; return; }   // táctil: tocar quita la selección (el navegador ya no lo hace)
@@ -348,7 +350,7 @@ function epClick(e) {
 function epNotePop(a, i, f) {   // las llamadas a nota: el texto de la nota en una ventanita, sin saltar
   const el = f && document.getElementById('ep' + i + '-' + f), box = el && (el.closest('li, aside, p, div, section') || el), t = box && box !== EP.secs[i] && epTxt(box);
   if (!t || t.length > 1500) return false;
-  const pp = $('#epPop'); EP.pop = null; pp.innerHTML = `<div class="vwpoph"><span class="vwk">Nota</span><button class="vwib" data-onclick="epPopClose()" aria-label="Cerrar">✕</button></div><p class="epnote">${esc(t)}</p><div class="row vwpopb"><button data-onclick="epGoTo(${i},'${esc(f).replace(/'/g, '')}');epPopClose()">Ir a la nota</button></div>`;
+  const pp = $('#epPop'); EP.pop = null; pp.innerHTML = `<div class="vwpoph"><span class="vwk">Nota</span><button class="vwib" data-onclick="epPopClose()" aria-label="Cerrar">✕</button></div><p class="epnote">${esc(t)}</p><div class="row vwpopb"><button data-onclick="lnEpGo(${i},'${esc(f).replace(/'/g, '')}');epPopClose()">Ir a la nota</button></div>`;
   pp.hidden = false; epPlace(pp, a.getBoundingClientRect()); return true;
 }
 function epPlace(el, r) {   // una ventanita flotante junto a un rectángulo de la pantalla
@@ -373,7 +375,7 @@ const epAQ = a => [Math.round(a.q[0]), Math.round(a.q[2])];   // [inicio, fin] d
 function epDrawAnn() {
   const by = new Map(); for (const a of epAnns()) { if (a.k !== 'hl' || !EP.secs[a.p]) continue; (by.get(a.p) || by.set(a.p, []).get(a.p)).push(a); }
   EP.secs.forEach((sec, i) => { const L = by.get(i); if (!L && !sec.querySelector('mark.eph')) return; const keepF = sec.querySelector('mark.epfh'); if (keepF) epUnwrap(sec, 'epfh'); epUnwrap(sec, 'eph');
-    for (const a of L || []) { const [s, e] = epAQ(a); epWrap(sec, s, e, () => { const m = document.createElement('mark'); m.className = 'eph' + (a.m ? ' cm' : ''); m.dataset.a = a.id; m.style.setProperty('--c', a.c); if (a.m) m.title = a.m.slice(0, 300); return m; }); }
+    for (const a of L || []) { const [s, e] = epAQ(a); epWrap(sec, s, e, () => { const m = document.createElement('mark'); m.className = 'eph' + (a.m ? ' cm' : '') + (a.s === 'u' ? ' u' : a.s === 'x' ? ' x' : ''); m.dataset.a = a.id; m.style.setProperty('--c', a.c); if (a.m) m.title = a.m.slice(0, 300); return m; }); }
     if (keepF) epFindMark(); });
   epCount(); if (EP.side && EP.tab === 'ann') epSideDraw();
 }
@@ -390,7 +392,7 @@ function epSelShow() {
   if (EP.auto && !EP.autoPaused) epAutoPause(true);
   b.hidden = false; const rs = r.getClientRects(), last = rs[rs.length - 1] || r.getBoundingClientRect(); epPlace(b, last);
 }
-function epFromSel(ci, comment) {   // subraya la selección (si cruza capítulos, un subrayado por capítulo)
+function epFromSel(ci, comment, style) {   // subraya la selección (si cruza capítulos, un subrayado por capítulo)
   const r = epSelRange(); if (!r) return; const secOf = n => (n.nodeType === 1 ? n : n.parentElement)?.closest('section.epc');
   const s0 = secOf(r.startContainer), s1 = secOf(r.endContainer); if (!s0 || !s1) return;
   const i0 = +s0.dataset.i, i1 = +s1.dataset.i, now = vwNow(), add = [];
@@ -398,7 +400,7 @@ function epFromSel(ci, comment) {   // subraya la selección (si cruza capítulo
     const sec = EP.secs[i], a = i === i0 ? epOff(sec, r.startContainer, r.startOffset) : 0, b = i === i1 ? epOff(sec, r.endContainer, r.endOffset) : EP.len[i]; if (b <= a) continue;
     let t = ''; for (const [n, o] of epTexts(sec)) { const s = Math.max(a, o), e = Math.min(b, o + n.length); if (s < e) t += n.data.slice(s - o, e - o); }
     t = t.replace(/\s+/g, ' ').trim(); if (!t) continue;
-    add.push({id: uid(), k: 'hl', p: i, q: [a, -a, b, -a], c: VW_COLORS[ci][0], t: t.slice(0, 4000), at: now, up: now});
+    add.push({id: uid(), k: 'hl', p: i, q: [a, -a, b, -a], c: VW_COLORS[ci][0], ...(style ? {s: style} : {}), t: t.slice(0, 4000), at: now, up: now});
   }
   getSelection().removeAllRanges(); $('#epSel').hidden = true; if (!add.length) return;
   epMut(l => l.push(...add)); if (comment) setTimeout(() => epPopOpen(add[add.length - 1].id, true), 30);
@@ -412,9 +414,9 @@ const epUpd = (id, o, quiet) => epMut(l => { const a = l.find(x => x.id === id);
 function epUndo() { epSaveComment(); getSelection().removeAllRanges(); undo(); }
 function epPopOpen(id, focus) {
   const a = epAnns().find(x => x.id === id), pp = $('#epPop'); if (!a || !pp) return; epSaveComment(); EP.pop = id;
-  pp.innerHTML = `<div class="vwpoph"><span class="vwk">🖍 Subrayado · cap. ${a.p + 1}</span><span class="vwcs">${VW_COLORS.map(([c, t], i) => `<button class="vwc${a.c === c ? ' on' : ''}" style="--c:${c}" title="${t}" aria-label="${t}" data-onclick="epPopColor(${i})"></button>`).join('')}</span><button class="vwib" data-onclick="epPopClose()" aria-label="Cerrar">✕</button></div>
+  pp.innerHTML = `<div class="vwpoph"><span class="vwk">🖍 Subrayado · cap. ${a.p + 1}${annLbl(a.c) ? ' · ' + esc(annLbl(a.c)) : ''}</span><span class="vwcs">${VW_COLORS.map(([c, t], i) => `<button class="vwc${a.c === c ? ' on' : ''}" style="--c:${c}" title="${t}" aria-label="${t}" data-onclick="epPopColor(${i})"></button>`).join('')}</span><button class="vwib" data-onclick="epPopClose()" aria-label="Cerrar">✕</button></div>
     ${a.t ? `<blockquote class="vwq">${esc(a.t)}</blockquote>` : ''}<textarea id="epCm" placeholder="Comentario…" data-oninput="epCmIn()">${esc(a.m || '')}</textarea>
-    <div class="row vwpopb"><button data-onclick="epPopCopy()">📋 Copiar</button>${EP.src?.kind === 'paper' ? '<button data-onclick="epToNote()" title="Añade el texto y el comentario a las notas del paper">📝 A las notas</button>' : ''}<button class="danger" data-onclick="epPopDel()">🗑 Borrar</button></div>`;
+    <div class="row vwpopb">${lnStyRow(a, 'epPopStyle')}<button data-onclick="epPopCopy()">📋 Copiar</button>${EP.src?.kind === 'paper' ? '<button data-onclick="epToNote()" title="Añade el texto y el comentario a las notas del paper">📝 A las notas</button>' : ''}<button class="danger" data-onclick="epPopDel()">🗑 Borrar</button></div>`;
   pp.hidden = false; const m = $('#epDoc').querySelector(`mark[data-a="${id}"]`); if (m) { epShow(m); epPlace(pp, m.getBoundingClientRect()); } else { pp.style.left = '50%'; pp.style.top = '30%'; }
   document.querySelectorAll('#ep mark.eph.on').forEach(x => x.classList.remove('on')); document.querySelectorAll(`#ep mark[data-a="${id}"]`).forEach(x => x.classList.add('on'));
   if (focus) $('#epCm').focus({preventScroll: true}); if (EP.side && EP.tab === 'ann') epSideDraw();
@@ -447,7 +449,9 @@ function epSideShow() {
 }
 function epSideDraw() {
   const s = $('#epSide'), t = EP.tab;
-  const head = `<div class="vwst" role="tablist">${[['ann', '💬 Anotaciones'], ['toc', '📑 Índice']].map(([k, n]) => `<button role="tab" aria-selected="${t === k}" class="${t === k ? 'on' : ''}" data-onclick="epTab('${k}')">${n}</button>`).join('')}<button class="vwib" data-onclick="epSideClose()" aria-label="Cerrar el panel">✕</button></div>`;
+  const tabs = [['ann', '💬 Anotaciones'], ['toc', '📑 Índice'], ...(EP.find.hits.length || t === 'find' ? [['find', `🔍 ${EP.find.hits.length || ''}`]] : [])];   // v39.50: resultados de la búsqueda
+  const head = `<div class="vwst" role="tablist">${tabs.map(([k, n]) => `<button role="tab" aria-selected="${t === k}" class="${t === k ? 'on' : ''}${k === 'find' ? ' lntab' : ''}" data-onclick="epTab('${k}')">${n}</button>`).join('')}<button class="vwib" data-onclick="epSideClose()" aria-label="Cerrar el panel">✕</button></div>`;
+  if (t === 'find') return lnEpFindDraw(s, head);
   if (t === 'toc') {
     const L = EP.bk?.toc || [], cur = epLoc().i;
     s.innerHTML = `${head}<div class="vwsl vwtoc"><ul>${L.length ? L.map((x, k) => `<li><button class="vwtl${x.i === cur ? ' on' : ''}" data-k="${k}" style="--d:${x.lv}" data-onclick="epTocGo(${k})"><span>${esc(x.t)}</span></button></li>`).join('')
@@ -456,14 +460,14 @@ function epSideDraw() {
   }
   const all = annSorted(epAnns()), f = EP.filt || '', L = all.filter(a => !f || (f === 'cm' ? a.m : a.c === f));
   s.innerHTML = `${head}<div class="vwsh"><b>${all.length ? `${all.length} ${all.length === 1 ? 'subrayado' : 'subrayados'}` : 'Anotaciones'}</b></div>
-    ${all.length ? `<div class="vwsf"><button class="${f ? '' : 'on'}" data-onclick="epFilt('')">Todas</button>${VW_COLORS.filter(([c]) => all.some(a => a.c === c)).map(([c, t]) => `<button class="vwc${f === c ? ' on' : ''}" style="--c:${c}" title="Solo ${t.toLowerCase()}" data-onclick="epFilt('${c}')"></button>`).join('')}<button class="${f === 'cm' ? 'on' : ''}" data-onclick="epFilt('cm')" title="Solo las que tienen comentario">💬</button></div>` : ''}
+    ${all.length ? `<div class="vwsf"><button class="${f ? '' : 'on'}" data-onclick="epFilt('')">Todas</button>${annFiltChips(all, f, 'epFilt')}<button class="${f === 'cm' ? 'on' : ''}" data-onclick="epFilt('cm')" title="Solo las que tienen comentario">💬</button></div>` : ''}
     <div class="vwsl">${L.length ? L.map(a => `<button class="vwi${EP.pop === a.id ? ' on' : ''}" style="--c:${a.c}" data-onclick="epPick('${a.id}')"><small>cap. ${a.p + 1}${epChTitle(a.p) ? ' · ' + esc(shortTxt(epChTitle(a.p)).slice(0, 60)) : ''}</small>${a.t ? `<span class="vwit">${esc(a.t.length > 220 ? a.t.slice(0, 220) + '…' : a.t)}</span>` : ''}${a.m ? `<span class="vwim">💬 ${esc(a.m.length > 300 ? a.m.slice(0, 300) + '…' : a.m)}</span>` : ''}</button>`).join('')
       : `<p class="empty">${all.length ? 'Ninguna con este filtro.' : 'Aún no hay subrayados. Selecciona texto y elige un color.'}</p>`}</div>
     ${all.length ? `<div class="vwsx vwexp"><small>${f ? 'Las del filtro' : 'Todas'}:</small><button data-onclick="epExpCopy()" title="Copiar al portapapeles">📋 Copiar</button>${EP.src?.kind === 'paper' ? `<button data-onclick="epExpNotes()" title="${f ? 'Añadirlas como nota nueva del paper' : 'Una nota «Anotaciones del EPUB» en el paper: si ya existe, se actualiza'}">📝 A las notas</button>` : ''}<button data-onclick="epExpMd()" title="Descargar como resumen en Markdown">⬇ .md</button></div>` : ''}`;
 }
 function epFilt(f) { EP.filt = f; epSideDraw(); }
 function epPick(id) { if (vwMv()) epSideClose(); epPopOpen(id); }
-function epTocGo(k) { const x = EP.bk?.toc[k]; if (!x) return; if (vwMv()) epSideClose(); epGoTo(x.i, x.frag); }
+function epTocGo(k) { const x = EP.bk?.toc[k]; if (!x) return; if (vwMv()) epSideClose(); lnEpGo(x.i, x.frag); }
 function epGoSide(i) { if (vwMv()) epSideClose(); epGoLoc({i, f: 0}); }
 function epTocCur() { const s = $('#epSide'); if (!EP.side || EP.tab !== 'toc' || !s) return; const cur = epLoc().i, L = EP.bk?.toc || [];
   s.querySelectorAll('.vwtl').forEach((b, k) => b.classList.toggle('on', L.length ? L[k]?.i === cur : k === cur)); }
@@ -482,14 +486,14 @@ function epExpMd() { const L = epExpList(); if (!L.length) return; const P = epP
 /* ---- Buscar en el libro (sin distinguir mayúsculas ni tildes) ---- */
 const epFold = s => s.split('').map(c => (c.normalize('NFD')[0] || c).toLowerCase()[0] || c).join('');
 function epFindToggle(on) { EP.findOpen = on ?? !EP.findOpen; $('#ep').classList.toggle('find', EP.findOpen); if (EP.findOpen) { $('#epQ').focus(); $('#epQ').select(); } else { epFindReset(true); $('#epScroll').focus({preventScroll: true}); } }
-function epFindReset(clear) { EP.find = {q: '', hits: [], i: -1}; $('#epQn').textContent = ''; EP.secs.forEach(s => epUnwrap(s, 'epfh')); if (clear) $('#epQ').value = ''; }
+function epFindReset(clear) { const had = EP.find.hits.length; EP.find = {q: '', hits: [], i: -1}; $('#epQn').textContent = ''; if (had || clear) lnEpFindUi(); EP.secs.forEach(s => epUnwrap(s, 'epfh')); if (clear) $('#epQ').value = ''; }
 function epFindKey(e) { if (e.key === 'Enter') { e.preventDefault(); epFind(e.shiftKey ? -1 : 1); } else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); epFindToggle(false); } }
 function epFind(dir) {
   const q = epFold($('#epQ').value.trim()); if (!q) return;
   if (EP.find.q !== q) {
     epFindReset(); EP.find.q = q; if (!EP.fold.length) EP.fold = EP.secs.map(s => epFold(s.textContent));
     for (let i = 0; i < EP.fold.length && EP.find.hits.length < 2000; i++) { let k = -1; while ((k = EP.fold[i].indexOf(q, k + 1)) >= 0 && EP.find.hits.length < 2000) EP.find.hits.push({i, a: k, b: k + q.length}); }
-    const here = epLoc(), hp = EP.cum[here.i] + here.f * EP.len[here.i]; EP.find.i = EP.find.hits.findIndex(h => EP.cum[h.i] + h.a >= hp) - (dir > 0 ? 1 : 0); if (EP.find.i < -1) EP.find.i = -1;
+    const here = epLoc(), hp = EP.cum[here.i] + here.f * EP.len[here.i]; EP.find.i = EP.find.hits.findIndex(h => EP.cum[h.i] + h.a >= hp) - (dir > 0 ? 1 : 0); if (EP.find.i < -1) EP.find.i = -1; lnEpFindUi();
   }
   const H = EP.find.hits; if (!H.length) { $('#epQn').textContent = 'Sin resultados'; return; }
   EP.find.i = (EP.find.i + dir + H.length) % H.length; $('#epQn').textContent = `${EP.find.i + 1} de ${H.length}${H.length >= 2000 ? '+' : ''}`; epFindMark();
@@ -552,7 +556,7 @@ function epConcShow() { const d = $('#ep'); if (!d) return; const h = epConcHidd
 function epConcTap() { if (!epConcHidden()) return false; epAutoPause(true); return true; }
 function epConcSet(on) { try { localStorage.setItem(VW_CONC_K, on ? '1' : '0'); } catch (e) {} if (on && !EP.auto) epAutoStart(); else epAutoShow(); if (on) toast('Modo concentración: toca la página para sacar las barras.', [], 2600); }
 function epAutoShow() {
-  epConcShow(); const b = epAutoBar(); b.hidden = !EP.auto; if (!EP.auto) return;
+  epConcShow(); wlSync(); const b = epAutoBar(); b.hidden = !EP.auto; if (!EP.auto) return;
   b.querySelector('.vwcb').classList.toggle('on', vwConcOn()); $('#epAutoR').value = EP.autoLv; $('#epAutoV').textContent = vwAutoFmt(EP.autoLv); b.classList.toggle('paused', !!EP.autoPaused);
   const p = b.querySelector('.vwap'); p.textContent = EP.autoPaused ? '▶' : '⏸'; p.ariaLabel = EP.autoPaused ? 'Seguir' : 'Pausa';
 }
@@ -602,7 +606,7 @@ function epReadMenu() {
     ${!EP.auto && s.mode === 'page' && s.two ? `${o(!s.one, "epSetPut('one',false)", '⏩ Pasar de dos en dos', '')}${o(s.one, "epSetPut('one',true)", '↪ Pasar de una en una (la derecha pasa a la izquierda)', '')}` : ''}
     <div class="vwhint">Página a página: toca a la izquierda o a la derecha (o desliza, o ← →) para pasar. La doble página necesita una pantalla ancha.</div><hr>
     <button data-onclick="${EP.auto ? 'epAutoStop()' : 'epAutoStart()'}">${EP.auto ? '⏹ Parar el desplazamiento automático' : '⏬ Desplazamiento automático'} <small class="vwsub">A</small></button>
-    <button data-onclick="epConcSet(${vwConcOn() ? 0 : 1})">${tick(vwConcOn())}🧘 Modo concentración <small class="vwsub">C</small></button>`);
+    <button data-onclick="epConcSet(${vwConcOn() ? 0 : 1})">${tick(vwConcOn())}🧘 Modo concentración <small class="vwsub">C</small></button>${sayCan() ? '<hr>' + sayMenuBtn(true) : ''}`);
 }
 function epMode(m) { if (EP.auto) epAutoStop(); const o = epSet(); o.mode = m === 'scroll' ? 'scroll' : 'page'; o.two = m === 'two'; try { localStorage.setItem(EP_SET_K, JSON.stringify(o)); } catch (e) {} epSetApply(true); }
 function epFicha() { const p = epPaperOf(); if (p) openPaper(p.id); }
@@ -616,6 +620,8 @@ document.addEventListener('fullscreenchange', () => { if (!document.fullscreenEl
 function epEsc() {
   if (epConcTap()) return;
   const m = $('#epMenu'); if (m && !m.hidden) { m.hidden = true; return; }
+  if (lnShown()) return lnClose();
+  if (SAY.on && SAY.ep) return sayStop();
   if (!$('#epPop').hidden) return epPopClose();
   if (!$('#epSel').hidden) { getSelection().removeAllRanges(); $('#epSel').hidden = true; return; }
   if (EP.findOpen) return epFindToggle(false);
@@ -639,6 +645,7 @@ function epKey(e) {
   if (!EP.open) return; const inText = /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName) || e.target.isContentEditable, mod = e.ctrlKey || e.metaKey;
   if (mod && e.key.toLowerCase() === 'f') { e.preventDefault(); return epFindToggle(true); }
   if (mod && e.key.toLowerCase() === 'z' && !inText) { e.preventDefault(); return epUndo(); }
+  if (e.altKey && e.key === 'ArrowLeft' && LN.ep.length && !inText) { e.preventDefault(); return lnEpBack(); }
   if (inText || mod || e.altKey) return;
   const k = EP_KEYS[e.key.length === 1 ? e.key.toLowerCase() : e.key]; if (!k) return;
   if (k[1]() !== false) e.preventDefault();

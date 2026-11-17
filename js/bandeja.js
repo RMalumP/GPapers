@@ -264,9 +264,14 @@ function annCite(p, page, ep) {
   return `(${who}, ${p.year || 's. f.'}, ${ep ? 'cap.' : 'p.'} ${page})`;
 }
 function annText(p, L, fmt = db.settings.annFmt, ep = false) {   // ep: anotaciones de un EPUB (capítulos, no páginas)
-  const name = VW_COLORS.reduce((o, [c, t]) => (o[c] = t, o), {}), one = s => String(s || '').replace(/\s*\n\s*/g, ' ').trim();
+  const G = typeof annLbls === 'function' && Object.keys(annLbls()).length && new Set(L.map(a => a.c)).size > 1;   // v39.51: con colores con significado, agrupadas por significado
+  if (G) return VW_COLORS.map(([c]) => c).concat([...new Set(L.map(a => a.c))].filter(c => !VW_COLORS.some(x => x[0] === c))).map(c => { const S = L.filter(a => a.c === c); return S.length ? (fmt === 'md' ? `### ${annColName(c)}\n\n` : `${annColName(c).toUpperCase()}\n\n`) + annText1(p, S, fmt, ep) : ''; }).filter(Boolean).join('\n\n');
+  return annText1(p, L, fmt, ep);
+}
+function annText1(p, L, fmt, ep) {
+  const name = new Proxy({}, {get: (_, c) => typeof annColName === 'function' ? annColName(c) : c}), one = s => String(s || '').replace(/\s*\n\s*/g, ' ').trim();
   L = annSorted(L);
-  if (fmt === 'md') return L.map(a => `- **${annPg(a, ep)}** · ${a.k === 'note' ? 'Nota' : a.k === 'area' ? 'Zona' : 'Subrayado'} (${name[a.c] || a.c})${a.t ? `\n  > ${one(a.t)}` : ''}${a.m ? `\n  ${a.m.trim().replace(/\n/g, '\n  ')}` : ''}`).join('\n');
+  if (fmt === 'md') return L.map(a => `- **${annPg(a, ep)}** · ${a.k === 'note' ? 'Nota' : a.k === 'area' ? 'Zona' : a.k === 'ink' ? 'Trazo a mano' : 'Subrayado'} (${name[a.c] || a.c})${a.t ? `\n  > ${one(a.t)}` : ''}${a.m ? `\n  ${a.m.trim().replace(/\n/g, '\n  ')}` : ''}`).join('\n');
   return L.map(a => { const ref = fmt === 'cite' && p ? annCite(p, a.p + 1, ep) : `(${annPg(a, ep)})`;
     return (a.t ? `«${one(a.t)}» ${ref}` : ref) + (a.m ? '\n' + a.m.trim() : ''); }).join('\n\n');
 }
