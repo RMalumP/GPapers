@@ -107,7 +107,7 @@ El estilo **Derecho y jurisprudencia** une las guías de la UAM (Facultad de Der
 
 ## Código
 Sin compilación: `index.html` carga scripts clásicos en este orden (comparten el ámbito global, así que la app sigue funcionando desde `file://`), y `sw.js` los guarda en el mismo orden:
-`js/modelo.js` (modelo de datos y utilidades), `js/citas.js` (estilos de cita, tipos y estilos propios), `js/persistencia.js` (abrir, guardar, deshacer), `js/importar.js`, `js/config.js` (atajos, configuración, ayuda), `js/lista.js` (lista y exportar), `js/edicion.js` (edición, notas, relaciones, papelera, historial), `js/drive.js` (Google Drive), `js/extras.js` (PWA, duplicados, PDF, proyectos, copias), `js/visor.js` (visor y anotaciones de PDF), `js/bandeja.js` (bandeja «PDF por citar» y copia en el Drive normal), `js/epub.js` (lector de EPUB) y `app.js` (datos de la aplicación y arranque).
+`js/modelo.js` (modelo de datos y utilidades), `js/citas.js` (estilos de cita, tipos y estilos propios), `js/persistencia.js` (abrir, guardar, deshacer), `js/importar.js`, `js/config.js` (atajos, configuración, ayuda), `js/lista.js` (lista y exportar), `js/edicion.js` (edición, notas, relaciones, papelera, historial), `js/drive.js` (Google Drive), `js/extras.js` (PWA, duplicados, PDF, proyectos, copias), `js/visor.js` (visor y anotaciones de PDF), `js/bandeja.js` (bandeja «PDF por citar» y copia en el Drive normal), `js/epub.js` (lector de EPUB), `js/lectura.js` (enlaces, vista previa, pantalla encendida y resultados de la búsqueda en el visor) y `app.js` (datos de la aplicación y arranque).
 Un archivo nuevo se añade en los tres sitios; `pruebas/prueba_version.js` lo comprueba.
 El HTML no lleva `onclick` ni otros manejadores en línea: `index.html` tiene una CSP que los bloquea (y no permite `eval`). Cada elemento dice qué hacer en `data-on<evento>`, p. ej. `data-onclick="openPaper('p1')"`; ese texto lo lee un minilenguaje (llamadas, lecturas, textos, números, listas, `this`, `event`, `!` y `+`), sin evaluarlo como JavaScript (ver «Eventos de la interfaz» en `js/modelo.js`). Para asignar se usan funciones pequeñas (`put(F,'mode',this.value,render)`, `setHas(…)`, etc., en `app.js`); las variables `const`/`let` que haga falta leer van en `ON_VARS`. `pruebas/prueba_eventos.js` comprueba que no queda ningún manejador en línea y que todos los `data-on` se pueden leer.
 
@@ -384,3 +384,14 @@ Todo en **⋯ del visor → 📖 Modo de lectura** (se recuerda en este disposit
 - Con el dedo, el tirador va por **palabras enteras** (como al subrayar).
 - Se quita la opción de v39.48 («✋ Límites de un subrayado ya hecho»): los tiradores siempre se pueden mover.
 - Pruebas: `python3 pruebas/prueba_visor_tiradores.py .`
+
+## Visor: enlaces que funcionan, vista previa de citas, pantalla encendida y lista de resultados (v39.50)
+Nada de esto añade botones fijos: cada cosa sale solo cuando hace falta. Código en `js/lectura.js` (PDF y EPUB).
+- **Enlaces del PDF**: tocar «[12]», «Fig. 3», «Sección 2» o cualquier enlace interno del PDF ya lleva a su sitio (antes no hacía nada: el visor no leía los enlaces). Por defecto sale antes una **vista previa** del destino (la referencia de la bibliografía, la figura…), pintada aparte y sin moverte de donde lees; en un PDF a dos columnas enseña solo la columna de la referencia, para que la letra se lea. «➜ Ir a la página N» salta y marca un momento dónde has caído. Con el ratón, la mano sale sobre los enlaces.
+- **Enlaces a internet**: piden confirmación («↗ Abrir en una pestaña nueva» o «📋 Copiar»).
+- **↩ Volver**: después de saltar (enlace, índice, miniaturas o lista de resultados) sale abajo a la izquierda «↩ Volver a la p. N» para regresar a donde estabas (también **Alt + ←**); se apilan varios saltos. ✕ lo quita.
+- **EPUB**: lo mismo con sus enlaces internos (texto o imagen del destino, «➜ Ir allí» y «↩ Volver»); las llamadas a nota siguen con su ventanita.
+- **⚙ Ajustes del visor → 🔗 Al tocar un enlace o una cita**: «👁 Ver antes una vista previa» (por defecto) o «➜ Ir directamente (con ↩ Volver)». En el dispositivo: `gp-vw-link`.
+- **🔆 Pantalla encendida** (⚙ Ajustes del visor, si el navegador lo permite): con el PDF o el EPUB abierto la pantalla no se apaga sola mientras lees; se apaga tras **5 minutos sin tocar nada**. Con el desplazamiento automático en marcha, nunca. Opciones: mientras lees (por defecto), solo con el automático o como el sistema (`gp-vw-wake`).
+- **Lista de resultados de la búsqueda**: junto a «3 de 27» sale **☰**, que abre en el panel la pestaña 🔍 con cada resultado, su página (o capítulo) y la frase donde aparece; tocar uno lleva a él (con un solo «↩ Volver» por búsqueda). Hasta 400 en la lista.
+- Pruebas: `python3 pruebas/prueba_visor_enlaces.py .`

@@ -250,3 +250,22 @@ html.mv #epSel{position:fixed;gap:8px}html.mv #epSel .vwc{width:32px;height:32px
 #vw.tsel:not(.night) .vwhl{mix-blend-mode:normal;opacity:.34}
 /* v39.46: con el candado la hoja no se mueve (ni arrastrando, ni con la rueda, ni con dos dedos): solo se pasa de página */
 #vw.zlock #vwScroll{touch-action:none}
+/* v39.50: enlaces del PDF y del EPUB (vista previa y «↩ Volver»), lista de resultados de la búsqueda */
+#vwScroll.lnk,#vwScroll.lnk .textLayer span{cursor:pointer}
+.lnpop .lncv{max-height:min(46vh,340px);overflow:auto;border:1px solid var(--bd);border-radius:8px;background:#fff;display:flex;justify-content:center}
+#vw.night .lnpop .lncv{background:#1c1e23}.lnpop .lncv canvas{display:block;max-width:100%;height:auto}.lnpop .lncv .empty{margin:16px;opacity:.7}
+.lnpop .lnurl{word-break:break-all;font-size:calc(13px * var(--fz,1));margin:2px 0 4px;opacity:.85}
+.lnpop .lnim{display:block;max-width:100%;max-height:30vh;margin:0 auto 6px;object-fit:contain}
+.lnpop[hidden],.lnback[hidden]{display:none}
+.lnback{position:absolute;left:12px;bottom:14px;display:flex;align-items:center;gap:2px;padding:3px;border-radius:99px;z-index:7}
+.lnback>button:first-child{border:0;background:color-mix(in srgb,var(--pri) 14%,transparent);border-radius:99px;padding:6px 12px;font-size:calc(13px * var(--fz,1));white-space:nowrap}
+.lnback .vwib{min-width:30px;min-height:30px;font-size:calc(12px * var(--fz,1));opacity:.7}
+#vw.fs.flip:not(.tabl) .lnback{left:62px}
+html.mv .lnback{bottom:calc(64px + env(safe-area-inset-bottom,0px))}
+#vw.conc .lnback,#vw.conc .lnpop,#ep.conc .lnback,#ep.conc .lnpop{display:none!important}
+.lnfl{position:absolute;left:0;right:0;height:calc(var(--scale-factor) * 16px);background:color-mix(in srgb,var(--pri) 28%,transparent);pointer-events:none;animation:lnfl 1.8s forwards;z-index:3}
+@keyframes lnfl{0%{opacity:1}70%{opacity:.8}100%{opacity:0}}
+.vwqL{min-width:28px;min-height:28px;font-size:calc(14px * var(--fz,1))}.vwqL[hidden]{display:none}
+.lnres .vwi b{background:color-mix(in srgb,#ffd400 55%,transparent);font-weight:600;border-radius:3px}
+.lnres{display:flex;flex-direction:column;gap:6px}
+.vwst button[role=tab]{min-width:0;overflow:hidden;text-overflow:ellipsis}.vwst button[role=tab].lntab{flex:0 0 auto}
