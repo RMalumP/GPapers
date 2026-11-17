@@ -57,6 +57,13 @@ Todo vive en `movil.css` y `js/movil.js`, detrás de la clase `mv` de `<html>`, 
 En la barra lateral, dentro de «Información» (plegada, bajo Configuración), el botón **Añadir app** (mismo estilo que Ayuda) instala la aplicación en el dispositivo. Solo se ve si se abre desde la web y aún no está instalada
 (se oculta al abrirla como app y al instalarse). En Chrome y Edge la instalación la ofrece el navegador; en los demás se explica cómo hacerlo.
 
+## App Android (APK)
+La carpeta `android/` es una app Android (Trusted Web Activity) que abre `https://rmalump.github.io/GPapers/` con Chrome a pantalla completa, con su icono y sin barra de dirección. No lleva copia de la web: cada versión nueva de la web llega sola a la app, así que el APK solo hay que volver a compilarlo si cambia el nombre, el icono o la dirección (subir `versionCode` y `versionName` en `android/app/build.gradle`).
+- **Verificación**: `https://rmalump.github.io/.well-known/assetlinks.json` (en el repositorio `rmalump.github.io`) lleva la huella SHA-256 de la clave de firma. Sin él, la app funciona igual pero muestra una barra con la dirección arriba.
+- **Firma**: la clave (`gpapers.jks`) no está en el repositorio. Hay que usar siempre la misma, porque con otra el móvil no deja actualizar la app instalada.
+- **Compilar**: `cd android && GPAPERS_KEYSTORE=ruta/gpapers.jks GPAPERS_KEYSTORE_PASSWORD=… gradle assembleRelease` (Android SDK 36). El flujo `.github/workflows/apk.yml` hace lo mismo en GitHub y publica el APK en «Releases» si existen los secrets `GPAPERS_KEYSTORE_BASE64` y `GPAPERS_KEYSTORE_PASSWORD`; sin ellos no hace nada.
+- **Instalar**: abrir el `.apk` en el móvil y permitir «instalar apps de origen desconocido».
+
 ## Citas (APA 7, Vancouver, MLA, IEEE y Chicago)
 La plantilla depende del tipo de fuente (artículo, libro, capítulo, congreso, tesis, web, artículo de prensa y entrada de blog). Las citas llevan *cursiva* real: en texto plano se quita,
 y en «Copiar con formato» y en Word se convierte. En la pestaña «Cita» puedes escribir `*texto*` para cursiva (un asterisco literal, `\*`).
