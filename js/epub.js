@@ -149,7 +149,7 @@ function epBuild() {
   const sw = fn => VW_COLORS.map(([c, t], i) => `<button class="vwc" data-c="${i}" style="--c:${c}" title="${t}" aria-label="Color ${t}" data-onclick="${fn}(${i})"></button>`).join('');
   document.body.insertAdjacentHTML('beforeend', `<dialog id="ep" aria-label="Lector de EPUB">
     <div class="vwh"><button class="vwib" data-onclick="epClose()" title="Volver a la lista (Esc)" aria-label="Volver">←</button><b class="vwt"></b>
-      <span id="epWhere" class="epw"></span>
+      <span id="epWhere" class="epw"></span><span id="epLeft" class="epw lnleft"></span>
       <span class="vwf"><input id="epQ" type="search" placeholder="Buscar en el libro" aria-label="Buscar en el libro" data-onkeydown="epFindKey(event)" data-oninput="epFindReset()"><span id="epQn"></span><button class="vwib vwqL" id="epQL" hidden data-onclick="epPanel('find')" title="Ver todos los resultados, con su frase" aria-label="Lista de resultados">☰</button></span>
       <button class="vwib vwfb" data-onclick="epFindToggle()" title="Buscar (Ctrl+F)" aria-label="Buscar">🔍</button>
       <button class="vwib epaa" id="epAaB" data-onclick="epTypoMenu(event)" title="Texto: tamaño, letra, interlineado, ancho y colores" aria-label="Texto">Aa</button>
@@ -166,7 +166,7 @@ function epBuild() {
     <div class="vwbody"><div id="epScroll" tabindex="-1"><div id="epDoc"></div></div><p id="epLoad" class="vwload">Abriendo el EPUB…</p><aside id="epSide" hidden></aside>
       <button id="epFsX" class="vwfloat vwib" data-onclick="epFs(false)" title="Salir de pantalla completa (Esc)" aria-label="Salir de pantalla completa">✕</button></div>
     <div class="epfoot"><input id="epBar" type="range" min="0" max="1000" value="0" aria-label="Posición en el libro" data-oninput="epBarTip(this.value)" data-onchange="epBarGo(this.value)"><span id="epPct"></span></div>
-    <div id="epSel" class="vwfloat" hidden>${sw('epSelColor')}<button class="vwib" data-onclick="epSelNote()" title="Subrayar y comentar" aria-label="Subrayar y comentar">💬</button><button class="vwib" data-onclick="epSelCopy()" title="Copiar el texto" aria-label="Copiar">📋</button></div>
+    <div id="epSel" class="vwfloat" hidden data-onmousedown="event.preventDefault()">${sw('epSelColor')}<button class="vwib" data-onclick="epSelNote()" title="Subrayar y comentar" aria-label="Subrayar y comentar">💬</button><button class="vwib" data-onclick="epSelCopy()" title="Copiar el texto" aria-label="Copiar">📋</button><button class="vwib" data-onclick="lnSelMore(true)" title="Más: copiar con la cita, definición, traducir…" aria-label="Más">⋯</button></div>
     <div id="epPop" class="vwfloat vwpop" hidden></div></dialog>`);
   const d = $('#ep'), sc = $('#epScroll');
   d.addEventListener('cancel', e => { e.preventDefault(); epEsc(); });
@@ -196,7 +196,7 @@ async function epOpen(src, file) {
   ep$('.vwt').textContent = ep$('.vwt').title = epTitle(); $('#epDoc').innerHTML = ''; $('#epLoad').hidden = false; $('#epLoad').textContent = 'Abriendo el EPUB…'; $('#epWhere').textContent = '';
   $('#epQ').value = ''; $('#epQn').textContent = ''; d.classList.remove('find', 'fs', 'conc'); epPopClose(); $('#epSel').hidden = true; ep$('.epnb').hidden = src?.kind !== 'paper';
   EP.side = !!VW.sideNext || !vwMv() && innerWidth > 1100 && vwSideOn() && epAnns().length > 0; if (VW.sideNext) EP.tab = 'ann'; VW.sideNext = false;
-  epSetApply(); epColorShow(); epCount(); d.classList.toggle('tsel', tsWant()); if (!d.open) d.showModal(); epSideShow();
+  epSetApply(); epColorShow(); epCount(); lnLblApply(); d.classList.toggle('tsel', tsWant()); if (!d.open) d.showModal(); epSideShow();
   EP.txt = null; LN.ep = []; LN.epFindQ = null; lnClose(); lnEpBackShow(); $('#epQL').hidden = true; wlPoke();
   try {
     const bk = await epBook(file); if (gen !== EP.gen) return; EP.bk = bk;
@@ -414,7 +414,7 @@ const epUpd = (id, o, quiet) => epMut(l => { const a = l.find(x => x.id === id);
 function epUndo() { epSaveComment(); getSelection().removeAllRanges(); undo(); }
 function epPopOpen(id, focus) {
   const a = epAnns().find(x => x.id === id), pp = $('#epPop'); if (!a || !pp) return; epSaveComment(); EP.pop = id;
-  pp.innerHTML = `<div class="vwpoph"><span class="vwk">🖍 Subrayado · cap. ${a.p + 1}</span><span class="vwcs">${VW_COLORS.map(([c, t], i) => `<button class="vwc${a.c === c ? ' on' : ''}" style="--c:${c}" title="${t}" aria-label="${t}" data-onclick="epPopColor(${i})"></button>`).join('')}</span><button class="vwib" data-onclick="epPopClose()" aria-label="Cerrar">✕</button></div>
+  pp.innerHTML = `<div class="vwpoph"><span class="vwk">🖍 Subrayado · cap. ${a.p + 1}${annLbl(a.c) ? ' · ' + esc(annLbl(a.c)) : ''}</span><span class="vwcs">${VW_COLORS.map(([c, t], i) => `<button class="vwc${a.c === c ? ' on' : ''}" style="--c:${c}" title="${t}" aria-label="${t}" data-onclick="epPopColor(${i})"></button>`).join('')}</span><button class="vwib" data-onclick="epPopClose()" aria-label="Cerrar">✕</button></div>
     ${a.t ? `<blockquote class="vwq">${esc(a.t)}</blockquote>` : ''}<textarea id="epCm" placeholder="Comentario…" data-oninput="epCmIn()">${esc(a.m || '')}</textarea>
     <div class="row vwpopb"><button data-onclick="epPopCopy()">📋 Copiar</button>${EP.src?.kind === 'paper' ? '<button data-onclick="epToNote()" title="Añade el texto y el comentario a las notas del paper">📝 A las notas</button>' : ''}<button class="danger" data-onclick="epPopDel()">🗑 Borrar</button></div>`;
   pp.hidden = false; const m = $('#epDoc').querySelector(`mark[data-a="${id}"]`); if (m) { epShow(m); epPlace(pp, m.getBoundingClientRect()); } else { pp.style.left = '50%'; pp.style.top = '30%'; }
@@ -460,7 +460,7 @@ function epSideDraw() {
   }
   const all = annSorted(epAnns()), f = EP.filt || '', L = all.filter(a => !f || (f === 'cm' ? a.m : a.c === f));
   s.innerHTML = `${head}<div class="vwsh"><b>${all.length ? `${all.length} ${all.length === 1 ? 'subrayado' : 'subrayados'}` : 'Anotaciones'}</b></div>
-    ${all.length ? `<div class="vwsf"><button class="${f ? '' : 'on'}" data-onclick="epFilt('')">Todas</button>${VW_COLORS.filter(([c]) => all.some(a => a.c === c)).map(([c, t]) => `<button class="vwc${f === c ? ' on' : ''}" style="--c:${c}" title="Solo ${t.toLowerCase()}" data-onclick="epFilt('${c}')"></button>`).join('')}<button class="${f === 'cm' ? 'on' : ''}" data-onclick="epFilt('cm')" title="Solo las que tienen comentario">💬</button></div>` : ''}
+    ${all.length ? `<div class="vwsf"><button class="${f ? '' : 'on'}" data-onclick="epFilt('')">Todas</button>${annFiltChips(all, f, 'epFilt')}<button class="${f === 'cm' ? 'on' : ''}" data-onclick="epFilt('cm')" title="Solo las que tienen comentario">💬</button></div>` : ''}
     <div class="vwsl">${L.length ? L.map(a => `<button class="vwi${EP.pop === a.id ? ' on' : ''}" style="--c:${a.c}" data-onclick="epPick('${a.id}')"><small>cap. ${a.p + 1}${epChTitle(a.p) ? ' · ' + esc(shortTxt(epChTitle(a.p)).slice(0, 60)) : ''}</small>${a.t ? `<span class="vwit">${esc(a.t.length > 220 ? a.t.slice(0, 220) + '…' : a.t)}</span>` : ''}${a.m ? `<span class="vwim">💬 ${esc(a.m.length > 300 ? a.m.slice(0, 300) + '…' : a.m)}</span>` : ''}</button>`).join('')
       : `<p class="empty">${all.length ? 'Ninguna con este filtro.' : 'Aún no hay subrayados. Selecciona texto y elige un color.'}</p>`}</div>
     ${all.length ? `<div class="vwsx vwexp"><small>${f ? 'Las del filtro' : 'Todas'}:</small><button data-onclick="epExpCopy()" title="Copiar al portapapeles">📋 Copiar</button>${EP.src?.kind === 'paper' ? `<button data-onclick="epExpNotes()" title="${f ? 'Añadirlas como nota nueva del paper' : 'Una nota «Anotaciones del EPUB» en el paper: si ya existe, se actualiza'}">📝 A las notas</button>` : ''}<button data-onclick="epExpMd()" title="Descargar como resumen en Markdown">⬇ .md</button></div>` : ''}`;

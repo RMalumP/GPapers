@@ -55,7 +55,7 @@ function vwBuild() {
   const sw = VW_COLORS.map(([c, t], i) => `<button class="vwc" data-c="${i}" style="--c:${c}" title="${t}" aria-label="Color ${t}" data-onclick="vwColor(${i})"></button>`).join('');
   document.body.insertAdjacentHTML('beforeend', `<dialog id="vw" aria-label="Visor de PDF">
     <div class="vwh"><button class="vwib" data-onclick="vwClose()" title="Volver a la lista (Esc)" aria-label="Volver">←</button><b class="vwt"></b>
-      <span class="vwpg"><input id="vwPg" type="number" min="1" aria-label="Página" data-onchange="vwGoN(this.value)" data-onkeydown="onEnter(event,vwGoN,this.value)"><span id="vwPn"></span></span>
+      <span class="vwpg"><input id="vwPg" type="number" min="1" aria-label="Página" data-onchange="vwGoN(this.value)" data-onkeydown="onEnter(event,vwGoN,this.value)"><span id="vwPn"></span></span><small id="vwLeft" class="lnleft" hidden></small>
       <span class="vwz"><button class="vwib" data-onclick="vwZoomBy(0.8333)" title="Alejar (Ctrl + −)" aria-label="Alejar">−</button><button id="vwZl" class="vwzl" data-onclick="vwFitW()" title="Ajustar al ancho">100 %</button><button class="vwib" data-onclick="vwZoomBy(1.2)" title="Acercar (Ctrl + +)" aria-label="Acercar">＋</button></span>
       <span class="vwf"><input id="vwQ" type="search" placeholder="Buscar en el PDF" aria-label="Buscar en el PDF" data-onkeydown="vwFindKey(event)" data-oninput="vwFindReset()"><span id="vwQn"></span><button class="vwib vwqL" id="vwQL" hidden data-onclick="vwPanel('find')" title="Ver todos los resultados, con su frase" aria-label="Lista de resultados">☰</button></span>
       <button class="vwib vwfb" data-onclick="vwFindToggle()" title="Buscar (Ctrl+F)" aria-label="Buscar">🔍</button>
@@ -75,7 +75,7 @@ function vwBuild() {
       <button class="vwm vwfsb" data-onclick="vwFs(false)" title="Salir de pantalla completa (Esc o «atrás»)"><span>⛶</span><small>Salir</small></button>
       <button class="vwm vwsb" data-onclick="vwPanel('ann')" title="Subrayados, notas y comentarios"><span>💬</span><small>Anotaciones</small><b id="vwAn"></b></button></div>
     <div class="vwbody"><div id="vwScroll" tabindex="-1"><div id="vwPages"></div><p id="vwLoad" class="vwload">Abriendo el PDF…</p></div><aside id="vwSide" hidden></aside></div>
-    <div id="vwSel" class="vwfloat" hidden>${sw.replace(/vwColor/g, 'vwSelColor')}<button class="vwib" data-onclick="vwSelNote()" title="Subrayar y comentar" aria-label="Subrayar y comentar">💬</button><button class="vwib" data-onclick="vwSelCopy()" title="Copiar el texto" aria-label="Copiar">📋</button></div>
+    <div id="vwSel" class="vwfloat" hidden data-onmousedown="event.preventDefault()">${sw.replace(/vwColor/g, 'vwSelColor')}<button class="vwib" data-onclick="vwSelNote()" title="Subrayar y comentar" aria-label="Subrayar y comentar">💬</button><button class="vwib" data-onclick="vwSelCopy()" title="Copiar el texto" aria-label="Copiar">📋</button><button class="vwib" data-onclick="lnSelMore(false)" title="Más: copiar con la cita, definición, traducir…" aria-label="Más">⋯</button></div>
     <div id="vwPop" class="vwfloat vwpop" hidden></div>
     <button id="vwTbTab" class="vwfloat" data-onclick="vwTbHide(false)" title="Sacar la barra de herramientas" aria-label="Sacar la barra">▾</button>
     <button id="vwLock" class="vwfloat vwlk" data-onclick="vwLockToggle()" title="Bloquear el tamaño (K)" aria-label="Bloquear el tamaño" aria-pressed="false">🔓</button>
@@ -105,7 +105,7 @@ async function vwOpen(src, file) {
   const d = $('#vw'); vw$('.vwt').textContent = vwTitle(); vw$('.vwt').title = vwTitle(); $('#vwPages').innerHTML = ''; $('#vwLoad').hidden = false; $('#vwLoad').textContent = 'Abriendo el PDF…';
   $('#vwQ').value = ''; $('#vwQn').textContent = ''; vwPopClose(); $('#vwSel').hidden = true; if (VW.sideNext) VW.tab = 'ann'; VW.side = VW.sideNext || !document.documentElement.classList.contains('mv') && innerWidth > 1100 && vwSideOn(); VW.sideNext = false; vwSideShow();
   vw$('.vwnb').hidden = src?.kind !== 'paper';
-  Object.assign(VW, vwRdGet(), {cropM: null, zLock: false}); vwRdClass(); vwCropShow(); VW.night = vwNightOn(); d.classList.toggle('night', VW.night); d.classList.toggle('tsel', tsWant()); VW.lite = vwLiteWant(); d.classList.toggle('lite', VW.lite); VW.toc = null; VW.thIo?.disconnect();
+  Object.assign(VW, vwRdGet(), {cropM: null, zLock: false}); vwRdClass(); vwCropShow(); VW.theme = vwTheme(); VW.night = VW.theme === 'night'; d.classList.toggle('night', VW.night); d.classList.toggle('sepia', VW.theme === 'sepia'); lnLblApply(); d.classList.toggle('tsel', tsWant()); VW.lite = vwLiteWant(); d.classList.toggle('lite', VW.lite); VW.toc = null; VW.thIo?.disconnect();
   if (!d.open) d.showModal(); vwModeShow(); vwColorShow(); vwCount(); lnClose(); lnBackClear(); $('#vwQL').hidden = true; wlPoke();
   if (!VW.pushed && !VW_TAB) { try { history.pushState({vw: 1}, ''); VW.pushed = true; } catch (e) {} }   // el botón «atrás» del móvil cierra el visor
   try {
@@ -714,7 +714,7 @@ function vwTapAt(x, y) {   // tocar un subrayado o una zona abre su ventanita
 function vwPopOpen(id, focus) {
   vwSaveComment(); const a = vwAnns().find(x => x.id === id); if (!a) return;
   VW.pop = id; const pp = $('#vwPop'), paper = vwPaper(), P = paper && db.papers.find(p => p.id === paper.id);
-  pp.innerHTML = `<div class="vwpoph"><span class="vwk">${a.k === 'note' ? '🗒 Nota' : a.k === 'area' ? '▭ Zona' : '🖍 Subrayado'} · p. ${a.p + 1}</span><span class="vwcs">${VW_COLORS.map(([c, t], i) => `<button class="vwc${a.c === c ? ' on' : ''}" style="--c:${c}" title="${t}" aria-label="Color ${t}" data-onclick="vwPopColor(${i})"></button>`).join('')}</span><button class="vwib" data-onclick="vwPopClose()" aria-label="Cerrar">✕</button></div>
+  pp.innerHTML = `<div class="vwpoph"><span class="vwk">${a.k === 'note' ? '🗒 Nota' : a.k === 'area' ? '▭ Zona' : '🖍 Subrayado'} · p. ${a.p + 1}${annLbl(a.c) ? ' · ' + esc(annLbl(a.c)) : ''}</span><span class="vwcs">${VW_COLORS.map(([c, t], i) => `<button class="vwc${a.c === c ? ' on' : ''}" style="--c:${c}" title="${t}" aria-label="Color ${t}" data-onclick="vwPopColor(${i})"></button>`).join('')}</span><button class="vwib" data-onclick="vwPopClose()" aria-label="Cerrar">✕</button></div>
     ${a.t ? `<blockquote class="vwq">${esc(a.t.length > 400 ? a.t.slice(0, 400) + '…' : a.t)}</blockquote>` : ''}
     <textarea id="vwCm" rows="3" placeholder="${a.k === 'note' ? 'Escribe la nota…' : 'Comentario (opcional)…'}" data-oninput="vwCmIn()">${esc(a.m || '')}</textarea>
     <div class="row vwpopb">${a.t ? '<button data-onclick="vwPopCopy()" title="Copiar el texto subrayado">📋 Copiar</button>' : ''}${P ? '<button data-onclick="vwToNote()" title="Añadir a las notas del paper, con la página, para citarlo">📝 A las notas</button>' : ''}<button class="danger" data-onclick="vwPopDel()">🗑 Borrar</button></div>`;
@@ -771,7 +771,7 @@ function vwAnnDraw(s, head) {
   const grp = !k && nH && nN ? [['hl', '🖍 Subrayados'], ['note', '🗒 Notas']].map(([g, n]) => { const G = L.filter(a => vwKindOf(a) === g); return G.length ? `<h4 class="vwgh">${n} (${G.length})</h4>${G.map(item).join('')}` : ''; }).join('') : L.map(item).join('');
   s.innerHTML = `${head}<div class="vwsh">${all.length ? `<span class="vwkd" role="group" aria-label="Tipo"><button class="${k ? '' : 'on'}" data-onclick="vwKind('')">Todas ${all.length}</button><button class="${k === 'hl' ? 'on' : ''}" data-onclick="vwKind('hl')" title="Subrayados y zonas">🖍 Subrayados ${nH}</button><button class="${k === 'note' ? 'on' : ''}" data-onclick="vwKind('note')" title="Notas adhesivas">🗒 Notas ${nN}</button></span><button class="vwpk${pk ? ' on' : ''}" data-onclick="vwPickToggle()" title="Elegir varias para borrarlas, copiarlas o llevarlas a las notas">${pk ? '✓ Elegir' : '☐ Elegir'}</button>` : '<b>Anotaciones</b>'}</div>
     ${pk ? `<div class="vwpkb"><button data-onclick="vwPickAll()">${L.length && L.every(a => pk.has(a.id)) ? '☐ Ninguna' : '☑ Todas las de la lista'}</button><button class="danger" data-onclick="vwPickDel()" ${n ? '' : 'disabled'}>🗑 Borrar${n ? ` (${n})` : ''}</button></div>` : ''}
-    <div class="vwsf"><button class="${f ? '' : 'on'}" data-onclick="vwFilt('')">Todas</button>${VW_COLORS.filter(([c]) => all.some(a => a.c === c)).map(([c, t]) => `<button class="vwc${f === c ? ' on' : ''}" style="--c:${c}" title="Solo ${t.toLowerCase()}" data-onclick="vwFilt('${c}')"></button>`).join('')}<button class="${f === 'cm' ? 'on' : ''}" data-onclick="vwFilt('cm')" title="Solo las que tienen comentario">💬</button></div>
+    <div class="vwsf"><button class="${f ? '' : 'on'}" data-onclick="vwFilt('')">Todas</button>${annFiltChips(all, f, 'vwFilt')}<button class="${f === 'cm' ? 'on' : ''}" data-onclick="vwFilt('cm')" title="Solo las que tienen comentario">💬</button></div>
     <div class="vwsl">${L.length ? grp
       : `<p class="empty">${all.length ? 'Ninguna con este filtro.' : 'Aún no hay anotaciones. Selecciona texto y elige un color, o usa 🖍 Subrayar, ▭ Zona o 🗒 Nota.'}</p>`}</div>
     ${frV.length ? `<details class="vwfr"><summary>${frV.length} ${frV.length === 1 ? 'anotación que ya traía' : 'anotaciones que ya traía'} el PDF</summary>${frV.slice(0, 300).map(x => `<button class="vwi" style="--c:${x.c}" data-onclick="vwGoForeign('${x.id}')"><small>p. ${x.p + 1} · ${esc(x.sub)}${x.who ? ' · ' + esc(x.who) : ''}</small>${x.m ? `<span class="vwim">${esc(x.m.slice(0, 300))}</span>` : ''}</button>`).join('')}<button class="pri" data-onclick="vwImport()" title="Pasan a ser tuyas: se pueden cambiar, comentar y sincronizar">Hacerlas editables</button></details>` : ''}
@@ -831,10 +831,10 @@ function vwThCur() { const b = document.querySelector('#vwSide .vwth'); if (!b) 
 /* ---- Modo noche: fondo oscuro y letra clara; las imágenes del PDF no se tocan ---- */
 const vwNightPref = () => { try { return localStorage.getItem('gp-vw-night') || 'off'; } catch (e) { return 'off'; } };
 const vwNightOn = () => { const p = vwNightPref(); return p === 'on' || p === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches; };
-const vwPC = () => VW.night ? {background: '#1c1e23', foreground: '#dcdde1'} : null;
+const vwPC = () => VW.night ? {background: '#1c1e23', foreground: '#dcdde1'} : VW.theme === 'sepia' ? {background: '#f4ecd8', foreground: '#433422'} : null;   // v39.51: también sepia
 function vwNight(v) { try { localStorage.setItem('gp-vw-night', v); } catch (e) {} vwNightApply(); }
 function vwNightApply() {
-  const on = vwNightOn(); if (!VW.open || VW.night === on) return; VW.night = on; $('#vw').classList.toggle('night', on);
+  const th = vwTheme(); if (!VW.open || VW.theme === th) return; VW.theme = th; VW.night = th === 'night'; $('#vw').classList.toggle('night', VW.night); $('#vw').classList.toggle('sepia', th === 'sepia');
   VW.pages.forEach(p => { if (p.cv) { p.rs = 0; VW.queue.add(p.i); } }); vwPump(); if (VW.side && VW.tab === 'th') vwSideDraw();
 }
 try { matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => vwNightApply()); } catch (e) {}
@@ -1007,7 +1007,7 @@ function vwVis() {
   vwSatPush(); if (on) pdfVisAsk(); toast(on ? 'Se guardará una copia con los subrayados en la carpeta «GPapers» de tu Drive.' : 'Este PDF ya no se copiará a tu Drive normal (la copia que ya esté allí no se borra).', [], 4500);
 }
 function vwMd() {   // resumen en Markdown
-  const L = [...vwAnns()].sort((a, b) => a.p - b.p || vwTop(a) - vwTop(b)), name = VW_COLORS.reduce((o, [c, t]) => (o[c] = t, o), {});
+  const L = [...vwAnns()].sort((a, b) => a.p - b.p || vwTop(a) - vwTop(b)), name = new Proxy({}, {get: (_, c) => annColName(c)});
   const p = vwPaper(), head = p ? `# ${vwTitle()}\n\n${p.authors?.length ? p.authors.join('; ') + (p.year ? ` (${p.year})` : '') + '\n\n' : ''}` : `# ${vwTitle()}\n\n`;
   const md = head + L.map(a => `- **p. ${a.p + 1}** · ${a.k === 'note' ? 'Nota' : a.k === 'area' ? 'Zona' : 'Subrayado'} (${name[a.c] || a.c})${a.t ? `\n  > ${a.t.replace(/\n/g, ' ')}` : ''}${a.m ? `\n  ${a.m.replace(/\n/g, '\n  ')}` : ''}`).join('\n') + '\n';
   download(md, (vwTitle().replace(/[\\/:*?"<>|]+/g, ' ').slice(0, 80).trim() || 'anotaciones') + ' - anotaciones.md', 'text/markdown');
@@ -1209,7 +1209,7 @@ function vwFs(on) {
    la barra sigue ocupando su sitio, como siempre; desde que se oculta, flota (clase tbx) hasta salir. */
 function vwTbHide(h) { const d = $('#vw'); VW.tbHide = h; d.classList.toggle('tbh', h); if (h) d.classList.add('tbx'); }
 function vwBars() { const d = $('#vw'); d.classList.add('fsbars'); d.style.setProperty('--vwhh', (vw$('.vwh')?.offsetHeight || 49) + 'px'); clearTimeout(VW.barT); VW.barT = setTimeout(() => d.classList.remove('fsbars'), 3000); }
-function vwPgTip() { const t = $('#vwPgTip'); if (!VW.pages.length) return; VW.tipPg = VW.cur; t.textContent = `Página ${VW.cur + 1} de ${VW.pages.length}`; t.hidden = false; clearTimeout(VW.pgT); VW.pgT = setTimeout(() => t.hidden = true, 3000); }
+function vwPgTip() { const t = $('#vwPgTip'); if (!VW.pages.length) return; VW.tipPg = VW.cur; const lf = lnLeftOn() && lnLeftPdf(); t.textContent = `Página ${VW.cur + 1} de ${VW.pages.length}${lf ? ' · ' + lf : ''}`; t.hidden = false; clearTimeout(VW.pgT); VW.pgT = setTimeout(() => t.hidden = true, 3000); }
 function vwTaps(x, y) {   // toques seguidos en una zona vacía: 2 → colores, 3 → barras
   const now = Date.now(), L = VW.taps = (VW.taps || []).filter(t => now - t.t < 450 && Math.hypot(t.x - x, t.y - y) < 40); L.push({x, y, t: now});
   clearTimeout(VW.tapT);
@@ -1300,8 +1300,8 @@ function vwCfgHtml(ep) {
     <div class="ctxh">🖍 Al cambiar el color de un subrayado</div>${b(annColOnly(), 'annColSet(1)', '🎯 Solo cambia ese subrayado')}${b(!annColOnly(), 'annColSet(0)', 'Ese y los siguientes (también el color para subrayar)')}
     ${ep ? '' : `<hr><div class="ctxh">👆 Gestos de zoom</div>${b(VW.zPinch, `vwRdSet('zPinch',${VW.zPinch ? 0 : 1})`, '🤏 Pellizcar con dos dedos')}${b(VW.zDbl, `vwRdSet('zDbl',${VW.zDbl ? 0 : 1})`, '👆 Doble toque: acercar y volver a ajustar', 'En pantalla completa el doble toque sigue sacando los colores')}
     <hr><div class="ctxh">⛶ Pantalla completa: pestaña ▾ de la barra oculta</div>${[['l', '◧ A la izquierda'], ['c', '▣ En el centro'], ['r', '◨ A la derecha']].map(([v, t]) => b(VW.tbPos === v, `vwTabPos('${v}')`, t)).join('')}
-    <hr><div class="ctxh">🌙 Modo noche</div>${[['off', 'No'], ['on', 'Sí'], ['auto', 'Como el sistema (modo oscuro)']].map(([v, t]) => b(vwNightPref() === v, `vwNight('${v}')`, t)).join('')}`}
-    ${rdCfgHtml(b)}
+    <hr><div class="ctxh">🌙 Modo noche y sepia</div>${[['off', '☀ Normal'], ['sepia', '📜 Sepia (más cálido)'], ['on', '🌙 Noche'], ['auto', 'Como el sistema (noche con el modo oscuro)']].map(([v, t]) => b(vwNightPref() === v, `vwNight('${v}')`, t)).join('')}`}
+    ${rdCfgHtml(b, ep)}
     <hr><div class="ctxh">Aa Tamaño del texto de la interfaz</div><div class="epmrow">${UI_FZ.map(z => `<button data-keep class="${uiFz() === z ? 'on' : ''}" data-onclick="uiFzSet(${z});${me}">${Math.round(z * 100)} %</button>`).join('')}</div>
     <hr><div class="ctxh">📂 Al abrir</div>${desk ? `${b(db.settings.pdfTab !== 'app', "setCfg('pdfTab','tab')", 'Los PDF, en una pestaña nueva')}${b(db.settings.pdfTab === 'app', "setCfg('pdfTab','app')", 'Los PDF, dentro de la aplicación')}` : ''}${b(vwSideOn(), `vwSidePref(${vwSideOn() ? 0 : 1})`, 'Con el panel de anotaciones abierto (pantallas anchas)')}
     ${pf ? b(pdfVisOf(pf), 'vwVis()', '☁ Guardar este PDF también en mi Drive normal (con los subrayados)') : ''}

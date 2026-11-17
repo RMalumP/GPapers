@@ -44,7 +44,7 @@ with sync_playwright() as pw:
     def pick(t):
         ok = A.evaluate("t => { const b = [...document.querySelectorAll('#vwMenu button')].find(b => b.textContent.includes(t)); if (b) b.click(); return !!b; }", t); A.wait_for_timeout(150)
         if not ok: eq('opción del menú: ' + t, False, True)
-    pick('Solo cambia ese subrayado'); pick('🤏 Pellizcar'); pick('A la derecha'); pick('Sí'); pick('Siempre')
+    pick('Solo cambia ese subrayado'); pick('🤏 Pellizcar'); pick('A la derecha'); pick('🌙 Noche'); pick('Siempre')
     eq('las opciones se aplican (color, gesto, pestaña, noche, modo ligero)', A.evaluate("[annColOnly(), VW.zPinch, VW.tbPos, vwNightPref(), $('#vw').classList.contains('night'), vwLitePref(), VW.lite, $('#vw').classList.contains('lite')]"), [True, False, 'r', 'on', True, 'on', True, True])
     eq('y el menú sigue abierto, marcándolas', A.evaluate("[!$('#vwMenu').hidden, [...document.querySelectorAll('#vwMenu button')].find(b => b.textContent.includes('Solo cambia ese')).textContent.startsWith('✓')]"), [True, True])
     pick('Los PDF, en una pestaña nueva'); pick('Con el panel de anotaciones')

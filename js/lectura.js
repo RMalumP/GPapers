@@ -17,9 +17,11 @@ const lnPref = () => { try { return localStorage.getItem(LN_K) === 'go' ? 'go' :
 function lnSet(v) { try { localStorage.setItem(LN_K, v === 'go' ? 'go' : 'prev'); } catch (e) {} }
 const wlPref = () => { try { const v = localStorage.getItem(WL_K); return v === 'auto' || v === 'off' ? v : 'read'; } catch (e) { return 'read'; } };
 function wlSetPref(v) { try { localStorage.setItem(WL_K, v); } catch (e) {} wlSync(); }
-function rdCfgHtml(b) {   // lo de esta parte en ⚙ Ajustes del visor (PDF y EPUB)
+function rdCfgHtml(b, ep) {   // lo de esta parte en ⚙ Ajustes del visor (PDF y EPUB)
   const lp = lnPref(), wp = wlPref();
-  return `<hr><div class="ctxh">🔗 Al tocar un enlace o una cita</div>${b(lp === 'prev', "lnSet('prev')", '👁 Ver antes una vista previa', 'La referencia, la figura o la nota salen en una ventanita sin moverte de donde lees')}${b(lp === 'go', "lnSet('go')", '➜ Ir directamente (con ↩ Volver)')}
+  return `<hr><button data-keep data-onclick="annLblMenu(${ep ? 'true' : 'false'})">🏷 Significado de los colores <small class="vwsub">${Object.keys(annLbls()).length || 'sin nombres'} ›</small></button>
+    ${b(lnLeftOn(), `lnLeftSet(${lnLeftOn() ? 0 : 1})`, '⏱ Ver el tiempo que falta para terminar (≈, a tu ritmo)')}
+    <hr><div class="ctxh">🔗 Al tocar un enlace o una cita</div>${b(lp === 'prev', "lnSet('prev')", '👁 Ver antes una vista previa', 'La referencia, la figura o la nota salen en una ventanita sin moverte de donde lees')}${b(lp === 'go', "lnSet('go')", '➜ Ir directamente (con ↩ Volver)')}
     ${'wakeLock' in navigator ? `<hr><div class="ctxh">🔆 Pantalla encendida</div>${[['read', 'Mientras lees (se apaga tras 5 min sin tocar)'], ['auto', 'Solo mientras la página baja sola (⏬)'], ['off', 'Como el sistema']].map(([v, t]) => b(wp === v, `wlSetPref('${v}')`, t)).join('')}` : ''}`;
 }
 
@@ -219,3 +221,92 @@ function lnEpFindPick(j) {
   if (vwMv()) epSideClose(); else document.querySelectorAll('#epSide .lnres .vwi').forEach((b, k) => b.classList.toggle('on', k === j));
 }
 function lnEpFindUi() { const b = $('#epQL'); if (b) b.hidden = !EP.find.hits.length; if (EP.side && EP.tab === 'find') epSideDraw(); }
+
+/* ===== Colores con significado, más opciones con la selección, sepia y tiempo que falta (v39.51, PDF y EPUB) =====
+   · Significado de los colores (⚙ Ajustes del visor → 🏷): un nombre para cada color («Idea clave», «Crítica»…). Va en los ajustes comunes
+     (db.settings.annLbl = {'#ffd400': 'Idea clave', …}: se sincroniza) y sale en los colores, en los filtros del panel, en la ventanita de cada
+     anotación y al copiar o llevar las anotaciones a las notas, que se agrupan por significado.
+   · ⋯ en la barra de la selección: ❝ Copiar con la cita («…» (Pérez, 2024, p. 3)), 📖 definición (RAE o Cambridge), 🌐 traducir y 🎓 Google
+     Académico. Lo de fuera se abre en una pestaña nueva y solo se envía el texto elegido, y solo al pulsarlo.
+   · Sepia también en el PDF (⚙ → 🌙 Modo noche y sepia; gp-vw-night = 'off' | 'sepia' | 'on' | 'auto').
+   · Tiempo que falta: «≈ 12 min», calculado con tu ritmo de lectura en este dispositivo (gp-vw-pace: segundos por página del PDF;
+     gp-ep-pace: letras por minuto del EPUB). Se ve junto al número de páginas (pantallas anchas), en el aviso de página de la pantalla
+     completa y junto al capítulo del EPUB. ⚙ → ⏱ para quitarlo (gp-vw-left). */
+const annLbls = () => db.settings.annLbl && typeof db.settings.annLbl === 'object' ? db.settings.annLbl : {};
+const annLbl = c => annLbls()[c] || '';
+const annColName = c => annLbl(c) || VW_COLORS.find(x => x[0] === c)?.[1] || c;
+function annLblSet(c, v) {
+  if (!VW_COLORS.some(x => x[0] === c)) return; v = String(v || '').replace(/\s+/g, ' ').trim().slice(0, 40); const o = {...annLbls()};
+  if (v) o[c] = v; else delete o[c]; if (Object.keys(o).length) db.settings.annLbl = o; else delete db.settings.annLbl; markDirty(); lnLblApply();
+  if (VW.open && VW.side) vwSideDraw(); if (typeof EP !== 'undefined' && EP.open && EP.side) epSideDraw();
+}
+function lnLblApply() {   // los nombres en los títulos de los botones de color
+  document.querySelectorAll('#vw .vwc[data-c], #ep .vwc[data-c]').forEach(b => { const [c, t] = VW_COLORS[+b.dataset.c] || []; if (!c) return; const l = annLbl(c); b.title = l ? `${t} · ${l}` : t; b.ariaLabel = 'Color ' + (l || t); });
+}
+function annLblMenu(ep) {
+  const back = ep ? 'epCfgMenu()' : 'vwCfgMenu()', L = annLbls();
+  (ep ? epMenu : vwMenu)(ep ? EP.menuR : VW.menuR, `<button data-keep data-onclick="${back}">‹ Volver</button><hr><div class="ctxh">🏷 Significado de cada color</div>
+    ${VW_COLORS.map(([c, t]) => `<label class="lnlbr"><i style="--c:${c}"></i><input type="text" maxlength="40" placeholder="${t}" value="${esc(L[c] || '')}" data-onchange="annLblSet('${c}',this.value)" aria-label="Significado del ${t.toLowerCase()}"></label>`).join('')}
+    <div class="vwhint">Por ejemplo: amarillo, idea clave; rojo, crítica. Sale en los colores, en los filtros y al llevar las anotaciones a las notas (agrupadas). Se guarda con tus ajustes y llega a tus otros dispositivos.</div>`);
+}
+function annFiltChips(all, f, fn) {   // los colores del filtro del panel (con su nombre, si lo tienen)
+  return VW_COLORS.filter(([c]) => all.some(a => a.c === c)).map(([c, t]) => { const l = annLbl(c);
+    return l ? `<button class="lnchip${f === c ? ' on' : ''}" style="--c:${c}" title="Solo ${esc(l)}" data-onclick="${fn}('${c}')"><i></i>${esc(l)}</button>`
+      : `<button class="vwc${f === c ? ' on' : ''}" style="--c:${c}" title="Solo ${t.toLowerCase()}" data-onclick="${fn}('${c}')"></button>`; }).join('');
+}
+
+/* ---- ⋯ en la barra de la selección ---- */
+function lnSelText(ep) { const r = ep ? epSelRange() : vwSelRange(); return r ? r.toString().replace(/\s+/g, ' ').replace(/(\w)- (\w)/g, '$1$2').trim() : ''; }
+function lnSelMore(ep) {
+  const r = ep ? epSelRange() : vwSelRange(); if (!r) return; const t = lnSelText(ep), bar = $(ep ? '#epSel' : '#vwSel').getBoundingClientRect();
+  let pg = 0; if (ep) { const s = r.startContainer.parentElement?.closest('section.epc'); pg = s ? +s.dataset.i : epLoc().i; } else { const L = vwRangeAnn(r); pg = L.length ? L[0].p : VW.cur; }
+  LN.sel = {t: t.slice(0, 4000), pg, ep}; const w = t.split(/\s+/).filter(Boolean).length, one = w > 0 && w <= 3;
+  const m = ep ? epMenu : vwMenu; if (ep) EP.menuR = bar; else VW.menuR = bar;
+  m(bar, `<button data-onclick="lnSelCite()" title="«…» (autor, año, página): para pegarlo en un trabajo">❝ Copiar con la cita</button>
+    ${one ? `<button data-onclick="lnSelWeb('rae')">📖 Definición (RAE)</button><button data-onclick="lnSelWeb('cam')">📖 Definition (Cambridge)</button>` : ''}
+    <button data-onclick="lnSelWeb('tr')">🌐 Traducir al español</button><button data-onclick="lnSelWeb('sch')">🎓 Buscar en Google Académico</button>
+    <div class="vwhint">Lo de fuera se abre en una pestaña nueva y envía solo el texto elegido.</div>`);
+}
+async function lnSelCite() {
+  const s = LN.sel; if (!s?.t) return; const P = s.ep ? epPaperOf() : vwPaper(), ref = P ? annCite(P, s.pg + 1, s.ep) : `(${s.ep ? 'cap.' : 'p.'} ${s.pg + 1})`;
+  await clipText(`«${s.t}» ${ref}`, $(s.ep ? '#ep' : '#vw')); getSelection().removeAllRanges(); $(s.ep ? '#epSel' : '#vwSel').hidden = true; toast('Copiado con la cita.', [], 1600);
+}
+const LN_WEB = {rae: t => 'https://dle.rae.es/' + encodeURIComponent(t.toLowerCase()), cam: t => 'https://dictionary.cambridge.org/dictionary/english/' + encodeURIComponent(t.toLowerCase()),
+  tr: t => 'https://translate.google.com/?sl=auto&tl=es&op=translate&text=' + encodeURIComponent(t.slice(0, 1500)), sch: t => 'https://scholar.google.com/scholar?q=' + encodeURIComponent(t.slice(0, 300))};
+function lnSelWeb(k) { const s = LN.sel, f = LN_WEB[k]; if (!s?.t || !f) return; window.open(f(s.t.replace(/[«»"“”]/g, '').trim()), '_blank', 'noopener'); }
+
+/* ---- Sepia en el PDF ---- */
+const vwTheme = () => { const p = vwNightPref(); return p === 'sepia' ? 'sepia' : vwNightOn() ? 'night' : ''; };
+
+/* ---- Tiempo que falta ---- */
+const LN_LEFT_K = 'gp-vw-left';
+const lnLeftOn = () => { try { return localStorage.getItem(LN_LEFT_K) !== '0'; } catch (e) { return true; } };
+function lnLeftSet(on) { try { localStorage.setItem(LN_LEFT_K, on ? '1' : '0'); } catch (e) {} lnLeftShow(); }
+const lnNum = (k, d, lo, hi) => { try { const v = +localStorage.getItem(k); return v >= lo && v <= hi ? v : d; } catch (e) { return d; } };
+const lnFmtMin = m => { m = Math.max(1, Math.round(m)); return m < 60 ? `≈ ${m} min` : `≈ ${Math.floor(m / 60)} h${m % 60 ? ' ' + (m % 60) + ' min' : ''}`; };
+function lnLeftPdf() { if (!VW.pages.length) return ''; const n = VW.pages.length - VW.cur - (VW.two ? vwSpreadN(vwSpread(VW.cur)) : 1); return n <= 0 ? '' : lnFmtMin(n * lnNum('gp-vw-pace', 75, 5, 1800) / 60); }
+function lnLeftEp() { if (!EP.secs.length) return ''; const l = epLoc(), pos = EP.cum[l.i] + l.f * EP.len[l.i], rest = EP.total - pos; return rest < 200 ? '' : lnFmtMin(rest / lnNum('gp-ep-pace', 1300, 100, 20000)); }
+function lnLeftShow() {
+  const on = lnLeftOn(), a = $('#vwLeft'), b = $('#epLeft');
+  if (a) { const t = on && VW.open ? lnLeftPdf() : ''; a.textContent = t; a.hidden = !t; a.title = t ? `Lo que te falta para terminar, a tu ritmo de lectura (${t.replace('≈ ', '')})` : ''; }
+  if (b) { const t = on && typeof EP !== 'undefined' && EP.open ? lnLeftEp() : ''; b.textContent = t ? ' · ' + t : ''; b.title = t ? 'Lo que te falta para terminar, a tu ritmo de lectura' : ''; }
+}
+const LNP = {pg: -1, t: 0, acc: 0, chars: 0, secs: 0, pos: -1};
+function lnPaceTick() {   // cada 5 s: cuánto tiempo pasas en cada página (o cuántas letras avanzas en el EPUB), solo leyendo (activo hace poco o con el automático)
+  if (!rdOpen() || document.hidden) { LNP.pg = -1; LNP.pos = -1; return; }
+  const active = Date.now() - WL.act < 120e3 || VW.open && VW.auto && !VW.autoPaused || typeof EP !== 'undefined' && EP.open && EP.auto && !EP.autoPaused;
+  if (VW.open && VW.pages.length) {
+    if (LNP.pg !== VW.cur) {
+      if (LNP.pg >= 0 && VW.cur === LNP.pg + (VW.two ? vwSpreadN(vwSpread(LNP.pg)) : 1) && LNP.acc >= 8 && LNP.acc <= 900) {   // pasó a la siguiente: lo que tardó en esa
+        const per = LNP.acc / (VW.two ? vwSpreadN(vwSpread(LNP.pg)) : 1), old = lnNum('gp-vw-pace', 75, 5, 1800); try { localStorage.setItem('gp-vw-pace', Math.round(old * .8 + per * .2)); } catch (e) {} }
+      LNP.pg = VW.cur; LNP.acc = 0;
+    } else if (active) LNP.acc += 5;
+  } else if (typeof EP !== 'undefined' && EP.open && EP.secs.length) {
+    const l = epLoc(), pos = EP.cum[l.i] + l.f * EP.len[l.i];
+    if (LNP.pos >= 0 && active) { const d = pos - LNP.pos; if (d > 0 && d < 6000) { LNP.chars += d; LNP.secs += 5; } else if (d <= 0) LNP.secs += 5; }
+    LNP.pos = pos;
+    if (LNP.secs >= 60) { if (LNP.chars > 150) { const v = LNP.chars / LNP.secs * 60, old = lnNum('gp-ep-pace', 1300, 100, 20000); try { localStorage.setItem('gp-ep-pace', Math.round(old * .8 + Math.min(8000, v) * .2)); } catch (e) {} } LNP.chars = LNP.secs = 0; }
+  }
+  lnLeftShow();
+}
+setInterval(lnPaceTick, 5000);

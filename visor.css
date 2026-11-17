@@ -268,4 +268,11 @@ html.mv .lnback{bottom:calc(64px + env(safe-area-inset-bottom,0px))}
 .vwqL{min-width:28px;min-height:28px;font-size:calc(14px * var(--fz,1))}.vwqL[hidden]{display:none}
 .lnres .vwi b{background:color-mix(in srgb,#ffd400 55%,transparent);font-weight:600;border-radius:3px}
 .lnres{display:flex;flex-direction:column;gap:6px}
-.vwst button[role=tab]{min-width:0;overflow:hidden;text-overflow:ellipsis}.vwst button[role=tab].lntab{flex:0 0 auto}
+.vwst:has(.lntab) button[role=tab]{min-width:0;overflow:hidden;text-overflow:ellipsis}.vwst button[role=tab].lntab{flex:0 0 auto}
+/* v39.51: sepia en el PDF, colores con significado, tiempo que falta */
+#vw.sepia #vwScroll{background:#e9dfc8}#vw.sepia .vwp,#vw.sepia .vwtc0{background:#f4ecd8}#vw.sepia .lnpop .lncv{background:#f4ecd8}
+.lnleft{font-size:calc(12px * var(--fz,1));opacity:.65;white-space:nowrap;font-variant-numeric:tabular-nums}.lnleft[hidden]{display:none}
+@media (max-width:900px){#vwLeft{display:none}}html.mv #vwLeft,html.mv #epLeft{display:none}
+.lnchip{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--bd);border-radius:99px;padding:2px 9px 2px 4px;background:var(--bg);font-size:calc(12px * var(--fz,1));white-space:nowrap}
+.lnchip i{width:14px;height:14px;border-radius:99px;background:var(--c);flex:none}.lnchip.on{outline:2px solid var(--pri);font-weight:600}
+.lnlbr{display:flex;align-items:center;gap:8px;padding:3px 10px}.lnlbr i{width:20px;height:20px;border-radius:99px;background:var(--c);flex:none}.lnlbr input{flex:1;min-width:0;padding:4px 8px}
