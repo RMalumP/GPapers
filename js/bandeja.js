@@ -271,7 +271,7 @@ function annText(p, L, fmt = db.settings.annFmt, ep = false) {   // ep: anotacio
 function annText1(p, L, fmt, ep) {
   const name = new Proxy({}, {get: (_, c) => typeof annColName === 'function' ? annColName(c) : c}), one = s => String(s || '').replace(/\s*\n\s*/g, ' ').trim();
   L = annSorted(L);
-  if (fmt === 'md') return L.map(a => `- **${annPg(a, ep)}** · ${a.k === 'note' ? 'Nota' : a.k === 'area' ? 'Zona' : 'Subrayado'} (${name[a.c] || a.c})${a.t ? `\n  > ${one(a.t)}` : ''}${a.m ? `\n  ${a.m.trim().replace(/\n/g, '\n  ')}` : ''}`).join('\n');
+  if (fmt === 'md') return L.map(a => `- **${annPg(a, ep)}** · ${a.k === 'note' ? 'Nota' : a.k === 'area' ? 'Zona' : a.k === 'ink' ? 'Trazo a mano' : 'Subrayado'} (${name[a.c] || a.c})${a.t ? `\n  > ${one(a.t)}` : ''}${a.m ? `\n  ${a.m.trim().replace(/\n/g, '\n  ')}` : ''}`).join('\n');
   return L.map(a => { const ref = fmt === 'cite' && p ? annCite(p, a.p + 1, ep) : `(${annPg(a, ep)})`;
     return (a.t ? `«${one(a.t)}» ${ref}` : ref) + (a.m ? '\n' + a.m.trim() : ''); }).join('\n\n');
 }

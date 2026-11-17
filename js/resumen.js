@@ -1,7 +1,7 @@
 /* ---- Resumen de anotaciones (Exportar → «🖍 Resumen de anotaciones…») ----
    Para los papers del alcance de Exportar (seleccionados, los visibles con los filtros o todos), en su orden: la cita completa
    en el estilo elegido y debajo sus subrayados, zonas y notas, por página y de arriba abajo. Se descarga en Word (.docx), PDF o Markdown. */
-const SUM_KIND = a => a.k === 'note' ? 'Nota' : a.k === 'area' ? 'Zona' : 'Subrayado';
+const SUM_KIND = a => a.k === 'note' ? 'Nota' : a.k === 'area' ? 'Zona' : a.k === 'ink' ? 'Trazo a mano' : 'Subrayado';
 function sumData() {
   const o = ex(), L = exList();
   return L.map(p => ({p, cite: cite(p, o), pdfs: PDF_N.map(n => p[pdfF(n)]).filter(pf => pf && Array.isArray(pf.ann) && pf.ann.length).map(pf => ({name: pf.name || 'PDF', ep: isEpub(pf.name), L: annSorted(pf.ann)}))}))

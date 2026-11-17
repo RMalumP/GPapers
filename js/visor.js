@@ -106,7 +106,7 @@ async function vwOpen(src, file) {
   $('#vwQ').value = ''; $('#vwQn').textContent = ''; vwPopClose(); $('#vwSel').hidden = true; if (VW.sideNext) VW.tab = 'ann'; VW.side = VW.sideNext || !document.documentElement.classList.contains('mv') && innerWidth > 1100 && vwSideOn(); VW.sideNext = false; vwSideShow();
   vw$('.vwnb').hidden = src?.kind !== 'paper';
   Object.assign(VW, vwRdGet(), {cropM: null, zLock: false}); vwRdClass(); vwCropShow(); VW.theme = vwTheme(); VW.night = VW.theme === 'night'; d.classList.toggle('night', VW.night); d.classList.toggle('sepia', VW.theme === 'sepia'); lnLblApply(); d.classList.toggle('tsel', tsWant()); VW.lite = vwLiteWant(); d.classList.toggle('lite', VW.lite); VW.toc = null; VW.thIo?.disconnect();
-  if (!d.open) d.showModal(); vwModeShow(); vwColorShow(); vwCount(); lnClose(); lnBackClear(); $('#vwQL').hidden = true; wlPoke();
+  if (!d.open) d.showModal(); vwModeShow(); vwColorShow(); vwCount(); lnClose(); lnBackClear(); $('#vwQL').hidden = true; wlPoke(); if (P2.doc) p2Close();
   if (!VW.pushed && !VW_TAB) { try { history.pushState({vw: 1}, ''); VW.pushed = true; } catch (e) {} }   // el botón «atrás» del móvil cierra el visor
   try {
     const L = await vwLib(); if (gen !== VW.gen) return;
@@ -150,7 +150,7 @@ function vwAskPass(wrong) {   // contraseña de un PDF protegido
 async function vwClose(fromPop, keepHist) {
   if (!VW.open) return; vwAutoStop(); if (VW.fs) vwFs(false); vwSaveComment(); vwNotesClose(true);
   const src = VW.src; vwPageSave(true);
-  VW.open = false; VW.gen++; VW.io?.disconnect(); VW.queue.clear();
+  if (!SAY.ep) sayStop(true); p2Close(); VW.open = false; VW.gen++; VW.io?.disconnect(); VW.queue.clear();
   for (const p of VW.pages) { try { p.task?.cancel(); } catch (e) {} p.proxy?.cleanup(); }
   if (VW.doc && src && VW.file) vwKeepPut({key: vwSrcKey(src), size: VW.file.size, doc: VW.doc, txt: VW.find.txt}); else try { VW.doc?.destroy(); } catch (e) {}
   VW.doc = null; VW.pages = []; VW.file = null; $('#vwPages').innerHTML = ''; vwPopClose(); $('#vwSel').hidden = true; lnClose(); lnBackClear(); wlSync();
@@ -232,6 +232,7 @@ function vwEsc() {
   if (vwConcTap()) return;   // modo concentración: Esc saca las barras
   const m = $('#vwMenu'); if (m && !m.hidden) { m.hidden = true; return $('#vwMoreB').focus(); }   // un menú abierto: Esc lo cierra (no el visor)
   if (lnShown()) return lnClose();
+  if (SAY.on && !SAY.ep) return sayStop();
   if (!$('#vwCol').hidden) return vwColClose();
   if (VW.fs) return vwFs(false);
   if (vwDocked()) return vwNotesClose();
@@ -441,10 +442,10 @@ function vwAnnPage(p) {
   if (!L.length) { p.annWait = false; p.annSig = ''; if (layer.childElementCount) layer.innerHTML = ''; return; }
   if (!vwVp(p)) { p.annWait = true; if (p.vis) vwAnnFetch(p); return; }
   p.annWait = false;
-  const sig = JSON.stringify(L.map(a => [a.id, a.k, a.c, a.s || '', a.m || '', a.q, VW.pop === a.id]));   // v39.45: si no cambió nada en esta página, no se repinta (crear o cambiar uno repinta solo su página)
+  const sig = JSON.stringify(L.map(a => [a.id, a.k, a.c, a.s || '', a.m || '', a.q, a.g?.length || 0, VW.pop === a.id]));   // v39.45: si no cambió nada en esta página, no se repinta (crear o cambiar uno repinta solo su página)
   if (sig === p.annSig && layer.childElementCount) return; p.annSig = sig;
   layer.innerHTML = L.map(a => { const B = vwBoxes(p, a.q); return a.k === 'note' ? B.slice(0, 1).map(b => `<button class="vwnote" data-a="${a.id}" style="left:${vwPx(b.x)};top:${vwPx(b.y)};--c:${a.c}" title="${esc(a.m || 'Nota')}" aria-label="Nota">🗒</button>`).join('')
-    : B.map(b => `<i class="vwhl${a.k === 'area' ? ' area' : a.s === 'u' ? ' u' : a.s === 'x' ? ' x' : ''}${a.m ? ' cm' : ''}${VW.pop === a.id ? ' on' : ''}" data-a="${a.id}" style="left:${vwPx(b.x)};top:${vwPx(b.y)};width:${vwPx(b.w)};height:${vwPx(b.h)};--c:${a.c}"></i>`).join('')
+    : (a.k === 'ink' ? lnInkSvg(p, a) : '') + B.map(b => `<i class="vwhl${a.k === 'ink' ? ' ink' : a.k === 'area' ? ' area' : a.s === 'u' ? ' u' : a.s === 'x' ? ' x' : ''}${a.m ? ' cm' : ''}${VW.pop === a.id ? ' on' : ''}" data-a="${a.id}" style="left:${vwPx(b.x)};top:${vwPx(b.y)};width:${vwPx(b.w)};height:${vwPx(b.h)};--c:${a.c}"></i>`).join('')
       + (a.m ? (b => b ? `<i class="vwcmk" data-a="${a.id}" style="left:calc(${vwPx(b.x + b.w)} + 2px);top:${vwPx(b.y)};--c:${a.c}" title="${esc(a.m)}">💬</i>` : '')(B.at(-1)) : ''); }).join('');   // 💬: tiene comentario (se toca para verlo)
 }
 function vwAnnFetch(p) {   // pide a PDF.js la geometría de la página (una sola vez) y pinta solo sus subrayados
@@ -579,7 +580,7 @@ function tsClear() { getSelection().removeAllRanges(); }
 
 /* ---- Herramientas: seleccionar, subrayar arrastrando, zona y nota ---- */
 function vwMode(m) { VW.mode = VW.mode === m && m !== 'sel' ? 'sel' : m; vwModeShow(); getSelection().removeAllRanges(); $('#vwSel').hidden = true; }
-function vwModeShow() { document.querySelectorAll('#vw .vwm[data-m]').forEach(b => b.classList.toggle('on', b.dataset.m === VW.mode)); $('#vw').dataset.mode = VW.mode; }
+function vwModeShow() { document.querySelectorAll('#vw .vwm[data-m]').forEach(b => b.classList.toggle('on', b.dataset.m === VW.mode)); $('#vw').dataset.mode = VW.mode; lnInkShow(); }
 /* Al cambiar el color de un subrayado (v39.45, ⋯ → 📖 Modo de lectura, PDF y EPUB): «ese y los siguientes» (como siempre: también pasa a ser
    el color para subrayar) o «solo ese» (el color para subrayar no cambia). Se recuerda en el dispositivo (gp-ann-col). */
 const ANN_COL_K = 'gp-ann-col';
@@ -661,6 +662,7 @@ function vwDown(e) {
   if (VW.mode === 'hl') { const c = vwCaret(e.clientX, e.clientY), sc = $('#vwScroll');
     if (e.pointerType !== 'mouse' && !e.target.closest('.textLayer span')) { VW.pan = {x: e.clientX, y: e.clientY, l: sc.scrollLeft, t: sc.scrollTop, id: e.pointerId}; e.preventDefault(); try { sc.setPointerCapture(e.pointerId); } catch (er) {} return; }   // con el dedo fuera del texto (márgenes, huecos): mueve la página
     VW.drag = {kind: 'hl', p, a: c, x: e.clientX, y: e.clientY, id: e.pointerId, touch: e.pointerType !== 'mouse'}; e.preventDefault(); $('#vwScroll').setPointerCapture(e.pointerId); getSelection().removeAllRanges(); }
+  else if (VW.mode === 'ink') lnInkDown(e, p);
   else if (VW.mode === 'area') { VW.drag = {kind: 'area', p, x: e.clientX, y: e.clientY, id: e.pointerId}; e.preventDefault(); $('#vwScroll').setPointerCapture(e.pointerId); }
   else VW.tap = {x: e.clientX, y: e.clientY, t: Date.now()};
   if (VW.fs && !e.target.closest('.textLayer span')) { clearTimeout(VW.lpT); const x = e.clientX, y = e.clientY; VW.lpT = setTimeout(() => { if (VW.tap && !VW.drag) { VW.tap = null; vwBars(); } }, 550); }
@@ -674,7 +676,8 @@ function vwMove(e) {
     const r = document.createRange(), s = getSelection(), ord = g.a.n === c.n ? g.a.o <= c.o : !!(g.a.n.compareDocumentPosition(c.n) & Node.DOCUMENT_POSITION_FOLLOWING);
     let [A, B] = ord ? [g.a, c] : [c, g.a]; if (g.touch) { A = vwSnap(A, true); B = vwSnap(B, false); }   // con el dedo, palabras enteras (luego se afina con los tiradores)
     r.setStart(A.n, A.o); r.setEnd(B.n, B.o); s.removeAllRanges(); s.addRange(r);
-  } else if (g.kind === 'area') {
+  } else if (g.kind === 'ink') lnInkMove(e, g);
+  else if (g.kind === 'area') {
     let box = $('#vwBox'); if (!box) { box = document.createElement('div'); box.id = 'vwBox'; document.body.append(box); }
     const d = $('#vw'); if (box.parentElement !== d) d.append(box);
     Object.assign(box.style, {left: Math.min(g.x, e.clientX) + 'px', top: Math.min(g.y, e.clientY) + 'px', width: Math.abs(e.clientX - g.x) + 'px', height: Math.abs(e.clientY - g.y) + 'px', '--c': VW_COLORS[VW.color][0]});
@@ -683,9 +686,10 @@ function vwMove(e) {
 function vwUp(e) {
   clearTimeout(VW.lpT);
   const pn = VW.pan; if (pn && pn.id === e.pointerId) { VW.pan = null; const hp = !!VW.pop; if (e.type !== 'pointercancel' && Math.hypot(e.clientX - pn.x, e.clientY - pn.y) < 8 && !vwConcTap() && !vwTapAt(e.clientX, e.clientY) && !vwReadTap(e.clientX, hp)) vwEmptyTap(e.clientX, e.clientY); return; }
-  const g = VW.drag; if (e.type === 'pointercancel') { VW.drag = null; VW.tap = null; $('#vwBox')?.remove(); return; }
+  const g = VW.drag; if (e.type === 'pointercancel') { if (g?.kind === 'ink') lnInkUp(g, true); VW.drag = null; VW.tap = null; $('#vwBox')?.remove(); return; }
   if (g && g.id === e.pointerId) {
     VW.drag = null; $('#vwBox')?.remove();
+    if (g.kind === 'ink') return lnInkUp(g);
     if (g.kind === 'hl') { if (vwSelRange()) vwFromSel(VW.color); else vwTapAt(e.clientX, e.clientY); return; }
     if (g.kind === 'area') {
       const p = g.p, pr = vwVisRect(p), cl = (v, a, b) => Math.min(b, Math.max(a, v));
@@ -715,7 +719,7 @@ function vwTapAt(x, y) {   // tocar un subrayado o una zona abre su ventanita
 function vwPopOpen(id, focus) {
   vwSaveComment(); const a = vwAnns().find(x => x.id === id); if (!a) return;
   VW.pop = id; const pp = $('#vwPop'), paper = vwPaper(), P = paper && db.papers.find(p => p.id === paper.id);
-  pp.innerHTML = `<div class="vwpoph"><span class="vwk">${a.k === 'note' ? '🗒 Nota' : a.k === 'area' ? '▭ Zona' : '🖍 Subrayado'} · p. ${a.p + 1}${annLbl(a.c) ? ' · ' + esc(annLbl(a.c)) : ''}</span><span class="vwcs">${VW_COLORS.map(([c, t], i) => `<button class="vwc${a.c === c ? ' on' : ''}" style="--c:${c}" title="${t}" aria-label="Color ${t}" data-onclick="vwPopColor(${i})"></button>`).join('')}</span><button class="vwib" data-onclick="vwPopClose()" aria-label="Cerrar">✕</button></div>
+  pp.innerHTML = `<div class="vwpoph"><span class="vwk">${a.k === 'note' ? '🗒 Nota' : a.k === 'area' ? '▭ Zona' : a.k === 'ink' ? '✏ Trazo a mano' : '🖍 Subrayado'} · p. ${a.p + 1}${annLbl(a.c) ? ' · ' + esc(annLbl(a.c)) : ''}</span><span class="vwcs">${VW_COLORS.map(([c, t], i) => `<button class="vwc${a.c === c ? ' on' : ''}" style="--c:${c}" title="${t}" aria-label="Color ${t}" data-onclick="vwPopColor(${i})"></button>`).join('')}</span><button class="vwib" data-onclick="vwPopClose()" aria-label="Cerrar">✕</button></div>
     ${a.t ? `<blockquote class="vwq">${esc(a.t.length > 400 ? a.t.slice(0, 400) + '…' : a.t)}</blockquote>` : ''}
     <textarea id="vwCm" rows="3" placeholder="${a.k === 'note' ? 'Escribe la nota…' : 'Comentario (opcional)…'}" data-oninput="vwCmIn()">${esc(a.m || '')}</textarea>
     <div class="row vwpopb">${a.k === 'hl' ? lnStyRow(a, 'vwPopStyle') : ''}${a.t ? '<button data-onclick="vwPopCopy()" title="Copiar el texto subrayado">📋 Copiar</button>' : ''}${P ? '<button data-onclick="vwToNote()" title="Añadir a las notas del paper, con la página, para citarlo">📝 A las notas</button>' : ''}<button class="danger" data-onclick="vwPopDel()">🗑 Borrar</button></div>`;
@@ -768,7 +772,7 @@ function vwAnnDraw(s, head) {
   const all = vwAnns(), f = VW.filt, k = VW.kind || '', L = vwSideList(), nH = all.filter(a => vwKindOf(a) === 'hl').length, nN = all.length - nH;
   const fr = VW.foreign || [], frV = fr.filter(x => !x.dup && !all.some(a => a.src === x.id));
   const pk = VW.pick, n = pk?.size || 0;
-  const item = a => `<button class="vwi${VW.pop === a.id || pk?.has(a.id) ? ' on' : ''}" style="--c:${a.c}" data-onclick="vwPick('${a.id}')"${pk ? ` aria-pressed="${pk.has(a.id)}"` : ''}><small>${pk ? (pk.has(a.id) ? '☑ ' : '☐ ') : ''}p. ${a.p + 1} · ${a.k === 'note' ? '🗒 Nota' : a.k === 'area' ? '▭ Zona' : '🖍'}</small>${a.t ? `<span class="vwit">${esc(a.t.length > 220 ? a.t.slice(0, 220) + '…' : a.t)}</span>` : ''}${a.m ? `<span class="vwim">💬 ${esc(a.m.length > 300 ? a.m.slice(0, 300) + '…' : a.m)}</span>` : ''}</button>`;
+  const item = a => `<button class="vwi${VW.pop === a.id || pk?.has(a.id) ? ' on' : ''}" style="--c:${a.c}" data-onclick="vwPick('${a.id}')"${pk ? ` aria-pressed="${pk.has(a.id)}"` : ''}><small>${pk ? (pk.has(a.id) ? '☑ ' : '☐ ') : ''}p. ${a.p + 1} · ${a.k === 'note' ? '🗒 Nota' : a.k === 'area' ? '▭ Zona' : a.k === 'ink' ? '✏ Trazo' : '🖍'}</small>${a.t ? `<span class="vwit">${esc(a.t.length > 220 ? a.t.slice(0, 220) + '…' : a.t)}</span>` : ''}${a.m ? `<span class="vwim">💬 ${esc(a.m.length > 300 ? a.m.slice(0, 300) + '…' : a.m)}</span>` : ''}</button>`;
   const grp = !k && nH && nN ? [['hl', '🖍 Subrayados'], ['note', '🗒 Notas']].map(([g, n]) => { const G = L.filter(a => vwKindOf(a) === g); return G.length ? `<h4 class="vwgh">${n} (${G.length})</h4>${G.map(item).join('')}` : ''; }).join('') : L.map(item).join('');
   s.innerHTML = `${head}<div class="vwsh">${all.length ? `<span class="vwkd" role="group" aria-label="Tipo"><button class="${k ? '' : 'on'}" data-onclick="vwKind('')">Todas ${all.length}</button><button class="${k === 'hl' ? 'on' : ''}" data-onclick="vwKind('hl')" title="Subrayados y zonas">🖍 Subrayados ${nH}</button><button class="${k === 'note' ? 'on' : ''}" data-onclick="vwKind('note')" title="Notas adhesivas">🗒 Notas ${nN}</button></span><button class="vwpk${pk ? ' on' : ''}" data-onclick="vwPickToggle()" title="Elegir varias para borrarlas, copiarlas o llevarlas a las notas">${pk ? '✓ Elegir' : '☐ Elegir'}</button>` : '<b>Anotaciones</b>'}</div>
     ${pk ? `<div class="vwpkb"><button data-onclick="vwPickAll()">${L.length && L.every(a => pk.has(a.id)) ? '☐ Ninguna' : '☑ Todas las de la lista'}</button><button class="danger" data-onclick="vwPickDel()" ${n ? '' : 'disabled'}>🗑 Borrar${n ? ` (${n})` : ''}</button></div>` : ''}
@@ -836,7 +840,7 @@ const vwPC = () => VW.night ? {background: '#1c1e23', foreground: '#dcdde1'} : V
 function vwNight(v) { try { localStorage.setItem('gp-vw-night', v); } catch (e) {} vwNightApply(); }
 function vwNightApply() {
   const th = vwTheme(); if (!VW.open || VW.theme === th) return; VW.theme = th; VW.night = th === 'night'; $('#vw').classList.toggle('night', VW.night); $('#vw').classList.toggle('sepia', th === 'sepia');
-  VW.pages.forEach(p => { if (p.cv) { p.rs = 0; VW.queue.add(p.i); } }); vwPump(); if (VW.side && VW.tab === 'th') vwSideDraw();
+  VW.pages.forEach(p => { if (p.cv) { p.rs = 0; VW.queue.add(p.i); } }); vwPump(); if (VW.side && VW.tab === 'th') vwSideDraw(); p2Redraw();
 }
 try { matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => vwNightApply()); } catch (e) {}
 function vwJump(id) {
@@ -859,7 +863,7 @@ async function vwForeign(gen) {
         if (qp) for (let k = 0; k + 7 < qp.length; k += 8) { const xs = [qp[k], qp[k + 2], qp[k + 4], qp[k + 6]], ys = [qp[k + 1], qp[k + 3], qp[k + 5], qp[k + 7]]; q.push(Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)); }
         else q.push(...a.rect);
         const c = a.color ? '#' + [...a.color].map(v => v.toString(16).padStart(2, '0')).join('') : '#ffd400';
-        out.push({id: a.id, p: p.i, sub: VW_FSUB[a.subtype], k: a.subtype === 'Text' || a.subtype === 'FreeText' ? 'note' : /Highlight|Underline|StrikeOut|Squiggly/.test(a.subtype) ? 'hl' : 'area',
+        out.push({id: a.id, p: p.i, sub: VW_FSUB[a.subtype], k: a.subtype === 'Text' || a.subtype === 'FreeText' ? 'note' : /Highlight|Underline|StrikeOut|Squiggly/.test(a.subtype) ? 'hl' : a.subtype === 'Ink' && a.inkLists?.length ? 'ink' : 'area', ...(a.subtype === 'Ink' && a.inkLists?.length ? {g: a.inkLists.slice(0, 60).map(s => [...s].slice(0, 2000))} : {}),
           q: a.subtype === 'Text' ? [a.rect[0], a.rect[3], a.rect[0], a.rect[3]] : q, c, ...(a.subtype === 'Underline' ? {s: 'u'} : a.subtype === 'StrikeOut' ? {s: 'x'} : {}), m: a.contentsObj?.str || '', who: a.titleObj?.str || ''}); }
     } catch (e) {}
     if (p.i % (VW.lite ? 3 : 10) === (VW.lite ? 2 : 9)) await new Promise(r => vwIdle(r));
@@ -894,7 +898,7 @@ function vwNear(hex) {   // el color de la paleta más parecido
 }
 function vwImport(ids) {   // ids: solo esas (si no, todas las que traía el PDF)
   const mine = vwAnns(), L = (VW.foreign || []).filter(f => !f.dup && !mine.some(a => a.src === f.id) && (!ids || ids.includes(f.id))); if (!L.length) return;
-  const now = vwNow(); vwMut(l => { for (const f of L) l.push({id: uid(), k: f.k, p: f.p, q: f.q.map(v => Math.round(v * 100) / 100), c: vwNear(f.c), ...(f.s ? {s: f.s} : {}), ...(f.m ? {m: f.m} : {}), src: String(f.id).slice(0, 60), at: now, up: now}); });
+  const now = vwNow(); vwMut(l => { for (const f of L) l.push({id: uid(), k: f.k, p: f.p, q: f.q.map(v => Math.round(v * 100) / 100), c: vwNear(f.c), ...(f.s ? {s: f.s} : {}), ...(f.g ? {g: f.g.map(s => s.map(v => Math.round(v * 10) / 10))} : {}), ...(f.m ? {m: f.m} : {}), src: String(f.id).slice(0, 60), at: now, up: now}); });
   vwHideDups(); toast(`${L.length} ${L.length === 1 ? 'anotación ahora es editable' : 'anotaciones ahora son editables'}.`, [], 3000);
 }
 
@@ -944,7 +948,7 @@ function vwFindMark(p) {
 /* ---- Más: descargar, ficha del paper, abrir con el navegador, dónde se guarda ---- */
 function vwMore(e) {
   e.stopPropagation(); const r = VW.menuR = e.currentTarget.getBoundingClientRect(), paper = vwPaper(), P = paper && db.papers.find(p => p.id === paper.id), pf = vwHolders()[0];
-  vwMenu(r, `<button data-keep data-onclick="vwReadMenu()">📖 Modo de lectura <small class="vwsub">${esc(vwRdSum())} ›</small></button><button data-keep data-onclick="vwBmMenu()">🔖 Marcadores <small class="vwsub">${vwBms().length || 'ninguno'} ›</small></button><button data-keep data-onclick="vwCfgMenu()">⚙ Ajustes del visor <small class="vwsub">›</small></button><hr><button data-onclick="vwOut()">⬇ Descargar el PDF con las anotaciones</button>${vwAnns().length ? '<button data-onclick="vwMd()">⬇ Resumen de subrayados y comentarios (.md)</button>' : ''}
+  vwMenu(r, `<button data-keep data-onclick="vwReadMenu()">📖 Modo de lectura <small class="vwsub">${esc(vwRdSum())} ›</small></button><button data-keep data-onclick="vwBmMenu()">🔖 Marcadores <small class="vwsub">${vwBms().length || 'ninguno'} ›</small></button><button data-keep data-onclick="vwCfgMenu()">⚙ Ajustes del visor <small class="vwsub">›</small></button><hr><button data-onclick="lnInkMode()" title="Dibujar o escribir a mano sobre la página (con el dedo, el lápiz o el ratón)">${tick(VW.mode === 'ink')}✏ Lápiz</button>${p2MenuBtn()}<hr><button data-onclick="vwOut()">⬇ Descargar el PDF con las anotaciones</button>${vwAnns().length ? '<button data-onclick="vwMd()">⬇ Resumen de subrayados y comentarios (.md)</button>' : ''}
     ${vwCanShare() ? `<button data-onclick="vwOther(false)">📲 Abrir en otra app…</button>${vwAnns().length ? '<button data-onclick="vwOther(true)">📲 Abrir en otra app, con las anotaciones…</button>' : ''}` : ''}
     <button data-onclick="vwNative()">↗ Abrir con el visor del navegador</button>${vwAnns().length && !vwCanShare() ? '<button data-onclick="vwOther(true)">↗ Abrir con el visor del navegador, con las anotaciones</button>' : ''}
     ${P && !$('#dlg').open ? '<button data-onclick="vwFicha()">📝 Ficha del paper</button>' : ''}${VW.src?.kind === 'inbox' ? '<button data-onclick="vwCite()">＋ Crear la cita de este PDF</button>' : ''}
@@ -962,7 +966,7 @@ const vwDocked = () => $('#dlg').open && $('#dlg').classList.contains('vwdock');
 function vwNotes() {
   const d = $('#dlg');
   if (vwDocked()) { if (d.classList.contains('vwhide')) { d.classList.remove('vwhide'); return d.querySelector('.ned')?.focus(); } return vwSplitOk() ? vwNotesClose() : vwNotesHide(); }
-  const p = vwPaper(); if (!p || d.open) return;
+  const p = vwPaper(); if (!p || d.open) return; if (P2.doc) p2Close(true);
   VW.dlgNext = d.nextSibling; d.classList.add('vwdock'); vw$('.vwbody').insertBefore(d, $('#vwSide'));
   vw$('.vwbody').insertBefore(vwSplitEl(), d); vwSplitSet(vwSplitGet()); $('#vw').classList.add('vwdk'); vwSplitMode();
   if (VW.side && (vwMv() || innerWidth < 1500)) { VW.side = false; vwSideShow(); }   // sin el panel de anotaciones: el PDF necesita su mitad
@@ -1010,7 +1014,7 @@ function vwVis() {
 function vwMd() {   // resumen en Markdown
   const L = [...vwAnns()].sort((a, b) => a.p - b.p || vwTop(a) - vwTop(b)), name = new Proxy({}, {get: (_, c) => annColName(c)});
   const p = vwPaper(), head = p ? `# ${vwTitle()}\n\n${p.authors?.length ? p.authors.join('; ') + (p.year ? ` (${p.year})` : '') + '\n\n' : ''}` : `# ${vwTitle()}\n\n`;
-  const md = head + L.map(a => `- **p. ${a.p + 1}** · ${a.k === 'note' ? 'Nota' : a.k === 'area' ? 'Zona' : 'Subrayado'} (${name[a.c] || a.c})${a.t ? `\n  > ${a.t.replace(/\n/g, ' ')}` : ''}${a.m ? `\n  ${a.m.replace(/\n/g, '\n  ')}` : ''}`).join('\n') + '\n';
+  const md = head + L.map(a => `- **p. ${a.p + 1}** · ${a.k === 'note' ? 'Nota' : a.k === 'area' ? 'Zona' : a.k === 'ink' ? 'Trazo a mano' : 'Subrayado'} (${name[a.c] || a.c})${a.t ? `\n  > ${a.t.replace(/\n/g, ' ')}` : ''}${a.m ? `\n  ${a.m.replace(/\n/g, '\n  ')}` : ''}`).join('\n') + '\n';
   download(md, (vwTitle().replace(/[\\/:*?"<>|]+/g, ' ').slice(0, 80).trim() || 'anotaciones') + ' - anotaciones.md', 'text/markdown');
 }
 async function vwOut() {   // el PDF con las anotaciones dentro, para Acrobat, Foxit o enviarlo
@@ -1044,6 +1048,10 @@ async function vwPdfOut(file, anns) {
       const [x, y] = a.q; rect = [x, y - 20, x + 20, y];
       const ap = ctx.register(ctx.stream(`${C.map(f3).join(' ')} rg 0.35 0.3 0.1 RG 0.8 w 1 1 18 18 re B 1 w 4.5 14 m 15.5 14 l 4.5 10 m 15.5 10 l 4.5 6 m 12 6 l S`, {Type: 'XObject', Subtype: 'Form', BBox: [0, 0, 20, 20]}));
       dict = {...base, Subtype: 'Text', Rect: rect, Name: 'Comment', Open: false, F: 28, Subj: T('Nota'), Contents: T(a.m || ''), AP: {N: ap}};
+    } else if (a.k === 'ink') {   // v39.53: trazos a mano
+      const [l, b, r, t] = a.q, wd = LN_INK_W; rect = [l - wd, b - wd, r + wd, t + wd];
+      const ap = ctx.register(ctx.stream([`${C.map(f3).join(' ')} RG ${f3(wd)} w 1 J 1 j`, ...a.g.map(s => s.map((v, j) => j % 2 ? `${f3(v)} ${j === 1 ? 'm' : 'l'}` : f3(v)).join(' ') + ' S')].join('\n'), {Type: 'XObject', Subtype: 'Form', BBox: rect}));
+      dict = {...base, Subtype: 'Ink', Rect: rect, InkList: a.g, BS: {W: wd, S: N('S')}, Subj: T('Trazo a mano'), AP: {N: ap}, ...(a.m ? {Contents: T(a.m)} : {})};
     } else {
       const q = [], ops = ['/GS0 gs', `${C.map(f3).join(' ')} rg`]; let x1 = Infinity, y1 = Infinity, x2 = -Infinity, y2 = -Infinity;
       for (let k = 0; k + 3 < a.q.length; k += 4) { const [l, b, r, t] = a.q.slice(k, k + 4); q.push(l, t, r, t, l, b, r, b); ops.push(`${f3(l)} ${f3(b)} ${f3(r - l)} ${f3(t - b)} re f`); x1 = Math.min(x1, l); y1 = Math.min(y1, b); x2 = Math.max(x2, r); y2 = Math.max(y2, t); }
@@ -1293,7 +1301,7 @@ function vwReadMenu() {
     <hr><button data-keep data-onclick="vwAutoMenu()">⏬ Desplazamiento automático <small class="vwsub">${VW.auto ? (VW.autoPaused ? 'en pausa' : 'en marcha') : 'parado'}${vwConcOn() ? ' · concentración' : ''} ›</small></button>
     <hr><button data-onclick="vwRdSet('crop',${VW.crop ? 0 : 1})" title="Quita los márgenes en blanco de las páginas para que el texto se vea más grande">${tick(VW.crop)}✂ Recortar los márgenes${VW.cropM?.hand ? ' (a mano)' : ' (automático)'}</button>
     ${VW.crop ? '<button data-keep data-onclick="lnCropMenu()">✂ Ajustar el recorte… <small class="vwsub">›</small></button>' : ''}
-    <hr><button data-keep data-onclick="lnRotate(VW.cur);vwReadMenu()">↻ Girar la página ${VW.cur + 1}${vwRot(VW.cur) ? ` <small class="vwsub">${vwRot(VW.cur)}°</small>` : ''}</button><button data-keep data-onclick="lnRotate('*');vwReadMenu()">↻ Girar todas las páginas</button>${Object.keys(VW.rot || {}).length ? '<button data-keep data-onclick="lnRotate(null);vwReadMenu()">↺ Quitar los giros</button>' : ''}
+    <hr><button data-keep data-onclick="lnRotate(VW.cur);vwReadMenu()">↻ Girar la página ${VW.cur + 1}${vwRot(VW.cur) ? ` <small class="vwsub">${vwRot(VW.cur)}°</small>` : ''}</button><button data-keep data-onclick="lnRotate('*');vwReadMenu()">↻ Girar todas las páginas</button>${Object.keys(VW.rot || {}).length ? '<button data-keep data-onclick="lnRotate(null);vwReadMenu()">↺ Quitar los giros</button>' : ''}${sayCan() ? '<hr>' + sayMenuBtn(false) : ''}
 `);
 }
 /* ⚙ Ajustes del visor (v39.47, ⋯ → ⚙): lo que se elige una vez y se olvida, fuera de los submenús de lectura. Mismo panel en el PDF y en

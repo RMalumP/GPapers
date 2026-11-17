@@ -222,7 +222,7 @@ async function epOpen(src, file) {
   }
 }
 function epClose(keep) {
-  if (!EP.open) return; epAutoStop(); if (EP.fs) epFs(false); epSaveComment(); epPosSave(true);
+  if (!EP.open) return; epAutoStop(); if (SAY.ep) sayStop(true); if (EP.fs) epFs(false); epSaveComment(); epPosSave(true);
   const src = EP.src; EP.open = false; EP.gen++;
   EP.urls.forEach(u => URL.revokeObjectURL(u)); Object.assign(EP, {urls: [], secs: [], bk: null, file: null, starts: null});
   $('#epDoc').innerHTML = ''; epPopClose(); $('#epSel').hidden = true; const m = $('#epMenu'); if (m) m.hidden = true; lnClose(); LN.ep = []; lnEpBackShow(); EP.txt = null; wlSync();
@@ -606,7 +606,7 @@ function epReadMenu() {
     ${!EP.auto && s.mode === 'page' && s.two ? `${o(!s.one, "epSetPut('one',false)", '⏩ Pasar de dos en dos', '')}${o(s.one, "epSetPut('one',true)", '↪ Pasar de una en una (la derecha pasa a la izquierda)', '')}` : ''}
     <div class="vwhint">Página a página: toca a la izquierda o a la derecha (o desliza, o ← →) para pasar. La doble página necesita una pantalla ancha.</div><hr>
     <button data-onclick="${EP.auto ? 'epAutoStop()' : 'epAutoStart()'}">${EP.auto ? '⏹ Parar el desplazamiento automático' : '⏬ Desplazamiento automático'} <small class="vwsub">A</small></button>
-    <button data-onclick="epConcSet(${vwConcOn() ? 0 : 1})">${tick(vwConcOn())}🧘 Modo concentración <small class="vwsub">C</small></button>`);
+    <button data-onclick="epConcSet(${vwConcOn() ? 0 : 1})">${tick(vwConcOn())}🧘 Modo concentración <small class="vwsub">C</small></button>${sayCan() ? '<hr>' + sayMenuBtn(true) : ''}`);
 }
 function epMode(m) { if (EP.auto) epAutoStop(); const o = epSet(); o.mode = m === 'scroll' ? 'scroll' : 'page'; o.two = m === 'two'; try { localStorage.setItem(EP_SET_K, JSON.stringify(o)); } catch (e) {} epSetApply(true); }
 function epFicha() { const p = epPaperOf(); if (p) openPaper(p.id); }
@@ -621,6 +621,7 @@ function epEsc() {
   if (epConcTap()) return;
   const m = $('#epMenu'); if (m && !m.hidden) { m.hidden = true; return; }
   if (lnShown()) return lnClose();
+  if (SAY.on && SAY.ep) return sayStop();
   if (!$('#epPop').hidden) return epPopClose();
   if (!$('#epSel').hidden) { getSelection().removeAllRanges(); $('#epSel').hidden = true; return; }
   if (EP.findOpen) return epFindToggle(false);

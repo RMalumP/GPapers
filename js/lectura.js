@@ -30,7 +30,7 @@ const WL = {lock: null, act: 0, t: 0, busy: false};
 const rdOpen = () => VW.open || typeof EP !== 'undefined' && EP.open;
 function wlWant() {
   if (document.hidden || !('wakeLock' in navigator) || !rdOpen()) return false; const p = wlPref(); if (p === 'off') return false;
-  const auto = VW.open && VW.auto && !VW.autoPaused || typeof EP !== 'undefined' && EP.open && EP.auto && !EP.autoPaused;
+  const auto = SAY.on && !SAY.paused || VW.open && VW.auto && !VW.autoPaused || typeof EP !== 'undefined' && EP.open && EP.auto && !EP.autoPaused;
   return auto || p === 'read' && Date.now() - WL.act < WL_IDLE;
 }
 async function wlSync() {
@@ -265,7 +265,7 @@ function lnSelMore(ep) {
   m(bar, `<button data-onclick="lnSelCite()" title="«…» (autor, año, página): para pegarlo en un trabajo">❝ Copiar con la cita</button>
     <button data-onmousedown="event.preventDefault()" data-onclick="lnSelStyle('u')" title="Con el color elegido, una línea debajo en vez de resaltar">U̲ Subrayar con una línea</button><button data-onmousedown="event.preventDefault()" data-onclick="lnSelStyle('x')">S̶ Tachar</button>
     ${one ? `<button data-onclick="lnSelWeb('rae')">📖 Definición (RAE)</button><button data-onclick="lnSelWeb('cam')">📖 Definition (Cambridge)</button>` : ''}
-    <button data-onclick="lnSelWeb('tr')">🌐 Traducir al español</button><button data-onclick="lnSelWeb('sch')">🎓 Buscar en Google Académico</button>
+    ${sayCan() ? `<button data-onclick="saySel(${!!ep})">🔊 Leer en voz alta desde aquí</button>` : ''}<button data-onclick="lnSelWeb('tr')">🌐 Traducir al español</button><button data-onclick="lnSelWeb('sch')">🎓 Buscar en Google Académico</button>
     <div class="vwhint">Lo de fuera se abre en una pestaña nueva y envía solo el texto elegido.</div>`);
 }
 async function lnSelCite() {
@@ -368,3 +368,214 @@ function lnRotPage(p) {
   if (p.tl) { p.tl.cancel?.(); p.el.querySelector('.textLayer')?.remove(); p.tl = null; }
   vwAnnPage(p); if (VW.find.q) vwFindMark(p); if (p.vis) VW.queue.add(p.i);
 }
+
+/* ===== Leer en voz alta, lápiz a mano y los dos PDF a la vez (v39.53) =====
+   · 🔊 Leer en voz alta (⋯ → 📖 Modo de lectura, o ⋯ de la barra de la selección: «desde aquí»), PDF y EPUB, con la voz del sistema
+     (speechSynthesis: nada sale a internet). Marca la frase que lee, pasa sola de página o de capítulo y la sigue en la pantalla. Una
+     barrita abajo (⏮ ⏸ ⏭, velocidad, ✕) mientras lee; Esc o cerrar el visor la paran. Velocidad en el dispositivo (gp-vw-say).
+   · ✏ Lápiz (⋯ del PDF): trazos a mano sobre la página (anotación «ink»: g = trazos en coordenadas del PDF). Los trazos seguidos
+     (menos de 2 s entre uno y otro, en la misma página) van juntos en una anotación, que se toca para cambiar el color, comentar o borrar.
+     En el PDF anotado sale como Ink (Acrobat, Foxit), y los dibujos que traía el PDF se traen. Una píldora «✏ Lápiz · ✕» dice que está puesto.
+   · ⧉ Los dos PDF a la vez (⋯, si el paper tiene PDF 1 y PDF 2): el otro, a la derecha (o debajo con la tablet en vertical; en el móvil,
+     encima y se cierra con ✕), solo para leer, con su zoom. El divisor es el de las notas. */
+
+/* ---- 🔊 Leer en voz alta ---- */
+const SAY_K = 'gp-vw-say', SAY_RATES = [.8, 1, 1.2, 1.4, 1.7, 2];
+const SAY = {on: false, ep: false, list: [], k: 0, at: 0, paused: false, gen: 0, lang: 'es-ES'};
+const sayCan = () => 'speechSynthesis' in window && typeof SpeechSynthesisUtterance === 'function';
+function sayRate() { try { const r = +JSON.parse(localStorage.getItem(SAY_K) || '{}').r; return SAY_RATES.includes(r) ? r : 1; } catch (e) { return 1; } }
+function sayRateStep() { const r = SAY_RATES[(SAY_RATES.indexOf(sayRate()) + 1) % SAY_RATES.length]; try { localStorage.setItem(SAY_K, JSON.stringify({r})); } catch (e) {} if (SAY.on && !SAY.paused) sayAgain(); sayBar(); }
+function sayLang(t) { const s = ' ' + String(t).toLowerCase().slice(0, 4000) + ' ', c = rx => (s.match(rx) || []).length; return c(/ (the|of|and|to|is|that|for|with|are|this) /g) > c(/ (el|la|los|las|de|que|y|en|por|con|para|una|del|se) /g) ? 'en-US' : 'es-ES'; }
+function sayVoice(lang) { const V = speechSynthesis.getVoices?.() || [], l = lang.slice(0, 2); return V.find(v => v.lang === lang && v.localService) || V.find(v => v.lang === lang) || V.find(v => v.lang?.slice(0, 2) === l) || null; }
+function saySplit(s, base = 0, out = []) {   // frases [inicio, fin) de un texto; las muy largas, en trozos (en las comas)
+  const one = (x, y) => { while (x < y && /\s/.test(s[x])) x++; while (y > x && /\s/.test(s[y - 1])) y--; if (y > x && /[\p{L}\p{N}]/u.test(s.slice(x, y))) out.push([base + x, base + y]); };
+  const add = (x, y) => { while (y - x > 280) { let c = s.lastIndexOf(', ', x + 250); if (c <= x + 60) c = s.lastIndexOf(' ', x + 250); if (c <= x) c = x + 250; one(x, c + 1); x = c + 1; } one(x, y); };
+  const rx = /[.!?…]+[»"”’')\]]*\s+|\n\s*\n/g; let a = 0, m;
+  while ((m = rx.exec(s))) { const e = m.index + m[0].length; add(a, e); a = e; }
+  add(a, s.length); return out;
+}
+const sayWords = t => String(t || '').replace(/\s+/g, ' ').trim().split(' ').slice(0, 5).map(w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('\\s*');
+async function sayPdfPage(i) {   // las frases de una página del PDF, con sus rectángulos (para marcarlas)
+  const p = VW.pages[i]; if (!p || !VW.doc) return []; p.proxy ||= await VW.doc.getPage(i + 1); vwVp(p);
+  const tc = await p.proxy.getTextContent(), it = []; let s = '';
+  for (const x of tc.items) { if (typeof x.str !== 'string') continue; if (x.str) { it.push({a: s.length, b: s.length + x.str.length, x}); s += x.str; } if (x.hasEOL) s += x.str.endsWith('-') ? '' : ' '; }
+  SAY.lang = sayLang(s);
+  return saySplit(s).map(([a, b]) => {
+    const q = [];
+    for (const o of it) { if (o.b <= a || o.a >= b) continue; const [, , c, d, e, f] = o.x.transform, w = o.x.width, h = Math.hypot(c, d) || o.x.height || 10, n = o.b - o.a, f0 = Math.max(0, a - o.a) / n, f1 = Math.min(n, b - o.a) / n;
+      q.push(e + w * f0, f - h * .25, e + w * f1, f + h * .95); }
+    return {p: i, a, b, t: vwClean(s.slice(a, b)), q};
+  }).filter(c => c.t);
+}
+const EP_BLK = 'p,li,h1,h2,h3,h4,h5,h6,blockquote,td,th,dt,dd,pre,figcaption,caption,div,section';
+function sayEpChap(i) {   // las frases de un capítulo del EPUB (cada párrafo aparte), en posiciones del texto del capítulo (las de los subrayados)
+  const sec = EP.secs[i]; if (!sec) return []; const segs = []; let cur = null, all = '';
+  for (const [n, o] of epTexts(sec)) { const bl = n.parentElement?.closest(EP_BLK); if (!cur || cur.bl !== bl) segs.push(cur = {bl, a: o, s: ''}); cur.s += n.data; all += n.data; }
+  SAY.lang = sayLang(all); const out = [];
+  for (const g of segs) saySplit(g.s, g.a, out);
+  return out.map(([a, b]) => ({p: i, a, b, t: all.slice(a, b).replace(/\s+/g, ' ').trim()})).filter(c => c.t);
+}
+async function sayLoad(i, dir) {   // la siguiente página (o capítulo) con texto, en la dirección dir; null si no hay más
+  const N = SAY.ep ? EP.secs.length : VW.pages.length, g = SAY.gen;
+  for (let k = i, tries = 0; k >= 0 && k < N && tries < 40; k += dir, tries++) {
+    const L = SAY.ep ? sayEpChap(k) : await sayPdfPage(k); if (g !== SAY.gen || !SAY.on) return null;
+    if (L.length) return L;
+  }
+  return null;
+}
+async function sayStart(ep, from) {   // from: {p, t: texto donde empezar} (si no, lo que se ve)
+  if (!sayCan()) return toast('Este navegador no puede leer en voz alta.', [], 3000);
+  sayStop(true); Object.assign(SAY, {on: true, ep: !!ep, paused: false, k: 0}); const g = ++SAY.gen;
+  let i = from ? from.p : ep ? epLoc().i : VW.cur, L = await sayLoad(i, 1); if (g !== SAY.gen) return;
+  if (!L) { sayStop(); return toast(ep ? 'No hay texto que leer.' : 'Esta parte del PDF no tiene texto que leer (¿es un escaneado?).', [], 4000); }
+  let k = 0;
+  if (L[0].p === i) {
+    k = from?.t ? sayFind(L, sayWords(from.t)) : sayVisible(L);
+  }
+  SAY.list = L; SAY.k = k; sayBar(); saySpeak();
+}
+function sayFind(L, rx) {   // la frase donde está un trozo de texto
+  if (!rx) return 0; const R = new RegExp(rx, 'i'), j = L.findIndex(c => R.test(c.t)); if (j >= 0) return j;
+  for (let k = 0; k < L.length - 1; k++) if (R.test(L[k].t + ' ' + L[k + 1].t)) return k;
+  return 0;
+}
+function sayVisible(L) {   // la primera frase que se ve en la pantalla
+  if (SAY.ep) { const sc = $('#epScroll').getBoundingClientRect(), sec = EP.secs[L[0].p]; for (let k = 0; k < L.length; k++) { const r = sayEpRange(sec, L[k].a, L[k].b)?.getBoundingClientRect(); if (r && r.bottom > sc.top + 4 && r.left >= sc.left - 4 && r.top < sc.bottom) return k; } return 0; }
+  const p = VW.pages[L[0].p], sc = $('#vwScroll').getBoundingClientRect(); if (!p?.el || VW.flip) return 0; const r = p.el.getBoundingClientRect(), k1 = r.height / (p.h || r.height);
+  const j = L.findIndex(c => { const b = vwBoxes(p, c.q)[0]; return b && r.top + b.y * k1 >= sc.top - 2; }); return Math.max(0, j);
+}
+function sayEpRange(sec, a, b) {
+  let r = null; for (const [n, o] of epTexts(sec)) { const e = o + n.length; if (!r && a < e) { r = document.createRange(); r.setStart(n, a - o); } if (r && b <= e) { r.setEnd(n, b - o); return r; } }
+  return r;
+}
+function saySpeak() {
+  const c = SAY.list[SAY.k]; if (!SAY.on) return; if (!c) return sayMore(1);
+  const g = ++SAY.gen; SAY.paused = false; sayMark(c); sayBar();
+  const u = new SpeechSynthesisUtterance(c.t), v = sayVoice(SAY.lang); u.lang = SAY.lang; u.rate = sayRate(); if (v) u.voice = v;
+  u.onend = () => { if (g !== SAY.gen || !SAY.on || SAY.paused) return; SAY.k++; saySpeak(); };
+  u.onerror = e => { if (g !== SAY.gen || /interrupted|canceled/.test(e.error)) return; sayStop(); toast('No se pudo leer en voz alta' + (e.error ? ` (${e.error})` : '') + '.', [], 4000); };
+  SAY.u = u; try { speechSynthesis.cancel(); } catch (e) {} speechSynthesis.speak(u); wlSync();
+}
+async function sayMore(dir) {   // se acabó la página (o el capítulo): la siguiente, o la anterior
+  const c0 = SAY.list[0]; if (!c0) return sayStop(); const g = ++SAY.gen, L = await sayLoad(c0.p + dir, dir); if (g !== SAY.gen || !SAY.on) return;
+  if (!L) { sayStop(); if (dir > 0) toast(SAY.ep ? 'Fin del libro.' : 'Fin del PDF.', [], 2500); return; }
+  SAY.list = L; SAY.k = dir > 0 ? 0 : L.length - 1; saySpeak();
+}
+function sayStep(d) { if (!SAY.on) return; SAY.k += d; if (SAY.k < 0) return sayMore(-1); if (SAY.k >= SAY.list.length) return sayMore(1); saySpeak(); }
+function sayAgain() { saySpeak(); }
+function sayToggle() {
+  if (!SAY.on) return; if (SAY.paused) return saySpeak();   // seguir: la frase en la que paró, desde el principio (pausar en Android corta la voz)
+  SAY.paused = true; SAY.gen++; try { speechSynthesis.cancel(); } catch (e) {} sayBar(); wlSync();
+}
+function sayStop(quiet) {
+  const was = SAY.on; SAY.on = false; SAY.paused = false; SAY.gen++; SAY.list = []; if (was || !quiet) try { speechSynthesis.cancel(); } catch (e) {}
+  sayUnmark(); document.querySelectorAll('.lnsayb').forEach(b => b.remove()); if (was) wlSync();
+}
+function sayUnmark() { document.querySelectorAll('#vw .lnsay').forEach(e => e.remove()); if (typeof EP !== 'undefined') for (const s of EP.secs || []) if (s.querySelector('mark.lnsay')) epUnwrap(s, 'lnsay'); }
+function sayMark(c) {   // marca la frase que se lee y la lleva a la vista
+  sayUnmark();
+  if (SAY.ep) {
+    const sec = EP.secs[c.p]; if (!sec) return; epWrap(sec, c.a, c.b, () => { const m = document.createElement('mark'); m.className = 'lnsay'; return m; });
+    const m = sec.querySelector('mark.lnsay'); if (!m) return; const sc = $('#epScroll').getBoundingClientRect(), r = m.getBoundingClientRect();
+    if (r.top < sc.top + 30 || r.bottom > sc.bottom - 90 || r.left < sc.left || r.right > sc.right) epShow(m); return;
+  }
+  const p = VW.pages[c.p]; if (!p?.el) return;
+  if (VW.flip ? !(VW.cur === c.p || VW.two && VW.cur + 1 === c.p) : false) vwGo(c.p, true);
+  const B = vwBoxes(p, c.q); if (!B.length) return; const lay = p.el.querySelector('.vwa'); if (!lay) return;
+  lay.insertAdjacentHTML('beforebegin', B.map(b => `<i class="lnsay" style="left:${vwPx(b.x)};top:${vwPx(b.y)};width:${vwPx(b.w)};height:${vwPx(b.h)}"></i>`).join(''));
+  const el = p.el.querySelector('.lnsay'), sc = $('#vwScroll'), s = sc.getBoundingClientRect(), r = el.getBoundingClientRect();
+  if (r.top < s.top + 30 || r.bottom > s.bottom - 90) sc.scrollTop += r.top - s.top - s.height * .3;
+}
+function sayBar() {
+  const host = $(SAY.ep ? '#ep' : '#vw'); if (!host || !SAY.on) return; let b = host.querySelector('.lnsayb');
+  if (!b) { b = document.createElement('div'); b.className = 'vwfloat lnsayb'; b.setAttribute('role', 'toolbar'); b.setAttribute('aria-label', 'Lectura en voz alta'); host.append(b); }
+  const c = SAY.list[SAY.k], r = sayRate();
+  b.innerHTML = `<span class="lnsayi" aria-hidden="true">🔊</span><small>${c ? (SAY.ep ? 'cap. ' : 'p. ') + (c.p + 1) : ''}</small><button data-onclick="sayStep(-1)" title="La frase anterior" aria-label="La frase anterior">⏮</button><button class="lnsayp" data-onclick="sayToggle()" title="${SAY.paused ? 'Seguir' : 'Pausa'}" aria-label="${SAY.paused ? 'Seguir' : 'Pausa'}">${SAY.paused ? '▶' : '⏸'}</button><button data-onclick="sayStep(1)" title="La frase siguiente" aria-label="La frase siguiente">⏭</button><button class="lnsayr" data-onclick="sayRateStep()" title="Velocidad">${String(r).replace('.', ',')}×</button><button data-onclick="sayStop()" title="Parar" aria-label="Parar">✕</button>`;
+}
+function saySel(ep) { const s = LN.sel; if (!s) return; getSelection().removeAllRanges(); $(ep ? '#epSel' : '#vwSel').hidden = true; sayStart(ep, {p: s.pg, t: s.t}); }
+const sayMenuBtn = ep => sayCan() ? `<button data-onclick="${SAY.on && SAY.ep === !!ep ? 'sayStop()' : `sayStart(${!!ep})`}">${SAY.on && SAY.ep === !!ep ? '⏹ Dejar de leer en voz alta' : '🔊 Leer en voz alta desde aquí'}</button>` : '';
+
+/* ---- ✏ Lápiz ---- */
+const LN_INK_W = 1.8;   // grosor del trazo, en puntos del PDF
+function lnInkMode() { vwMode('ink'); }
+function lnInkShow() {
+  const v = $('#vw'); if (!v) return; let b = $('#lnInk'); const on = VW.mode === 'ink';
+  if (!on) { b?.remove(); return; }
+  if (!b) { b = document.createElement('div'); b.id = 'lnInk'; b.className = 'vwfloat lninkb'; vw$('.vwbody').append(b); }
+  b.innerHTML = `<span>✏ Lápiz</span><i class="lninkc" style="--c:${VW_COLORS[VW.color][0]}"></i><small>dibuja con el dedo, el lápiz o el ratón</small><button data-onclick="vwMode('sel')" title="Dejar el lápiz" aria-label="Dejar el lápiz">✕</button>`;
+}
+function lnInkDown(e, p) {
+  const r = p.el.getBoundingClientRect(), k = p.w / r.width, pt = [(e.clientX - r.left) * k, (e.clientY - r.top) * k];
+  const sv = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); sv.setAttribute('class', 'lnink lnlive'); sv.setAttribute('viewBox', `0 0 ${p.w} ${p.h}`); sv.style.setProperty('--c', VW_COLORS[VW.color][0]);
+  sv.innerHTML = `<path stroke-width="${LN_INK_W}" d="M${pt[0].toFixed(1)} ${pt[1].toFixed(1)}"/>`; p.el.append(sv);
+  VW.drag = {kind: 'ink', p, id: e.pointerId, v: [pt], q: [vwToPdf(p, e.clientX, e.clientY)], sv, r, k};
+  e.preventDefault(); try { $('#vwScroll').setPointerCapture(e.pointerId); } catch (er) {}
+}
+function lnInkMove(e, g) {
+  const evs = e.getCoalescedEvents?.() || [e];
+  for (const ev of evs) { const pt = [(ev.clientX - g.r.left) * g.k, (ev.clientY - g.r.top) * g.k], l = g.v.at(-1); if (Math.hypot(pt[0] - l[0], pt[1] - l[1]) < .8) continue; g.v.push(pt); g.q.push(vwToPdf(g.p, ev.clientX, ev.clientY)); }
+  g.sv.firstChild.setAttribute('d', g.v.map((p, j) => `${j ? 'L' : 'M'}${p[0].toFixed(1)} ${p[1].toFixed(1)}`).join(''));
+}
+function lnInkUp(g, cancel) {
+  g.sv.remove(); if (cancel) return; const pts = g.q.length > 1 ? g.q : [g.q[0], [g.q[0][0] + .6, g.q[0][1] + .6]];
+  const st = pts.flatMap(([x, y]) => [Math.round(x * 10) / 10, Math.round(y * 10) / 10]).slice(0, 2000), now = vwNow(), c = VW_COLORS[VW.color][0], L = VW.inkLast;
+  const box = s => { const xs = s.filter((_, j) => !(j % 2)), ys = s.filter((_, j) => j % 2); return [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)]; };
+  if (L && L.p === g.p.i && L.c === c && Date.now() - L.t < 2000 && vwAnns().some(a => a.id === L.id && (a.g?.length || 0) < 60)) {
+    vwMut(l => { const a = l.find(x => x.id === L.id); if (!a) return; a.g = [...a.g, st]; a.q = box(a.g.flat()); a.up = now; });
+  } else { const id = uid(); vwAdd({id, k: 'ink', p: g.p.i, q: box(st), g: [st], c, at: now, up: now}); VW.inkLast = {id, p: g.p.i, c}; }
+  VW.inkLast.t = Date.now();
+}
+function lnInkSvg(p, a) {   // los trazos de una anotación «ink», en el espacio de la página como se ve (escala 1)
+  const v = vwVp(p); if (!v || !a.g) return '';
+  const d = a.g.map(s => { let o = ''; for (let j = 0; j + 1 < s.length; j += 2) { const [x, y] = v.convertToViewportPoint(s[j], s[j + 1]); o += `${j ? 'L' : 'M'}${x.toFixed(1)} ${y.toFixed(1)}`; } return o; }).join('');
+  return `<svg class="lnink${VW.pop === a.id ? ' on' : ''}" data-a="${a.id}" viewBox="0 0 ${p.w.toFixed(1)} ${p.h.toFixed(1)}" preserveAspectRatio="none" style="--c:${a.c}" aria-hidden="true"><path stroke-width="${LN_INK_W}" d="${d}"/></svg>`;
+}
+
+/* ---- ⧉ Los dos PDF a la vez ---- */
+const P2 = {doc: null, gen: 0, z: 1, n: 0, io: null};
+function p2Other() {   // el otro PDF del paper (1 o 2), si lo tiene y es un PDF; 0 si no
+  const s = VW.src; if (s?.kind !== 'paper') return 0; const P = (D && D.id === s.id ? D : null) || db.papers.find(x => x.id === s.id), n = s.n === 2 ? 1 : 2, pf = P?.[pdfF(n)];
+  return pf && !isEpub(pf.name) ? n : 0;
+}
+const p2MenuBtn = () => { const n = p2Other(); return n ? `<button data-onclick="${P2.doc ? 'p2Close()' : 'p2Open()'}">⧉ ${P2.doc ? `Cerrar el PDF ${P2.n} de al lado` : `Ver el PDF ${n} al lado`}</button>` : ''; };
+async function p2Open() {
+  const n = p2Other(); if (!n) return; const id = VW.src.id, P = (D && D.id === id ? D : null) || db.papers.find(x => x.id === id), pf = P[pdfF(n)];
+  if (vwDocked()) { vwNotesClose(true); if (vwDocked()) return; }   // las notas y el otro PDF van en el mismo sitio
+  p2Close(true); const g = P2.gen; let file; try { file = await pdfFile(pdfKey(id, n), pf); } catch (e) { if (e.name !== 'AbortError') toast('No se pudo abrir el PDF: ' + e.message, [], 4000); return; }
+  if (!file || g !== P2.gen || !VW.open) return;
+  let doc; try { doc = await vwLoadDoc(await vwLib(), file); } catch (e) { return toast('No se pudo abrir el PDF: ' + e.message, [], 4000); }
+  if (g !== P2.gen || !VW.open) { doc.destroy(); return; }
+  Object.assign(P2, {doc, n, z: 1, name: pf.name, pgs: []});
+  const pane = document.createElement('div'); pane.id = 'lnP2'; pane.className = 'lnp2'; pane.setAttribute('role', 'region'); pane.setAttribute('aria-label', 'PDF ' + n);
+  pane.innerHTML = `<div class="lnp2h"><b>📄 PDF ${n}</b><span class="lnp2n" title="${esc(pf.name)}">${esc(pf.name)}</span><small id="lnP2pg"></small><button data-onclick="p2Zoom(-1)" title="Alejar" aria-label="Alejar">−</button><button data-onclick="p2Zoom(1)" title="Acercar" aria-label="Acercar">＋</button><button data-onclick="p2Close()" title="Cerrar el PDF ${n}" aria-label="Cerrar">✕</button></div><div class="lnp2s" id="lnP2s"></div>`;
+  const body = vw$('.vwbody'); body.insertBefore(pane, $('#vwSide')); body.insertBefore(vwSplitEl(), pane); vwSplitSet(vwSplitGet()); $('#vw').classList.add('lnp2on'); vwSplitMode();
+  if (VW.side && (vwMv() || innerWidth < 1500)) { VW.side = false; vwSideShow(); }   // como con las notas: sin el panel de anotaciones, cada PDF tiene su mitad
+  const p1 = await doc.getPage(1); if (g !== P2.gen) return; const v1 = p1.getViewport({scale: 1}), s = $('#lnP2s');
+  P2.ar = v1.width / v1.height; P2.pgs = Array.from({length: doc.numPages}, (_, i) => { const d = document.createElement('div'); d.className = 'lnp2p'; d.dataset.i = i; d.style.aspectRatio = `${v1.width} / ${v1.height}`; s.append(d); return {i, el: d, rs: 0, proxy: i ? null : p1}; });
+  P2.io = new IntersectionObserver(es => { for (const e of es) { const p = P2.pgs[+e.target.dataset.i]; p.vis = e.isIntersecting; if (p.vis) p2Render(p); } }, {root: s, rootMargin: '600px 0px'});
+  P2.pgs.forEach(p => P2.io.observe(p.el)); s.addEventListener('scroll', p2Pg, {passive: true}); p2Zoom(0); p2Pg();
+  setTimeout(() => { if (VW.open && VW.fit) vwFitW(true); }, 60);   // el PDF de la izquierda, al nuevo ancho
+}
+async function p2Render(p) {
+  if (!P2.doc || p.busy) return; const s = $('#lnP2s'); if (!s) return; const W = p.el.clientWidth, dpr = Math.min(2.5, devicePixelRatio || 1), want = Math.round(W * dpr);
+  if (!W || p.rs === want && !p.dirty) return; p.busy = true; const g = P2.gen;
+  try {
+    p.proxy ||= await P2.doc.getPage(p.i + 1); if (g !== P2.gen) return; const v1 = p.proxy.getViewport({scale: 1}); p.el.style.aspectRatio = `${v1.width} / ${v1.height}`;
+    const vp = p.proxy.getViewport({scale: want / v1.width}), cv = document.createElement('canvas'); cv.width = Math.round(vp.width); cv.height = Math.round(vp.height);
+    await p.proxy.render({canvasContext: cv.getContext('2d', {alpha: false}), viewport: vp, pageColors: vwPC()}).promise; if (g !== P2.gen) return;
+    p.el.querySelector('canvas')?.remove(); p.el.append(cv); p.rs = want; p.dirty = false;
+  } catch (e) {} finally { p.busy = false; }
+  if (p.vis && P2.doc && p.el.clientWidth && Math.round(p.el.clientWidth * Math.min(2.5, devicePixelRatio || 1)) !== p.rs) p2Render(p);   // cambió el zoom mientras se pintaba
+}
+function p2Zoom(d) {
+  if (!P2.doc) return; const s = $('#lnP2s'), f = s.scrollTop / Math.max(1, s.scrollHeight); P2.z = Math.max(.5, Math.min(4, Math.round((P2.z + d * .25) * 100) / 100));
+  s.style.setProperty('--z', P2.z); s.scrollTop = f * s.scrollHeight; clearTimeout(P2.zt); P2.zt = setTimeout(() => P2.pgs.forEach(p => { if (p.vis) p2Render(p); }), 120);
+}
+function p2Pg() { const s = $('#lnP2s'), o = $('#lnP2pg'); if (!s || !o || !P2.pgs.length) return; const y = s.getBoundingClientRect().top + 8; let i = 0; for (const p of P2.pgs) { if (p.el.getBoundingClientRect().bottom > y) { i = p.i; break; } } o.textContent = `p. ${i + 1}/${P2.pgs.length}`; }
+function p2Redraw() { for (const p of P2.pgs || []) { p.dirty = true; if (p.vis) p2Render(p); } }   // otro tema (noche, sepia)
+function p2Close(keep) {
+  P2.gen++; P2.io?.disconnect(); P2.io = null; try { P2.doc?.destroy(); } catch (e) {} P2.doc = null; P2.pgs = [];
+  const pane = $('#lnP2'); if (!pane) return; pane.remove(); if (!vwDocked() && !keep) $('#vwSplit')?.remove(); $('#vw')?.classList.remove('lnp2on');
+  if (!keep) setTimeout(() => { if (VW.open && VW.fit) vwFitW(true); }, 60);
+}
+window.addEventListener('resize', () => { if (P2.doc) { vwSplitMode(); clearTimeout(P2.rt); P2.rt = setTimeout(() => P2.pgs.forEach(p => { if (p.vis) p2Render(p); }), 200); } });

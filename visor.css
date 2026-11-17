@@ -283,3 +283,36 @@ mark.eph.u{background:none!important;text-decoration:underline 2px var(--c);text
 .lnsty{display:inline-flex;gap:2px;margin-right:4px}.lnsty button{min-width:30px;padding:3px 6px!important;border-radius:6px}.lnsty button.on{outline:2px solid var(--pri);background:color-mix(in srgb,var(--pri) 12%,transparent)}
 .lncrop{display:grid;grid-template-columns:5.5em 1fr;align-items:center;gap:8px;padding:4px 10px;font-size:calc(13px * var(--fz,1))}.lncrop input{accent-color:var(--pri)}
 .textLayer[data-main-rotation="90"]{transform:rotate(90deg) translateY(-100%)}.textLayer[data-main-rotation="180"]{transform:rotate(180deg) translate(-100%,-100%)}.textLayer[data-main-rotation="270"]{transform:rotate(270deg) translateX(-100%)}
+
+/* v39.53: leer en voz alta, lápiz y los dos PDF a la vez */
+.lnsay{position:absolute;background:#5aa0ff;mix-blend-mode:multiply;opacity:.28;border-radius:3px;pointer-events:none}
+#vw.night .lnsay{mix-blend-mode:screen;opacity:.35}
+mark.lnsay{background:color-mix(in srgb,#5aa0ff 30%,transparent);color:inherit;border-radius:3px}
+.lnsayb{position:absolute;left:50%;bottom:14px;transform:translateX(-50%);display:flex;align-items:center;gap:2px;padding:3px 4px 3px 10px;border-radius:99px;z-index:8;white-space:nowrap}
+.lnsayb small{opacity:.7;margin:0 6px 0 4px;font-size:calc(12px * var(--fz,1))}
+.lnsayb button{min-width:36px;min-height:36px;border:0;background:none;border-radius:99px;font-size:calc(15px * var(--fz,1))}
+.lnsayb button:hover{background:color-mix(in srgb,var(--pri) 12%,transparent)}.lnsayb .lnsayr{font-size:calc(12px * var(--fz,1));min-width:42px}
+html.mv .lnsayb{bottom:calc(64px + env(safe-area-inset-bottom,0px))}
+.lnink{position:absolute;inset:0;width:100%;height:100%;overflow:visible;pointer-events:none}
+.lnink path{fill:none;stroke:var(--c);stroke-linecap:round;stroke-linejoin:round}
+.lnink.on path{filter:drop-shadow(0 0 2px color-mix(in srgb,var(--c) 70%,#000))}
+.vwhl.ink{background:none!important;opacity:1!important;mix-blend-mode:normal!important;outline:0}
+.vwhl.ink.on{outline:1.5px dashed color-mix(in srgb,var(--c) 70%,#000);outline-offset:3px}
+#vw[data-mode=ink] .vwp{touch-action:none;cursor:crosshair}#vw[data-mode=ink] .textLayer{pointer-events:none;user-select:none}
+.lninkb{position:absolute;left:50%;top:10px;transform:translateX(-50%);display:flex;align-items:center;gap:8px;padding:3px 4px 3px 12px;border-radius:99px;z-index:8;white-space:nowrap;font-size:calc(13px * var(--fz,1))}
+.lninkb small{opacity:.65}.lninkb .lninkc{width:14px;height:14px;border-radius:50%;background:var(--c)}.lninkb button{min-width:32px;min-height:32px;border:0;background:none;border-radius:99px}
+@media (max-width:600px){.lninkb small{display:none}}
+#vw .vwbody>#lnP2{position:relative;flex:0 0 calc(var(--vwn,50) * 1%);min-width:0;min-height:0;display:flex;flex-direction:column;border-left:1px solid var(--bd);background:var(--bg,#fff)}
+#vw.lnp2on:not(.vwsp) .vwbody>#lnP2{position:absolute;inset:0;z-index:7}#vw.lnp2on:not(.vwsp) .vwsplit{display:none}
+#vw.lnp2on.vwsp.vwcol .vwbody{flex-direction:column}#vw.lnp2on.vwsp.vwcol .vwbody>#lnP2{border-left:0;border-top:1px solid var(--bd)}
+#vw.lnp2on.vwsp.vwcol .vwsplit{width:auto;height:14px;margin:-7px 0;cursor:row-resize}
+#vw.lnp2on.vwsp.vwcol .vwsplit::after{top:5px;bottom:5px;left:50%;right:auto;width:56px;height:auto;transform:translateX(-50%)}
+#vw.lnp2on.vwsp.vwcol #vwScroll{min-height:0}
+.lnp2h{display:flex;align-items:center;gap:6px;padding:6px 8px;border-bottom:1px solid var(--bd);font-size:calc(13px * var(--fz,1))}
+.lnp2h .lnp2n{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;opacity:.75}.lnp2h small{opacity:.7;white-space:nowrap}
+.lnp2h button{min-width:32px;min-height:32px;border:1px solid var(--bd);background:none;border-radius:8px}
+.lnp2s{flex:1;overflow:auto;padding:8px;background:#e7e8eb;display:flex;flex-direction:column;align-items:center;gap:8px}
+#vw.night .lnp2s{background:#0e0f12}
+.lnp2p{flex:none;width:calc(var(--z,1) * 100%);max-width:none;background:#fff;box-shadow:0 1px 4px #0003;position:relative}
+#vw.night .lnp2p{background:#1c1e23}#vw.sepia .lnp2p{background:#f4ecd8}
+.lnp2p canvas{display:block;width:100%;height:100%}
