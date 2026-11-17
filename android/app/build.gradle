@@ -1,0 +1,43 @@
+// App Android de GPapers: una «Trusted Web Activity» que abre la web https://rmalump.github.io/GPapers/ a pantalla completa con Chrome.
+// La app no lleva copia de la web: cada versión nueva de la web llega sola. Solo hay que volver a compilar si cambia el nombre, el icono o la dirección.
+plugins { id 'com.android.application' }
+
+def host = 'rmalump.github.io'
+def startUrl = 'https://rmalump.github.io/GPapers/index.html'
+
+android {
+    namespace 'io.github.rmalump.gpapers'
+    compileSdk 36
+    defaultConfig {
+        applicationId 'io.github.rmalump.gpapers'
+        minSdk 24
+        targetSdk 35
+        versionCode 1
+        versionName '1.0'
+        manifestPlaceholders = [hostName: host, launchUrl: startUrl]
+        resValue 'string', 'appName', 'GPapers'
+        resValue 'string', 'launcherName', 'GPapers'
+        resValue 'string', 'assetStatements', """[{ "relation": ["delegate_permission/common.handle_all_urls"], "target": {"namespace": "web", "site": "https://${host}"} }]"""
+        resValue 'color', 'colorPrimary', '#2457c5'
+        resValue 'color', 'backgroundColor', '#f7f8fa'
+    }
+    // Firma: la clave no está en el repositorio. Se lee de variables de entorno (en GitHub, de los «secrets» del repositorio).
+    signingConfigs {
+        release {
+            storeFile System.getenv('GPAPERS_KEYSTORE') ? file(System.getenv('GPAPERS_KEYSTORE')) : null
+            storePassword System.getenv('GPAPERS_KEYSTORE_PASSWORD')
+            keyAlias 'gpapers'
+            keyPassword System.getenv('GPAPERS_KEYSTORE_PASSWORD')
+        }
+    }
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig System.getenv('GPAPERS_KEYSTORE') ? signingConfigs.release : null
+        }
+    }
+    compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
+    buildFeatures { resValues true }
+}
+
+dependencies { implementation 'com.google.androidbrowserhelper:androidbrowserhelper:2.7.4' }

@@ -1,0 +1,44 @@
+# Compila la app Android (TWA) y la publica como descarga en «Releases».
+# Solo hace falta cuando cambia la carpeta android/ (nombre, icono, dirección): las versiones nuevas de la web llegan solas a la app.
+# Necesita dos secrets del repositorio: GPAPERS_KEYSTORE_BASE64 (la clave .jks en base64) y GPAPERS_KEYSTORE_PASSWORD.
+# Sin ellos no hace nada (así no falla). La clave debe ser siempre la misma: con otra, el móvil no deja actualizar la app instalada.
+name: APK Android
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['android/**']
+permissions:
+  contents: write
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    env:
+      HAY_CLAVE: ${{ secrets.GPAPERS_KEYSTORE_BASE64 != '' }}
+    steps:
+      - if: env.HAY_CLAVE != 'true'
+        run: echo "::notice::Faltan los secrets GPAPERS_KEYSTORE_BASE64 y GPAPERS_KEYSTORE_PASSWORD; no se compila el APK."
+      - if: env.HAY_CLAVE == 'true'
+        uses: actions/checkout@v4
+      - if: env.HAY_CLAVE == 'true'
+        uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: 21 }
+      - if: env.HAY_CLAVE == 'true'
+        uses: gradle/actions/setup-gradle@v4
+        with: { gradle-version: '8.14.3' }
+      - if: env.HAY_CLAVE == 'true'
+        name: Compilar y firmar
+        working-directory: android
+        env:
+          GPAPERS_KEYSTORE_PASSWORD: ${{ secrets.GPAPERS_KEYSTORE_PASSWORD }}
+        run: |
+          echo "${{ secrets.GPAPERS_KEYSTORE_BASE64 }}" | base64 -d > "$RUNNER_TEMP/gpapers.jks"
+          export GPAPERS_KEYSTORE="$RUNNER_TEMP/gpapers.jks"
+          gradle --no-daemon assembleRelease
+          V=$(grep -oP "versionName '\K[^']+" app/build.gradle)
+          cp app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/gpapers-$V.apk"
+          echo "V=$V" >> "$GITHUB_ENV"
+      - if: env.HAY_CLAVE == 'true'
+        name: Publicar en Releases
+        env: { GH_TOKEN: '${{ github.token }}' }
+        run: gh release create "apk-$V" "$RUNNER_TEMP/gpapers-$V.apk" --title "App Android $V" --notes "Instalar en Android: descargar el .apk y abrirlo (hay que permitir «instalar apps de origen desconocido»)." || gh release upload "apk-$V" "$RUNNER_TEMP/gpapers-$V.apk" --clobber
