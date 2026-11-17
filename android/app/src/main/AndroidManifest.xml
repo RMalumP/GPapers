@@ -6,7 +6,8 @@
         android:icon="@mipmap/ic_launcher"
         android:label="@string/appName"
         android:theme="@android:style/Theme.Translucent.NoTitleBar"
-        android:supportsRtl="true">
+        android:supportsRtl="true"
+        android:manageSpaceActivity="com.google.androidbrowserhelper.trusted.ManageDataLauncherActivity">
 
         <meta-data android:name="asset_statements" android:resource="@string/assetStatements" />
 
@@ -32,6 +33,11 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="https" android:host="${hostName}" android:pathPrefix="/GPapers" />
             </intent-filter>
+        </activity>
+
+        <!-- Obligatoria: al abrir, la app crea el acceso directo «Ajustes del sitio» con esta pantalla. Sin ella, la app se cierra nada más arrancar. -->
+        <activity android:name="com.google.androidbrowserhelper.trusted.ManageDataLauncherActivity" android:exported="false">
+            <meta-data android:name="android.support.customtabs.trusted.MANAGE_SPACE_URL" android:value="${launchUrl}" />
         </activity>
 
         <provider
