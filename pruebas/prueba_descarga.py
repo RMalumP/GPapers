@@ -53,6 +53,11 @@ with sync_playwright() as pw:
         eq('después: visor abierto con las páginas y sin la ventana', [s['dlw'], s['vw'], p.evaluate("document.querySelectorAll('#vw .vwp').length > 0")], [False, True, True])
         eq('la primera vez: buscar y descargar', p.evaluate("__calls"), ['lista', 'media:F1'])
         p.evaluate("vwClose()"); p.wait_for_timeout(300)
+        # 1b) después, con la copia del navegador, no se va a Drive ni sale la ventana
+        p.evaluate("(async () => { PDF_FILES.clear(); vwKeepDrop(); __calls.length = 0; pdfOpen('p1', 1); })(); 0"); p.wait_for_timeout(200)
+        eq('con la copia: abre sin ventana ni Drive', [p.evaluate(st)['dlw'], p.evaluate("__calls")], [False, []])
+        p.wait_for_timeout(1500); eq('con la copia: visor abierto', p.evaluate(st)['vw'], True)
+        p.evaluate("vwClose()"); p.wait_for_timeout(300)
         # 2) otra vez sin la copia del navegador: ya sabe dónde está, no lo busca
         p.evaluate("(async () => { PDF_FILES.clear(); await pdfForget('p1'); __calls.length = 0; pdfOpen('p1', 1); })(); 0"); p.wait_for_timeout(3000)
         eq('la segunda vez: solo descargar', [p.evaluate("__calls"), p.evaluate(st)['vw']], [['media:F1'], True])
