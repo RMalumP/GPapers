@@ -2,6 +2,10 @@
 
 Lo más reciente arriba. Hasta la v39.53 estas notas estaban en el README; van de la más nueva a la más antigua (algunas rondas antiguas no tenían número de versión).
 
+## APK 1.2.2: pantalla de carga de GPapers al abrir la app
+- Al abrir la app de Android, mientras Chrome arranca, ahora se ve el fondo de GPapers con su icono. Antes la primera ventana era transparente y, sobre todo en el primer arranque, se veía la pantalla de inicio del móvil durante 2 o 3 segundos. La 1.1 ya lo hacía.
+- La prueba del emulador (`apk-prueba.yml`) compara el arranque de la versión de `main` con la nueva y dice qué colores se ven en pantalla cada medio segundo.
+
 ## v40.2: los PDF de Google Drive se abren sin espera a ciegas
 - **Ventana de descarga al momento.** Al abrir un PDF que solo está en tu Google Drive (subido desde otro dispositivo) no se veía nada hasta tenerlo entero, a veces 10 s o más, salvo un aviso de 3 s. Ahora sale enseguida una ventana con el nombre, una barra con el porcentaje y lo que lleva («45 % · 1,2 de 2,7 MB») y **Cancelar** (o Escape). Se cierra sola al abrirse el visor.
 - **Arreglo: los PDF ya guardados se volvían a descargar.** Android cierra a veces, sin avisar, la conexión de la app con el almacenamiento del navegador (por ejemplo, al dejarla en segundo plano). La primera lectura después fallaba, la app creía que no había copia del PDF y lo descargaba otra vez de Drive. Ahora abre otra conexión y repite la lectura.
