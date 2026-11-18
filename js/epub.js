@@ -163,7 +163,7 @@ function epBuild() {
       <button class="vwm eptc" data-onclick="epPanel('toc')" title="Índice del libro (I)"><span>📑</span><small>Índice</small></button>
       <button class="vwm epnb" data-onclick="epNotes()" title="Notas del paper (E)"><span>📝</span><small>Notas</small></button>
       <button class="vwm vwsb" data-onclick="epPanel('ann')" title="Subrayados y comentarios (L)"><span>💬</span><small>Anotaciones</small><b id="epAn"></b></button></div>
-    <div class="vwbody"><div id="epScroll" tabindex="-1"><div id="epDoc"></div></div><p id="epLoad" class="vwload">Abriendo el EPUB…</p><aside id="epSide" hidden></aside>
+    <div class="vwbody"><div id="epScroll" tabindex="0" aria-label="Texto del libro"><div id="epDoc"></div></div><p id="epLoad" class="vwload">Abriendo el EPUB…</p><aside id="epSide" hidden></aside>
       <button id="epFsX" class="vwfloat vwib" data-onclick="epFs(false)" title="Salir de pantalla completa (Esc)" aria-label="Salir de pantalla completa">✕</button></div>
     <div class="epfoot"><input id="epBar" type="range" min="0" max="1000" value="0" aria-label="Posición en el libro" data-oninput="epBarTip(this.value)" data-onchange="epBarGo(this.value)"><span id="epPct"></span></div>
     <div id="epSel" class="vwfloat" hidden data-onmousedown="event.preventDefault()">${sw('epSelColor')}<button class="vwib" data-onclick="epSelNote()" title="Subrayar y comentar" aria-label="Subrayar y comentar">💬</button><button class="vwib" data-onclick="epSelCopy()" title="Copiar el texto" aria-label="Copiar">📋</button><button class="vwib" data-onclick="lnSelMore(true)" title="Más: copiar con la cita, definición, traducir…" aria-label="Más">⋯</button></div>
@@ -450,7 +450,7 @@ function epSideShow() {
 function epSideDraw() {
   const s = $('#epSide'), t = EP.tab;
   const tabs = [['ann', '💬 Anotaciones'], ['toc', '📑 Índice'], ...(EP.find.hits.length || t === 'find' ? [['find', `🔍 ${EP.find.hits.length || ''}`]] : [])];   // v39.50: resultados de la búsqueda
-  const head = `<div class="vwst" role="tablist">${tabs.map(([k, n]) => `<button role="tab" aria-selected="${t === k}" class="${t === k ? 'on' : ''}${k === 'find' ? ' lntab' : ''}" data-onclick="epTab('${k}')">${n}</button>`).join('')}<button class="vwib" data-onclick="epSideClose()" aria-label="Cerrar el panel">✕</button></div>`;
+  const head = `<div class="vwst"><div class="vwstt" role="tablist">${tabs.map(([k, n]) => `<button role="tab" aria-selected="${t === k}" class="${t === k ? 'on' : ''}${k === 'find' ? ' lntab' : ''}" data-onclick="epTab('${k}')">${n}</button>`).join('')}</div><button class="vwib" data-onclick="epSideClose()" aria-label="Cerrar el panel">✕</button></div>`;
   if (t === 'find') return lnEpFindDraw(s, head);
   if (t === 'toc') {
     const L = EP.bk?.toc || [], cur = epLoc().i;
@@ -592,9 +592,10 @@ function epMenu(r, html) {
 function epMore(e) {
   e?.stopPropagation?.(); if (e?.currentTarget) EP.menuR = e.currentTarget.getBoundingClientRect(); const s = epSet(), P = epPaperOf();
   const mode = (EP.auto ? 'Automático' : s.mode === 'page' ? (s.two ? 'Doble página' : 'Página a página') : 'Seguido');
-  epMenu(EP.menuR, `<button data-onclick="cmdOpen(true)">🔎 Buscar una orden… <small class="vwsub">${esc(db.settings.shortcuts.palette || '')}</small></button><hr><button data-keep data-onclick="epReadMenu()">📖 Modo de lectura <small class="vwsub">${mode} ›</small></button><button data-keep data-onclick="epTypoMenu()">Aa Texto y colores <small class="vwsub">›</small></button><button data-keep data-onclick="epBmMenu()">🔖 Marcadores <small class="vwsub">${epBms().length || 'ninguno'} ›</small></button><button data-keep data-onclick="epCfgMenu()">⚙ Ajustes del visor <small class="vwsub">›</small></button>
+  epMenu(EP.menuR, `<button data-keep data-onclick="epReadMenu()">📖 Modo de lectura <small class="vwsub">${mode} ›</small></button><button data-keep data-onclick="epTypoMenu()">Aa Texto y colores <small class="vwsub">›</small></button><button data-keep data-onclick="epBmMenu()">🔖 Marcadores <small class="vwsub">${epBms().length || 'ninguno'} ›</small></button><button data-keep data-onclick="epCfgMenu()">⚙ Ajustes del visor <small class="vwsub">›</small></button>
     <hr>${epCanShare() ? '<button data-onclick="epShare()">📲 Abrir en otra app…</button>' : ''}<button data-onclick="epDownload()">⬇ Descargar el EPUB</button>
     ${P && !$('#dlg').open ? '<button data-onclick="epFicha()">📝 Ficha del paper</button>' : ''}${EP.src?.kind === 'inbox' ? '<button data-onclick="epCite()">＋ Crear la cita de este EPUB</button>' : ''}
+    <hr><button data-onclick="cmdOpen(true)">🔎 Buscar una orden… <small class="vwsub">${esc(db.settings.shortcuts.palette || '')}</small></button>
     ${EP.bk ? `<hr><div class="vwhint">${esc(EP.bk.meta.title || '')}${EP.bk.meta.authors.length ? ' · ' + esc(EP.bk.meta.authors.slice(0, 3).join('; ')) : ''}${EP.bk.meta.year ? ' · ' + esc(EP.bk.meta.year) : ''} · ${EP.secs.length} ${EP.secs.length === 1 ? 'capítulo' : 'capítulos'}</div>` : ''}`);
 }
 function epMoreBack() { epMore(); }

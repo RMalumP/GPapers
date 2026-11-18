@@ -21,7 +21,7 @@ html.mv #mvHdrRow{display:none;position:fixed;z-index:70;top:calc(52px + env(saf
 html.mv.mv-mo #mvHdrRow{display:flex}
 html.mv.mv-mo header{z-index:70}   /* el menú ⋯ vive dentro de la cabecera (su contexto de apilamiento): la cabecera tiene que quedar por encima de la sombra (#mvShade, 65) o la sombra se come los toques */
 html.mv #mvHdrRow>button,html.mv #mvHdrRow #fmenu button{justify-content:flex-start;text-align:left;border:0;background:none;color:inherit;padding:10px 12px;min-height:44px;display:flex;align-items:center;gap:8px;white-space:normal}
-html.mv #mvHdrRow>button.pri{background:var(--pri);color:#fff;border-radius:8px}
+html.mv #mvHdrRow>button.pri{background:var(--pri);color:var(--onpri);border-radius:8px}
 html.mv #mvHdrRow>button[title^="Guardar"]::after{content:"Guardar"}
 html.mv #mvHdrRow #syncBtn[hidden]{display:none}html.mv #syncBtn .syl{display:inline}
 html.mv #mvHdrRow .fm{display:contents}html.mv #fmBtn{display:none}
@@ -127,11 +127,11 @@ html.mv #mvNav .mvns{display:flex;min-width:0}html.mv #mvNav .mvns>button{flex:1
 html.mv #mvNav button>span:last-child{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 html.mv #mvNav [data-mv=cfg] .mvl::after{content:"Configuración"}html.mv #mvNav #mvIb:not([hidden])~[data-mv=cfg] .mvl::after{content:"Ajustes"}   /* con 🗃️ a su lado no cabe entero */
 @media (max-width:369px){html.mv #mvNav button{font-size:calc(10px * var(--fz,1))}html.mv #mvNav{padding-left:0;padding-right:0}}@media (max-width:339px){html.mv #mvNav [data-mv=cfg] .mvl::after{content:"Ajustes"}html.mv #mvNav{grid-template-columns:minmax(0,1fr) 52px minmax(0,1fr)}html.mv #mvNav .mvnew .ic{width:42px}}   /* móviles estrechos: que quepan los nombres */
-html.mv #mvIb .ic b{position:absolute;top:-4px;right:-12px;font-size:calc(10px * var(--fz,1));line-height:15px;min-width:15px;padding:0 4px;border-radius:8px;background:var(--pri);color:#fff}html.mv #mvIb.on .ic{outline:2px solid var(--pri);outline-offset:2px;border-radius:6px}
+html.mv #mvIb .ic b{position:absolute;top:-4px;right:-12px;font-size:calc(10px * var(--fz,1));line-height:15px;min-width:15px;padding:0 4px;border-radius:8px;background:var(--pri);color:var(--onpri)}html.mv #mvIb.on .ic{outline:2px solid var(--pri);outline-offset:2px;border-radius:6px}
 html.mv #ibBtn{display:none}   /* en el móvil, la bandeja va en la barra inferior */
 html.mv #mvNav button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;border:0;background:none;padding:4px 0;font-size:calc(11px * var(--fz,1));min-height:0}
 html.mv #mvNav .ic{font-size:calc(20px * var(--fz,1));width:auto;position:relative}html.mv #mvNav .mvfd{top:-2px;right:-8px}
-html.mv #mvNav .mvnew .ic{background:var(--pri);color:#fff;width:46px;height:34px;border-radius:17px;display:flex;align-items:center;justify-content:center;font-size:calc(22px * var(--fz,1))}
+html.mv #mvNav .mvnew .ic{background:var(--pri);color:var(--onpri);width:46px;height:34px;border-radius:17px;display:flex;align-items:center;justify-content:center;font-size:calc(22px * var(--fz,1))}
 html.mv.mv-dr #mvNav{z-index:50}
 html.mv #toast{bottom:calc(var(--mvnav) + var(--mvsafe) + 10px);max-width:calc(100vw - 20px);flex-wrap:wrap}
 
@@ -183,7 +183,7 @@ html.mv #ctx.colm{max-height:min(75dvh,600px);overflow-y:auto;overscroll-behavio
 /* arrastrar un paper con el dedo a otra sección */
 html.mvdrag,html.mvdrag body{user-select:none;-webkit-user-select:none}
 html.mv #list .card,html.mv #list tr.rw{-webkit-touch-callout:none}
-.mvghost{position:fixed;z-index:300;transform:translate(-50%,-130%);max-width:70vw;padding:6px 12px;border-radius:16px;background:var(--pri);color:#fff;font-size:calc(13px * var(--fz,1));white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none;box-shadow:0 4px 14px #0004}
+.mvghost{position:fixed;z-index:300;transform:translate(-50%,-130%);max-width:70vw;padding:6px 12px;border-radius:16px;background:var(--pri);color:var(--onpri);font-size:calc(13px * var(--fz,1));white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none;box-shadow:0 4px 14px #0004}
 html.mv #list .gbox.over{outline:2px dashed var(--pri);outline-offset:2px;border-radius:10px}
 /* tabla del móvil, más compacta: menos aire, letra y botones algo más pequeños (las zonas táctiles siguen siendo cómodas en altura de línea) */
 html.mv .tbl tr.rw{padding:4px 2px 4px 8px;row-gap:1px;column-gap:7px;font-size:calc(12px * var(--fz,1))}

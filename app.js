@@ -139,3 +139,11 @@ document.addEventListener('scroll', e => {   // la cabecera fija de un diálogo 
   const d = e.target, h = d.tagName === 'DIALOG' && d.querySelector(':scope > .dh'); if (!h) return;
   if (d.scrollTop > 40) h.classList.add('sm'); else if (d.scrollTop < 10) h.classList.remove('sm');
 }, true);
+/* v40, accesibilidad: un botón que solo lleva un emoji o un símbolo (📋, ✕, ⋯, 🔖…) se lee en voz alta con su descripción (title), no con el nombre del dibujo */
+const A11Y_TXT = /[\p{L}\p{N}]/u;
+function a11yFix(root) {
+  if (!root?.querySelectorAll) return; const L = [...root.querySelectorAll('button[title]:not([aria-label])')]; if (root.matches?.('button[title]:not([aria-label])')) L.push(root);
+  for (const b of L) if (!A11Y_TXT.test(b.textContent)) { const t = b.title.split(' · ')[0].trim(); if (t) b.setAttribute('aria-label', t); }
+}
+new MutationObserver(ms => { for (const m of ms) for (const n of m.addedNodes) if (n.nodeType === 1) a11yFix(n); }).observe(document.documentElement, {childList: true, subtree: true});
+a11yFix(document);

@@ -121,9 +121,10 @@ function stoHTML() {
   const u = est?.usage, q = est?.quota, pc = u && q ? Math.min(100, u / q * 100) : 0;
   return `${u != null ? `<div class="stob" role="img" aria-label="Usado ${stoFmt(u)} de ${stoFmt(q || 0)}"><i style="width:${Math.max(.5, pc)}%"></i></div><small>Usado en total: <b>${stoFmt(u)}</b>${q ? ` de ${stoFmt(q)} disponibles (${pc < 1 ? '<1' : Math.round(pc)} %)` : ''}.</small>` : ''}
     <table class="stot"><thead><tr><th>Qué</th><th class="num">Cuántos</th><th class="num">Tamaño</th><th></th></tr></thead><tbody>${rows}</tbody></table>
-    <p class="row"><button class="sm" data-onclick="stoFree('gc')" title="Copias de PDF, portadas e imágenes que ya no usa ningún proyecto ni copia de seguridad">🧹 Limpiar lo que ya no se usa</button><button class="sm" data-onclick="STO=null;drawCfg()">↻ Volver a calcular</button>${pers === false ? `<button class="sm" data-onclick="stoPersist()" title="Así el navegador no borra los datos de la app cuando le falta espacio">🔒 Pedir que no se borren</button>` : ''}</p>
+    <p class="row"><button class="sm" data-onclick="stoFree('gc')" title="Copias de PDF, portadas e imágenes que ya no usa ningún proyecto ni copia de seguridad">🧹 Limpiar lo que ya no se usa</button><button class="sm" data-onclick="stoRescan()">↻ Volver a calcular</button>${pers === false ? `<button class="sm" data-onclick="stoPersist()" title="Así el navegador no borra los datos de la app cuando le falta espacio">🔒 Pedir que no se borren</button>` : ''}</p>
     <small class="cfgnote">Tamaños aproximados. Solo de este navegador: no cambia nada en el JSON ni en Google Drive.${pers ? ' El navegador no borrará estos datos por falta de espacio.' : ''}</small>`;
 }
+function stoRescan() { STO = null; drawCfg(); }
 function stoToggle(on) { setHas(CFG_OPEN, 'sto', on); const el = $('#cfgSto'); if (on && el) { STO = null; el.innerHTML = stoHTML(); } }
 async function stoFree(k) {
   if (k === 'gc') { const n = await pdfGc(); await imgGc(); toast(n ? `Se borraron ${n} ${n === 1 ? 'archivo que no se usaba' : 'archivos que no se usaban'}.` : 'No había nada sin usar.', [], 3500); }

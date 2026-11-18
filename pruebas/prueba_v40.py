@@ -197,6 +197,11 @@ with sync_playwright() as pw:
     A.evaluate("shareFiles()"); A.wait_for_timeout(1200)
     eq('un PDF compartido llega a la bandeja y se borra de la caché', A.evaluate("(async () => [db.inbox.some(i => i.name === 'compartido.pdf'), (await (await caches.open('gp-share')).keys()).length])()"), [True, 0])
 
+    # ---- Accesibilidad (I7)
+    eq('en el ordenador, la barra lateral no se oculta a los lectores de pantalla', A.evaluate("[$('#side').getAttribute('aria-hidden'), $('#side').inert]"), [None, False])
+    eq('los botones de solo emoji se leen con su descripción', A.evaluate("[...document.querySelectorAll('#list .card .cpb')].every(b => b.getAttribute('aria-label') === 'Copiar la cita (estilo elegido en Exportar), con cursiva al pegar en Word')"), True)
+    A.evaluate("db.tags.push({id: 'ty', name: 'Amarilla', color: '#ffd400'}, {id: 'tz', name: 'Azul', color: '#1a3a8a'}); db.papers[0].tagIds = ['ty', 'tz']; markDirty(); render()"); A.wait_for_timeout(200)
+    eq('etiqueta clara: letra oscura; oscura: letra blanca', A.evaluate("['ty', 'tz'].map(t => getComputedStyle([...document.querySelectorAll('#list .card .chip.on')].find(c => c.textContent === (t === 'ty' ? 'Amarilla' : 'Azul'))).color)"), ['oklch(0 0 0)', 'oklch(1 0 0)'])
     eq('sin errores', errs, [])
     b.close(); srv.terminate()
 print(f'{n - fail}/{n} pruebas OK'); sys.exit(1 if fail else 0)

@@ -74,7 +74,7 @@ function vwBuild() {
       <button class="vwm vwfsb" data-onclick="vwTbHide(true)" title="Ocultar esta barra (se vuelve a sacar con la pestaña ▾; su sitio se elige en ⋯ → Modo de lectura)"><span>▴</span><small>Ocultar</small></button>
       <button class="vwm vwfsb" data-onclick="vwFs(false)" title="Salir de pantalla completa (Esc o «atrás»)"><span>⛶</span><small>Salir</small></button>
       <button class="vwm vwsb" data-onclick="vwPanel('ann')" title="Subrayados, notas y comentarios"><span>💬</span><small>Anotaciones</small><b id="vwAn"></b></button></div>
-    <div class="vwbody"><div id="vwScroll" tabindex="-1"><div id="vwPages"></div><p id="vwLoad" class="vwload">Abriendo el PDF…</p></div><aside id="vwSide" hidden></aside></div>
+    <div class="vwbody"><div id="vwScroll" tabindex="0" aria-label="Páginas del PDF"><div id="vwPages"></div><p id="vwLoad" class="vwload">Abriendo el PDF…</p></div><aside id="vwSide" hidden></aside></div>
     <div id="vwSel" class="vwfloat" hidden data-onmousedown="event.preventDefault()">${sw.replace(/vwColor/g, 'vwSelColor')}<button class="vwib" data-onclick="vwSelNote()" title="Subrayar y comentar" aria-label="Subrayar y comentar">💬</button><button class="vwib" data-onclick="vwSelCopy()" title="Copiar el texto" aria-label="Copiar">📋</button><button class="vwib" data-onclick="lnSelMore(false)" title="Más: copiar con la cita, definición, traducir…" aria-label="Más">⋯</button></div>
     <div id="vwPop" class="vwfloat vwpop" hidden></div>
     <button id="vwTbTab" class="vwfloat" data-onclick="vwTbHide(false)" title="Sacar la barra de herramientas" aria-label="Sacar la barra">▾</button>
@@ -762,7 +762,7 @@ const vwSideList = () => { const f = VW.filt, k = VW.kind; const T = new Map(); 
 function vwSideDraw() {
   const s = $('#vwSide'), t = VW.tab || 'ann';
   const tabs = VW.find.hits.length || t === 'find' ? [...VW_TABS, ['find', `🔍 ${VW.find.hits.length || ''}`]] : VW_TABS;   // v39.50: los resultados de la búsqueda, solo si hay
-  const head = `<div class="vwst" role="tablist">${tabs.map(([k, n]) => `<button role="tab" aria-selected="${t === k}" class="${t === k ? 'on' : ''}${k === 'find' ? ' lntab' : ''}" data-onclick="vwTab('${k}')">${n}</button>`).join('')}<button class="vwib" data-onclick="vwSide(false)" aria-label="Cerrar el panel">✕</button></div>`;
+  const head = `<div class="vwst"><div class="vwstt" role="tablist">${tabs.map(([k, n]) => `<button role="tab" aria-selected="${t === k}" class="${t === k ? 'on' : ''}${k === 'find' ? ' lntab' : ''}" data-onclick="vwTab('${k}')">${n}</button>`).join('')}</div><button class="vwib" data-onclick="vwSide(false)" aria-label="Cerrar el panel">✕</button></div>`;
   if (t === 'toc') return vwTocDraw(s, head);
   if (t === 'th') return vwThDraw(s, head);
   if (t === 'find') return lnFindDraw(s, head);
@@ -948,10 +948,11 @@ function vwFindMark(p) {
 /* ---- Más: descargar, ficha del paper, abrir con el navegador, dónde se guarda ---- */
 function vwMore(e) {
   e.stopPropagation(); const r = VW.menuR = e.currentTarget.getBoundingClientRect(), paper = vwPaper(), P = paper && db.papers.find(p => p.id === paper.id), pf = vwHolders()[0];
-  vwMenu(r, `<button data-onclick="cmdOpen(true)">🔎 Buscar una orden… <small class="vwsub">${esc(db.settings.shortcuts.palette || '')}</small></button><hr><button data-keep data-onclick="vwReadMenu()">📖 Modo de lectura <small class="vwsub">${esc(vwRdSum())} ›</small></button><button data-keep data-onclick="vwBmMenu()">🔖 Marcadores <small class="vwsub">${vwBms().length || 'ninguno'} ›</small></button><button data-keep data-onclick="vwCfgMenu()">⚙ Ajustes del visor <small class="vwsub">›</small></button><hr><button data-onclick="lnInkMode()" title="Dibujar o escribir a mano sobre la página (con el dedo, el lápiz o el ratón)">${tick(VW.mode === 'ink')}✏ Lápiz</button>${p2MenuBtn()}<hr><button data-onclick="vwOut()">⬇ Descargar el PDF con las anotaciones</button>${vwAnns().length ? '<button data-onclick="vwMd()">⬇ Resumen de subrayados y comentarios (.md)</button>' : ''}
+  vwMenu(r, `<button data-keep data-onclick="vwReadMenu()">📖 Modo de lectura <small class="vwsub">${esc(vwRdSum())} ›</small></button><button data-keep data-onclick="vwBmMenu()">🔖 Marcadores <small class="vwsub">${vwBms().length || 'ninguno'} ›</small></button><button data-keep data-onclick="vwCfgMenu()">⚙ Ajustes del visor <small class="vwsub">›</small></button><hr><button data-onclick="lnInkMode()" title="Dibujar o escribir a mano sobre la página (con el dedo, el lápiz o el ratón)">${tick(VW.mode === 'ink')}✏ Lápiz</button>${p2MenuBtn()}<hr><button data-onclick="vwOut()">⬇ Descargar el PDF con las anotaciones</button>${vwAnns().length ? '<button data-onclick="vwMd()">⬇ Resumen de subrayados y comentarios (.md)</button>' : ''}
     ${vwCanShare() ? `<button data-onclick="vwOther(false)">📲 Abrir en otra app…</button>${vwAnns().length ? '<button data-onclick="vwOther(true)">📲 Abrir en otra app, con las anotaciones…</button>' : ''}` : ''}
     <button data-onclick="vwNative()">↗ Abrir con el visor del navegador</button>${vwAnns().length && !vwCanShare() ? '<button data-onclick="vwOther(true)">↗ Abrir con el visor del navegador, con las anotaciones</button>' : ''}
     ${P && !$('#dlg').open ? '<button data-onclick="vwFicha()">📝 Ficha del paper</button>' : ''}${VW.src?.kind === 'inbox' ? '<button data-onclick="vwCite()">＋ Crear la cita de este PDF</button>' : ''}
+    <hr><button data-onclick="cmdOpen(true)">🔎 Buscar una orden… <small class="vwsub">${esc(db.settings.shortcuts.palette || '')}</small></button>
 `);
 }
 function vwMenu(r, html) {   // menú desplegable dentro del visor (el de la aplicación queda debajo del visor)
