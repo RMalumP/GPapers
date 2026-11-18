@@ -2,6 +2,12 @@
 
 Lo más reciente arriba. Hasta la v39.53 estas notas estaban en el README; van de la más nueva a la más antigua (algunas rondas antiguas no tenían número de versión).
 
+## v40.2: los PDF de Google Drive se abren sin espera a ciegas
+- **Ventana de descarga al momento.** Al abrir un PDF que solo está en tu Google Drive (subido desde otro dispositivo) no se veía nada hasta tenerlo entero, a veces 10 s o más, salvo un aviso de 3 s. Ahora sale enseguida una ventana con el nombre, una barra con el porcentaje y lo que lleva («45 % · 1,2 de 2,7 MB») y **Cancelar** (o Escape). Se cierra sola al abrirse el visor.
+- **Más rápido**: PDF.js se carga mientras se descarga el archivo, y el PDF ya no se busca en Drive antes de cada descarga, porque la app recuerda dónde está desde la última sincronización (si ya no está ahí, lo busca). Como antes, después se queda una copia en el navegador y la próxima vez abre sin descargar.
+- **APK 1.2.1**: vuelve el permiso de notificaciones. Sin él, en Android 13 o más nuevo, el primer arranque pasaba por el logo de Chrome y la pantalla de inicio antes de mostrar la app.
+- Prueba nueva: `python3 pruebas/prueba_descarga.py .` (Drive simulado y lento: la ventana sale al momento, avanza, se cancela y el visor se abre).
+
 ## v40.1: los PDF vuelven a abrirse en todos los navegadores; repaso y estadísticas, opcionales
 - **Arreglo importante: el visor vuelve a PDF.js 4.10.** PDF.js 5.7 (v40) usa funciones de JavaScript tan nuevas (`Map.getOrInsertComputed`, `Math.sumPrecise`, `Promise.try`…) que un Chrome, Edge o Chromium de hace unos meses no las tiene, y ahí los PDF no llegaban a abrirse. En el móvil abrían, pero más despacio. La política de seguridad vuelve a ser la de antes (sin `wasm-unsafe-eval`). Prueba nueva: `python3 pruebas/prueba_navegador_viejo.py .` quita esas funciones del navegador y comprueba que el PDF se abre.
 - **🧠 Repaso de subrayados y 📊 Estadísticas de lectura** pasan a ser opciones de Configuración → Apariencia, **apagadas por defecto**. Apagadas no salen en la barra lateral ni en Ctrl+K, y con las estadísticas apagadas no se guarda nada mientras lees (tampoco se sincroniza cada 5 minutos). Lo ya guardado se conserva y vuelve a verse al encenderlas.

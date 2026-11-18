@@ -190,10 +190,23 @@ async function syPdfs(tok, files, m, N, pj = PJ.cur) {
 }
 const pdfSlots = (m, trash) => [...(trash ? syPapersOf(m) : m.papers || []).flatMap(p => pdfsOf(p).map(n => ({key: pdfKey(p.id, n), pf: p[pdfF(n)], p, n}))),
   ...(m.inbox || []).map(it => ({key: inKey(it.id), pf: it, it}))];   // todos los PDF del proyecto: de los papers (y de la papelera) y de la bandeja
-async function pdfFromDrive(id, name, quiet) {   // id: clave del hueco (pdfKey). El PDF subido por otro dispositivo (solo con acceso vigente: no se abre ninguna ventana de Google)
-  const tok = syOn() && syTokGet(); if (!tok) return null;
-  try { const nm = syNames(PJ.cur).pdf + id, f = (await syLs(tok, `name = '${nm}'`)).find(x => x.name === nm); if (!f) return null; if (!quiet) toast('Descargando el PDF de tu Google Drive…', [], 3000);
-    return new File([await (await syDrive(tok, `/drive/v3/files/${f.id}?alt=media`)).blob()], name, {type: docMime(name)}); } catch (e) { return null; }
+async function pdfFromDrive(id, name, quiet, ui) {   // id: clave del hueco (pdfKey). El PDF subido por otro dispositivo (solo con acceso vigente: no se abre ninguna ventana de Google)
+  const tok = syOn() && syTokGet(); if (!tok) return null;   // ui (v40.2): la ventana de descarga, con su progreso y Cancelar
+  try { const nm = syNames(PJ.cur).pdf + id; ui?.show(name);
+    for (const known of [true, false]) {   // v40.2: con el número del archivo ya visto en Drive no hace falta buscarlo antes (si ya no está, se busca)
+      const f = known ? SY_FID.get(nm) : (await syLs(tok, `name = '${nm}'`, ui?.signal)).find(x => x.name === nm); if (!f) continue;
+      if (!quiet && !ui) toast('Descargando el PDF de tu Google Drive…', [], 3000);
+      try { return new File([await syBlob(tok, f, ui)], name, {type: docMime(name)}); } catch (e) { if (!known || e.estado !== 404) throw e; SY_FID.delete(nm); }
+    }
+    return null;
+  } catch (e) { return null; }
+}
+async function syBlob(tok, f, ui) {   // v40.2: descarga contando lo que llega, para la barra de progreso
+  const r = await syDrive(tok, `/drive/v3/files/${f.id}?alt=media`, {signal: ui?.signal}), tot = +f.size || +r.headers.get('content-length') || 0;
+  if (!ui || !r.body?.getReader) return r.blob();
+  const rd = r.body.getReader(), parts = []; let got = 0; ui.prog(0, tot);
+  for (;;) { const {done, value} = await rd.read(); if (done) break; parts.push(value); got += value.length; ui.prog(got, tot); }
+  return new Blob(parts);
 }
 function setPdfDrive(on) { setCfg('pdfDrive', on); if (on && syAuto()) sySoon(500); }
 /* ---- Imágenes incrustadas aparte: en la biblioteca de Drive solo queda su huella ---- */
@@ -282,12 +295,14 @@ async function syDrive(tok, ruta, o = {}) {
   if (!r.ok) { const e = Error('drive ' + r.status); e.estado = r.status; throw e; }
   return r;
 }
-async function syLs(tok, q = "name contains 'gpapers-'") {   // archivos de esta aplicación en la carpeta oculta (que comparte con otras webs del mismo proyecto de Google); q: solo esos
+const SY_FID = new Map();   // v40.2: nombre → archivo de Drive (id y tamaño) de los PDF vistos al listar: abrir uno no tiene que buscarlo antes
+async function syLs(tok, q = "name contains 'gpapers-'", signal) {   // archivos de esta aplicación en la carpeta oculta (que comparte con otras webs del mismo proyecto de Google); q: solo esos
   const out = []; let pt = '';
   do {
-    const j = await (await syDrive(tok, '/drive/v3/files?spaces=appDataFolder&pageSize=1000&fields=nextPageToken,files(id,name,size,md5Checksum,modifiedTime)&q=' + encodeURIComponent(q) + (pt ? '&pageToken=' + encodeURIComponent(pt) : ''))).json();
+    const j = await (await syDrive(tok, '/drive/v3/files?spaces=appDataFolder&pageSize=1000&fields=nextPageToken,files(id,name,size,md5Checksum,modifiedTime)&q=' + encodeURIComponent(q) + (pt ? '&pageToken=' + encodeURIComponent(pt) : ''), {signal})).json();
     out.push(...(j.files || []).filter(f => f.name.startsWith('gpapers-'))); pt = j.nextPageToken;
   } while (pt);
+  for (const f of out) if (f.name.includes('-pdf-')) SY_FID.set(f.name, {id: f.id, size: f.size});
   return out;
 }
 const syLsFor = (tok, N) => syLs(tok, [SY_IDX, N.snap, N.legacy].filter(Boolean).map(n => `name = '${n}'`).concat([N.d, N.img, N.pdf].map(n => `name contains '${n}'`)).join(' or '))   // solo lo de este proyecto (y el índice): menos que listar
@@ -388,7 +403,7 @@ async function syGc(tok, files, idx) {   // archivos de proyectos borrados: los 
 }
 
 /* ---- Una vuelta de sincronización ---- */
-const syBlocked = () => [...document.querySelectorAll('dialog[open]')].some(d => !['help', 'pv', 'sy', 'cr', 'vw'].includes(d.id));   // ventanas que editan datos: no se les cambia nada debajo
+const syBlocked = () => [...document.querySelectorAll('dialog[open]')].some(d => !['help', 'pv', 'sy', 'cr', 'vw', 'dlw'].includes(d.id));   // ventanas que editan datos: no se les cambia nada debajo
 const syTrivial = () => !db.papers.length && !db.trash.length || path === 'ejemplo_papers.json' && !dirty;   // aquí solo está el ejemplo: manda Drive sin preguntar
 async function syOnce(inter) {
   const id = PJ.cur, N = syNames(id); await SY_BG.get(id);   // si se estaba subiendo en segundo plano, se espera

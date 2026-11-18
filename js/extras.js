@@ -219,12 +219,37 @@ async function pdfFile(key, pf, ask = true) {   // el archivo de un PDF enlazado
     if (h) try { if (await h.queryPermission({mode: 'read'}) === 'granted' || await h.requestPermission({mode: 'read'}) === 'granted') file = await h.getFile(); else { toast('Sin permiso para leer el PDF.'); return null; } } catch (e) { toast(`No se encuentra «${pf.name}»: elígelo de nuevo.`, [], 4000); }
   }
   if (!file) file = await pdfKept(key, pf.name) || (pf.from && await pdfKept(pf.from, pf.name));
-  if (!file) { file = await pdfFromDrive(key, pf.name) || (pf.from && await pdfFromDrive(pf.from, pf.name)); if (file) pdfKeep(key, file); }   // subido por otro dispositivo (o desde la bandeja)
+  if (!file) {   // subido por otro dispositivo (o desde la bandeja)
+    const ui = dlwNew(); try { file = await pdfFromDrive(key, pf.name, false, ui) || (pf.from && await pdfFromDrive(pf.from, pf.name, false, ui)); } finally { ui.end(); }
+    if (ui.signal.aborted) throw new DOMException('cancelado', 'AbortError'); if (file) pdfKeep(key, file);
+  }
   if (!file && ask) {   // archivo movido o sin copia en Drive: se vuelve a enlazar
     const r = await pdfChoose(key); file = r.file; if (r.h) idb('readwrite', st => st.put(r.h, 'pdf:' + key)).catch(() => {});
     if (file.name !== pf.name) toast(`Has elegido «${file.name}», distinto de «${pf.name}».`, [], 4000);
   }
   return file;
+}
+/* ---- v40.2: la ventana de descarga ----
+   Un PDF que solo está en Google Drive tardaba en abrirse sin que se viera nada (salvo un aviso de 3 segundos). Ahora, en cuanto se va a Drive,
+   sale una ventana con el nombre, la barra de progreso (porcentaje y MB) y Cancelar; se cierra al abrirse el visor. */
+const szStr = b => b < 1048576 ? Math.max(1, Math.round(b / 1024)) + ' KB' : (b / 1048576).toLocaleString('es', {minimumFractionDigits: 1, maximumFractionDigits: 1}) + ' MB';
+function dlwNew() {
+  const ac = new AbortController(); let d = null;
+  const ui = {signal: ac.signal,
+    show(name) {
+      if (d || ac.signal.aborted) return; d = document.createElement('dialog'); d.id = 'dlw'; d.setAttribute('aria-labelledby', 'dlwT');
+      d.innerHTML = `<p id="dlwT"></p><div class="dlwb ind" role="progressbar" aria-label="Progreso de la descarga" aria-valuemin="0" aria-valuemax="100"><i></i></div><p class="dlwn" aria-live="polite">Buscando el archivo…</p><div class="row dlwa"><button type="button">Cancelar</button></div>`;
+      d.querySelector('#dlwT').textContent = `Descargando «${name}» de tu Google Drive`;
+      d.querySelector('button').addEventListener('click', () => ac.abort()); d.addEventListener('cancel', e => { e.preventDefault(); ac.abort(); });
+      document.body.appendChild(d); d.showModal();
+    },
+    prog(got, tot) {
+      if (!d) return; const b = d.querySelector('.dlwb'), pc = tot ? Math.min(100, Math.round(got * 100 / tot)) : null;
+      b.classList.toggle('ind', pc === null); b.firstChild.style.width = (pc ?? 100) + '%'; pc === null ? b.removeAttribute('aria-valuenow') : b.setAttribute('aria-valuenow', pc);
+      d.querySelector('.dlwn').textContent = pc === null ? szStr(got) : `${pc} % · ${szStr(got)} de ${szStr(tot)}`;
+    },
+    end() { if (d) { d.close(); d.remove(); d = null; } }};
+  ac.signal.addEventListener('abort', () => ui.end()); return ui;
 }
 function pdfNative(file, page) {   // el visor del navegador, en otra pestaña (desde file:// o si se pide)
   if (isEpub(file.name)) return;   // un EPUB no tiene visor del navegador: se abre siempre en el lector propio
@@ -233,6 +258,7 @@ function pdfNative(file, page) {   // el visor del navegador, en otra pestaña (
 }
 async function pdfOpen(id, n = 1, ev) {
   const p = D && D.id === id && $('#dlg').open ? D : db.papers.find(x => x.id === id), pf = p && p[pdfF(n)], key = pdfKey(id, n); if (!pf) return;   // con el editor abierto, el borrador
+  if (vwCan() && !isEpub(pf.name)) vwLib().catch(() => {});   // v40.2: PDF.js se va cargando mientras se busca o se descarga el archivo
   try {
     const file = await pdfFile(key, pf); if (!file) return;
     vwOpenAny({kind: 'paper', id, n}, file, ev, pf.page); covFromOpen(id, n, file); contSet(id, n);
