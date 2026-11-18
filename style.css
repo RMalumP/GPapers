@@ -355,3 +355,7 @@ button.lnk{background:none;border:0;color:var(--pri);text-decoration:underline;p
 @supports (color: oklch(from red l c h)){:root{--onpri:oklch(from var(--pri) clamp(0, (.565 - l) * 1000, 1) 0 0)}.chip.on{color:oklch(from var(--c) clamp(0, (.565 - l) * 1000, 1) 0 0);text-shadow:none}}
 :root[data-theme=dark] .rst{color:color-mix(in srgb,var(--c),#fff 45%)}@media(prefers-color-scheme:dark){:root:not([data-theme=light]) .rst{color:color-mix(in srgb,var(--c),#fff 45%)}}
 #vwScroll:focus-visible,#epScroll:focus-visible{outline:2px solid var(--pri);outline-offset:-2px}
+/* v40.2: ventana de descarga de un PDF de Google Drive */
+#dlw{width:min(420px,92vw)}#dlwT{font-weight:600;overflow-wrap:anywhere}.dlwb{height:8px;border-radius:4px;background:var(--bd);overflow:hidden}.dlwb>i{display:block;height:100%;width:0;background:var(--pri);border-radius:4px;transition:width .2s}
+.dlwb.ind>i{width:40%!important;animation:dlwi 1.2s ease-in-out infinite}@keyframes dlwi{from{transform:translateX(-100%)}to{transform:translateX(250%)}}.dlwn{font-size:calc(13px * var(--fz,1));opacity:.8;font-variant-numeric:tabular-nums}.dlwa{justify-content:flex-end}
+@media(prefers-reduced-motion:reduce){.dlwb.ind>i{animation:none;width:100%!important;opacity:.5}}
