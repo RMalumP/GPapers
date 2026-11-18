@@ -58,6 +58,17 @@ with sync_playwright() as pw:
         eq('con la copia: abre sin ventana ni Drive', [p.evaluate(st)['dlw'], p.evaluate("__calls")], [False, []])
         p.wait_for_timeout(1500); eq('con la copia: visor abierto', p.evaluate(st)['vw'], True)
         p.evaluate("vwClose()"); p.wait_for_timeout(300)
+        # 1c) Android cerró la conexión con el almacenamiento (app en segundo plano): la copia se sigue encontrando
+        p.evaluate("(async () => { PDF_FILES.clear(); vwKeepDrop(); (await IDB_CONN).close(); __calls.length = 0; pdfOpen('p1', 1); })(); 0"); p.wait_for_timeout(1500)
+        eq('conexión cerrada: abre con la copia, sin Drive', [p.evaluate("__calls"), p.evaluate(st)['vw']], [[], True])
+        p.evaluate("vwClose()"); p.wait_for_timeout(300)
+        # 1d) el navegador borró la copia por su cuenta: se descarga y se dice por qué
+        p.evaluate("(async () => { PDF_FILES.clear(); vwKeepDrop(); await idb('readwrite', st => st.delete('pdfb:p1')); __calls.length = 0; pdfOpen('p1', 1); })(); 0"); p.wait_for_timeout(5500)
+        eq('copia borrada por el navegador: lo descarga y lo explica', [p.evaluate(st)['vw'], 'el navegador la ha borrado' in p.evaluate("$('#toast')?.textContent || ''")], [True, True])
+        p.evaluate("vwClose()"); p.wait_for_timeout(300)
+        # 1e) no se puede guardar la copia (sin espacio): se avisa en vez de callar
+        p.evaluate("(() => { const P = IDBObjectStore.prototype, o = P.put; P.put = function () { throw new DOMException('lleno', 'QuotaExceededError'); }; pdfKeep('zz', new File(['%PDF'], 'a.pdf')); setTimeout(() => P.put = o, 100); })()"); p.wait_for_timeout(300)
+        eq('sin espacio: avisa', 'no le queda espacio' in p.evaluate("$('#toast')?.textContent || ''"), True)
         # 2) otra vez sin la copia del navegador: ya sabe dónde está, no lo busca
         p.evaluate("(async () => { PDF_FILES.clear(); await pdfForget('p1'); __calls.length = 0; pdfOpen('p1', 1); })(); 0"); p.wait_for_timeout(3000)
         eq('la segunda vez: solo descargar', [p.evaluate("__calls"), p.evaluate(st)['vw']], [['media:F1'], True])

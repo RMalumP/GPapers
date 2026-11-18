@@ -82,6 +82,7 @@ async function forgetAppData() {
   BOOTED = false; clearTimeout(tSes); clearTimeout(tUi);
   const ks = await idb('readonly', st => st.getAllKeys()).catch(() => []);
   await idb('readwrite', st => { ks.filter(k => typeof k === 'string' && /^(session|ui|projects|proj:|projbad:|imgd:|img:|pdf:|pdfb:|pdft:|pdfUp:|pdfVis:|h:|bk:|bkd:|fav:|rec:|sync)/.test(k)).forEach(k => st.delete(k)); return st.count(); }).catch(() => {});
+  try { localStorage.removeItem('gp-kept'); } catch (e) {}
   toast('Datos de este navegador borrados. La próxima vez la aplicación arrancará limpia.');   // en esta pestaña ya no se guarda nada más
 }
 const reloadApp = async () => { RELOADING = true; await sessionNow(); await uiNow(); location.reload(); };

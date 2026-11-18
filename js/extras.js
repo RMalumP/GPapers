@@ -197,9 +197,19 @@ async function pdfChoose(key) {   // elige el archivo de un hueco (guardándolo 
 /* Sin acceso a archivos (móvil, Safari, Firefox) el navegador no puede volver a leer un PDF elegido: se guarda una copia en este navegador
    («pdfb:<clave>», hasta 100 MB), igual que la que se descarga de Google Drive, para no tener que elegirlo ni descargarlo cada vez. */
 const PDF_KEEP = 100 * 1048576;
-const pdfKeep = (key, file) => { if (file && file.size <= PDF_KEEP) idb('readwrite', st => st.put(new Blob([file], {type: docMime(file.name)}), 'pdfb:' + key)).catch(() => {}); };
+/* v40.2: guardar la copia ya no falla en silencio. Si no se puede (sin espacio, más de 100 MB), se avisa; y se apunta de qué PDF hay copia («gp-kept»),
+   para que, si al abrirlo ya no está, se sepa que la borró el navegador y no que nunca se guardó. */
+const KEPT_LS = 'gp-kept';
+const keptGet = () => { try { return new Set(JSON.parse(localStorage.getItem(KEPT_LS)) || []); } catch (e) { return new Set(); } };
+const keptMark = (keys, on) => { try { const s = keptGet(); [].concat(keys).forEach(k => on ? s.add(k) : s.delete(k)); localStorage.setItem(KEPT_LS, JSON.stringify([...s].slice(-3000))); } catch (e) {} };
+let KEEP_WARNED = false;
+const pdfKeepWarn = why => { if (KEEP_WARNED) return; KEEP_WARNED = true; toast(`No se pudo guardar una copia del PDF en este dispositivo (${why}), así que la próxima vez habrá que descargarlo otra vez.`, [], 9000); };
+const pdfKeep = (key, file) => { if (!file) return;
+  if (file.size > PDF_KEEP) return pdfKeepWarn('mide más de 100 MB');
+  idb('readwrite', st => st.put(new Blob([file], {type: docMime(file.name)}), 'pdfb:' + key)).then(() => keptMark(key, true),
+    e => pdfKeepWarn(e?.name === 'QuotaExceededError' ? 'no le queda espacio a la app' : 'error ' + (e?.name || e?.message || 'desconocido'))); };
 const pdfKept = async (key, name) => { const b = await idb('readonly', st => st.get('pdfb:' + key)).catch(() => null); return b instanceof Blob ? new File([b], name || 'documento.pdf', {type: docMime(name)}) : null; };
-const pdfForget = key => idb('readwrite', st => { st.delete('pdf:' + key); st.delete('pdfb:' + key); return st.delete('pdft:' + key); }).catch(() => {});
+const pdfForget = key => { keptMark(key, false); return idb('readwrite', st => { st.delete('pdf:' + key); st.delete('pdfb:' + key); return st.delete('pdft:' + key); }).catch(() => {}); };
 async function pdfPick(n = 1) {
   const f = pdfF(n);
   try { const {file} = await pdfChoose(pdfKey(D.id, n)); const o = D[f]; D[f] = o && o.name === file.name ? {...o} : {name: file.name, ...(pdfPage(o?.page) ? {page: o.page} : {}), ...(o?.vis ? {vis: o.vis} : {})}; drawD(); docOffer(file); }   // el mismo archivo (movido): se quedan sus anotaciones
@@ -220,8 +230,9 @@ async function pdfFile(key, pf, ask = true) {   // el archivo de un PDF enlazado
   }
   if (!file) file = await pdfKept(key, pf.name) || (pf.from && await pdfKept(pf.from, pf.name));
   if (!file) {   // subido por otro dispositivo (o desde la bandeja)
-    const ui = dlwNew(); try { file = await pdfFromDrive(key, pf.name, false, ui) || (pf.from && await pdfFromDrive(pf.from, pf.name, false, ui)); } finally { ui.end(); }
+    const K = keptGet(), lost = K.has(key) || !!pf.from && K.has(pf.from), ui = dlwNew(); try { file = await pdfFromDrive(key, pf.name, false, ui) || (pf.from && await pdfFromDrive(pf.from, pf.name, false, ui)); } finally { ui.end(); }
     if (ui.signal.aborted) throw new DOMException('cancelado', 'AbortError'); if (file) pdfKeep(key, file);
+    if (file && lost) pdfLostSay();
   }
   if (!file && ask) {   // archivo movido o sin copia en Drive: se vuelve a enlazar
     const r = await pdfChoose(key); file = r.file; if (r.h) idb('readwrite', st => st.put(r.h, 'pdf:' + key)).catch(() => {});
@@ -250,6 +261,10 @@ function dlwNew() {
     },
     end() { if (d) { d.close(); d.remove(); d = null; } }};
   ac.signal.addEventListener('abort', () => ui.end()); return ui;
+}
+async function pdfLostSay() {   // la copia estaba guardada y ya no: la borró el navegador (o el sistema, al liberar espacio)
+  let per = null; try { per = await navigator.storage?.persisted?.(); } catch (e) {}
+  setTimeout(() => toast(`Este PDF tenía una copia en el dispositivo, pero el navegador la ha borrado${per === false ? ' (suele hacerlo cuando falta espacio en el móvil)' : ''}, así que se ha descargado de nuevo.`, [], 9000), 3500);
 }
 function pdfNative(file, page) {   // el visor del navegador, en otra pestaña (desde file:// o si se pide)
   if (isEpub(file.name)) return;   // un EPUB no tiene visor del navegador: se abre siempre en el lector propio

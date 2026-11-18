@@ -10,9 +10,14 @@ const idbOpen = () => IDB_CONN ??= new Promise((res, rej) => {
   const r = indexedDB.open('gestor-papers', 1); r.onupgradeneeded = () => r.result.createObjectStore('k');
   r.onerror = () => { IDB_CONN = null; rej(r.error); };
   r.onsuccess = () => { const c = r.result; c.onversionchange = c.onclose = () => { c.close(); IDB_CONN = null; }; res(c); }; });
-const idb = (mode, fn) => idbOpen().then(c => new Promise((res, rej) => {   // IndexedDB: recuerda el último archivo entre sesiones
-  let t; try { t = c.transaction('k', mode); } catch (e) { IDB_CONN = null; return rej(e); }   // la conexión se cerró: la siguiente vez se abre otra
-  const q = fn(t.objectStore('k')); t.oncomplete = () => res(q && q.result); t.onerror = () => rej(t.error); t.onabort = () => rej(t.error); }));
+const idb = (mode, fn, again) => idbOpen().then(c => new Promise((res, rej) => {   // IndexedDB: recuerda el último archivo entre sesiones
+  // v40.2: si la conexión se cerró (Android la cierra a veces al dejar la app en segundo plano), se abre otra y se repite enseguida.
+  // Antes fallaba esa lectura: la copia del PDF parecía no estar y se volvía a descargar de Google Drive.
+  const retry = e => { IDB_CONN = null; if (again) rej(e); else res(idb(mode, fn, true)); };
+  let t; try { t = c.transaction('k', mode); } catch (e) { return retry(e); }
+  let q; try { q = fn(t.objectStore('k')); } catch (e) { try { t.abort(); } catch (e2) {} return mode === 'readonly' ? retry(e) : rej(e); }
+  t.oncomplete = () => res(q && q.result); t.onerror = () => rej(t.error);
+  t.onabort = () => mode === 'readonly' && (!t.error || t.error.name === 'InvalidStateError' || t.error.name === 'UnknownError') ? retry(t.error) : rej(t.error); }));
 /* ---- Copia de trabajo con las imágenes aparte ----
    Las imágenes incrustadas (data:) no van dentro del JSON de la copia de trabajo: cada una se guarda una sola vez en «imgd:<huella>»
    y el JSON lleva {kind: 'data', ref: huella} (marcado con img: 1). Así guardar la sesión tras cada cambio no reescribe todas las imágenes. */
@@ -69,7 +74,7 @@ async function pdfGc() {
       if (pre === 'img') return !pids.has(rest);
       if (pre === 'pdfUp' || pre === 'pdfVis') { const j = rest.indexOf(':'), pj = rest.slice(0, j); return !pjs.has(pj) || byPj.has(pj) && !byPj.get(pj).has(rest.slice(j + 1)); }
       return !used.has(rest); });
-    if (gone.length) await idb('readwrite', st => { gone.forEach(k => st.delete(k)); return null; });
+    if (gone.length) { await idb('readwrite', st => { gone.forEach(k => st.delete(k)); return null; }); keptMark(gone.filter(k => k.startsWith('pdfb:')).map(k => k.slice(5)), false); }
     return gone.length;
   } catch (e) { return 0; }
 }

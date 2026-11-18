@@ -134,7 +134,7 @@ function stoToggle(on) { setHas(CFG_OPEN, 'sto', on); const el = $('#cfgSto'); i
 async function stoFree(k) {
   if (k === 'gc') { const n = await pdfGc(); await imgGc(); toast(n ? `Se borraron ${n} ${n === 1 ? 'archivo que no se usaba' : 'archivos que no se usaban'}.` : 'No había nada sin usar.', [], 3500); }
   else if (k === 'drive') { const L = STO?.drive.keys || []; if (!L.length || !await askOk(`¿Borrar de este navegador ${L.length === 1 ? 'la copia de 1 PDF' : `las copias de ${L.length} PDF`} que ya están en tu Google Drive? Se vuelven a bajar al abrirlos (hace falta conexión).`, {ok: 'Borrar', danger: true})) return;
-    await idb('readwrite', st => { L.forEach(x => st.delete(x)); return null; }).catch(() => {}); }
+    await idb('readwrite', st => { L.forEach(x => st.delete(x)); return null; }).catch(() => {}); keptMark(L.map(x => x.slice(5)), false); }
   else { if (k === 'pdftx' && !await askOk('¿Borrar el texto preparado para buscar en los PDF y EPUB? Se vuelve a preparar al abrir cada documento.', {ok: 'Borrar', danger: true})) return;
     await idb('readwrite', st => st.delete(stoRange(k))).catch(() => {}); if (k === 'pdftx') { TX.mem = null; if (txOn()) renderQ(); } }
   STO = null; if ($('#cfg').open) drawCfg();
