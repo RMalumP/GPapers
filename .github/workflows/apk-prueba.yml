@@ -1,4 +1,5 @@
-# Prueba la app Android en un emulador: la instala, la abre y guarda lo que pasa (logcat), para ver si se cierra al arrancar.
+# Prueba la app Android en emuladores (Android 11, 13 y 14): la instala, la abre y comprueba a los 25 s que sigue en pantalla.
+# Guarda una captura, el logcat y la ventana con el foco como artefactos, para ver qué pasa si se cierra al arrancar.
 name: APK prueba en emulador
 on:
   workflow_dispatch:
@@ -9,6 +10,10 @@ permissions:
 jobs:
   emulador:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        api: [30, 33, 34]   # Android 11, 13 y 14
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -25,7 +30,7 @@ jobs:
       - name: Abrir la app en el emulador
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 34
+          api-level: ${{ matrix.api }}
           target: google_apis
           arch: x86_64
           disable-animations: true
@@ -33,9 +38,22 @@ jobs:
             adb install -r android/app/build/outputs/apk/debug/app-debug.apk
             adb logcat -c
             adb shell am start -W -n io.github.rmalump.gpapers/com.google.androidbrowserhelper.trusted.LauncherActivity
-            sleep 20
+            sleep 25
+            adb shell dumpsys window | grep -E "mCurrentFocus|mFocusedApp" | tee foco.txt || true
+            adb exec-out screencap -p > pantalla.png || true
             adb logcat -d -b crash > crash.txt || true
             adb logcat -d > logcat.txt || true
             echo "===== CRASH ====="; cat crash.txt
-            echo "===== APP ====="; grep -iE "gpapers|androidbrowserhelper|AndroidRuntime|TwaLauncher|FATAL" logcat.txt | head -200
+            echo "===== APP ====="; grep -iE "gpapers|androidbrowserhelper|AndroidRuntime|TwaLauncher|FATAL|ActivityManager.*(Killing|died)|cr_" logcat.txt | head -300
             if grep -q "FATAL EXCEPTION" crash.txt logcat.txt; then exit 1; fi
+            # a los 25 s tiene que verse la app (en Chrome o en la propia app), no la pantalla de inicio del móvil
+            if ! grep -qiE "chrome|gpapers" foco.txt; then echo "::error::La app no está en pantalla: se ha cerrado"; exit 1; fi
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: emulador-android-api${{ matrix.api }}
+          path: |
+            pantalla.png
+            logcat.txt
+            foco.txt
+          if-no-files-found: ignore
