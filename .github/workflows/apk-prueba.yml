@@ -1,4 +1,4 @@
-# Prueba la app Android en emuladores (Android 11, 13 y 14): la instala, la abre y comprueba a los 25 s que sigue en pantalla.
+# Prueba la app Android en emuladores (Android 11, 13, 14 y 15): la instala, la abre y comprueba a los 25 s que sigue en pantalla.
 # Guarda una captura, el logcat y la ventana con el foco como artefactos, para ver qué pasa si se cierra al arrancar.
 name: APK prueba en emulador
 on:
@@ -13,7 +13,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        api: [30, 33, 34]   # Android 11, 13 y 14
+        api: [30, 33, 34, 35]   # Android 11, 13, 14 y 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
