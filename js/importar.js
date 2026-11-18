@@ -281,10 +281,12 @@ async function impFile() {
     impText(text);
   } catch (e) { if (e.name !== 'AbortError') say('No se pudo leer el archivo: ' + e.message); }
 }
-function impText(t) {
+const impParse = t => isCsl(t) ? parseCsl(t) : /^\s*TY\s{2}-/m.test(t) ? parseRis(t) : /@\w+\s*\{/.test(t) ? parseBib(t) : isSdTxt(t) ? parseSd(t) : parseCites(t);
+async function impText(t) {
   t = t.replace(/^\uFEFF/, '');
   if (/^\s*[[{]/.test(t) && !isCsl(t)) { try { if (Array.isArray(JSON.parse(t).papers)) return say('Este JSON es un proyecto de la aplicación: ábrelo con Archivo ▾ → «Abrir un archivo JSON…».'); } catch (e) {} }
-  const refs = isCsl(t) ? parseCsl(t) : /^\s*TY\s{2}-/m.test(t) ? parseRis(t) : /@\w+\s*\{/.test(t) ? parseBib(t) : isSdTxt(t) ? parseSd(t) : parseCites(t);
+  let refs; if (t.length > 300000) { toast('Leyendo las referencias…', [], 30000); try { refs = await wk('parse', {t}); } catch (e) { refs = impParse(t); } toast('Listo.', [], 600); }   // v40: un archivo grande, en segundo plano
+  else refs = impParse(t);
   if (!refs.length) return say('No se reconoce ninguna referencia. Usa BibTeX (.bib), RIS (.ris), CSL-JSON (.json), el texto (.txt) de ScienceDirect o citas copiadas de Google Scholar, una por línea.');
   IMP = {mode: 'prev', refs: impPrepare(refs)}; impDraw(); if (!$('#imp').open) $('#imp').showModal();
 }

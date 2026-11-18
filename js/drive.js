@@ -47,6 +47,29 @@ function syNormS(d, s = syS(d)) {
   return o;
 }
 const syNorm = d => JSON.parse(syNormS(d));
+/* ---- Trabajo pesado en segundo plano (v40): normalizar, fusionar y leer BibTeX grandes en un Web Worker (js/trabajo.js) para que la app no se congele.
+   Si no hay worker (file://, un navegador sin él) o falla, se hace aquí, como antes: el resultado es el mismo. ---- */
+const WK = {w: null, n: 0, cb: new Map(), off: typeof importScripts === 'function'};   // dentro del propio worker, nunca
+function wkGet() {
+  if (WK.off || typeof Worker !== 'function' || !/^https?:$/.test(location.protocol)) return null;
+  if (!WK.w) try {
+    WK.w = new Worker('js/trabajo.js');
+    WK.w.onmessage = ({data: m}) => { const c = WK.cb.get(m.id); if (!c) return; WK.cb.delete(m.id); if (m.err != null) c.ko(Error(m.err)); else c.ok(m.r); };
+    WK.w.onerror = e => { e.preventDefault?.(); wkDown(); };
+  } catch (e) { WK.off = true; return null; }
+  return WK.w;
+}
+function wkDown() { WK.off = true; try { WK.w?.terminate(); } catch (e) {} WK.w = null; for (const c of WK.cb.values()) c.ko(Error('worker')); WK.cb.clear(); }
+function wk(job, data) { const w = wkGet(); if (!w) return Promise.reject(Error('sin worker')); return new Promise((ok, ko) => { const id = ++WK.n; WK.cb.set(id, {ok, ko}); w.postMessage({id, job, ...data}); }); }
+const syNmPut = (k, o) => { SY_NM.set(k, o); SY_NM.set(syHash(o), o); while (SY_NM.size > SY_NM_MAX) SY_NM.delete(SY_NM.keys().next().value); };
+async function syNormA(d, s = syS(d)) {   // como syNormS, en el worker
+  if (SY_NM.has(syHash(s))) return syNormS(d, s);
+  let o; try { o = await wk('norm', {s}); } catch (e) { return syNormS(d, s); }
+  syNmPut(syHash(s), o); return o;
+}
+async function syMergeA(lS, rS, b) {   // syNormS(syMerge(…)) en el worker; lS y rS ya normalizados (texto)
+  try { const o = await wk('merge', {l: lS, r: rS, b}); syNmPut(syHash(o), o); return o; } catch (e) { return syNormS(syMerge(JSON.parse(lS), JSON.parse(rS), b)); }
+}
 function syVal(x, y, z, hasB, mine) {   // un valor: si solo cambió un lado gana ese; si cambiaron los dos, «mine» decide (true = este dispositivo)
   if (syS(x) === syS(y)) return x;
   if (hasB && syS(x) === syS(z)) return y;
@@ -372,18 +395,18 @@ async function syOnce(inter) {
   const tok = await syToken(inter), full = syGcDue() || PJ.gone.length > 0, files = full ? await syLs(tok) : await syLsFor(tok, N);
   const [I, iB, R] = await Promise.all([syIdxGet(tok, files), idb('readonly', st => st.get('syncIdxBase')).catch(() => null), syRemote(tok, files, N)]);   // a la vez: menos esperas
   const rw = R.w ? await syUnwire(tok, R.w, files, N) : null;
-  const snap = syTokS(db), plain = JSON.parse(snap), curS = syNormS(plain, snap);
+  const snap = syTokS(db), plain = JSON.parse(snap), curS = await syNormA(plain, snap);
   const iM = I.w ? syIdxMerge(syIdxLocal(plain.settings), I.w, iB) : syIdxLocal(plain.settings);
   for (const p of PJ.list) if ((p.id === id ? dirty : p.dirty) && !iM.projects.some(e => e.id === p.id)) iM.projects.push(pjEntry(p));   // borrado en otro dispositivo, pero aquí tiene cambios sin guardar: se queda
   if (!iM.projects.some(e => e.id === id)) {   // el proyecto abierto se borró en otro dispositivo: se pasa a otro
     if (iM.projects.length) { syIdxApply(iM); return {gone: id}; }
     iM.projects.push(pjEntry(pjCur()));
   }
-  const localS = syNormS({...plain, settings: {...iM.settings, ...syOwn(plain.settings)}}), local = JSON.parse(localS);   // con los ajustes comunes que llegan del índice
+  const localS = await syNormA({...plain, settings: {...iM.settings, ...syOwn(plain.settings)}}), local = JSON.parse(localS);   // con los ajustes comunes que llegan del índice
   let mS = localS, replace = false;
   if (rw) {
-    const remoteS = syNormS(rw), remote = JSON.parse(remoteS), base = await syBase(N);
-    if (base) mS = syNormS(syMerge(local, remote, base));
+    const remoteS = await syNormA(rw), remote = JSON.parse(remoteS), base = await syBase(N);
+    if (base) mS = await syMergeA(localS, remoteS, base);
     else if (localS === remoteS || syTrivial()) { mS = remoteS; replace = syTrivial(); }
     else { const c = await syAsk(local, remote); if (!c) return {cancel: true};
       mS = c === 'merge' ? syNormS(syMerge(local, remote, null)) : c === 'drive' ? remoteS : localS; replace = c === 'drive'; }

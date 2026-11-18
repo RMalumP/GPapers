@@ -188,7 +188,6 @@ function progDraw() {   // barra de progreso de lectura del proyecto, en la cabe
    en IndexedDB («pdf:<clave>») y la copia en Google Drive («gpapers-pdf-<clave>»). */
 const PDF_T = [{description: 'PDF o EPUB', accept: {'application/pdf': ['.pdf'], 'application/epub+zip': ['.epub']}}], DOC_ACC = '.pdf,.epub,application/pdf,application/epub+zip', PEND_PDF = new Map(), PDF_FILES = new Map();   // PEND_PDF: elegidos en el borrador · PDF_FILES: archivos de esta sesión (sin acceso a archivos); ambos por clave
 const PDF_N = [1, 2], pdfF = n => n === 2 ? 'pdf2' : 'pdf', pdfKey = (id, n) => n === 2 ? id + '~2' : id;
-const pdfPage = v => { v = parseInt(v, 10); return Number.isInteger(v) && v > 0 && v < 100000 ? v : 0; };
 const pdfsOf = p => PDF_N.filter(n => p[pdfF(n)]);   // huecos con PDF de un paper
 async function pdfChoose(key) {   // elige el archivo de un hueco (guardándolo en el borrador o en el paper); devuelve el File
   if (FSA) { const [h] = await showOpenFilePicker({types: PDF_T}); PEND_PDF.set(key, h); return {file: await h.getFile(), h}; }

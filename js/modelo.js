@@ -150,6 +150,7 @@ function annClean(l) {   // el mismo orden de campos siempre: normalizar dos vec
   return out;
 }
 /* EPUB (v39.42): van en los mismos huecos que los PDF («pdf» y «pdf2», la bandeja); el formato lo dice la extensión del nombre */
+const pdfPage = v => { v = parseInt(v, 10); return Number.isInteger(v) && v > 0 && v < 100000 ? v : 0; };   // (v40: aquí, para que validate() funcione también en el worker)
 const isEpub = n => /\.epub$/i.test(String(n || ''));
 const isDoc = f => !!f && (/\.(pdf|epub)$/i.test(f.name || '') || f.type === 'application/pdf' || f.type === 'application/epub+zip');   // un archivo que se puede enlazar (PDF o EPUB)
 const docMime = n => isEpub(n) ? 'application/epub+zip' : 'application/pdf';

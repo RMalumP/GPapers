@@ -55,6 +55,7 @@ with sync_playwright() as pw:
     eq('sin papers: botones para empezar', A.evaluate("[...document.querySelectorAll('#list .empty0 button')].map(b => b.getAttribute('data-onclick'))"), ["openImport('doi')", "openImport('file')", 'inboxPick()', 'openPaper()'])
     A.evaluate("db.papers.push(P('a', 'Uno', {doi: '10.1000/a'}), P('b', 'Dos', {doi: '10.1000/b'}), P('c', 'Tres', {doi: '10.1000/c'})); markDirty(); qSet('zzzz', true)")
     eq('con filtros sin resultados: dice cuáles y ofrece limpiarlos', A.evaluate("[!!$('#list .empty1'), /zzzz/.test($('#list .empty1').textContent)]"), [True, True])
+    eq('sin nada abierto, la franja «Seguir leyendo» no ocupa sitio', A.evaluate("getComputedStyle($('#cont')).display"), 'none')
     A.click('#list .empty1 button'); A.wait_for_timeout(200)
     eq('«Limpiar filtros» vuelve a mostrarlos todos', A.evaluate("document.querySelectorAll('#list .card').length"), 3)
 
@@ -196,6 +197,18 @@ with sync_playwright() as pw:
       await c.put('/compartido/0', new Response(b, {headers: {'Content-Type': 'application/pdf', 'X-Name': encodeURIComponent('compartido.pdf')}})); })()"""); A.wait_for_timeout(200)
     A.evaluate("shareFiles()"); A.wait_for_timeout(1200)
     eq('un PDF compartido llega a la bandeja y se borra de la caché', A.evaluate("(async () => [db.inbox.some(i => i.name === 'compartido.pdf'), (await (await caches.open('gp-share')).keys()).length])()"), [True, 0])
+
+    # ---- Trabajo pesado en un worker (R8)
+    eq('normalizar en el worker da lo mismo que aquí', A.evaluate("(async () => { db.trash.push({at: new Date().toISOString(), paper: P('t9', 'En la papelera')}); db.papers[2].image = {kind: 'data', data: 'data:image/png;base64,iVBORw0KGgo='}; db.orders = [{id: 'o1', name: 'Prioridad', of: 'tag', fmt: 'num'}]; const s = syTokS(db); return [await wk('norm', {s}) === syNormRaw(JSON.parse(s)), WK.off, db.inbox.length > 0]; })()"), [True, False, True])
+    eq('fusionar en el worker da lo mismo que aquí', A.evaluate("""(async () => { const L = JSON.parse(syNormS(JSON.parse(syTokS(db)))), R = structuredClone(L), B = structuredClone(L);
+      L.papers[0].title = 'Cambio aquí'; R.papers[1].year = 1999; R.readLog = {'2026-01-01': {zz: {s: 9, p: 0}}};
+      const lS = syNormS(L), rS = syNormS(R), w = await syMergeA(lS, rS, B), m = syNormS(syMerge(JSON.parse(lS), JSON.parse(rS), B)); const o = JSON.parse(w);
+      return [w === m, o.papers[0].title, o.papers[1].year, !!o.readLog['2026-01-01'].zz]; })()"""), [True, 'Cambio aquí', 1999, True])
+    big = "\n".join(f"@article{{k{i}, title={{Título {i}}}, author={{García, Ana and Li, Wei}}, year={{2020}}, journal={{Revista}}, abstract={{{'x' * 400}}}}}" for i in range(800))
+    A.evaluate("t => impText(t)", big); A.wait_for_timeout(2500)
+    eq('un BibTeX grande se lee en el worker', A.evaluate("[IMP.refs.length, IMP.refs[799].key, $('#imp').open]"), [800, 'k799', True])
+    A.evaluate("$('#imp').close(); wkDown()")
+    eq('sin worker, todo sigue funcionando aquí', A.evaluate("(async () => { const s = syTokS(db); return [await syNormA(JSON.parse(s), s + ' ') === syNormRaw(JSON.parse(s)), WK.off]; })()"), [True, True])
 
     # ---- Accesibilidad (I7)
     eq('en el ordenador, la barra lateral no se oculta a los lectores de pantalla', A.evaluate("[$('#side').getAttribute('aria-hidden'), $('#side').inert]"), [None, False])
