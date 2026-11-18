@@ -30,11 +30,11 @@ function vwShowAt(p, y) {   // lleva a la vista el punto y (en puntos de la pág
   const sc = $('#vwScroll'); if (VW.flip && !p.el.classList.contains('cur')) vwGo(p.i, true);
   sc.scrollTo({top: p.el.offsetTop + y * VW.scale - sc.clientHeight / 3}); if (!VW.flip) VW.cur = vwSpread(p.i);
 }
-function vwReadTap(x, hadPop) {   // toque en una zona vacía de la página: lo usa el modo de lectura (devuelve true) o sigue como siempre
+function vwReadTap(x, y, hadPop) {   // toque en una zona vacía de la página: lo usa el modo de lectura (devuelve true) o sigue como siempre
   if (hadPop) return false;   // el toque cerraba una ventanita
   const R = $('#vwScroll').getBoundingClientRect(), f = (x - R.left) / Math.max(1, R.width), z = f < .3 ? -1 : f > .7 ? 1 : 0;
   if (VW.auto) { if (z) vwAutoSpeed(z); else vwAutoPause(); return true; }
-  if (VW.flip && z) { vwStep(z); return true; }
+  if (VW.flip) { const p = pzAt(x, y, $('#vwScroll')); if (p) { vwStep(p); return true; } }   // v40.3: zonas a elegir (👆 Zonas para pasar)
   return false;
 }
 function vwRdSet(k, v) {
@@ -47,7 +47,7 @@ function vwRdSet(k, v) {
   if (VW.zLock) vwLockSet(false, true);   // otra forma de ver las páginas: el tamaño vuelve a ajustarse
   vwFlipShow(); vwFitW(); vwGo(i, true);   // el zoom vuelve a «ajustar»: una página, dos o la página entera
   if (flipOn) toast('Doble página de una en una: toca a la derecha o a la izquierda para pasar (página a página).', [], 2800);
-  else if (k === 'flip' && VW.flip) toast('Toca a la izquierda o a la derecha de la página para pasar a la anterior o la siguiente.', [], 2600);
+  else if (k === 'flip' && VW.flip) { toast(`Toca la página para pasar (zonas: ${pzName().toLowerCase()}; se cambian en 📖 Modo de lectura → 👆).`, [], 2800); pzShow(false); }
 }
 function vwReadMenu() {
   vwMenu(VW.menuR, `<button data-keep data-onclick="vwMoreBack()">‹ Volver</button><hr><div class="ctxh">Páginas</div>
@@ -58,8 +58,8 @@ function vwReadMenu() {
     <button data-onclick="vwRdSet('one',1)" title="La de la derecha pasa a la izquierda y entra la siguiente (con página a página)">${tick(vwOne())}↪ Pasar de una en una</button>` : ''}
     <hr><div class="ctxh">Pasar de página</div>
     <button data-onclick="vwRdSet('flip',0)">${tick(!VW.flip)}↕ Desplazando (todo seguido)</button>
-    <button data-onclick="vwRdSet('flip',1)">${tick(VW.flip)}👆 Página a página, con toques a los lados</button>
-    ${VW.flip ? `<button data-onclick="vwLockSet(${VW.zLock ? 0 : 1})" title="No deja cambiar el zoom y, al pasar de página, se queda el mismo tamaño y la misma zona">${tick(VW.zLock)}🔒 Candado del tamaño <small class="vwsub">K</small></button>` : ''}
+    <button data-onclick="vwRdSet('flip',1)">${tick(VW.flip)}👆 Página a página, con toques</button>
+    ${VW.flip ? pzBtn(false) : ''}${VW.flip ? `<button data-onclick="vwLockSet(${VW.zLock ? 0 : 1})" title="No deja cambiar el zoom y, al pasar de página, se queda el mismo tamaño y la misma zona">${tick(VW.zLock)}🔒 Candado del tamaño <small class="vwsub">K</small></button>` : ''}
     <hr><button data-keep data-onclick="vwAutoMenu()">⏬ Desplazamiento automático <small class="vwsub">${VW.auto ? (VW.autoPaused ? 'en pausa' : 'en marcha') : 'parado'}${vwConcOn() ? ' · concentración' : ''} ›</small></button>
     <hr><button data-onclick="vwRdSet('crop',${VW.crop ? 0 : 1})" title="Quita los márgenes en blanco de las páginas para que el texto se vea más grande">${tick(VW.crop)}✂ Recortar los márgenes${VW.cropM?.hand ? ' (a mano)' : ' (automático)'}</button>
     ${VW.crop ? '<button data-keep data-onclick="lnCropMenu()">✂ Ajustar el recorte… <small class="vwsub">›</small></button>' : ''}

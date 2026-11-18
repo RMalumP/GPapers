@@ -345,7 +345,7 @@ function epClick(e) {
   if (tsStr() || EP.swiped && Date.now() - EP.swiped < 400) return;
   if (EP.auto) { if (epConcTap()) return; const x = e.clientX / innerWidth; return x < .3 ? epAutoSpeed(-1) : x > .7 ? epAutoSpeed(1) : epAutoPause(); }
   if (!$('#epPop').hidden) return epPopClose();
-  if (EP.paged) { const r = $('#epScroll').getBoundingClientRect(), x = (e.clientX - r.left) / r.width; if (x < .3) epStep(-1); else if (x > .7) epStep(1); }
+  if (EP.paged) { const z = pzAt(e.clientX, e.clientY, $('#epScroll')); if (z) epStep(z); }   // v40.3: zonas a elegir (👆 Zonas para pasar)
 }
 function epNotePop(a, i, f) {   // las llamadas a nota: el texto de la nota en una ventanita, sin saltar
   const el = f && document.getElementById('ep' + i + '-' + f), box = el && (el.closest('li, aside, p, div, section') || el), t = box && box !== EP.secs[i] && epTxt(box);
@@ -603,9 +603,10 @@ function epCfgMenu() { epMenu(EP.menuR, vwCfgHtml(true)); }
 function epReadMenu() {
   const s = epSet(), o = (on, fn, t, k) => `<button data-onclick="${fn}">${tick(on)}${t}${k ? ` <small class="vwsub">${k}</small>` : ''}</button>`;
   epMenu(EP.menuR, `<button data-keep data-onclick="epMoreBack()">‹ Volver</button><hr>
-    ${o(!EP.auto && s.mode === 'scroll', "epMode('scroll')", '↕ Seguido (desplazar)', '')}${o(!EP.auto && s.mode === 'page' && !s.two, "epMode('page')", '📄 Página a página, con toques a los lados', 'P')}${o(!EP.auto && s.mode === 'page' && s.two, "epMode('two')", '📖 Doble página', 'D')}
+    ${o(!EP.auto && s.mode === 'scroll', "epMode('scroll')", '↕ Seguido (desplazar)', '')}${o(!EP.auto && s.mode === 'page' && !s.two, "epMode('page')", '📄 Página a página, con toques', 'P')}${o(!EP.auto && s.mode === 'page' && s.two, "epMode('two')", '📖 Doble página', 'D')}
     ${!EP.auto && s.mode === 'page' && s.two ? `${o(!s.one, "epSetPut('one',false)", '⏩ Pasar de dos en dos', '')}${o(s.one, "epSetPut('one',true)", '↪ Pasar de una en una (la derecha pasa a la izquierda)', '')}` : ''}
-    <div class="vwhint">Página a página: toca a la izquierda o a la derecha (o desliza, o ← →) para pasar. La doble página necesita una pantalla ancha.</div><hr>
+    ${!EP.auto && s.mode === 'page' ? pzBtn(true) : ''}
+    <div class="vwhint">Página a página: toca la página (👆 Zonas para pasar), desliza o usa ← → para pasar. La doble página necesita una pantalla ancha.</div><hr>
     <button data-onclick="${EP.auto ? 'epAutoStop()' : 'epAutoStart()'}">${EP.auto ? '⏹ Parar el desplazamiento automático' : '⏬ Desplazamiento automático'} <small class="vwsub">A</small></button>
     <button data-onclick="epConcSet(${vwConcOn() ? 0 : 1})">${tick(vwConcOn())}🧘 Modo concentración <small class="vwsub">C</small></button>${sayCan() ? '<hr>' + sayMenuBtn(true) : ''}`);
 }

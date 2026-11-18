@@ -2,6 +2,14 @@
 
 Lo más reciente arriba. Hasta la v39.53 estas notas estaban en el README; van de la más nueva a la más antigua (algunas rondas antiguas no tenían número de versión).
 
+## v40.3: zonas para pasar de página, a elegir
+- **👆 Zonas para pasar** (📖 Modo de lectura, en página a página, en el PDF y en el EPUB). Antes solo se pasaba tocando a la izquierda o a la derecha. Ahora la página se parte en 3 × 3 casillas y se elige qué hace cada una:
+  - **Izquierda y derecha** (como antes, por defecto), **Arriba y abajo** (arriba vuelve, abajo pasa), **Al revés** (derecha, anterior) y **Casi todo adelante** (solo la columna izquierda vuelve).
+  - **Hasta tres personalizadas**: cada casilla se toca para cambiarla entre ◀ Anterior, Siguiente ▶ o nada. Las casillas «—» siguen como siempre (subrayar, menús, pantalla completa). Se puede empezar copiando una de las formas hechas.
+  - Al elegir o cambiar, las zonas se ven un momento sobre la página (azul: anterior; verde: siguiente). Se recuerda en el dispositivo.
+- Deslizar, las flechas del teclado y el desplazamiento automático no cambian.
+- Prueba nueva: `python3 pruebas/prueba_visor_zonas.py .`
+
 ## APK 1.2.2: pantalla de carga de GPapers al abrir la app
 - Al abrir la app de Android, mientras Chrome arranca, ahora se ve el fondo de GPapers con su icono. Antes la primera ventana era transparente y, sobre todo en el primer arranque, se veía la pantalla de inicio del móvil durante 2 o 3 segundos. La 1.1 ya lo hacía.
 - La prueba del emulador (`apk-prueba.yml`) compara el arranque de la versión de `main` con la nueva y dice qué colores se ven en pantalla cada medio segundo.
