@@ -458,6 +458,7 @@ const sySoon = (ms = 3000) => { clearTimeout(SY.tm); SY.tm = setTimeout(() => { 
 const syAuto = () => syOn() && syP().auto !== false;
 function syApply(m, replace) {   // pone en la app lo que llega de Drive (se puede deshacer)
   if (replace) bkTake('Antes de reemplazar por Google Drive');
+  recFlush();   // un cambio de aquí aún sin copia para deshacer: se copia antes de que llegue lo de Drive
   const hist = new Map(db.papers.map(p => [p.id, p.history]));
   SY.applying = true;
   try {

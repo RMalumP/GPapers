@@ -116,12 +116,15 @@ function imgOk(i) {   // imagen del paper: URL, archivo local enlazado (solo el 
   if (i.kind === 'file' && typeof i.name === 'string' && i.name) return {kind: 'file', name: i.name};
   return null;
 }
+const KEY_RX = /^[A-Za-z0-9_][A-Za-z0-9_:.+-]{0,63}$/;   // clave de cita: lo que aceptan BibTeX, biblatex y Pandoc sin escapar
 function NEWF(p) {   // rellena los campos nuevos de un paper (JSON antiguo, importados, papelera) sin tocar los existentes
   for (const k of STR_F) p[k] = typeof p[k] === 'string' ? p[k] : '';
   p.editors = Array.isArray(p.editors) ? p.editors.filter(x => typeof x === 'string' && x.trim()) : [];
   p.authorType = Object.hasOwn(AUTH_T, p.authorType) ? p.authorType : 'auto';
   p.linkMode = Object.hasOwn(LINK_MODES, p.linkMode) ? p.linkMode : 'auto'; p.hideAccessed = !!p.hideAccessed; p.image = imgOk(p.image);
   for (const k of ['pdf', 'pdf2']) p[k] = pdfClean(p[k]);   // hasta dos PDF enlazados (con sus subrayados y comentarios)
+  if (p.retracted !== true) delete p.retracted;   // v40: retractado según OpenAlex (solo se guarda si lo está)
+  if (typeof p.key !== 'string' || !KEY_RX.test(p.key)) delete p.key;   // v40: clave de cita fija (BibTeX, Pandoc), solo si se fijó
   return p;
 }
 /* ===== PDF: subrayados, comentarios y notas (visor, js/visor.js) =====

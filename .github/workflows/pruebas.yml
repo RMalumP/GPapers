@@ -16,16 +16,33 @@ jobs:
       - run: node pruebas/prueba_version.js .
       - run: node pruebas/pruebas_citas.js .
       - run: node pruebas/prueba_eventos.js .
+  # Todas las pruebas de navegador (pruebas/prueba_*.py), repartidas en 5 grupos: una prueba nueva entra sola, sin tocar este archivo.
+  # Chromium se guarda en caché entre ejecuciones (solo se descarga si cambia la versión de Playwright).
   navegador:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        prueba: [f4, ui, sync, visor, visor_notas, visor_fases, visor_lectura, visor_extras, visor_mejoras, visor_pasar, visor_rapido, visor_tactil, visor_ajustes, epub, proyectos, mejoras, interfaz, derecho, principal, importar, rendimiento, movil, motor, varias_secciones, tabla_seleccion, auditoria]
+        grupo: [0, 1, 2, 3, 4]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-1.63.0-chromium
       - run: pip install playwright==1.63.0 && python -m playwright install --with-deps chromium
-      - run: python pruebas/prueba_${{ matrix.prueba }}.py .
+      - name: Pruebas del grupo ${{ matrix.grupo }}
+        run: |
+          fallos=0; i=0
+          for f in pruebas/prueba_*.py; do
+            if [ $((i % 5)) -eq ${{ matrix.grupo }} ]; then
+              echo "::group::$f"
+              python "$f" . || { echo "::error::$f falló"; fallos=1; }
+              echo "::endgroup::"
+            fi
+            i=$((i + 1))
+          done
+          exit $fallos

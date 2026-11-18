@@ -19,8 +19,8 @@ with sync_playwright() as pw:
     pg.goto('file://' + str(folder / 'index.html')); pg.wait_for_timeout(300)
     # ---- Deshacer: las imágenes incrustadas no se copian en cada paso
     pg.evaluate(SEED, 3)
-    pg.evaluate("img => { db.papers[0].image = {kind: 'data', data: img}; markDirty(); }", IMG)
-    pg.evaluate("lastRecAt = 0; db.papers[1].title = 'Cambio'; markDirty()")
+    pg.evaluate("img => { db.papers[0].image = {kind: 'data', data: img}; markDirty(); recFlush(); }", IMG)   # v40: la copia para deshacer se hace un momento después; recFlush la hace ya
+    pg.evaluate("lastRecAt = 0; db.papers[1].title = 'Cambio'; markDirty(); recFlush()")
     eq('la copia para deshacer no lleva la imagen', pg.evaluate("img => UNDO.some(u => snapStr(u).includes(img))", IMG), False)
     eq('sin imágenes la copia es el JSON de siempre (sin el historial del día)', pg.evaluate("(db.papers[0].image = null, snapStr(snapDb()) === JSON.stringify(db, (k, v) => k === 'history' ? undefined : v))"), True)
     pg.evaluate("img => { db.papers[0].image = {kind: 'data', data: img}; }", IMG)

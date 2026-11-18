@@ -25,7 +25,7 @@ function privHTML() {
   const on = syOn(), p = syP();
   return `<div class="dh"><h2>Privacidad</h2><div class="dbtn"><button data-onclick="$('#pv').close()">Cerrar ✕</button></div></div><div class="sytx">
     <h4>Qué datos se tratan y dónde</h4><p>Tus proyectos (papers, notas, secciones, etiquetas y papelera) y tus ajustes se guardan <b>en tu navegador</b> (copia de trabajo de cada proyecto en el almacenamiento de la aplicación) y en los <b>archivos JSON</b> que tú eliges. No se envían a ningún servidor de quien mantiene la aplicación: no hay cuentas, ni analíticas, ni publicidad, ni cookies de seguimiento.</p>
-    <h4>Cuándo sale algo a internet</h4><ul><li><b>Buscar por DOI, ISBN o título</b>: se envía el DOI o el título a CrossRef (api.crossref.org), o el ISBN a Open Library (openlibrary.org), para traer los datos.</li><li><b>Completar con OpenAlex</b> (botón en Datos): se envía el DOI o el título a OpenAlex (api.openalex.org) para traer el resumen, las citas y el enlace al PDF en abierto.</li>
+    <h4>Cuándo sale algo a internet</h4><ul><li><b>Buscar por DOI, ISBN, arXiv, PMID o título</b>: se envía el DOI o el título a CrossRef (api.crossref.org); si CrossRef no conoce el DOI (arXiv, Zenodo…), a doi.org, que lo pasa a su agencia (DataCite, mEDRA…); el PMID a PubMed (api.ncbi.nlm.nih.gov) y el ISBN a Open Library (openlibrary.org), para traer los datos.</li><li><b>Completar con OpenAlex</b> (botón en Datos): se envía el DOI o el título a OpenAlex (api.openalex.org) para traer el resumen, las citas y el enlace al PDF en abierto.</li>
     <li><b>Imágenes por URL</b>: tu navegador las descarga de la web donde están.</li>
     <li><b>Sincronización con Google Drive</b>, solo si la activas (abajo).</li></ul>
     <h4>Sincronización con Google Drive (opcional)</h4><p>Si pulsas 🔄 y das permiso, la aplicación guarda una copia de tus proyectos (archivos <code>gpapers-…</code>: la lista de proyectos con los ajustes, cada proyecto, los cambios de cada autoguardado y las imágenes incrustadas) en una <b>carpeta privada y oculta de tu propio Google Drive</b>. Usa el permiso <code>drive.appdata</code>, que solo deja ver, crear y borrar esa carpeta concreta: la aplicación <b>no puede leer ni modificar ningún otro archivo de tu Drive</b>.</p>
@@ -246,7 +246,7 @@ function docFill(p, r) {   // pone en el paper (o el borrador) los datos que le 
   return ks;
 }
 async function docFillDoi(id, doi) {
-  toast('Buscando los datos del DOI en CrossRef…', [], 2500); let r; try { r = await fetchDoi(doi); } catch (e) { return toast(e.message, [], 5000); }
+  toast('Buscando los datos del DOI…', [], 2500); let r; try { r = await fetchDoi(doi); } catch (e) { return toast(e.message, [], 5000); }
   if (D?.id !== id || !$('#dlg').open) openPaper(id); if (D?.id !== id) return;
   const ks = docFill(D, {...r, doi}); drawD(); toast(ks.length ? `Completado: ${ks.map(k => DOC_FL[k] || k.toUpperCase()).join(', ')}. Revísalo y guarda la ficha.` : 'La ficha ya tenía esos datos.', [], 5000);
 }
@@ -382,7 +382,7 @@ async function bkRestore(i) {
   if (!await askOk(`¿Restaurar la copia del ${bkFmt(c)} (${c.n} papers)?\nSe sustituye lo que hay ahora en «${pjCur().name}»; antes se guarda una copia del estado actual y puedes deshacerlo (${db.settings.shortcuts.undo}).`)) return;
   let d; try { d = JSON.parse(await bkJSON(c)); d.settings = structuredClone(db.settings); d = validate(d); } catch (e) { return say('La copia no es válida: ' + e.message); } finally { syncTypes(db.settings.customTypes); syncStyles(db.settings.customStyles, db.settings.export); }
   await bkTake('Antes de restaurar', true);
-  const hist = new Map(db.papers.map(p => [p.id, p.history])); db = d; db.papers.forEach(p => p.history = hist.get(p.id) || []);
+  recFlush(); const hist = new Map(db.papers.map(p => [p.id, p.history])); db = d; db.papers.forEach(p => p.history = hist.get(p.id) || []);
   for (const id of [...SEL]) if (!db.papers.some(p => p.id === id)) SEL.delete(id);
   lastRecAt = 0; record(); markDirty(); applySettings(); render(); bkOpen(); toast('Copia restaurada. Lo anterior sigue en las copias y se puede deshacer.', [], 5000);
 }

@@ -321,3 +321,14 @@ html:not(.mv) #sbMain{flex:1 1 auto;overflow-y:auto;overflow-x:hidden;scrollbar-
 .fav .fvi{margin-right:6px;font-size:calc(12px * var(--fz,1))}.favk{margin:0 0 6px}.favk button{flex:1;font-size:calc(12px * var(--fz,1));padding:3px 6px}#favN{display:flex;flex-direction:column;gap:6px;margin-bottom:6px}#favN[hidden]{display:none}#favH{opacity:.7}
 /* Tamaño del texto de la interfaz (v39.41) */
 .uifz{gap:8px;margin:6px 0 10px}.uifz button{padding:3px 8px;line-height:1.2}
+/* Lista vacía (v40): en un proyecto sin papers, tres formas de empezar; con filtros, cuáles y «Limpiar filtros» */
+.empty0{max-width:720px;margin:24px auto;text-align:center}.empty0 h2{margin:0 0 6px;font-size:calc(22px * var(--fz,1))}.empty0>p{opacity:.8;margin:6px 0 14px}
+.e0b{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px}.e0b button{display:flex;flex-direction:column;align-items:center;gap:4px;padding:16px 12px;border-radius:10px;text-align:center}
+.e0b button b{font-size:calc(28px * var(--fz,1))}.e0b button span{font-weight:600}.e0b button small{opacity:.7}.e0b button:hover{border-color:var(--pri)}
+button.lnk{background:none;border:0;color:var(--pri);text-decoration:underline;padding:4px}
+.empty1{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:16px 0}.empty1 p{margin:0}
+/* Rendimiento (v40): el navegador no maqueta ni pinta las tarjetas que no se ven (las filas de tabla no admiten esta propiedad) */
+#list article.card{content-visibility:auto;contain-intrinsic-size:auto 150px}
+/* Retractados (v40) */
+.retr{display:inline-block;font-size:calc(11.5px * var(--fz,1));font-weight:600;color:#fff;background:var(--red);border-radius:4px;padding:0 5px;margin-right:4px;vertical-align:2px;white-space:nowrap}
+.retrw{background:color-mix(in srgb,var(--red) 12%,transparent);border:1px solid var(--red);border-radius:8px;padding:8px 10px}

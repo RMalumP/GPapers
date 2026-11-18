@@ -102,7 +102,8 @@ async function covFromOpen(id, n, file) {   // al abrir un PDF: si el paper aún
 async function pdfSniffDoc(doc) {   // {doi, title} de las dos primeras páginas y los metadatos de un PDF ya abierto con PDF.js
     let txt = '', big = {h: 0, s: ''}; for (let i = 1; i <= Math.min(2, doc.numPages); i++) { const tc = await (await doc.getPage(i)).getTextContent();
       for (const t of tc.items) { if (typeof t.str !== 'string') continue; txt += t.str + (t.hasEOL ? '\n' : ' '); const h = Math.hypot(t.transform[2], t.transform[3]); if (i === 1 && t.str.trim().length > 3 && h > big.h + .5) big = {h, s: t.str.trim()}; else if (i === 1 && Math.abs(h - big.h) < .5 && big.s.length < 200) big.s += ' ' + t.str.trim(); } }
-    const doi = (txt.replace(/\s*\n\s*/g, ' ').match(DOI_RE) || [''])[0].replace(/[.,;:)\]}>'"]+$/, '').toLowerCase();
+    const flat = txt.replace(/\s*\n\s*/g, ' '), ax = (flat.match(ARXIV_RE) || [])[1];   // sin DOI, el sello «arXiv:2401.12345» del margen da el suyo (v40)
+    const doi = ((flat.match(DOI_RE) || [''])[0].replace(/[.,;:)\]}>'"]+$/, '') || (ax ? '10.48550/arxiv.' + ax : '')).toLowerCase();
     const meta = await doc.getMetadata().catch(() => null), mt = String(meta?.info?.Title || '').trim();
     const guess = (mt.length > 8 && !/^(microsoft word|untitled|doi|\S+\.(docx?|pdf|tex))/i.test(mt) ? mt : big.s).replace(/\s+/g, ' ').trim().slice(0, 400);
     return {doi, title: guess};
@@ -143,7 +144,7 @@ async function inboxCite(id) {
   const dup = ibDup(it);
   if (dup && !await askOk(`Ya tienes este paper: «${shortTxt(dup.alias || dup.title)}». ¿Crear otra cita igualmente? (Con «🔗 Enlazar a ese paper» el PDF pasa al que ya tienes.)`, {ok: 'Crear otra'})) return;
   let r = null;
-  if (it.doi) { toast('Buscando los datos del DOI en CrossRef…', [], 2500); try { r = await fetchDoi(it.doi); } catch (e) { toast(e.message + ' Se crea con el título.', [], 5000); } }
+  if (it.doi) { toast('Buscando los datos del DOI…', [], 2500); try { r = await fetchDoi(it.doi); } catch (e) { toast(e.message + ' Se crea con el título.', [], 5000); } }
   if (!r && isEpub(it.name)) { const f = await pdfFile(inKey(id), it, false).catch(() => null), m = f && await epMeta(f);   // EPUB: un libro, con sus metadatos
     if (m) r = {title: m.title || it.name.replace(/\.epub$/i, ''), authors: m.authors, year: m.year, type: 'libro', publisher: m.publisher, isbn: m.isbn, doi: it.doi || '', url: it.doi ? 'https://doi.org/' + it.doi : ''}; }
   r ||= {title: (it.guess || '').split(' · ')[0] || it.name.replace(/\.(pdf|epub)$/i, '').replace(/[_]+/g, ' '), authors: [], year: '', type: isEpub(it.name) ? 'libro' : 'articulo', doi: it.doi || '', url: it.doi ? 'https://doi.org/' + it.doi : ''};

@@ -33,6 +33,7 @@ function drawD() {
       ...Object.fromEntries([['isbn', 'ISBN'], ['issn', 'ISSN'], ['institution', 'Institución (facultad, departamento…)'], ['docNumber', 'Número de documento'], ['series', 'Serie o colección'], ['seriesNumber', 'Número en la serie'], ['conferenceName', 'Nombre del congreso'], ['conferencePlace', 'Lugar del congreso'], ['conferenceDates', 'Fechas del congreso'], ['abbr', 'Abreviatura'], ['ecli', 'ECLI (p. ej. ECLI:ES:TS:2017:1229 o EU:C:2005:446)']].map(([k, l]) => [k, inp(k, lbl(k, l))]))})[k];
     const isCap = baseT(D.type) === 'capitulo', book = isCap ? fh('venue') + (shows('editors', D.type) ? fh('editors') : '') : '';   // capítulo: el libro y sus editores, justo debajo de los autores
     put(has('sortKey'), inp('sortKey', 'Clave de orden en la bibliografía (opcional): p. ej. «Torre» para «de la Torre, Ana»', 'text', 'w'));
+    put(has('key'), `<label class="w">Clave de cita (BibTeX, LaTeX, Pandoc)<span class="row" style="flex-wrap:nowrap"><input id="dKey" style="flex:1;min-width:0" value="${esc(D.key || '')}" placeholder="${esc(keyNew(D))} (se fija al copiarla o exportar a BibTeX)" spellcheck="false" autocomplete="off" data-oninput="put(D,'key',this.value.trim())"><button data-onclick="keyCopy('tex')" title="Copiar \\cite{clave} para LaTeX">\\cite{}</button><button data-onclick="keyCopy('md')" title="Copiar [@clave] para Pandoc o Markdown">[@…]</button></span></label>`);
     rel('url');
     for (const n of PDF_N) {   // el segundo hueco aparece cuando ya hay un PDF enlazado
       const P = D[pdfF(n)], ep = isEpub(P?.name), L = (P ? docKind(P.name) : 'PDF o EPUB') + (n === 2 ? ' 2' : ''); if (n === 2 && !D.pdf && !P) continue;   // v39.42: también EPUB; la fila del primero se ve siempre
@@ -469,7 +470,7 @@ function setView(v) { db.settings.view = v; foldSnap(); dirty = true; touch(); r
 /* ===== Historial de cambios y relaciones ===== */
 const shortTxt = v => { v = String(v ?? '').replace(/\s+/g, ' ').trim(); return !v ? '—' : v.length > 60 ? v.slice(0, 57) + '…' : v; };
 const HMAX = () => 50;   // el historial no se guarda en el JSON: solo vive en memoria durante el día
-const dbJSON = () => JSON.stringify(db, (k, v) => k === 'history' ? undefined : v, 2);   // en el JSON solo queda la fecha de creación (created)
+const dbJSON = () => JSON.stringify(db, (k, v) => k === 'history' ? undefined : v, db.settings.jsonPretty ? 2 : undefined);   // en el JSON solo queda la fecha de creación (created); compacto salvo que se pida con sangría (v40: ~35 % más pequeño y más rápido)
 const isToday = t => new Date(t).toDateString() === new Date().toDateString();
 function logChange(p, ...msgs) {
   const t = new Date().toISOString(); p.history ??= [];
@@ -593,8 +594,17 @@ async function copyC(k, rich, b) {   // copia la cita sin marcas (texto) o con c
   if (rich) await clipHtml(`<p style="font-family:'Times New Roman',serif;font-size:12pt">${citeHtml(raw)}</p>`, citeTxt(raw), host); else await clipText(citeTxt(raw), host);
   if (b) { const t = b.textContent; b.textContent = 'Copiado ✓'; setTimeout(() => b.textContent = t, 1400); }
 }
+async function keyCopy(kind) {   // copia \cite{clave} o [@clave] y fija la clave (en la ficha y, si el paper ya existe, en la biblioteca)
+  let k = String(D.key || '').trim(); if (k && !KEY_RX.test(k)) return say('La clave de cita solo admite letras sin tilde, números y _ : . + - (sin espacios).');
+  if (k && keysUsed(D.id).has(k.toLowerCase())) return say(`Otro paper ya usa la clave «${k}».`);
+  if (!k) k = keyNew(D); D.key = k; const i = $('#dKey'); if (i) i.value = k;
+  const p = db.papers.find(x => x.id === D.id); if (p && p.key !== k) { p.key = k; markDirty(); }
+  const t = kind === 'tex' ? `\\cite{${k}}` : `[@${k}]`; await copyText(t, $('#dlg')); toast(`Copiado: ${t}`, [], 2500);
+}
 function commit() {
   if (!D.title.trim()) { tab = 'data'; drawD(); return say('El título es obligatorio.'); }
+  if (D.key) { D.key = String(D.key).trim(); if (!KEY_RX.test(D.key)) { tab = 'data'; drawD(); return say('La clave de cita solo admite letras sin tilde, números y _ : . + - (sin espacios).'); }
+    if (keysUsed(D.id).has(D.key.toLowerCase())) { tab = 'data'; drawD(); return say(`Otro paper ya usa la clave «${D.key}».`); } } else delete D.key;
   if (D.url && !/^https?:\/\//i.test(D.url)) return say('La URL debe empezar por http:// o https://');
   D.year = D.year ? +D.year : '';
   const nameFix = x => { if (x.includes(',') || isOrg(x)) return x; const w = x.trim().split(/\s+/); return w.length < 2 ? x : `${w.slice(1).join(' ')}, ${w[0]}`; };   // «Nombre Apellidos» → «Apellidos, Nombre»

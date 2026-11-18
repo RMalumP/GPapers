@@ -111,6 +111,7 @@ function validate(d) {
     delete d.settings.annLbl; if (ok.length) d.settings.annLbl = Object.fromEntries(ok); } d.settings.inboxPos = d.settings.inboxPos === 'top' ? 'top' : 'bottom'; d.settings.inboxBtn = !!d.settings.inboxBtn; d.settings.fmtOpen = !!d.settings.fmtOpen; d.settings.view = d.settings.view === 'table' ? 'table' : 'cards';
   { const c = sIn.tblCols, ok = a => Array.isArray(a) ? [...new Set(a.filter(k => typeof k === 'string' && /^[a-z]+$/.test(k)))] : [];   // columnas de la tabla: orden y ocultas
     delete d.settings.tblCols; if (c && typeof c === 'object') { const o = ok(c.order), h = ok(c.hidden); if (o.length || h.length) d.settings.tblCols = {...(o.length ? {order: o} : {}), ...(h.length ? {hidden: h} : {})}; } }
+  if (d.settings.jsonPretty !== true) delete d.settings.jsonPretty;   // v40: JSON con sangría (opcional)
   if (!Array.isArray(d.settings.templates)) d.settings.templates = defSettings().templates;
   d.settings.templates = d.settings.templates.filter(t => t && typeof t.name === 'string' && typeof t.text === 'string').map(t => ({id: idFix(t.id) || uid(), name: t.name, text: t.text}));
   d.settings.customTypes = [...new Map((Array.isArray(sIn.customTypes) ? sIn.customTypes : []).map(ctClean).filter(Boolean).map(c => [c.id, c])).values()];
@@ -199,10 +200,14 @@ function foldSnap() {   // un cambio que no crea paso de deshacer (opciones de e
   recFlush(); clearTimeout(tFold); tFold = 0;
   if (TYPING) tFold = setTimeout(() => { tFold = 0; if (!tRec) lastSnap = snapDb(); }, 400); else lastSnap = snapDb();
 }
+/* Fuera de los campos de texto, la copia también se hace un momento después (v40): recorrer la biblioteca (~100 ms con 2000 papers en un móvil medio)
+   justo tras el clic retrasaba que se viera el cambio. Se hace cuando el navegador está libre, como mucho a los 250 ms (antes de la copia de trabajo,
+   que sale a los 0,7 s y la reutiliza). Deshacer, rehacer o cualquier otro paso que la necesite la hacen antes (recFlush). */
+const recLater = f => typeof requestIdleCallback === 'function' ? requestIdleCallback(f, {timeout: 250}) : setTimeout(f, 60);
 function markDirty() {
   if (TYPING) { dirty = true; touch(); clearTimeout(tRec); tRec = setTimeout(recFlush, 400); return; }
-  clearTimeout(tRec); tRec = 0; record(); dirty = true; touch(); SNAP_SES = lastSnap;
-}   // la copia de trabajo de dentro de 0,7 s puede usar esta misma copia
+  clearTimeout(tRec); dirty = true; touch(); const t = tRec = setTimeout(() => {}, 0); recLater(() => { if (tRec === t) recFlush(); });   // tRec: marca de copia pendiente (un temporizador vacío, para que clearTimeout no toque otro)
+}
 let SNAP_SES = null;   // copia ya hecha que coincide con el proyecto (la invalida cualquier touch() que no venga de markDirty)
 function undo() { recFlush(); if (UNDO.length) { REDO.push(snapDb()); restore(UNDO.pop()); } }
 function redo() { recFlush(); if (REDO.length) { UNDO.push(snapDb()); restore(REDO.pop()); } }

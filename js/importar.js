@@ -56,7 +56,8 @@ function parseBib(t) {   // recorrido propio: las expresiones regulares fallan c
       web: pick('journal', 'booktitle', 'publisher', 'organization') || (/https?:|\\url/i.test(how) ? '' : how)}[ty];
     const venue = V || pick('journal', 'journaltitle', 'booktitle', 'publisher', 'school', 'institution');
     const dt = g('date'), pub = pick('publisher');
-    out.push({title: g('title'), year: (g('year') || dt).match(/\d{4}/)?.[0] || '', venue, doi: normDoi(g('doi')), url: g('url'), type: ty, authors: raw.map(nm),
+    const bkey = body.slice(0, body.indexOf(',')).trim();
+    out.push({key: KEY_RX.test(bkey) ? bkey : '', title: g('title'), year: (g('year') || dt).match(/\d{4}/)?.[0] || '', venue, doi: normDoi(g('doi')), url: g('url'), type: ty, authors: raw.map(nm),
       ...refFields(ty, {volume: g('volume'), issue: pick('issue', 'number'), pages: normPages(g('pages')), publisher: pub && pub !== venue ? pub : '', place: pick('address', 'location'), edition: g('edition'),
         pubDate: /^\d{4}-\d{2}-\d{2}$/.test(dt) ? dt : isoDate(g('year'), g('month'), g('day')), thesisType: ty === 'tesis' ? thesisFrom(g('type'), type) : '', editors: names(f.editor).map(nm),
         isbn: g('isbn'), issn: g('issn'), series: g('series'), seriesNumber: g('seriesnumber'), institution: g('institution') !== venue ? g('institution') : '',
@@ -99,16 +100,46 @@ function fromCrossref(m, doi) {   // mensaje de la API de CrossRef → referenci
       edition: cleanText(m['edition-number']), pubDate: dp.length === 3 ? isoDate(...dp) : '', isbn: cleanText(m.ISBN?.[0]), issn: cleanText(m.ISSN?.[0]), editors: (m.editor || []).map(nm).filter(Boolean),
       authorType: au.length && au.every(a => !a.family && a.name) ? 'entidad' : 'auto'})};
 }
+/* DOI de cualquier agencia, arXiv y PubMed (v40). CrossRef solo conoce sus DOI: los de DataCite (arXiv, Zenodo, Figshare…), mEDRA o JaLC daban 404.
+   Si CrossRef no lo tiene, se pide a doi.org en CSL-JSON (negociación de contenido; vale para todas las agencias). Un identificador de arXiv
+   (2401.12345, arXiv:2401.12345v2, arxiv.org/abs/…) se convierte en su DOI (10.48550/arXiv.…); un PMID se pide a PubMed en CSL-JSON. */
+const arxivId = raw => { const s = String(raw || '').trim(), m = s.match(/^(?:arxiv:\s*|https?:\/\/(?:www\.|export\.)?arxiv\.org\/(?:abs|pdf)\/)?(\d{4}\.\d{4,5}|[a-z-]+(?:\.[a-z]{2})?\/\d{7})(?:v\d+)?(?:\.pdf)?\/?$/i);
+  return m && (/^\d{4}\.\d{4,5}$/.test(m[1]) || /^(arxiv:|https?:)/i.test(s)) ? m[1] : ''; };
+const pmidOf = raw => (String(raw || '').trim().match(/^(?:pmid:?\s*|https?:\/\/(?:pubmed\.ncbi\.nlm\.nih\.gov|www\.ncbi\.nlm\.nih\.gov\/pubmed)\/)(\d{1,9})\/?$/i) || [, ''])[1];
+const ARXIV_RE = /\barxiv:\s*(\d{4}\.\d{4,5})(?:v\d+)?/i;   // el sello del margen de los PDF de arXiv
 async function fetchDoi(raw) {
-  const doi = normDoi(raw); if (!doi) throw Error('Escribe un DOI.');
-  const ac = new AbortController(), tm = setTimeout(() => ac.abort(), 10000);
+  const ax = arxivId(raw), doi = ax ? '10.48550/arxiv.' + ax.toLowerCase() : normDoi(raw); if (!doi) throw Error('Escribe un DOI.');
+  if (!/^10\.48550\//.test(doi)) {   // los de arXiv son de DataCite: CrossRef no los tiene
+    const ac = new AbortController(), tm = setTimeout(() => ac.abort(), 10000);
+    try {
+      const r = await fetch('https://api.crossref.org/works/' + encodeURI(doi), {signal: ac.signal});
+      if (r.ok) return fromCrossref((await r.json()).message, doi);
+      if (r.status !== 404) throw Error('CrossRef respondió con un error (' + r.status + ').');
+    } catch (e) { throw Error(e.name === 'AbortError' ? 'CrossRef tardó demasiado en responder.' : e instanceof TypeError ? 'No se pudo conectar con CrossRef (¿sin conexión, o abierta desde file://?).' : e.message); }
+    finally { clearTimeout(tm); }
+  }
+  return fetchDoiCsl(doi);
+}
+function fromCslOne(j, doi) {   // un registro CSL-JSON (doi.org, PubMed) → referencia de la app
+  const r = parseCsl(JSON.stringify([j]))[0]; if (!r || !r.title) throw Error('No se encontraron datos para ese identificador.');
+  if (doi) r.doi = doi; if (!r.venue) r.venue = cleanText(j.publisher || j['container-title'] || (r.doi && /^10\.48550\//.test(r.doi) ? 'arXiv' : ''));
+  if (r.publisher === r.venue) r.publisher = '';
+  if (!r.url && r.doi) r.url = 'https://doi.org/' + r.doi; r.general = ''; return r;
+}
+async function fetchDoiCsl(doi) {
+  const ac = new AbortController(), tm = setTimeout(() => ac.abort(), 12000);
   try {
-    const r = await fetch('https://api.crossref.org/works/' + encodeURI(doi), {signal: ac.signal});
-    if (r.status === 404) throw Error('CrossRef no encuentra ese DOI.');
-    if (!r.ok) throw Error('CrossRef respondió con un error (' + r.status + ').');
-    return fromCrossref((await r.json()).message, doi);
-  } catch (e) { throw Error(e.name === 'AbortError' ? 'CrossRef tardó demasiado en responder.' : e instanceof TypeError ? 'No se pudo conectar con CrossRef (¿sin conexión, o abierta desde file://?).' : e.message); }
+    const r = await fetch('https://doi.org/' + encodeURI(doi), {signal: ac.signal, headers: {Accept: 'application/vnd.citationstyles.csl+json'}});
+    if (r.status === 404) throw Error('No existe ese DOI (ni en CrossRef ni en DataCite).');
+    if (!r.ok) throw Error('doi.org respondió con un error (' + r.status + ').');
+    return fromCslOne(await r.json(), doi);
+  } catch (e) { throw Error(e.name === 'AbortError' ? 'doi.org tardó demasiado en responder.' : e instanceof TypeError ? 'No se pudo conectar con doi.org (¿sin conexión, o abierta desde file://?).' : e instanceof SyntaxError ? 'doi.org no devolvió datos de ese DOI.' : e.message); }
   finally { clearTimeout(tm); }
+}
+async function fetchPmid(raw) {
+  const id = pmidOf(raw); if (!id) throw Error('Ese PMID no es válido.');
+  const j = await apiJson('https://api.ncbi.nlm.nih.gov/lit/ctxp/v1/pubmed/?format=csl&id=' + id, 'PubMed');
+  const r = fromCslOne(Array.isArray(j) ? j[0] : j, normDoi(j?.DOI)); r.url = r.url || 'https://pubmed.ncbi.nlm.nih.gov/' + id + '/'; return r;
 }
 /* ---- CSL-JSON (Zotero, Pandoc…) ---- */
 const CSLR = {'article-journal': 'articulo', article: 'articulo', 'article-magazine': 'articulo', book: 'libro', chapter: 'capitulo', 'paper-conference': 'congreso', thesis: 'tesis', webpage: 'web',
@@ -260,7 +291,8 @@ function impText(t) {
 async function impDoi() {   // un DOI, un ISBN o un título (este da varios resultados para elegir)
   const v = $('#iDoi').value; $('#iMsg').textContent = 'Buscando…';
   try {
-    if (isDoi(v)) IMP = {mode: 'prev', refs: impPrepare([await fetchDoi(v)])};
+    if (isDoi(v) || arxivId(v)) IMP = {mode: 'prev', refs: impPrepare([await fetchDoi(v)])};
+    else if (pmidOf(v)) IMP = {mode: 'prev', refs: impPrepare([await fetchPmid(v)])};
     else if (isIsbn(v)) IMP = {mode: 'prev', refs: impPrepare([await fetchIsbn(v)])};
     else IMP = {mode: 'pick', q: v, refs: impPrepare(await searchTitle(v))};
     impDraw();
@@ -274,13 +306,14 @@ function impDraw() {
     const L = [o.abstract && row('oa_abs', !/resumen/i.test(D.general || ''), 'Resumen → a las notas generales', esc(o.abstract.length > 400 ? o.abstract.slice(0, 400) + '…' : o.abstract)),
       o.cites != null && row('oa_cit', false, 'Número de citas → a las notas generales', `Citado ${o.cites} ${o.cites === 1 ? 'vez' : 'veces'} según OpenAlex`),
       o.pdf && row('oa_pdf', !D.url, D.url ? 'PDF en abierto → a las notas generales (ya hay URL)' : 'PDF en abierto → como URL', `<a href="${esc(o.pdf)}" target="_blank" rel="noopener noreferrer">${esc(o.pdf)}</a>`)].filter(Boolean);
-    h += (o.byDoi ? '' : `<p class="empty">Encontrado por el título: «${esc(o.title)}»${o.year ? ` (${esc(o.year)})` : ''}. Comprueba que es el mismo trabajo.</p>`)
+    h += (o.retracted ? `<p class="retrw">⚠ <b>Este trabajo está retractado</b> según OpenAlex: la revista lo retiró. Al pulsar «Añadir» (o «Marcar») se marca en la biblioteca.</p>` : '')
+      + (o.byDoi ? '' : `<p class="empty">Encontrado por el título: «${esc(o.title)}»${o.year ? ` (${esc(o.year)})` : ''}. Comprueba que es el mismo trabajo.</p>`)
       + (L.length ? '<p>Marca lo que quieras añadir:</p>' + L.join('') : '<p>OpenAlex no tiene resumen, citas ni PDF en abierto de este trabajo.</p>')
-      + `<div class="row" style="margin-top:12px">${L.length ? '<button class="pri" data-onclick="oaGo()">Añadir</button>' : ''}<button data-onclick="$('#imp').close()">Cancelar</button></div>`;
+      + `<div class="row" style="margin-top:12px">${L.length || o.retracted ? `<button class="pri" data-onclick="oaGo()">${L.length ? 'Añadir' : 'Marcar como retractado'}</button>` : ''}<button data-onclick="$('#imp').close()">Cancelar</button></div>`;
     $('#imp').innerHTML = h; return; }
   if (m === 'text') h += `<textarea id="iTxt" style="min-height:220px" placeholder="Pega aquí BibTeX, RIS, el texto de ScienceDirect o citas de Google Scholar (una por línea, en APA, MLA, Chicago, Harvard o Vancouver)"></textarea><div class="row" style="margin-top:10px"><button class="pri" data-onclick="impText($('#iTxt').value)">Analizar</button>${close}</div>`;
   else if (m === 'pick') h += `<p>Resultados de CrossRef para «${esc(IMP.q)}». Elige el que buscas:</p><div class="ilist">${IMP.refs.map((r, i) => `<div class="irow"><span><b>${esc(r.title)}</b>${r.dup ? ' <span class="tag-dup">Duplicado</span>' : r.near ? ` <span class="tag-dup" title="Parecido a «${esc(r.near)}»">Parecido</span>` : ''}<br><small>${esc(r.authors.slice(0, 3).join('; '))}${r.authors.length > 3 ? ' et al.' : ''}${r.year ? ' (' + esc(r.year) + ')' : ''}${r.venue ? ' · ' + esc(r.venue) : ''}</small></span><button class="sm" style="margin-left:auto" data-onclick="impPick(${i})">Elegir</button></div>`).join('')}</div><div class="row" style="margin-top:10px"><button data-onclick="openImport('doi')">← Buscar otra cosa</button>${close}</div>`;
-  else if (m === 'doi') h += `<p class="empty" style="margin-top:0">Escribe un DOI, un ISBN (libros, en Open Library) o el título (CrossRef te propone varios resultados).</p><div class="row"><input id="iDoi" style="flex:1" placeholder="DOI, ISBN o título" aria-label="DOI, ISBN o título" data-onkeydown="onEnter(event,impDoi)"><button class="pri" data-onclick="impDoi()">Buscar</button></div><p id="iMsg" class="empty"></p>${close}`;
+  else if (m === 'doi') h += `<p class="empty" style="margin-top:0">Escribe un DOI (de cualquier agencia: CrossRef, DataCite, Zenodo…), un identificador de arXiv (2401.12345), un PMID (PMID 12345678), un ISBN (libros, en Open Library) o el título (CrossRef te propone varios resultados).</p><div class="row"><input id="iDoi" style="flex:1" placeholder="DOI, arXiv, PMID, ISBN o título" aria-label="DOI, arXiv, PMID, ISBN o título" data-onkeydown="onEnter(event,impDoi)"><button class="pri" data-onclick="impDoi()">Buscar</button></div><p id="iMsg" class="empty"></p>${close}`;
   else if (m === 'fill') {
     const j = v => Array.isArray(v) ? v.join('; ') : String(v ?? ''), r = IMP.ref, cur = k => j(D[k]), nw = k => j(r[k]), L = FLD.filter(([k]) => nw(k) && nw(k) !== cur(k) && (!FLD_T[k] || shows(k, r.type)));
     h += (L.length ? '<p>Marca los datos que quieras aplicar (por defecto, solo los campos vacíos):</p>' + L.map(([k, t]) => `<label class="irow"><input type="checkbox" id="f_${k}" ${cur(k) ? '' : 'checked'}><span><b>${t}</b><br><small>Ahora: ${esc(cur(k)) || '—'}</small><br><small>CrossRef: ${esc(nw(k))}</small></span></label>`).join('') : '<p>CrossRef no aporta datos nuevos.</p>')
@@ -300,7 +333,8 @@ const impCount = () => $('#iGo').textContent = 'Importar ' + IMP.refs.filter(r =
 function impGo() {
   const L = IMP.refs.filter(r => r.on); if (!L.length) return say('No hay ninguna referencia marcada.');
   const sec = $('#iSec').value, tag = $('#iTag').value, rd = $('#iRd').value, now = new Date().toISOString();
-  L.forEach(r => db.papers.push(NEWF({id: uid(), created: now, title: r.title, alias: '', reading: rd, rating: 0, sectionIds: sec ? [sec] : [], authors: r.authors, year: r.year ? +r.year : '', url: r.url || '', type: r.type,
+  const used = keysUsed();
+  L.forEach(r => db.papers.push(NEWF({id: uid(), created: now, ...(r.key && !used.has(r.key.toLowerCase()) && used.add(r.key.toLowerCase()) ? {key: r.key} : {}), title: r.title, alias: '', reading: rd, rating: 0, sectionIds: sec ? [sec] : [], authors: r.authors, year: r.year ? +r.year : '', url: r.url || '', type: r.type,
     venue: r.venue || '', doi: r.doi || '', ...Object.fromEntries(IMP_F.filter(k => r[k] != null).map(k => [k, r[k]])), general: r.general || '', tagIds: tag ? [tag] : [], notes: [], cites: {}, related: [], refTo: [], history: [{t: now, s: 'Importado'}]})));
   markDirty(); $('#imp').close(); render(); toast(`Se añadieron ${L.length === 1 ? "1 paper" : L.length + " papers"}.`, [{t: "Deshacer", fn: undo}], 6000);   // una sola operación: un único Ctrl+Z la deshace
 }
@@ -310,13 +344,36 @@ async function doiFill() {   // botón «Buscar» junto al DOI en la ventana de 
 /* ---- Completar con OpenAlex (gratuito, sin clave): resumen, número de citas y PDF en abierto ---- */
 const oaAbstract = ix => { if (!ix || typeof ix !== 'object') return ''; const w = []; for (const [t, ps] of Object.entries(ix)) for (const i of ps) w[i] = t; return cleanText(w.filter(Boolean).join(' ')); };
 async function fetchOpenAlex(doi, title) {
-  const d = normDoi(doi), sel = 'select=id,doi,title,publication_year,cited_by_count,abstract_inverted_index,open_access,best_oa_location';
+  const d = normDoi(doi), sel = 'select=id,doi,title,publication_year,cited_by_count,abstract_inverted_index,open_access,best_oa_location,is_retracted';
   let w;
   if (d) { try { w = await apiJson(`https://api.openalex.org/works/doi:${encodeURIComponent(d)}?${sel}`, 'OpenAlex'); } catch (e) { if (!/\(404\)/.test(e.message)) throw e; } }
   if (!w && String(title || '').trim().length > 5) w = (await apiJson(`https://api.openalex.org/works?per-page=1&${sel}&search=${encodeURIComponent(title)}`, 'OpenAlex')).results?.[0];
   if (!w) throw Error(d ? 'OpenAlex no encuentra ese DOI.' : 'OpenAlex no encuentra ese título.');
   const pdf = w.best_oa_location?.pdf_url || w.open_access?.oa_url || '';
-  return {title: cleanText(w.title), year: w.publication_year || '', cites: Number.isInteger(w.cited_by_count) ? w.cited_by_count : null, abstract: oaAbstract(w.abstract_inverted_index), pdf: /^https?:/i.test(pdf) ? pdf : '', byDoi: !!d && normDoi(w.doi) === d};
+  return {title: cleanText(w.title), year: w.publication_year || '', cites: Number.isInteger(w.cited_by_count) ? w.cited_by_count : null, abstract: oaAbstract(w.abstract_inverted_index), pdf: /^https?:/i.test(pdf) ? pdf : '', byDoi: !!d && normDoi(w.doi) === d, retracted: w.is_retracted === true};
+}
+/* Varios DOI a la vez en OpenAlex (v40): hasta 50 por petición con el filtro doi:a|b|c; devuelve un Map doi → obra (solo con los campos pedidos) */
+async function oaByDois(dois, fields, onStep) {
+  const L = [...new Set(dois.map(normDoi).filter(d => /^10\.\d{4,9}\//.test(d)))], out = new Map(), parts = [];
+  for (let i = 0; i < L.length; i += 50) parts.push(L.slice(i, i + 50));
+  let done = 0;
+  await syPool(parts, async P => {
+    const j = await apiJson(`https://api.openalex.org/works?per-page=50&select=doi,${fields}&filter=doi:${P.map(encodeURIComponent).join('|')}`, 'OpenAlex');
+    for (const w of j.results || []) { const d = normDoi(w.doi); if (d) out.set(d, w); } done += P.length; onStep?.(done, L.length);
+  }, 2);
+  return out;
+}
+/* ---- ¿Algún paper retractado? (v40, F4): OpenAlex marca las obras retiradas por la revista (is_retracted). Solo al pulsarlo: envía los DOI. ---- */
+async function retrCheck(ids) {
+  const P = (ids ? db.papers.filter(p => ids.includes(p.id)) : db.papers).filter(p => normDoi(p.doi));
+  if (!P.length) return toast('Ningún paper tiene DOI: OpenAlex los busca por el DOI.', [], 4000);
+  toast(`Comprobando ${P.length} papers en OpenAlex…`, [], 60000);
+  let M; try { M = await oaByDois(P.map(p => p.doi), 'is_retracted'); } catch (e) { return toast(e.message, [], 6000); }
+  let ch = 0; const bad = [];
+  for (const p of P) { const w = M.get(normDoi(p.doi)); if (!w) continue; const r = w.is_retracted === true; if (r) bad.push(p); if (!!p.retracted !== r) { if (r) p.retracted = true; else delete p.retracted; ch++; } }
+  if (ch) { markDirty(); render(); }
+  toast(bad.length ? `⚠ ${bad.length === 1 ? 'Hay 1 paper retractado' : `Hay ${bad.length} papers retractados`}: ${bad.slice(0, 3).map(p => '«' + shortTxt(p.alias || p.title) + '»').join(', ')}${bad.length > 3 ? '…' : ''}.` : `Ninguno de los ${M.size} papers encontrados en OpenAlex está retractado.`,
+    bad.length ? [{t: 'Ver', fn: () => { F.retr = true; render(); }}] : [], 8000);
 }
 async function oaFill() {   // botón «OpenAlex» junto al DOI en la ventana de editar
   try { IMP = {mode: 'oa', oa: await fetchOpenAlex(D.doi, D.title)}; impDraw(); $('#imp').showModal(); } catch (e) { say(e.message); }
@@ -326,6 +383,7 @@ function oaGo() {
   if ($('#oa_abs')?.checked) add('**Resumen:** ' + o.abstract);
   if ($('#oa_cit')?.checked) add(`**Citas** (OpenAlex, ${new Date().toISOString().slice(0, 10)}): ${o.cites}`);
   if ($('#oa_pdf')?.checked) { if (!D.url) D.url = o.pdf; else add('**PDF en abierto:** ' + o.pdf); }
+  if (o.retracted && o.byDoi) D.retracted = true;
   $('#imp').close(); drawD();
 }
 function fillGo() {
@@ -344,8 +402,8 @@ function shareIn() {
   try { history.replaceState(null, '', location.pathname); } catch (e) {}
   let all = [l, x, t].join(' '); try { all = decodeURIComponent(all); } catch (e) {}
   const doi = (all.match(DOI_RE) || [''])[0].replace(/[.,;:)\]}>'"]+$/, '').replace(/\/(full|abstract|pdf|epdf)$/i, '');
-  const isbn = [x, t].map(isIsbn).find(Boolean);
-  const q = doi || isbn || (t || x.replace(/https?:\/\/\S+/g, '')).trim() || l;
+  const isbn = [x, t].map(isIsbn).find(Boolean), ax = (all.match(/arxiv\.org\/(?:abs|pdf)\/(\d{4}\.\d{4,5})/i) || all.match(ARXIV_RE) || [])[1], pm = (all.match(/pubmed\.ncbi\.nlm\.nih\.gov\/(\d{1,9})/i) || [])[1];
+  const q = doi || (ax && 'arXiv:' + ax) || (pm && 'PMID ' + pm) || isbn || (t || x.replace(/https?:\/\/\S+/g, '')).trim() || l;
   openImport('doi'); $('#iDoi').value = q; if (q) impDoi();
   return true;
 }
