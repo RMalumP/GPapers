@@ -319,12 +319,14 @@ setInterval(lnPaceTick, 5000);
 const RL = {s: 0, p: 0, ids: new Set(), at: Date.now()}, RL_CH = 2000;
 const rlDay = (t = new Date()) => `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
 function rlTick() {
+  if (!db.settings.showStats) return;   // apagadas (lo normal): no se guarda nada
   RL.s += 5; const src = VW.open ? VW.src : typeof EP !== 'undefined' && EP.open ? EP.src : null;
   if (src?.kind === 'paper' && src.id != null) RL.ids.add(String(src.id));
   if (Date.now() - RL.at > 300e3) rlFlush();
 }
 function rlFlush() {
   const pg = Math.floor(RL.p); RL.at = Date.now();
+  if (!db.settings.showStats) { RL.s = RL.p = 0; RL.ids.clear(); return; }   // apagadas: no se guarda nada
   if (TAB.passive || RL.s < 5 && !pg) return;
   const L = db.readLog ||= {}, e = (L[rlDay()] ||= {})[syDev()] ||= {s: 0, p: 0};
   e.s = Math.min(86400, e.s + RL.s); e.p = Math.min(5000, e.p + pg); if (RL.ids.size) e.d = [...new Set([...(e.d || []), ...RL.ids])].slice(0, 50);

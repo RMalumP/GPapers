@@ -121,7 +121,7 @@ function revToday() {   // los de hoy: siempre los mismos durante el día
 }
 let REV = {L: [], i: 0};
 function revDraw0() {   // la entrada de la barra lateral: solo con subrayados
-  const g = $('#sg-rev'); if (!g) return; const n = revAll().length; g.hidden = !n; if (!n) return;
+  const g = $('#sg-rev'); if (!g) return; const n = db.settings.showRev ? revAll().length : 0; g.hidden = !n; if (!n) return;
   const st = revSt(), d = revDay(), left = revToday().filter(x => st.s[x.a.id] !== d).length;
   $('#revN').textContent = left ? `(${left})` : '✓'; $('#revN').title = left ? `${left} por repasar hoy` : 'Repaso de hoy hecho';
 }
@@ -194,7 +194,7 @@ function rlStreak(A) {   // días seguidos con al menos un minuto de lectura, ha
   const ok = i => (A.get(rlDay(rlBack(i)))?.s || 0) >= 60; let i = ok(0) ? 0 : 1, n = 0; while (ok(i)) { n++; i++; } return n;
 }
 function rlDraw0() {   // la entrada de la barra lateral: solo si hay algo guardado
-  const g = $('#sg-rl'); if (!g) return; const has = !!db.readLog && Object.keys(db.readLog).length > 0; g.hidden = !has; if (!has) return;
+  const g = $('#sg-rl'); if (!g) return; const has = !!db.settings.showStats && !!db.readLog && Object.keys(db.readLog).length > 0; g.hidden = !has; if (!has) return;
   const t = rlSum(rlAgg(), 1); $('#rlN').textContent = t.s >= 60 ? `(${rlFmt(t.s)} hoy)` : '';
 }
 function rlOpen() {

@@ -2,6 +2,11 @@
 
 Lo más reciente arriba. Hasta la v39.53 estas notas estaban en el README; van de la más nueva a la más antigua (algunas rondas antiguas no tenían número de versión).
 
+## v40.1: los PDF vuelven a abrirse en todos los navegadores; repaso y estadísticas, opcionales
+- **Arreglo importante: el visor vuelve a PDF.js 4.10.** PDF.js 5.7 (v40) usa funciones de JavaScript tan nuevas (`Map.getOrInsertComputed`, `Math.sumPrecise`, `Promise.try`…) que un Chrome, Edge o Chromium de hace unos meses no las tiene, y ahí los PDF no llegaban a abrirse. En el móvil abrían, pero más despacio. La política de seguridad vuelve a ser la de antes (sin `wasm-unsafe-eval`). Prueba nueva: `python3 pruebas/prueba_navegador_viejo.py .` quita esas funciones del navegador y comprueba que el PDF se abre.
+- **🧠 Repaso de subrayados y 📊 Estadísticas de lectura** pasan a ser opciones de Configuración → Apariencia, **apagadas por defecto**. Apagadas no salen en la barra lateral ni en Ctrl+K, y con las estadísticas apagadas no se guarda nada mientras lees (tampoco se sincroniza cada 5 minutos). Lo ya guardado se conserva y vuelve a verse al encenderlas.
+- **Visor**: el texto para buscar dentro de los PDF se saca 5 s después de abrir, página a página y solo con el navegador libre; si cierras antes, se deja para la próxima vez. Así no compite con pintar las primeras páginas y los subrayados.
+
 ## v40: añadir papers de cualquier sitio, OpenAlex, lectura y búsqueda en los PDF
 **Añadir papers**
 - **DOI de cualquier agencia**: si CrossRef no lo tiene (DataCite, Zenodo, mEDRA…), se pide a doi.org en formato CSL. **arXiv** por su número (`2401.12345`, `arXiv:…` o el enlace) y **PubMed** por PMID (`PMID: 31452104` o el enlace). La bandeja reconoce también el sello de arXiv del margen de los PDF.
@@ -35,7 +40,7 @@ Lo más reciente arriba. Hasta la v39.53 estas notas estaban en el README; van d
 - **La copia para deshacer** se hace cuando el navegador está libre, no justo después del clic; el JSON se guarda sin sangría (opción para quien lo lea a mano).
 - **Tarjetas y filas** con `content-visibility`: el navegador no maqueta lo que no se ve.
 - **Google Drive comprimido**: la copia completa se sube en gzip (5 a 10 veces menos datos). Se siguen leyendo las copias sin comprimir. Un dispositivo con una versión anterior no puede leer la copia comprimida hasta que se actualice (los cambios esperan; no se pierde nada).
-- **PDF.js 5.7** (antes 4.10): abre mejor los PDF con imágenes JPEG 2000 y JBIG2 (escaneados de revistas antiguas) y con perfiles de color, gracias a decodificadores en WebAssembly (`lib/pdfjs/wasm/`). Por eso la política de seguridad permite `wasm-unsafe-eval` (solo compilar WebAssembly, no `eval` de JavaScript). La caché de librerías se renueva sola la primera vez que se abre un PDF.
+- **PDF.js 5.7** (R7): se probó en la v40, pero se volvió a la 4.10 en la v40.1 (ver arriba).
 - **Sincronizar e importar archivos grandes sin congelar la pantalla**: preparar y fusionar el proyecto con Google Drive, y leer un .bib o .ris de más de 300 000 letras, se hace en un hilo aparte (`js/trabajo.js`). Si el navegador no lo permite, se hace como antes.
 - **Carga de los archivos al arrancar**: se midió dejar para después los del visor y el EPUB. Con la CPU a ¼ y sin caché, el arranque pasaba de 101 a 73 ms de scripts; con la caché del service worker (lo normal en una app instalada), unos 25 ms en los dos casos. Como la diferencia solo se nota la primera vez, se siguen cargando todos al arrancar (más sencillo y sin esperas al abrir el primer PDF).
 - **Pruebas**: GitHub Actions pasa todas las pruebas (antes faltaban 10) en 5 grupos con Chromium en caché; pruebas nuevas en `pruebas/prueba_v40.py`.

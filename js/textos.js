@@ -51,9 +51,14 @@ async function txOpen(id, n, pg) {   // abre el documento en esa página (o cap�
   else { vwGo(pg - 1, true); if (q) { vwFindToggle(true); $('#vwQ').value = q; await vwFind(1); } }
 }
 /* ---- Sacar el texto ---- */
-async function txFromPdfDoc(doc) {   // un PDF ya abierto con PDF.js → texto de cada página
-  const pages = [];
-  for (let i = 1; i <= doc.numPages; i++) { const pg = await doc.getPage(i), tc = await pg.getTextContent(); pages.push(tc.items.map(x => (x.str || '') + (x.hasEOL ? ' ' : '')).join('')); }
+const txIdle = () => new Promise(r => typeof requestIdleCallback === 'function' ? requestIdleCallback(r, {timeout: 2000}) : setTimeout(r, 30));
+async function txFromPdfDoc(doc, alive) {   // un PDF ya abierto con PDF.js → texto de cada página
+  const pages = [];   // alive (en el visor): página a página, solo con el navegador libre, y se deja si se cierra; así no retrasa pintar lo que estás leyendo
+  for (let i = 1; i <= doc.numPages; i++) {
+    if (alive) { await txIdle(); if (!alive()) throw Error('cerrado'); }
+    const pg = await doc.getPage(i), tc = await pg.getTextContent(); pages.push(tc.items.map(x => (x.str || '') + (x.hasEOL ? ' ' : '')).join(''));
+    if (alive && Math.abs(i - 1 - VW.cur) > 3) pg.cleanup();   // lo que PDF.js preparó para sacar el texto de una página lejana no se queda en memoria
+  }
   return pages;
 }
 async function txFromEpub(file) {   // los capítulos de un EPUB, sin abrir el lector
@@ -65,8 +70,8 @@ const txKnown = async key => !!(await idb('readonly', st => st.get('pdftx:' + ke
 function txAfterOpen(src, doc) {   // el visor acaba de abrir un PDF: si su texto no está guardado, se saca cuando el navegador esté libre
   if (src?.kind !== 'paper') return; const key = pdfKey(src.id, src.n), name = vwHolders()[0]?.name; if (!name) return;
   const go = async () => { const r = await idb('readonly', st => st.get('pdftx:' + key)).catch(() => null); if (r?.name === name) return;
-    try { await txPut(key, name, await txFromPdfDoc(doc)); } catch (e) {} };   // si se cierra antes y el documento ya no sirve, se hará la próxima vez
-  setTimeout(() => typeof requestIdleCallback === 'function' ? requestIdleCallback(() => go(), {timeout: 3000}) : go(), 800);   // después de pintar las primeras páginas
+    try { await txPut(key, name, await txFromPdfDoc(doc, () => VW.open && VW.doc === doc)); } catch (e) {} };   // si se cierra antes, se hará la próxima vez
+  setTimeout(() => VW.doc === doc && go(), 5000);   // cuando ya están pintadas las primeras páginas y los subrayados
 }
 function txAfterEpub(src) {   // el lector de EPUB acaba de abrir un libro: sus capítulos ya están en la página
   if (src?.kind !== 'paper') return; const key = pdfKey(src.id, src.n), name = epHolders()[0]?.name; if (!name) return;
@@ -85,7 +90,7 @@ async function txBuild() {   // Configuración → Datos: prepara el texto de to
     if (!file) { miss++; continue; }
     try {
       if (isEpub(x.pf.name)) await txPut(x.key, x.pf.name, await txFromEpub(file));
-      else { lib ||= await vwLib(); const doc = await lib.getDocument({data: new Uint8Array(await file.arrayBuffer()), cMapUrl: vwUrl('cmaps/'), cMapPacked: true, standardFontDataUrl: vwUrl('standard_fonts/'), wasmUrl: vwUrl('wasm/'), iccUrl: vwUrl('iccs/'), isEvalSupported: false, enableXfa: false}).promise;
+      else { lib ||= await vwLib(); const doc = await lib.getDocument({data: new Uint8Array(await file.arrayBuffer()), isEvalSupported: false, enableXfa: false}).promise;
         try { await txPut(x.key, x.pf.name, await txFromPdfDoc(doc)); } finally { doc.destroy(); } }
       done++;
     } catch (e) { bad++; }
