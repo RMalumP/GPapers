@@ -79,7 +79,7 @@ async function covQuiet(key, pf) {   // el archivo, solo si se puede leer sin pr
 async function covMake(key, pf, file) {
   if (file && isEpub(pf.name)) { const bk = await epBook(file).catch(() => null), d = bk ? await epThumb(bk) : ''; if (d) await idb('readwrite', st => st.put({n: pf.name, d}, 'pdft:' + key)).catch(() => {}); return d; }   // EPUB: su portada
   if (!vwCan() || !file) return ''; let doc;
-  try { const L = await vwLib(); doc = await L.getDocument({data: new Uint8Array(await file.arrayBuffer()), cMapUrl: vwUrl('cmaps/'), cMapPacked: true, standardFontDataUrl: vwUrl('standard_fonts/'), isEvalSupported: false}).promise;
+  try { const L = await vwLib(); doc = await L.getDocument({data: new Uint8Array(await file.arrayBuffer()), cMapUrl: vwUrl('cmaps/'), cMapPacked: true, standardFontDataUrl: vwUrl('standard_fonts/'), wasmUrl: vwUrl('wasm/'), iccUrl: vwUrl('iccs/'), isEvalSupported: false}).promise;
     const d = await pdfPage1(doc); await idb('readwrite', st => st.put({n: pf.name, d}, 'pdft:' + key)).catch(() => {}); return d; }
   catch (e) { return ''; } finally { doc?.destroy(); }
 }
@@ -112,7 +112,7 @@ async function inboxScan(id, file) {   // miniatura, DOI y título probable de l
   let doc; try {
     let doi, guess;
     if (isEpub(file.name)) { const m = await epMeta(file); if (!m) return; if (m.thumb) await idb('readwrite', st => st.put(m.thumb, 'pdft:' + inKey(id))).catch(() => {}); doi = m.doi; guess = [m.title, m.authors.map(a => a.split(',')[0]).slice(0, 3).join(', ')].filter(Boolean).join(' · ').slice(0, 400); }
-    else { const L = await vwLib(); doc = await L.getDocument({data: new Uint8Array(await file.arrayBuffer()), cMapUrl: vwUrl('cmaps/'), cMapPacked: true, standardFontDataUrl: vwUrl('standard_fonts/'), isEvalSupported: false}).promise;
+    else { const L = await vwLib(); doc = await L.getDocument({data: new Uint8Array(await file.arrayBuffer()), cMapUrl: vwUrl('cmaps/'), cMapPacked: true, standardFontDataUrl: vwUrl('standard_fonts/'), wasmUrl: vwUrl('wasm/'), iccUrl: vwUrl('iccs/'), isEvalSupported: false}).promise;
       const th = await pdfPage1(doc); await idb('readwrite', st => st.put(th, 'pdft:' + inKey(id))).catch(() => {}); ({doi, title: guess} = await pdfSniffDoc(doc)); }
     const it = (db.inbox || []).find(x => x.id === id); if (!it) return;
     if ((doi && it.doi !== doi) || (guess && it.guess !== guess)) { if (doi) it.doi = doi; if (guess) it.guess = guess; it.up = new Date().toISOString(); markDirty(); }

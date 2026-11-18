@@ -133,7 +133,7 @@ async function vwOpen(src, file) {
 }
 function vwLoadDoc(L, file) {
   return file.arrayBuffer().then(buf => {
-    const task = L.getDocument({data: new Uint8Array(buf), cMapUrl: vwUrl('cmaps/'), cMapPacked: true, standardFontDataUrl: vwUrl('standard_fonts/'), isEvalSupported: false, enableXfa: false});
+    const task = L.getDocument({data: new Uint8Array(buf), cMapUrl: vwUrl('cmaps/'), cMapPacked: true, standardFontDataUrl: vwUrl('standard_fonts/'), wasmUrl: vwUrl('wasm/'), iccUrl: vwUrl('iccs/'), isEvalSupported: false, enableXfa: false});
     task.onPassword = (cb, why) => vwAskPass(why === 2).then(p => p == null ? task.destroy() : cb(p));
     return task.promise;
   });
