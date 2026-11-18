@@ -933,7 +933,7 @@ const CMDS = () => [
   ['⚙️ Configuración', () => openCfg()], ['❓ Ayuda', () => openHelp()], ['🗑️ Papelera', () => trOpen()], ['🕸️ Relaciones', () => grOpen()], ['🧬 Buscar duplicados', () => dpOpen()], ['🛟 Copias de seguridad', () => bkOpen()],
   [db.settings.view === 'table' ? '▦ Ver como tarjetas' : '☰ Ver como tabla', () => viewToggle()], ['☰ Plegar o desplegar la barra lateral', () => sbToggle()], ['☑ Seleccionar los visibles', () => selVisible()],
   ['✕ Quitar la selección', () => selNone()], ['🧹 Limpiar todos los filtros', () => fClrAll()], ['🔄 Sincronizar con Google Drive', () => syOn() ? syNow() : syConnect()], ['🔍 Buscar en la lista', () => SC_ACT.find()],
-  ['📖 Seguir leyendo', () => contRead()], ['🧠 Repaso de subrayados', () => revOpen()], ['📊 Estadísticas de lectura', () => rlOpen()], ['🔗 Buscar relaciones con OpenAlex', () => relFind()], ['⚠ Comprobar si algún paper está retractado', () => retrCheck()],
+  ['📖 Seguir leyendo', () => contRead()], ...db.settings.showRev ? [['🧠 Repaso de subrayados', () => revOpen()]] : [], ...db.settings.showStats ? [['📊 Estadísticas de lectura', () => rlOpen()]] : [], ['🔗 Buscar relaciones con OpenAlex', () => relFind()], ['⚠ Comprobar si algún paper está retractado', () => retrCheck()],
   ['🗂 Exportar a Markdown para Obsidian (.zip)', () => obsSave()]];
 let CMD = {q: '', i: 0, L: []};
 function cmdOpen(rd) { CMD = {q: '', i: 0, L: [], rd: rd ? rdCmds() : null}; const d = $('#cmdk');   // rd: dentro del visor o del lector de EPUB, sus órdenes (v40)

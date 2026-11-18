@@ -111,7 +111,11 @@ with sync_playwright() as pw:
     # ---- Repaso de subrayados (F7) y Markdown para Obsidian (F8)
     A.evaluate("""(() => { const p = db.papers[0]; p.pdf = {name: 'prueba.pdf', ann: [{id: 'h1', p: 0, k: 'hl', c: '#ffd400', t: 'Una frase importante', q: [.1, .1, .5, .12]}, {id: 'h2', p: 1, k: 'hl', c: '#ffd400', t: 'Otra frase', m: 'mi comentario', q: [.1, .1, .5, .12]}]};
       p.general = 'Notas generales'; markDirty(); render(); })()"""); A.wait_for_timeout(300)
-    eq('la barra lateral ofrece el repaso', A.evaluate("[!$('#sg-rev').hidden, $('#revN').textContent]"), [True, '(2)'])
+    eq('el repaso está apagado por defecto: ni barra lateral ni Ctrl+K', A.evaluate("[db.settings.showRev, $('#sg-rev').hidden, CMDS().some(c => /Repaso/.test(c[0]))]"), [False, True, False])
+    A.evaluate("openCfg('ap')"); A.wait_for_timeout(150)
+    eq('se enciende en Configuración → Apariencia', A.evaluate("(() => { const i = [...document.querySelectorAll('#cfg label')].find(l => /Repaso de subrayados/.test(l.textContent)).querySelector('input'); const was = i.checked; i.click(); return [was, db.settings.showRev]; })()"), [False, True])
+    A.evaluate("$('#cfg').close()")
+    eq('la barra lateral ofrece el repaso', A.evaluate("[!$('#sg-rev').hidden, $('#revN').textContent, CMDS().some(c => /Repaso/.test(c[0]))]"), [True, '(2)', True])
     A.evaluate("revOpen()"); A.wait_for_timeout(200)
     eq('el repaso muestra un subrayado con su paper', A.evaluate("[$('#rev').open, /frase/.test($('#rev .revq').textContent), /Uno/.test($('#rev').textContent)]"), [True, True, True])
     A.evaluate("revKnow()"); A.wait_for_timeout(100)
@@ -124,7 +128,8 @@ with sync_playwright() as pw:
     eq('con YAML, clave de cita, notas y subrayados', ['citekey:' in md, 'retracted: true' in md, 'Notas generales' in md, '«Una frase importante»' in md, 'mi comentario' in md, md.startswith('---\ntitle: "Uno"')], [True] * 6)
 
     # ---- Estadísticas de lectura (F10)
-    A.evaluate("RL.s = 300; RL.p = 12.4; RL.ids.add('a'); rlFlush()")
+    eq('las estadísticas están apagadas por defecto: leer no guarda nada', A.evaluate("(() => { RL.s = 300; RL.p = 3; RL.ids.add('a'); rlTick(); rlFlush(); return [db.settings.showStats, !!db.readLog && Object.keys(db.readLog).length, RL.s, $('#sg-rl').hidden, CMDS().some(c => /Estadísticas/.test(c[0]))]; })()"), [False, 0, 0, True, False])
+    A.evaluate("setCfg('showStats', true); RL.s = 300; RL.p = 12.4; RL.ids.add('a'); rlFlush()")
     day = A.evaluate("rlDay()"); dev = A.evaluate("syDev()")
     eq('se guarda en el proyecto, por día y dispositivo', A.evaluate("db.readLog"), {day: {dev: {'s': 300, 'p': 12, 'd': ['a']}}})
     eq('lo que no llega a una página se guarda la próxima vez', A.evaluate("[RL.s, Math.round(RL.p * 10) / 10]"), [0, 0.4])
@@ -154,7 +159,8 @@ with sync_playwright() as pw:
     eq('la barra «Seguir leyendo» aparece en la lista', A.evaluate("[!$('#cont').hidden, /Uno/.test($('#cont').textContent)]"), [True, True])
 
     # ---- Buscar en el texto de los PDF (F5) y espacio usado (I6)
-    A.wait_for_timeout(500)
+    eq('cerrar el visor antes de 5 s: no se saca el texto (no compite con las primeras páginas)', A.evaluate("idb('readonly', st => st.get('pdftx:a')).then(r => r ?? null)"), None)
+    A.evaluate("pdfOpen('a', 1)"); A.wait_for_timeout(6500); A.evaluate("vwClose()"); A.wait_for_timeout(300)
     eq('al abrir un PDF en el visor se guarda su texto', A.evaluate("idb('readonly', st => st.get('pdftx:a')).then(r => r ? [r.name, r.pages.length, /Pagina 2, linea 1/.test(r.pages[1])] : null)"), ['prueba.pdf', 3, True])
     A.evaluate("qSet('texto:\"pagina 2\"', true)"); A.wait_for_timeout(400)
     eq('texto: encuentra el paper y dice la página', A.evaluate("[[...document.querySelectorAll('#list .card')].map(c => c.dataset.id), $('#list .txhit b').textContent, $('#list .txhit mark').textContent]"), [['a'], 'p. 2', 'Pagina 2'])

@@ -2,6 +2,10 @@
 
 Lo más reciente arriba. Hasta la v39.53 estas notas estaban en el README; van de la más nueva a la más antigua (algunas rondas antiguas no tenían número de versión).
 
+## v40.1: repaso y estadísticas, opcionales
+- **🧠 Repaso de subrayados y 📊 Estadísticas de lectura** pasan a ser opciones de Configuración → Apariencia, **apagadas por defecto**. Apagadas no salen en la barra lateral ni en Ctrl+K, y con las estadísticas apagadas no se guarda nada mientras lees (tampoco se sincroniza cada 5 minutos). Lo ya guardado se conserva y vuelve a verse al encenderlas.
+- **Visor**: el texto para buscar dentro de los PDF se saca 5 s después de abrir, página a página y solo con el navegador libre; si cierras antes, se deja para la próxima vez. Así no compite con pintar las primeras páginas y los subrayados.
+
 ## v40: añadir papers de cualquier sitio, OpenAlex, lectura y búsqueda en los PDF
 **Añadir papers**
 - **DOI de cualquier agencia**: si CrossRef no lo tiene (DataCite, Zenodo, mEDRA…), se pide a doi.org en formato CSL. **arXiv** por su número (`2401.12345`, `arXiv:…` o el enlace) y **PubMed** por PMID (`PMID: 31452104` o el enlace). La bandeja reconoce también el sello de arXiv del margen de los PDF.
