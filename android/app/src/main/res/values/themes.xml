@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- v1.2.2: ventana opaca con la pantalla de carga de GPapers. Con la transparente de antes, mientras Chrome arrancaba se veía
+         la pantalla de inicio del móvil (y el logo de Chrome en blanco). -->
+    <style name="Arranque" parent="@android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@drawable/arranque</item>
+        <item name="android:statusBarColor">@color/backgroundColor</item>
+        <item name="android:navigationBarColor">@color/backgroundColor</item>
+        <item name="android:windowLightStatusBar">true</item>
+    </style>
+</resources>

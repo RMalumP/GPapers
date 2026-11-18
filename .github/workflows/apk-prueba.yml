@@ -13,9 +13,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        api: [30, 33, 34, 35]   # Android 11, 13, 14 y 15
+        api: [33, 35]   # Android 13 y 15
     steps:
       - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
       - uses: actions/setup-java@v4
         with: { distribution: temurin, java-version: 21 }
       - uses: gradle/actions/setup-gradle@v4
@@ -23,6 +24,10 @@ jobs:
       - name: Compilar
         working-directory: android
         run: gradle --no-daemon assembleDebug
+      - name: Compilar la versión de main, para comparar el arranque
+        run: |
+          mkdir -p /tmp/main && git archive origin/main android | tar -x -C /tmp/main
+          cd /tmp/main/android && gradle --no-daemon assembleDebug && cp app/build/outputs/apk/debug/app-debug.apk /tmp/apk-main.apk
       - name: Activar KVM
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
@@ -35,6 +40,8 @@ jobs:
           arch: x86_64
           disable-animations: true
           script: |
+            bash .github/scripts/arranque-apk.sh main /tmp/apk-main.apk nueva android/app/build/outputs/apk/debug/app-debug.apk || true
+            adb shell am force-stop io.github.rmalump.gpapers
             adb install -r android/app/build/outputs/apk/debug/app-debug.apk
             adb logcat -c
             adb shell am start -W -n io.github.rmalump.gpapers/com.google.androidbrowserhelper.trusted.LauncherActivity
