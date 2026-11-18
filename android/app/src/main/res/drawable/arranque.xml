@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Lo que se ve mientras Chrome arranca: el fondo de la app con su icono en medio (antes la ventana era transparente y se veía la pantalla de inicio). -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:drawable="@color/backgroundColor" />
+    <item android:drawable="@drawable/splash" android:gravity="center" android:width="96dp" android:height="96dp" />
+</layer-list>

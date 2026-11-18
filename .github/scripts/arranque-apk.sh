@@ -12,10 +12,11 @@ mirar() {   # $1: etiqueta
   local t0=$(date +%s%N) prev=''
   adb logcat -c
   adb shell am start -n $PKG/com.google.androidbrowserhelper.trusted.LauncherActivity >/dev/null
-  for i in $(seq 1 45); do
-    local top=$(adb shell dumpsys activity activities | grep -m1 -E 'topResumedActivity' | grep -oE '[a-z0-9.]+/[A-Za-z0-9.$_]+' | head -1)
-    [ "$top" != "$prev" ] && echo "[$1] $(( ($(date +%s%N) - t0) / 1000000 )) ms: ${top:-(nada)}"; prev=$top; sleep 0.3
+  for i in $(seq 1 30); do   # qué actividad está delante y qué colores se ven (cada ~0,5 s)
+    local top=$(adb shell dumpsys activity activities | grep -m1 -E 'topResumedActivity' | grep -oE '[a-z0-9.]+/[A-Za-z0-9.$_]+' | head -1 | sed 's/.*\.//')
+    echo "[$1] $(( ($(date +%s%N) - t0) / 1000000 )) ms: ${top:-(nada)} · $(adb exec-out screencap | python3 "$(dirname "$0")/pantalla.py")"
   done
+  adb logcat -d | grep -E "SplashScreenStrategy|doesn't support splash" | head -3
   echo "[$1] tareas al final:"; adb shell dumpsys activity activities | grep -E '^\s+\* Task\{|Hist #' | head -12
   echo "[$1] registro:"; adb logcat -d | grep -E "START u0|m=(OPEN|CLOSE|TO_FRONT|TO_BACK)|Displayed|TwaLauncher|TWALauncher|LauncherActivity.*finish" | cut -c1-240 | head -30
 }
