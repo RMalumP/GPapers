@@ -87,7 +87,7 @@ with sync_playwright() as pw:
     pg.evaluate("db.settings.view = 'cards'; F.group = false; db.papers.length = 3; markDirty(); render()")
 
     # ---- 8. Escribir en un campo: la copia para deshacer, al parar ----
-    pg.evaluate("db.tags = [{id: 't1', name: 'Uno', color: '#2457c5'}]; markDirty(); UNDO.length = 0; lastRecAt = 0; openMg('tags')")
+    pg.evaluate("db.tags = [{id: 't1', name: 'Uno', color: '#2457c5'}]; markDirty(); recFlush(); UNDO.length = 0; lastRecAt = 0; openMg('tags')")
     inp = pg.locator('#mg input.mgn').first; inp.click(); inp.press('End'); pg.keyboard.type('abc', delay=20)
     eq('mientras se escribe no se hace la copia, pero el cambio queda pendiente', pg.evaluate("[db.tags[0].name, UNDO.length, dirty]"), ['Unoabc', 0, True])
     pg.wait_for_timeout(600)

@@ -294,23 +294,45 @@ function lnLeftShow() {
 }
 const LNP = {pg: -1, t: 0, acc: 0, chars: 0, secs: 0, pos: -1};
 function lnPaceTick() {   // cada 5 s: cuánto tiempo pasas en cada página (o cuántas letras avanzas en el EPUB), solo leyendo (activo hace poco o con el automático)
-  if (!rdOpen() || document.hidden) { LNP.pg = -1; LNP.pos = -1; return; }
+  if (!rdOpen() || document.hidden) { LNP.pg = -1; LNP.pos = -1; rlFlush(); return; }
   const active = Date.now() - WL.act < 120e3 || VW.open && VW.auto && !VW.autoPaused || typeof EP !== 'undefined' && EP.open && EP.auto && !EP.autoPaused;
+  if (active) rlTick();
   if (VW.open && VW.pages.length) {
     if (LNP.pg !== VW.cur) {
+      if (LNP.pg >= 0 && VW.cur === LNP.pg + (VW.two ? vwSpreadN(vwSpread(LNP.pg)) : 1)) RL.p += VW.cur - LNP.pg;   // estadísticas: páginas leídas (pasar a la siguiente, no saltar)
       if (LNP.pg >= 0 && VW.cur === LNP.pg + (VW.two ? vwSpreadN(vwSpread(LNP.pg)) : 1) && LNP.acc >= 8 && LNP.acc <= 900) {   // pasó a la siguiente: lo que tardó en esa
         const per = LNP.acc / (VW.two ? vwSpreadN(vwSpread(LNP.pg)) : 1), old = lnNum('gp-vw-pace', 75, 5, 1800); try { localStorage.setItem('gp-vw-pace', Math.round(old * .8 + per * .2)); } catch (e) {} }
       LNP.pg = VW.cur; LNP.acc = 0;
     } else if (active) LNP.acc += 5;
   } else if (typeof EP !== 'undefined' && EP.open && EP.secs.length) {
     const l = epLoc(), pos = EP.cum[l.i] + l.f * EP.len[l.i];
-    if (LNP.pos >= 0 && active) { const d = pos - LNP.pos; if (d > 0 && d < 6000) { LNP.chars += d; LNP.secs += 5; } else if (d <= 0) LNP.secs += 5; }
+    if (LNP.pos >= 0 && active) { const d = pos - LNP.pos; if (d > 0 && d < 6000) { LNP.chars += d; LNP.secs += 5; RL.p += d / RL_CH; } else if (d <= 0) LNP.secs += 5; }
     LNP.pos = pos;
     if (LNP.secs >= 60) { if (LNP.chars > 150) { const v = LNP.chars / LNP.secs * 60, old = lnNum('gp-ep-pace', 1300, 100, 20000); try { localStorage.setItem('gp-ep-pace', Math.round(old * .8 + Math.min(8000, v) * .2)); } catch (e) {} } LNP.chars = LNP.secs = 0; }
   }
   lnLeftShow();
 }
 setInterval(lnPaceTick, 5000);
+/* ---- Estadísticas de lectura (v40, F10): tiempo leyendo, páginas y papers de cada día, en el proyecto (db.readLog: día → dispositivo → {s, p, d})
+   para que se sumen los de todos tus dispositivos con Google Drive. Solo cuenta mientras lees de verdad (la misma regla que el ritmo de lectura).
+   Se guarda cada 5 minutos, al cerrar el visor y al salir, sin crear pasos de deshacer. En el EPUB, una página son ~2000 letras. */
+const RL = {s: 0, p: 0, ids: new Set(), at: Date.now()}, RL_CH = 2000;
+const rlDay = (t = new Date()) => `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
+function rlTick() {
+  RL.s += 5; const src = VW.open ? VW.src : typeof EP !== 'undefined' && EP.open ? EP.src : null;
+  if (src?.kind === 'paper' && src.id != null) RL.ids.add(String(src.id));
+  if (Date.now() - RL.at > 300e3) rlFlush();
+}
+function rlFlush() {
+  const pg = Math.floor(RL.p); RL.at = Date.now();
+  if (TAB.passive || RL.s < 5 && !pg) return;
+  const L = db.readLog ||= {}, e = (L[rlDay()] ||= {})[syDev()] ||= {s: 0, p: 0};
+  e.s = Math.min(86400, e.s + RL.s); e.p = Math.min(5000, e.p + pg); if (RL.ids.size) e.d = [...new Set([...(e.d || []), ...RL.ids])].slice(0, 50);
+  RL.s = 0; RL.p -= pg; RL.ids.clear();
+  const ks = Object.keys(L).sort(); if (ks.length > 400) ks.slice(0, ks.length - 400).forEach(k => delete L[k]);
+  foldSnap(); dirty = true; touch(); if (typeof rlDraw0 === 'function') rlDraw0();
+}
+addEventListener('pagehide', () => { try { rlFlush(); } catch (e) {} });
 
 /* ===== Subrayado con línea y tachado, recorte a mano y girar páginas (v39.52) =====
    · Estilo de un subrayado (campo «s» de la anotación: 'u' línea debajo, 'x' tachado; sin él, resaltado como siempre). Se cambia en la
@@ -579,3 +601,34 @@ function p2Close(keep) {
   if (!keep) setTimeout(() => { if (VW.open && VW.fit) vwFitW(true); }, 60);
 }
 window.addEventListener('resize', () => { if (P2.doc) { vwSplitMode(); clearTimeout(P2.rt); P2.rt = setTimeout(() => P2.pgs.forEach(p => { if (p.vis) p2Render(p); }), 200); } });
+/* ===== Buscar órdenes dentro del visor y del lector de EPUB (v40): Ctrl+K =====
+   Las órdenes salen de los propios menús (⋯ y sus submenús, que se recorren sin mostrarlos) y de los botones visibles de la barra:
+   así cualquier opción nueva de un menú aparece sola en la paleta. */
+function rdCmds() {
+  const ep = !VW.open && typeof EP !== 'undefined' && EP.open, menuFn = ep ? 'epMenu' : 'vwMenu', S = ep ? EP : VW, keepR = S.menuR, orig = window[menuFn], out = [], seen = new Set();
+  const fake = {stopPropagation() {}, currentTarget: {getBoundingClientRect: () => ({left: 0, top: 0, right: innerWidth - 8, bottom: 52, width: 0, height: 0})}};
+  const label = el => { const c = el.cloneNode(true); c.querySelectorAll('small').forEach(s => s.remove()); return (el.getAttribute('aria-label') || c.textContent || el.title || '').replace(/\s+/g, ' ').replace(/\s*›\s*$/, '').trim(); };
+  const queue = [[ep ? () => epMore(fake) : () => vwMore(fake), []]]; let html = '';
+  window[menuFn] = (r, h) => { html = h; };
+  try {
+    while (queue.length) {
+      const [fn, path] = queue.shift(); html = ''; try { fn(); } catch (e) { continue; }
+      const box = document.createElement('div'); box.innerHTML = html; let head = '';
+      for (const el of box.querySelectorAll('.ctxh, button[data-onclick]')) {
+        if (el.classList.contains('ctxh')) { head = el.textContent.replace(/\s+/g, ' ').trim(); continue; }
+        const on = el.getAttribute('data-onclick'), t = label(el);
+        if (!t || el.disabled || /Back\(\)$|^cmdOpen/.test(on) || /\bevent\b|\bthis\b/.test(on)) continue;
+        if (/^\w+Menu\(\)$/.test(on)) { const f = window[on.slice(0, -2)]; if (!seen.has(on) && path.length < 2 && typeof f === 'function') { seen.add(on); queue.push([() => f(), [...path, t]]); } continue; }
+        out.push({t: [...path, head, t].filter(Boolean).join(' › '), on});
+      }
+    }
+  } finally { window[menuFn] = orig; S.menuR = keepR; }
+  for (const b of (ep ? $('#ep') : $('#vw')).querySelectorAll('button[data-onclick]')) {   // la barra de arriba (lo que se ve)
+    if (b.closest('.vwmenu, #vwPages, #epDoc') || !b.offsetParent) continue; const on = b.getAttribute('data-onclick'), t = label(b);
+    if (t && !/\bevent\b|\bthis\b|^cmdOpen/.test(on) && !out.some(o => o.on === on)) out.push({t, on});
+  }
+  return out;
+}
+function rdCmdRun(on) {   // ejecuta una orden como si se pulsara su botón (el mismo minilenguaje data-on…)
+  const host = VW.open ? $('#vw') : $('#ep'), b = document.createElement('button'); b.hidden = true; b.setAttribute('data-onclick', on); host.append(b); b.click(); b.remove();
+}

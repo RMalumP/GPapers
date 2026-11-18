@@ -19,8 +19,12 @@ function mvDrawer(open) {   // la barra lateral, como panel que entra desde la i
   const on = open ?? !document.documentElement.classList.contains('mv-dr');
   if (on) mvMore(false);
   document.documentElement.classList.toggle('mv-dr', on);
-  mv$('#side')?.setAttribute('aria-hidden', String(!on)); mv$('#mvMenuBtn')?.setAttribute('aria-expanded', String(on));
+  mvSideA11y(); mv$('#mvMenuBtn')?.setAttribute('aria-expanded', String(on));
   if (on) mvCount();
+}
+function mvSideA11y() {   // v40: la barra lateral solo se oculta a los lectores de pantalla (y al tabulador) cuando es el panel cerrado del móvil
+  const sd = mv$('#side'); if (!sd) return; const h = document.documentElement, off = h.classList.contains('mv') && !h.classList.contains('mv-dr');
+  if (off) sd.setAttribute('aria-hidden', 'true'); else sd.removeAttribute('aria-hidden'); sd.inert = off;
 }
 function mvMore(open) {   // menú ⋯ de la cabecera (Google Drive, Guardar, Importar, Exportar y Archivo)
   const on = open ?? !document.documentElement.classList.contains('mv-mo');
@@ -153,7 +157,7 @@ function mvBuild() {
 }
 function mvApply() {
   const on = mvOn(); document.documentElement.classList.toggle('mv', on);
-  if (on) mvBuild(); else { mvClose(); if (MV_BUILT && typeof sbSearchDock === 'function') sbSearchDock(); }   // al salir, la búsqueda vuelve a su sitio de siempre
+  mvSideA11y(); if (on) mvBuild(); else { mvClose(); if (MV_BUILT && typeof sbSearchDock === 'function') sbSearchDock(); }   // al salir, la búsqueda vuelve a su sitio de siempre
   try { if (db.settings.view === 'table') render(); } catch (e) {}   // la tabla se pinta distinta en el móvil (fichas) y en el ordenador
 }
 // Sección ▾ y Etiquetas ▾: en el móvil y en pantallas táctiles, menú en vez de solo mostrar u ocultar la fila (va antes que los data-onclick de siempre)

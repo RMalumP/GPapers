@@ -47,6 +47,29 @@ function syNormS(d, s = syS(d)) {
   return o;
 }
 const syNorm = d => JSON.parse(syNormS(d));
+/* ---- Trabajo pesado en segundo plano (v40): normalizar, fusionar y leer BibTeX grandes en un Web Worker (js/trabajo.js) para que la app no se congele.
+   Si no hay worker (file://, un navegador sin él) o falla, se hace aquí, como antes: el resultado es el mismo. ---- */
+const WK = {w: null, n: 0, cb: new Map(), off: typeof importScripts === 'function'};   // dentro del propio worker, nunca
+function wkGet() {
+  if (WK.off || typeof Worker !== 'function' || !/^https?:$/.test(location.protocol)) return null;
+  if (!WK.w) try {
+    WK.w = new Worker('js/trabajo.js');
+    WK.w.onmessage = ({data: m}) => { const c = WK.cb.get(m.id); if (!c) return; WK.cb.delete(m.id); if (m.err != null) c.ko(Error(m.err)); else c.ok(m.r); };
+    WK.w.onerror = e => { e.preventDefault?.(); wkDown(); };
+  } catch (e) { WK.off = true; return null; }
+  return WK.w;
+}
+function wkDown() { WK.off = true; try { WK.w?.terminate(); } catch (e) {} WK.w = null; for (const c of WK.cb.values()) c.ko(Error('worker')); WK.cb.clear(); }
+function wk(job, data) { const w = wkGet(); if (!w) return Promise.reject(Error('sin worker')); return new Promise((ok, ko) => { const id = ++WK.n; WK.cb.set(id, {ok, ko}); w.postMessage({id, job, ...data}); }); }
+const syNmPut = (k, o) => { SY_NM.set(k, o); SY_NM.set(syHash(o), o); while (SY_NM.size > SY_NM_MAX) SY_NM.delete(SY_NM.keys().next().value); };
+async function syNormA(d, s = syS(d)) {   // como syNormS, en el worker
+  if (SY_NM.has(syHash(s))) return syNormS(d, s);
+  let o; try { o = await wk('norm', {s}); } catch (e) { return syNormS(d, s); }
+  syNmPut(syHash(s), o); return o;
+}
+async function syMergeA(lS, rS, b) {   // syNormS(syMerge(…)) en el worker; lS y rS ya normalizados (texto)
+  try { const o = await wk('merge', {l: lS, r: rS, b}); syNmPut(syHash(o), o); return o; } catch (e) { return syNormS(syMerge(JSON.parse(lS), JSON.parse(rS), b)); }
+}
 function syVal(x, y, z, hasB, mine) {   // un valor: si solo cambió un lado gana ese; si cambiaron los dos, «mine» decide (true = este dispositivo)
   if (syS(x) === syS(y)) return x;
   if (hasB && syS(x) === syS(z)) return y;
@@ -56,7 +79,7 @@ function syVal(x, y, z, hasB, mine) {   // un valor: si solo cambió un lado gan
 function syObj(x, y, z, mine, sub = {}) {   // objeto campo a campo; sub[k] fusiona ese campo a su manera
   x ||= {}; y ||= {}; const o = {}, hasB = !!z; z ||= {};
   for (const k of new Set([...Object.keys(x), ...Object.keys(y)])) {
-    const v = sub[k] ? sub[k](x[k], y[k], z[k], hasB) : syVal(x[k], y[k], z[k], hasB, mine);
+    const f = typeof sub === 'function' ? sub : sub[k], v = f ? f(x[k], y[k], z[k], hasB) : syVal(x[k], y[k], z[k], hasB, mine);   // sub como función: la misma para todos los campos
     if (v !== undefined) o[k] = v;
   }
   return o;
@@ -78,6 +101,8 @@ const syLst = (pick, key) => (x, y, z, h) => syList(x, y, h ? z || [] : null, pi
 const syAnn = syLst((a, b, c) => syObj(a, b, c, (a.up || '') >= (b.up || '')));   // subrayados y comentarios: uno a uno; si los dos cambian el mismo, gana el cambiado más tarde
 const syPdf = mine => (x, y, z, h) => x && y && typeof x === 'object' && typeof y === 'object' && x.name === y.name ? syObj(x, y, h && z && z.name === x.name ? z : null, mine, {ann: syAnn}) : syVal(x, y, z, h, mine);   // el mismo PDF: campo a campo
 function syPaper(a, b, c) { const mine = syWhen(a) >= syWhen(b); return syObj(a, b, c, mine, {notes: syLst((p, q, r) => syObj(p, q, r, mine)), pdf: syPdf(mine), pdf2: syPdf(mine)}); }
+const syMap = f => (x, y, z, h) => { if (!syIsObj(x || {}) || !syIsObj(y || {})) return syVal(x, y, z, h, true); const r = syObj(x, y, h ? (syIsObj(z) ? z : {}) : null, true, f); return Object.keys(r).length ? r : undefined; };
+const syReadLog = syMap(syMap((x, y, z, h) => syVal(x, y, z, h, true)));   // estadísticas de lectura (v40): día → dispositivo → {s, p, d}; cada dispositivo solo escribe lo suyo, así que no chocan
 const syInbox = (a, b, c) => syObj(a, b, c, (a.up || '') >= (b.up || ''), {ann: syAnn});
 function sySettings(x, y, z) {
   const o = syObj(x, y, z, true, {customTypes: syLst(syGen), customStyles: syLst(syGen), templates: syLst(syGen),
@@ -86,7 +111,7 @@ function sySettings(x, y, z) {
   return o;
 }
 function syMerge(L, R, B) {   // L = este dispositivo, R = Google Drive, B = última versión sincronizada (null la primera vez: se unen)
-  const o = syObj(L, R, B, true, {sections: syLst(syTS), tags: syLst(syTS), orders: syLst(syGen), posSaves: syLst(syGen), papers: syLst(syPaper), trash: syLst(syGen, t => t.paper.id), inbox: syLst(syInbox),
+  const o = syObj(L, R, B, true, {sections: syLst(syTS), tags: syLst(syTS), orders: syLst(syGen), posSaves: syLst(syGen), papers: syLst(syPaper), trash: syLst(syGen, t => t.paper.id), inbox: syLst(syInbox), readLog: syReadLog,
     settings: (x, y, z, h) => sySettings(x || {}, y || {}, h ? z || {} : null),
     manual: (x, y, z, h) => { if (!syIsObj(x || {}) || !syIsObj(y || {})) return syVal(x, y, z, h, true); const r = syObj(x, y, h ? (syIsObj(z) ? z : {}) : null, true); return Object.keys(r).length ? r : undefined; }});   // orden manual: sección a sección (antes, entero: ordenar dos secciones en dos dispositivos perdía una)
   o.papers ||= []; o.trash ||= []; o.inbox ||= []; o.tags ||= []; o.sections ||= [];
@@ -270,11 +295,19 @@ const syLsFor = (tok, N) => syLs(tok, [SY_IDX, N.snap, N.legacy].filter(Boolean)
 const syGcDue = () => { try { return Date.now() - (+localStorage.getItem('gp-sy-gc') || 0) > 864e5; } catch (e) { return true; } };   // la limpieza de proyectos borrados, una vez al día
 const syGcDone = () => { try { localStorage.setItem('gp-sy-gc', String(Date.now())); } catch (e) {} };
 const syVer = f => f.md5Checksum || `${f.modifiedTime}:${f.size}`;
-const syGet = async (tok, id) => (await syDrive(tok, `/drive/v3/files/${id}?alt=media`)).json();
+/* Copia completa comprimida (v40, R6): «gpapers-snap.json» (y la de cada proyecto) se sube en gzip, de 5 a 10 veces más pequeña: menos datos móviles
+   y vueltas más cortas. Se lee igual comprimida o no (los cambios sueltos y el índice siguen en JSON plano, son pequeños). */
+const SY_GZ = typeof CompressionStream === 'function' && typeof DecompressionStream === 'function';
+const syGz = s => new Response(new Blob([s]).stream().pipeThrough(new CompressionStream('gzip'))).blob().then(b => new Blob([b], {type: 'application/gzip'}));
+const syGet = async (tok, id) => {
+  const b = new Uint8Array(await (await syDrive(tok, `/drive/v3/files/${id}?alt=media`)).arrayBuffer());
+  if (b[0] === 0x1f && b[1] === 0x8b) { if (!SY_GZ) throw Error('formato'); return JSON.parse(await new Response(new Blob([b]).stream().pipeThrough(new DecompressionStream('gzip'))).text()); }
+  return JSON.parse(new TextDecoder().decode(b));
+};
 const syDel = (tok, id) => syDrive(tok, '/drive/v3/files/' + id, {method: 'DELETE'}).catch(() => {});
 async function syUpload(tok, id, name, body, type) {   // id: sustituye ese archivo; sin id, lo crea. Devuelve {id, md5Checksum, modifiedTime, size}
   const F = '&fields=id,md5Checksum,modifiedTime,size', meta = JSON.stringify(id ? {} : {name, parents: ['appDataFolder']});
-  if (new Blob([body]).size > SY_CFG.big) {   // grande: subida reanudable, sin el límite de 5 MB de las otras (se pide la dirección de subida y se envía ahí)
+  if (body instanceof Blob || new Blob([body]).size > SY_CFG.big) {   // grande (o binaria, como la copia comprimida): subida reanudable, sin el límite de 5 MB de las otras (se pide la dirección de subida y se envía ahí)
     const r = await syDrive(tok, `/upload/drive/v3/files${id ? '/' + id : ''}?uploadType=resumable${F}`, {method: id ? 'PATCH' : 'POST', headers: {'Content-Type': 'application/json; charset=UTF-8', 'X-Upload-Content-Type': type}, body: meta});
     const loc = r.headers.get('Location'); if (!loc) throw Error('reanudable');
     const u = await fetch(loc, {method: 'PUT', headers: {'Content-Type': type}, body, cache: 'no-store'});
@@ -310,7 +343,8 @@ async function syRemote(tok, files, N) {   // el proyecto en Drive (con huellas 
   return {w, c, sf, lf, all, files, n: ds.length, N};
 }
 async function syCompact(tok, R, mw, refs) {   // reescribe la copia completa y borra lo que ya incluye: los cambios sueltos, la copia antigua y las imágenes que nadie usa
-  const inc = R.all.map(f => f.name), f = await syUpload(tok, R.sf && R.sf.id, R.N.snap, JSON.stringify({app: 'gpapers', v: 2, at: new Date().toISOString(), inc, db: mw}), 'application/json');
+  const inc = R.all.map(f => f.name), js = JSON.stringify({app: 'gpapers', v: 2, at: new Date().toISOString(), inc, db: mw});
+  const f = SY_GZ ? await syUpload(tok, R.sf && R.sf.id, R.N.snap, await syGz(js), 'application/gzip') : await syUpload(tok, R.sf && R.sf.id, R.N.snap, js, 'application/json');
   R.c.snap = {ver: syVer(f), inc, db: mw}; R.c.deltas = {}; await syCacheSet(R.N, R.c);
   const old = Date.now() - 864e5;   // una imagen que otro dispositivo acaba de subir aún no está en esta copia: solo se borran las de más de un día
   await syPool([...R.all, ...(R.lf ? [R.lf] : []), ...R.files.filter(x => x.name.startsWith(R.N.img) && !refs.has(x.name.slice(R.N.img.length)) && Date.parse(x.modifiedTime) < old)], x => syDel(tok, x.id));
@@ -361,18 +395,18 @@ async function syOnce(inter) {
   const tok = await syToken(inter), full = syGcDue() || PJ.gone.length > 0, files = full ? await syLs(tok) : await syLsFor(tok, N);
   const [I, iB, R] = await Promise.all([syIdxGet(tok, files), idb('readonly', st => st.get('syncIdxBase')).catch(() => null), syRemote(tok, files, N)]);   // a la vez: menos esperas
   const rw = R.w ? await syUnwire(tok, R.w, files, N) : null;
-  const snap = syTokS(db), plain = JSON.parse(snap), curS = syNormS(plain, snap);
+  const snap = syTokS(db), plain = JSON.parse(snap), curS = await syNormA(plain, snap);
   const iM = I.w ? syIdxMerge(syIdxLocal(plain.settings), I.w, iB) : syIdxLocal(plain.settings);
   for (const p of PJ.list) if ((p.id === id ? dirty : p.dirty) && !iM.projects.some(e => e.id === p.id)) iM.projects.push(pjEntry(p));   // borrado en otro dispositivo, pero aquí tiene cambios sin guardar: se queda
   if (!iM.projects.some(e => e.id === id)) {   // el proyecto abierto se borró en otro dispositivo: se pasa a otro
     if (iM.projects.length) { syIdxApply(iM); return {gone: id}; }
     iM.projects.push(pjEntry(pjCur()));
   }
-  const localS = syNormS({...plain, settings: {...iM.settings, ...syOwn(plain.settings)}}), local = JSON.parse(localS);   // con los ajustes comunes que llegan del índice
+  const localS = await syNormA({...plain, settings: {...iM.settings, ...syOwn(plain.settings)}}), local = JSON.parse(localS);   // con los ajustes comunes que llegan del índice
   let mS = localS, replace = false;
   if (rw) {
-    const remoteS = syNormS(rw), remote = JSON.parse(remoteS), base = await syBase(N);
-    if (base) mS = syNormS(syMerge(local, remote, base));
+    const remoteS = await syNormA(rw), remote = JSON.parse(remoteS), base = await syBase(N);
+    if (base) mS = await syMergeA(localS, remoteS, base);
     else if (localS === remoteS || syTrivial()) { mS = remoteS; replace = syTrivial(); }
     else { const c = await syAsk(local, remote); if (!c) return {cancel: true};
       mS = c === 'merge' ? syNormS(syMerge(local, remote, null)) : c === 'drive' ? remoteS : localS; replace = c === 'drive'; }
@@ -458,6 +492,7 @@ const sySoon = (ms = 3000) => { clearTimeout(SY.tm); SY.tm = setTimeout(() => { 
 const syAuto = () => syOn() && syP().auto !== false;
 function syApply(m, replace) {   // pone en la app lo que llega de Drive (se puede deshacer)
   if (replace) bkTake('Antes de reemplazar por Google Drive');
+  recFlush();   // un cambio de aquí aún sin copia para deshacer: se copia antes de que llegue lo de Drive
   const hist = new Map(db.papers.map(p => [p.id, p.history]));
   SY.applying = true;
   try {

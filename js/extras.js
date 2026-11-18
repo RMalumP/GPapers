@@ -25,7 +25,7 @@ function privHTML() {
   const on = syOn(), p = syP();
   return `<div class="dh"><h2>Privacidad</h2><div class="dbtn"><button data-onclick="$('#pv').close()">Cerrar ✕</button></div></div><div class="sytx">
     <h4>Qué datos se tratan y dónde</h4><p>Tus proyectos (papers, notas, secciones, etiquetas y papelera) y tus ajustes se guardan <b>en tu navegador</b> (copia de trabajo de cada proyecto en el almacenamiento de la aplicación) y en los <b>archivos JSON</b> que tú eliges. No se envían a ningún servidor de quien mantiene la aplicación: no hay cuentas, ni analíticas, ni publicidad, ni cookies de seguimiento.</p>
-    <h4>Cuándo sale algo a internet</h4><ul><li><b>Buscar por DOI, ISBN o título</b>: se envía el DOI o el título a CrossRef (api.crossref.org), o el ISBN a Open Library (openlibrary.org), para traer los datos.</li><li><b>Completar con OpenAlex</b> (botón en Datos): se envía el DOI o el título a OpenAlex (api.openalex.org) para traer el resumen, las citas y el enlace al PDF en abierto.</li>
+    <h4>Cuándo sale algo a internet</h4><ul><li><b>Buscar por DOI, ISBN, arXiv, PMID o título</b>: se envía el DOI o el título a CrossRef (api.crossref.org); si CrossRef no conoce el DOI (arXiv, Zenodo…), a doi.org, que lo pasa a su agencia (DataCite, mEDRA…); el PMID a PubMed (api.ncbi.nlm.nih.gov) y el ISBN a Open Library (openlibrary.org), para traer los datos.</li><li><b>Completar con OpenAlex</b> (botones «OpenAlex» y «Parecidos» en Datos): se envía el DOI o el título a OpenAlex (api.openalex.org) para traer el resumen, las citas, el enlace al PDF en abierto, si está retractado y papers parecidos.</li><li><b>Relaciones y retractados con OpenAlex</b> (botón «Buscar relaciones con OpenAlex» en Relaciones, y «Comprobar si algún paper está retractado» en Configuración): se envían a OpenAlex los DOI de los papers del proyecto, solo al pulsarlos.</li>
     <li><b>Imágenes por URL</b>: tu navegador las descarga de la web donde están.</li>
     <li><b>Sincronización con Google Drive</b>, solo si la activas (abajo).</li></ul>
     <h4>Sincronización con Google Drive (opcional)</h4><p>Si pulsas 🔄 y das permiso, la aplicación guarda una copia de tus proyectos (archivos <code>gpapers-…</code>: la lista de proyectos con los ajustes, cada proyecto, los cambios de cada autoguardado y las imágenes incrustadas) en una <b>carpeta privada y oculta de tu propio Google Drive</b>. Usa el permiso <code>drive.appdata</code>, que solo deja ver, crear y borrar esa carpeta concreta: la aplicación <b>no puede leer ni modificar ningún otro archivo de tu Drive</b>.</p>
@@ -154,6 +154,25 @@ function recDraw() {
   const L = REC.map(id => db.papers.find(p => p.id === id)).filter(Boolean).slice(0, 5), g = $('#sg-rec'); if (!g) return; g.hidden = !L.length;
   $('#recL').innerHTML = L.map(p => `<button class="rec" data-onclick="openPaper('${p.id}')" title="${esc(p.title)}">${esc(shortTxt(p.alias || p.title) || '(sin título)')}</button>`).join('');
 }
+/* ---- Seguir leyendo (v40, I2): una franja sobre la lista con el último PDF o EPUB abierto de este proyecto, su página y el tiempo que falta.
+   Se recuerda en el dispositivo (gp-cont:<proyecto>); ✕ la oculta hasta que abras otro documento. ---- */
+const contK = () => 'gp-cont:' + PJ.cur;
+const contGet = () => { try { const o = JSON.parse(localStorage.getItem(contK()) || 'null'); return o && typeof o.id === 'string' ? o : null; } catch (e) { return null; } };
+function contSet(id, n) { try { localStorage.setItem(contK(), JSON.stringify({id, n, at: Date.now()})); } catch (e) {} }
+function contInfo() {   // {p, n, pf, ep, pg, of, left} del último documento, si sigue existiendo
+  const c = contGet(); if (!c || c.off) return null; const p = db.papers.find(x => x.id === c.id), pf = p && p[pdfF(c.n)]; if (!pf) return null;
+  const ep = isEpub(pf.name), pg = pdfPage(pf.page) || 1;   // en el EPUB, «page» es el capítulo (desde 1)
+  let of = 0; try { of = JSON.parse(localStorage.getItem('gp-vw-sz') || '{}')[pdfKey(c.id, c.n)]?.n || 0; } catch (e) {}
+  const left = !ep && of > pg ? lnFmtMin((of - pg) * lnNum('gp-vw-pace', 75, 5, 1800) / 60) : '';
+  return {p, n: c.n, pf, ep, pg, of, left};
+}
+function contDraw() {
+  const el = $('#cont'); if (!el) return; const i = !document.querySelector('dialog[open]') && contInfo(); el.hidden = !i; if (!i) return;
+  const where = i.ep ? `cap. ${i.pg}` : `p. ${i.pg}${i.of ? ` de ${i.of}` : ''}`;
+  el.innerHTML = `<button class="cmain" data-onclick="contRead()" title="Abrir donde lo dejaste">${i.ep ? '📘' : '📖'} <span>Seguir leyendo</span> <b>${esc(shortTxt(i.p.alias || i.p.title))}</b> <small>${where}${i.left ? ' · ' + i.left : ''}</small></button><button class="cx" data-onclick="contOff()" title="Ocultar hasta que abras otro documento" aria-label="Ocultar">✕</button>`;
+}
+function contRead() { const i = contInfo(); if (!i) return toast('Aún no has abierto ningún PDF o EPUB en este proyecto.', [], 3500); pdfOpen(i.p.id, i.n); }
+function contOff() { const c = contGet(); if (c) { c.off = 1; try { localStorage.setItem(contK(), JSON.stringify(c)); } catch (e) {} } contDraw(); }
 function progDraw() {   // barra de progreso de lectura del proyecto, en la cabecera
   const el = $('#pjProg'), n = db.papers.length; el.hidden = !n || !db.settings.showProgress; if (el.hidden) return;
   const c = {leido: 0, leyendo: 0, por_leer: 0}; db.papers.forEach(p => c[p.reading in c ? p.reading : 'por_leer']++);
@@ -169,7 +188,6 @@ function progDraw() {   // barra de progreso de lectura del proyecto, en la cabe
    en IndexedDB («pdf:<clave>») y la copia en Google Drive («gpapers-pdf-<clave>»). */
 const PDF_T = [{description: 'PDF o EPUB', accept: {'application/pdf': ['.pdf'], 'application/epub+zip': ['.epub']}}], DOC_ACC = '.pdf,.epub,application/pdf,application/epub+zip', PEND_PDF = new Map(), PDF_FILES = new Map();   // PEND_PDF: elegidos en el borrador · PDF_FILES: archivos de esta sesión (sin acceso a archivos); ambos por clave
 const PDF_N = [1, 2], pdfF = n => n === 2 ? 'pdf2' : 'pdf', pdfKey = (id, n) => n === 2 ? id + '~2' : id;
-const pdfPage = v => { v = parseInt(v, 10); return Number.isInteger(v) && v > 0 && v < 100000 ? v : 0; };
 const pdfsOf = p => PDF_N.filter(n => p[pdfF(n)]);   // huecos con PDF de un paper
 async function pdfChoose(key) {   // elige el archivo de un hueco (guardándolo en el borrador o en el paper); devuelve el File
   if (FSA) { const [h] = await showOpenFilePicker({types: PDF_T}); PEND_PDF.set(key, h); return {file: await h.getFile(), h}; }
@@ -217,7 +235,7 @@ async function pdfOpen(id, n = 1, ev) {
   const p = D && D.id === id && $('#dlg').open ? D : db.papers.find(x => x.id === id), pf = p && p[pdfF(n)], key = pdfKey(id, n); if (!pf) return;   // con el editor abierto, el borrador
   try {
     const file = await pdfFile(key, pf); if (!file) return;
-    vwOpenAny({kind: 'paper', id, n}, file, ev, pf.page); covFromOpen(id, n, file);
+    vwOpenAny({kind: 'paper', id, n}, file, ev, pf.page); covFromOpen(id, n, file); contSet(id, n);
   } catch (e) { if (e.name !== 'AbortError') say(`No se pudo abrir el ${docKind(pf.name)}: ` + e.message); }
 }
 const annN = pf => pf?.ann?.length || 0;
@@ -231,7 +249,7 @@ const pdfBtns = (p, full) => pdfsOf(p).map(n => { const pf = p[pdfF(n)], a = ann
 async function docSniff(file) {
   if (isEpub(file.name)) { const m = await epMeta(file); return m && {...m, ep: true}; }
   if (!vwCan()) return null; let doc;
-  try { const L = await vwLib(); doc = await L.getDocument({data: new Uint8Array(await file.arrayBuffer()), cMapUrl: vwUrl('cmaps/'), cMapPacked: true, standardFontDataUrl: vwUrl('standard_fonts/'), isEvalSupported: false}).promise;
+  try { const L = await vwLib(); doc = await L.getDocument({data: new Uint8Array(await file.arrayBuffer()), cMapUrl: vwUrl('cmaps/'), cMapPacked: true, standardFontDataUrl: vwUrl('standard_fonts/'), wasmUrl: vwUrl('wasm/'), iccUrl: vwUrl('iccs/'), isEvalSupported: false}).promise;
     return await pdfSniffDoc(doc); } catch (e) { return null; } finally { try { doc?.destroy(); } catch (e) {} }
 }
 const docRef = s => s.ep ? {title: s.title, authors: s.authors, year: s.year, publisher: s.publisher, isbn: s.isbn, type: 'libro'} : {title: s.title};
@@ -246,7 +264,7 @@ function docFill(p, r) {   // pone en el paper (o el borrador) los datos que le 
   return ks;
 }
 async function docFillDoi(id, doi) {
-  toast('Buscando los datos del DOI en CrossRef…', [], 2500); let r; try { r = await fetchDoi(doi); } catch (e) { return toast(e.message, [], 5000); }
+  toast('Buscando los datos del DOI…', [], 2500); let r; try { r = await fetchDoi(doi); } catch (e) { return toast(e.message, [], 5000); }
   if (D?.id !== id || !$('#dlg').open) openPaper(id); if (D?.id !== id) return;
   const ks = docFill(D, {...r, doi}); drawD(); toast(ks.length ? `Completado: ${ks.map(k => DOC_FL[k] || k.toUpperCase()).join(', ')}. Revísalo y guarda la ficha.` : 'La ficha ya tenía esos datos.', [], 5000);
 }
@@ -382,7 +400,7 @@ async function bkRestore(i) {
   if (!await askOk(`¿Restaurar la copia del ${bkFmt(c)} (${c.n} papers)?\nSe sustituye lo que hay ahora en «${pjCur().name}»; antes se guarda una copia del estado actual y puedes deshacerlo (${db.settings.shortcuts.undo}).`)) return;
   let d; try { d = JSON.parse(await bkJSON(c)); d.settings = structuredClone(db.settings); d = validate(d); } catch (e) { return say('La copia no es válida: ' + e.message); } finally { syncTypes(db.settings.customTypes); syncStyles(db.settings.customStyles, db.settings.export); }
   await bkTake('Antes de restaurar', true);
-  const hist = new Map(db.papers.map(p => [p.id, p.history])); db = d; db.papers.forEach(p => p.history = hist.get(p.id) || []);
+  recFlush(); const hist = new Map(db.papers.map(p => [p.id, p.history])); db = d; db.papers.forEach(p => p.history = hist.get(p.id) || []);
   for (const id of [...SEL]) if (!db.papers.some(p => p.id === id)) SEL.delete(id);
   lastRecAt = 0; record(); markDirty(); applySettings(); render(); bkOpen(); toast('Copia restaurada. Lo anterior sigue en las copias y se puede deshacer.', [], 5000);
 }

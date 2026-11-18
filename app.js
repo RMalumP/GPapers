@@ -39,7 +39,7 @@ function mgAdd(id) { db[MG].push({id, name: 'Nueva', color: '#2457c5', tagIds: [
    Aparte del JSON, la app guarda (1) una copia de trabajo, para reabrir justo donde lo dejaste aunque no hayas guardado, y
    (2) el estado de la interfaz (filtros, orden, barra lateral, bloques plegados). Viven fuera de la caché de la aplicación,
    así que las actualizaciones no los tocan y no hace falta borrar datos para recibir una versión nueva. */
-const APP_V = '39.53';   // debe coincidir con la versión de sw.js
+const APP_V = '40.0';   // debe coincidir con la versión de sw.js
 let BOOTED = false, RELOADING = false, SWREG = null, tSes = 0, tUi = 0, lastUi = '';
 const sessionNow = fast => { clearTimeout(tSes); if (!BOOTED || TAB.passive) return Promise.resolve();   // fast (desde sessionSoon): si acaba de hacerse la copia para deshacer, se usa esa (un JSON entero menos por cambio)   // copia de trabajo del proyecto abierto (y la lista de proyectos)
   const p = pjCur(); if (p) { Object.assign(p, {n: db.papers.length, file: path, dirty}); delete p.remote; }
@@ -139,3 +139,11 @@ document.addEventListener('scroll', e => {   // la cabecera fija de un diálogo 
   const d = e.target, h = d.tagName === 'DIALOG' && d.querySelector(':scope > .dh'); if (!h) return;
   if (d.scrollTop > 40) h.classList.add('sm'); else if (d.scrollTop < 10) h.classList.remove('sm');
 }, true);
+/* v40, accesibilidad: un botón que solo lleva un emoji o un símbolo (📋, ✕, ⋯, 🔖…) se lee en voz alta con su descripción (title), no con el nombre del dibujo */
+const A11Y_TXT = /[\p{L}\p{N}]/u;
+function a11yFix(root) {
+  if (!root?.querySelectorAll) return; const L = [...root.querySelectorAll('button[title]:not([aria-label])')]; if (root.matches?.('button[title]:not([aria-label])')) L.push(root);
+  for (const b of L) if (!A11Y_TXT.test(b.textContent)) { const t = b.title.split(' · ')[0].trim(); if (t) b.setAttribute('aria-label', t); }
+}
+new MutationObserver(ms => { for (const m of ms) for (const n of m.addedNodes) if (n.nodeType === 1) a11yFix(n); }).observe(document.documentElement, {childList: true, subtree: true});
+a11yFix(document);

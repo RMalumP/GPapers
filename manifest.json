@@ -20,15 +20,99 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
+    },
+    {
+      "src": "icon-maskable-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ],
   "share_target": {
-    "action": "./index.html",
-    "method": "GET",
+    "action": "./compartir",
+    "method": "POST",
+    "enctype": "multipart/form-data",
     "params": {
       "title": "title",
       "text": "text",
-      "url": "url"
+      "url": "url",
+      "files": [
+        {
+          "name": "docs",
+          "accept": [
+            "application/pdf",
+            ".pdf",
+            "application/epub+zip",
+            ".epub"
+          ]
+        }
+      ]
     }
-  }
+  },
+  "shortcuts": [
+    {
+      "name": "Nuevo paper",
+      "short_name": "Nuevo",
+      "description": "Crear un paper a mano",
+      "url": "./index.html?accion=nuevo",
+      "icons": [
+        {
+          "src": "icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "Buscar por DOI, arXiv o título",
+      "short_name": "Buscar DOI",
+      "description": "Añadir un paper por su DOI, arXiv, PMID, ISBN o título",
+      "url": "./index.html?accion=doi",
+      "icons": [
+        {
+          "src": "icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "Seguir leyendo",
+      "short_name": "Seguir leyendo",
+      "description": "Abrir el último PDF o EPUB donde lo dejaste",
+      "url": "./index.html?accion=leer",
+      "icons": [
+        {
+          "src": "icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    }
+  ],
+  "file_handlers": [
+    {
+      "action": "./index.html?abrir=1",
+      "accept": {
+        "application/pdf": [
+          ".pdf"
+        ],
+        "application/epub+zip": [
+          ".epub"
+        ],
+        "application/x-bibtex": [
+          ".bib"
+        ],
+        "application/x-research-info-systems": [
+          ".ris"
+        ],
+        "application/json": [
+          ".json"
+        ]
+      }
+    }
+  ]
 }

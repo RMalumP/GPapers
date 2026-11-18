@@ -45,7 +45,7 @@ const TPL_DEF = [   // plantillas de nota de serie; {fecha} y {paper} se sustitu
   {id: 't_ide', name: 'Idea propia', text: '**Idea:** \n**Relación con mi tema:** \n**Siguiente paso:** '}];
 const defSettings = () => ({palette: 'azul', appName: 'Papers', showFile: true, showImg: true, showProgress: false, pdfDrive: false, pdfVis: false, showInbox: true, pdfTab: 'tab', annAuto: false, annFmt: 'txt', inboxPos: 'bottom', inboxBtn: false, customTypes: [], customStyles: [], mainStyle: 'apa', citeOnlyMain: false, aliasInMore: false, shortcuts: {...SC_DEF}, fmtOpen: false, view: 'cards', templates: TPL_DEF.map(t => ({...t})), export: {fmt: 'txt', style: 'apa', order: 'auto', num: false, notes: false, particles: false, title: '', lang: 'es', dateFmt: 'long', vanAll: false, ppChap: true, numFmt: 'auto', disamb: true, abbrList: true, inText: false}});   // ajustes por defecto (se guardan en el JSON)
 let db = {version: 1, sections: [], tags: [], papers: [], trash: [], inbox: [], settings: defSettings()}, path = null, dirty = false, auto = false, D, tab = 'data', MG, timer;
-const F = {q: '', sorts: [{k: 'title', d: 1}], group: false, secs: new Set(), tags: new Set(), read: '', minRating: 0, inNotes: false, mode: 'any', tbSec: false, tbTag: true, exTags: new Set(), noTag: false, noSec: false, yFrom: 0, yTo: 0, adv: {mode: 'all', rules: []}};   // secs: secciones elegidas (vale cualquiera de ellas) · exTags: etiquetas excluidas · noTag / noSec: solo papers sin etiquetas / sin sección · yFrom, yTo: años (0 = sin límite) · adv: búsqueda avanzada
+const F = {q: '', inPdf: false, sorts: [{k: 'title', d: 1}], group: false, secs: new Set(), tags: new Set(), read: '', minRating: 0, inNotes: false, mode: 'any', tbSec: false, tbTag: true, exTags: new Set(), noTag: false, noSec: false, yFrom: 0, yTo: 0, adv: {mode: 'all', rules: []}};   // secs: secciones elegidas (vale cualquiera de ellas) · exTags: etiquetas excluidas · noTag / noSec: solo papers sin etiquetas / sin sección · yFrom, yTo: años (0 = sin límite) · adv: búsqueda avanzada
 const SEL = new Set();   // ids de papers seleccionados
 const READ = {por_leer: 'Por leer', leyendo: 'Leyendo', leido: 'Leído'};   // estado de lectura (único por paper)
 const READ_N = {por_leer: 0, leyendo: 1, leido: 2}, READ_C = {por_leer: '#888888', leyendo: '#2457c5', leido: '#27ae60'};
@@ -116,12 +116,15 @@ function imgOk(i) {   // imagen del paper: URL, archivo local enlazado (solo el 
   if (i.kind === 'file' && typeof i.name === 'string' && i.name) return {kind: 'file', name: i.name};
   return null;
 }
+const KEY_RX = /^[A-Za-z0-9_][A-Za-z0-9_:.+-]{0,63}$/;   // clave de cita: lo que aceptan BibTeX, biblatex y Pandoc sin escapar
 function NEWF(p) {   // rellena los campos nuevos de un paper (JSON antiguo, importados, papelera) sin tocar los existentes
   for (const k of STR_F) p[k] = typeof p[k] === 'string' ? p[k] : '';
   p.editors = Array.isArray(p.editors) ? p.editors.filter(x => typeof x === 'string' && x.trim()) : [];
   p.authorType = Object.hasOwn(AUTH_T, p.authorType) ? p.authorType : 'auto';
   p.linkMode = Object.hasOwn(LINK_MODES, p.linkMode) ? p.linkMode : 'auto'; p.hideAccessed = !!p.hideAccessed; p.image = imgOk(p.image);
   for (const k of ['pdf', 'pdf2']) p[k] = pdfClean(p[k]);   // hasta dos PDF enlazados (con sus subrayados y comentarios)
+  if (p.retracted !== true) delete p.retracted;   // v40: retractado según OpenAlex (solo se guarda si lo está)
+  if (typeof p.key !== 'string' || !KEY_RX.test(p.key)) delete p.key;   // v40: clave de cita fija (BibTeX, Pandoc), solo si se fijó
   return p;
 }
 /* ===== PDF: subrayados, comentarios y notas (visor, js/visor.js) =====
@@ -147,6 +150,7 @@ function annClean(l) {   // el mismo orden de campos siempre: normalizar dos vec
   return out;
 }
 /* EPUB (v39.42): van en los mismos huecos que los PDF («pdf» y «pdf2», la bandeja); el formato lo dice la extensión del nombre */
+const pdfPage = v => { v = parseInt(v, 10); return Number.isInteger(v) && v > 0 && v < 100000 ? v : 0; };   // (v40: aquí, para que validate() funcione también en el worker)
 const isEpub = n => /\.epub$/i.test(String(n || ''));
 const isDoc = f => !!f && (/\.(pdf|epub)$/i.test(f.name || '') || f.type === 'application/pdf' || f.type === 'application/epub+zip');   // un archivo que se puede enlazar (PDF o EPUB)
 const docMime = n => isEpub(n) ? 'application/epub+zip' : 'application/pdf';

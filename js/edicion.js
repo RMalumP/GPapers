@@ -22,7 +22,7 @@ function drawD() {
     const R = relFields(D), top = [], rest = [], has = k => Array.isArray(D[k]) ? D[k].length > 0 : D[k] != null && D[k] !== '';
     const put = (on, html) => html && (on ? top : rest).push(html), rel = k => put(R.has(k) || has(k), ALWAYS_F.includes(k) || shows(k, D.type) ? fh(k) : '');
     const fh = k => ({url: inp('url', 'URL', 'url', 'w'), venue: inp('venue', lbl('venue', 'Revista / editorial / sitio'), 'text', baseT(D.type) === 'capitulo' ? 'w' : ''), accessed: inp('accessed', 'Fecha de consulta', 'date'),
-      doi: `<label>DOI (sin https://doi.org/)<span class="row" style="flex-wrap:nowrap"><input style="flex:1;min-width:0" value="${esc(D.doi)}" data-oninput="put(D,'doi',this.value)"><button data-onclick="doiFill()" title="Rellenar con los datos de CrossRef">Buscar</button><button data-onclick="oaFill()" title="OpenAlex: resumen, número de citas y PDF en abierto (por el DOI o, sin DOI, por el título)">OpenAlex</button></span></label>`,
+      doi: `<label>DOI (sin https://doi.org/)<span class="row" style="flex-wrap:nowrap"><input style="flex:1;min-width:0" value="${esc(D.doi)}" data-oninput="put(D,'doi',this.value)"><button data-onclick="doiFill()" title="Rellenar con los datos de CrossRef">Buscar</button><button data-onclick="oaFill()" title="OpenAlex: resumen, número de citas y PDF en abierto (por el DOI o, sin DOI, por el título)">OpenAlex</button><button data-onclick="oaRelated()" title="Papers parecidos según OpenAlex, para importar los que quieras">Parecidos</button></span></label>`,
       volume: inp('volume', 'Volumen'), issue: inp('issue', lbl('issue', 'Número')), pages: inp('pages', 'Páginas (p. ej. 73-98)'), edition: inp('edition', lbl('edition', 'Edición (desde la 2.ª; p. ej. «2.ª»)')),
       publisher: inp('publisher', lbl('publisher', 'Editorial (del libro o actas)')), place: inp('place', lbl('place', 'Lugar de edición')),
       editors: `<label class="w">Editores del libro (uno por línea: «Apellidos, Nombre» o «Nombre Apellidos»)<textarea data-oninput="put(D,'editors',lines(this.value))">${esc(D.editors.join('\n'))}</textarea></label>`,
@@ -33,6 +33,7 @@ function drawD() {
       ...Object.fromEntries([['isbn', 'ISBN'], ['issn', 'ISSN'], ['institution', 'Institución (facultad, departamento…)'], ['docNumber', 'Número de documento'], ['series', 'Serie o colección'], ['seriesNumber', 'Número en la serie'], ['conferenceName', 'Nombre del congreso'], ['conferencePlace', 'Lugar del congreso'], ['conferenceDates', 'Fechas del congreso'], ['abbr', 'Abreviatura'], ['ecli', 'ECLI (p. ej. ECLI:ES:TS:2017:1229 o EU:C:2005:446)']].map(([k, l]) => [k, inp(k, lbl(k, l))]))})[k];
     const isCap = baseT(D.type) === 'capitulo', book = isCap ? fh('venue') + (shows('editors', D.type) ? fh('editors') : '') : '';   // capítulo: el libro y sus editores, justo debajo de los autores
     put(has('sortKey'), inp('sortKey', 'Clave de orden en la bibliografía (opcional): p. ej. «Torre» para «de la Torre, Ana»', 'text', 'w'));
+    put(has('key'), `<label class="w">Clave de cita (BibTeX, LaTeX, Pandoc)<span class="row" style="flex-wrap:nowrap"><input id="dKey" style="flex:1;min-width:0" value="${esc(D.key || '')}" placeholder="${esc(keyNew(D))} (se fija al copiarla o exportar a BibTeX)" spellcheck="false" autocomplete="off" data-oninput="put(D,'key',this.value.trim())"><button data-onclick="keyCopy('tex')" title="Copiar \\cite{clave} para LaTeX">\\cite{}</button><button data-onclick="keyCopy('md')" title="Copiar [@clave] para Pandoc o Markdown">[@…]</button></span></label>`);
     rel('url');
     for (const n of PDF_N) {   // el segundo hueco aparece cuando ya hay un PDF enlazado
       const P = D[pdfF(n)], ep = isEpub(P?.name), L = (P ? docKind(P.name) : 'PDF o EPUB') + (n === 2 ? ' 2' : ''); if (n === 2 && !D.pdf && !P) continue;   // v39.42: también EPUB; la fila del primero se ve siempre
@@ -80,7 +81,7 @@ function drawD() {
     h += blk('rel', 'Relacionados', `<div><small>Relacionados</small></div><div>${chips(D.related, '#6b45c2', 'relDel') || '<small>Ninguno.</small>'}</div>
       <div style="margin-top:6px"><small>Este paper cita a</small></div><div>${chips(D.refTo, '#0f8b8d', 'refDel') || '<small>Ninguno.</small>'}</div>
       <div style="margin-top:6px"><small>Citado por (otros papers que lo citan)</small></div><div>${chips(by, '#888888') || '<small>Ninguno.</small>'}</div>
-      <div class="row" style="margin-top:8px;flex-wrap:nowrap"><select style="width:auto" data-onchange="reltSet(this.value)"><option value="rel" ${RELT === 'rel' ? 'selected' : ''}>Relacionar con</option><option value="ref" ${RELT === 'ref' ? 'selected' : ''}>Cita a</option></select><input id="relQ" placeholder="Buscar un paper…" data-oninput="relSearch()" style="flex:1;min-width:0"></div><div id="relRes"></div>`);
+      <div class="row" style="margin-top:8px;flex-wrap:nowrap"><select style="width:auto" aria-label="Tipo de relación" data-onchange="reltSet(this.value)"><option value="rel" ${RELT === 'rel' ? 'selected' : ''}>Relacionar con</option><option value="ref" ${RELT === 'ref' ? 'selected' : ''}>Cita a</option></select><input id="relQ" placeholder="Buscar un paper…" data-oninput="relSearch()" style="flex:1;min-width:0"></div><div id="relRes"></div>`);
   }
   if (tab === 'hist') h += `<div class="hist">${D.history.filter(e => isToday(e.t)).reverse().map(e => `<div class="he"><small>${new Date(e.t).toLocaleString('es-ES')}</small> ${esc(e.s)}</div>`).join('') || '<small>Sin cambios hoy.</small>'}</div><small>Solo lectura. Solo muestra los cambios de hoy y no se guarda en el archivo. Creado el ${D.created ? new Date(D.created).toLocaleDateString('es-ES') : '—'}.</small>`;
   $('#dlg').innerHTML = h; hydrateImgs();
@@ -232,7 +233,7 @@ const edBox = (key, text) => `<div class="nbox" data-key="${key}">
   <div class="fmtw ${fmtPinned || FMT_OPEN.has(key) ? 'open' : ''}" data-id="${key}" data-onmousedown="event.preventDefault()"><button class="fmth" title="Mostrar u ocultar la barra de formato" data-onclick="toggleFmt('${key}')">Aa</button><div class="fmtc"><div class="fmt">
     <button title="Negrita (${db.settings.shortcuts.bold})" data-onclick="edCmd('${key}','bold')"><b>N</b></button><button title="Cursiva (${db.settings.shortcuts.italic})" data-onclick="edCmd('${key}','italic')"><i>K</i></button><button title="Tachado" data-onclick="edCmd('${key}','strikeThrough')"><s>T</s></button><button title="Subrayado" data-onclick="edCmd('${key}','underline')"><u>S</u></button>
     <button title="Lista con viñetas" data-onclick="edCmd('${key}','insertUnorderedList')">•</button><button title="Lista numerada" data-onclick="edCmd('${key}','insertOrderedList')">1.</button><button data-onclick="tplMenu(event,'${key}')">Plantilla ▾</button><button title="Insertar enlace a un paper o a una nota" data-onclick="lkOpen('${key}')">🔗</button>
-    <button class="pin ${fmtPinned ? 'on' : ''}" title="Chincheta: mantiene la barra desplegada en todas las notas" data-onclick="togglePin()">📌</button></div></div></div><div class="ned md" id="ed_${key}" data-key="${key}" contenteditable="true" role="textbox" aria-multiline="true">${mdEdit(text)}</div></div>`;
+    <button class="pin ${fmtPinned ? 'on' : ''}" title="Chincheta: mantiene la barra desplegada en todas las notas" data-onclick="togglePin()">📌</button></div></div></div><div class="ned md" id="ed_${key}" data-key="${key}" contenteditable="true" role="textbox" aria-multiline="true" aria-label="${key === 'gen' ? 'Notas generales' : 'Texto de la nota'}">${mdEdit(text)}</div></div>`;
 
 let fmtPinned = false;   // chincheta: barras desplegadas en TODAS las notas (valor inicial: Configuración)
 const FMT_OPEN = new Set();   // notas cuya barra se desplegó una a una, sin chincheta
@@ -417,7 +418,7 @@ function grDraw() {
     ${nodes.length ? `<svg id="grSvg" viewBox="0 0 ${W} ${H}" role="img" aria-label="Gráfico de relaciones"><defs><marker id="grAr" viewBox="0 0 10 10" refX="17" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#0f8b8d"/></marker></defs>
       ${E.map(e => { const a = P[ix.get(e.a)], b = P[ix.get(e.b)]; return `<line class="ed" data-a="${e.a}" data-b="${e.b}" x1="${a.x.toFixed(1)}" y1="${a.y.toFixed(1)}" x2="${b.x.toFixed(1)}" y2="${b.y.toFixed(1)}" stroke="${e.dir ? '#0f8b8d' : '#7c5cc4'}" stroke-width="1.6" ${e.dir ? 'marker-end="url(#grAr)"' : ''}/>`; }).join('')}
       ${nodes.map((p, i) => `<g class="nd" data-id="${p.id}" data-onclick="grGo('${p.id}')" tabindex="0" data-onkeydown="onEnter(event,grGo,'${p.id}')"><title>${esc(p.title)}</title><circle cx="${P[i].x.toFixed(1)}" cy="${P[i].y.toFixed(1)}" r="8" fill="var(--pri)" stroke="var(--card)" stroke-width="2"/><text x="${(P[i].x + 12).toFixed(1)}" y="${(P[i].y + 4).toFixed(1)}">${lbl(p)}</text></g>`).join('')}</svg>` : ''}
-    <div class="row" style="margin-top:12px"><button style="margin-left:auto" data-onclick="$('#gr').close()">Cerrar</button></div>`;
+    <div class="row" style="margin-top:12px"><button data-onclick="relFind()" title="Envía a OpenAlex los DOI de tus papers: propone las relaciones «cita a» entre ellos y te dice qué obras citan varios de ellos y aún no tienes">🔗 Buscar relaciones con OpenAlex</button><button style="margin-left:auto" data-onclick="$('#gr').close()">Cerrar</button></div>`;
 }
 function grGo(id) { $('#gr').close(); openPaper(id); }
 function grHelp(on) {   // sin relaciones: qué es esta función y cómo empezar, atenuado porque es un texto provisional; on = pedido con el botón ❓ (con relaciones), sin atenuar
@@ -469,7 +470,7 @@ function setView(v) { db.settings.view = v; foldSnap(); dirty = true; touch(); r
 /* ===== Historial de cambios y relaciones ===== */
 const shortTxt = v => { v = String(v ?? '').replace(/\s+/g, ' ').trim(); return !v ? '—' : v.length > 60 ? v.slice(0, 57) + '…' : v; };
 const HMAX = () => 50;   // el historial no se guarda en el JSON: solo vive en memoria durante el día
-const dbJSON = () => JSON.stringify(db, (k, v) => k === 'history' ? undefined : v, 2);   // en el JSON solo queda la fecha de creación (created)
+const dbJSON = () => JSON.stringify(db, (k, v) => k === 'history' ? undefined : v, db.settings.jsonPretty ? 2 : undefined);   // en el JSON solo queda la fecha de creación (created); compacto salvo que se pida con sangría (v40: ~35 % más pequeño y más rápido)
 const isToday = t => new Date(t).toDateString() === new Date().toDateString();
 function logChange(p, ...msgs) {
   const t = new Date().toISOString(); p.history ??= [];
@@ -593,8 +594,17 @@ async function copyC(k, rich, b) {   // copia la cita sin marcas (texto) o con c
   if (rich) await clipHtml(`<p style="font-family:'Times New Roman',serif;font-size:12pt">${citeHtml(raw)}</p>`, citeTxt(raw), host); else await clipText(citeTxt(raw), host);
   if (b) { const t = b.textContent; b.textContent = 'Copiado ✓'; setTimeout(() => b.textContent = t, 1400); }
 }
+async function keyCopy(kind) {   // copia \cite{clave} o [@clave] y fija la clave (en la ficha y, si el paper ya existe, en la biblioteca)
+  let k = String(D.key || '').trim(); if (k && !KEY_RX.test(k)) return say('La clave de cita solo admite letras sin tilde, números y _ : . + - (sin espacios).');
+  if (k && keysUsed(D.id).has(k.toLowerCase())) return say(`Otro paper ya usa la clave «${k}».`);
+  if (!k) k = keyNew(D); D.key = k; const i = $('#dKey'); if (i) i.value = k;
+  const p = db.papers.find(x => x.id === D.id); if (p && p.key !== k) { p.key = k; markDirty(); }
+  const t = kind === 'tex' ? `\\cite{${k}}` : `[@${k}]`; await copyText(t, $('#dlg')); toast(`Copiado: ${t}`, [], 2500);
+}
 function commit() {
   if (!D.title.trim()) { tab = 'data'; drawD(); return say('El título es obligatorio.'); }
+  if (D.key) { D.key = String(D.key).trim(); if (!KEY_RX.test(D.key)) { tab = 'data'; drawD(); return say('La clave de cita solo admite letras sin tilde, números y _ : . + - (sin espacios).'); }
+    if (keysUsed(D.id).has(D.key.toLowerCase())) { tab = 'data'; drawD(); return say(`Otro paper ya usa la clave «${D.key}».`); } } else delete D.key;
   if (D.url && !/^https?:\/\//i.test(D.url)) return say('La URL debe empezar por http:// o https://');
   D.year = D.year ? +D.year : '';
   const nameFix = x => { if (x.includes(',') || isOrg(x)) return x; const w = x.trim().split(/\s+/); return w.length < 2 ? x : `${w.slice(1).join(' ')}, ${w[0]}`; };   // «Nombre Apellidos» → «Apellidos, Nombre»

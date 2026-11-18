@@ -75,12 +75,16 @@ const has = (p, t) => p.tagIds.includes(t);   // las etiquetas son independiente
    revista:…, doi:…, #etiqueta (o etiqueta:…) y seccion:…. Sin prefijo se busca en título, alias, año, autores, revista, DOI, etiquetas y secciones
    (y en notas y citas con «Incluir notas»). */
 const SEARCH = new WeakMap();   // texto de búsqueda ya normalizado de cada paper: solo se recalcula si cambia
+/* Mientras solo se escribe en el buscador (renderQ) no cambia nada de la biblioteca: el texto guardado vale sin rehacerlo. Antes se volvía a unir
+   título, notas, citas y subrayados de cada paper en cada tecla solo para compararlo. Cualquier cambio (DB_REV) o pintado completo (SRCH_GEN) lo comprueba otra vez. */
+let SRCH_GEN = 0;
 function searchTxt(p) {
+  let c = SEARCH.get(p); if (c && c.rev === DB_REV && c.gen === SRCH_GEN && c.inN === F.inNotes && c.t === p.title) return c.n;
   const raw = [p.title, p.alias, p.year, ...p.authors, p.venue, p.doi, ...p.tagIds.map(i => tagById(i)?.name), ...p.sectionIds.map(i => secById(i)?.name),
     ...(F.inNotes ? [p.general, ...p.notes.map(n => n.content), ...Object.values(p.cites), ...pdfsOf(p).flatMap(n => (p[pdfF(n)].ann || []).flatMap(a => [a.t, a.m]))] : [])].join(' ');   // con «Incluir notas», también los subrayados y comentarios de sus PDF
-  let c = SEARCH.get(p); if (!c || c.raw !== raw) SEARCH.set(p, c = {raw, n: norm(raw)}); return c.n;
+  if (!c || c.raw !== raw) SEARCH.set(p, c = {raw, n: norm(raw)}); c.rev = DB_REV; c.gen = SRCH_GEN; c.inN = F.inNotes; c.t = p.title; return c.n;
 }
-const QP = {autor: 'au', autores: 'au', author: 'au', au: 'au', ano: 'yr', year: 'yr', revista: 've', venue: 've', editorial: 've', doi: 'doi', etiqueta: 'tag', tag: 'tag', seccion: 'sec', section: 'sec'};
+const QP = {autor: 'au', autores: 'au', author: 'au', au: 'au', ano: 'yr', year: 'yr', revista: 've', venue: 've', editorial: 've', doi: 'doi', etiqueta: 'tag', tag: 'tag', seccion: 'sec', section: 'sec', texto: 'tx', text: 'tx'};   // texto: dentro de los PDF y EPUB (v40)
 let QC = {raw: null, T: []};
 function qParse(raw) {   // el texto de la caja → [{k: '' | 'au' | 'yr' | 've' | 'doi' | 'tag' | 'sec', v (normalizado), neg, a, b (años)}]
   if (QC.raw === raw) return QC.T;
@@ -99,7 +103,7 @@ function qParse(raw) {   // el texto de la caja → [{k: '' | 'au' | 'yr' | 've'
 function qTest(p, T) {
   for (const t of T) {
     const v = t.v, k = t.k;
-    const ok = !k ? searchTxt(p).includes(v) : k === 'au' ? norm(p.authors.join('; ')).includes(v) : k === 'yr' ? +p.year > 0 && +p.year >= t.a && +p.year <= t.b
+    const ok = !k ? searchTxt(p).includes(v) || F.inPdf && txHas(p, v) : k === 'tx' ? txHas(p, v) : k === 'au' ? norm(p.authors.join('; ')).includes(v) : k === 'yr' ? +p.year > 0 && +p.year >= t.a && +p.year <= t.b
       : k === 've' ? norm(p.venue).includes(v) : k === 'doi' ? norm(p.doi).includes(v)
       : k === 'tag' ? p.tagIds.some(i => norm(tagById(i)?.name).includes(v)) : p.sectionIds.some(i => norm(secById(i)?.name).includes(v));
     if (ok === t.neg) return false;
@@ -124,7 +128,7 @@ function visible() {
   return sortList(db.papers.filter(p => (!T.length || qTest(p, T))
     && (!F.secs.size || p.sectionIds.some(s => F.secs.has(s))) && (!F.read || p.reading === F.read) && p.rating >= F.minRating && (!F.tags.size || [...F.tags][F.mode === 'all' ? 'every' : 'some'](t => has(p, t)))
     && (!F.noSec || !p.sectionIds.some(secById)) && (!F.noTag || !p.tagIds.some(tagById)) && (!F.exTags.size || ![...F.exTags].some(t => has(p, t)))
-    && (!F.yFrom || +p.year >= F.yFrom) && (!F.yTo || (+p.year > 0 && +p.year <= F.yTo)) && advTest(p)));
+    && (!F.yFrom || +p.year >= F.yFrom) && (!F.yTo || (+p.year > 0 && +p.year <= F.yTo)) && (!F.retr || p.retracted) && advTest(p)));
 }
 /* ---- Búsqueda avanzada: condiciones campo · condición · valor, que se cumplan todas o alguna ---- */
 const ADV_F = {any: 'Cualquier campo', title: 'Título', authors: 'Autores', year: 'Año', venue: 'Revista/editorial', doi: 'DOI', notes: 'Notas'};
@@ -169,6 +173,7 @@ function actList() {   // filtros aplicados, cada uno con su forma de quitarlo
   if (F.read) A.push(['📖 ' + READ[F.read], "fClr('read')"]);
   if (F.minRating) A.push(['★ ≥ ' + F.minRating, "fClr('min')"]);
   if (F.yFrom || F.yTo) A.push(['📅 ' + fYears(), "fClr('years')"]);
+  if (F.retr) A.push(['⚠ Retractados', "fClr('retr')"]);
   const nA = advRules().length; if (nA) A.push(['🔎 Búsqueda avanzada (' + nA + (nA === 1 ? ' condición)' : ' condiciones)'), "fClr('adv')"]);
   return A;
 }
@@ -177,7 +182,7 @@ function fClr(k, id) {
   else if (k === 'read') F.read = ''; else if (k === 'min') F.minRating = 0; else if (k === 'years') F.yFrom = F.yTo = 0; else if (k === 'adv') F.adv.rules = []; else F[k] = false;
   render();
 }
-function fClrAll() { F.q = ''; $('#q').value = ''; F.secs.clear(); F.tags.clear(); F.exTags.clear(); F.noSec = F.noTag = false; F.read = ''; F.minRating = 0; F.yFrom = F.yTo = 0; F.adv.rules = []; render(); }
+function fClrAll() { F.q = ''; $('#q').value = ''; F.retr = false; F.secs.clear(); F.tags.clear(); F.exTags.clear(); F.noSec = F.noTag = false; F.read = ''; F.minRating = 0; F.yFrom = F.yTo = 0; F.adv.rules = []; render(); }
 function actDraw() {
   const A = actList(), el = $('#actF'); el.hidden = !A.length;
   const cn = $('#count'), row = $('main>.row');   // en el móvil, con filtros, la cuenta va a la derecha de su fila en vez de ocupar una línea propia
@@ -220,11 +225,13 @@ function filtDraw() {   // chips de Secciones, Etiquetas y Lectura, con cuántos
     + (side ? chip({name: 'Sin etiquetas', color: '#888888'}, F.noTag, 'noTagF()', 0, '', nT) : '') : '<small>Aún no hay etiquetas.</small>';   // en la fila de arriba, sin contadores ni «Sin …», para que quepa
   $('#secF').innerHTML = secC(1); $('#secF2').innerHTML = secC(0);
   $('#tagF').innerHTML = tagC(1); $('#modeB').textContent = (F.mode === 'all' ? 'Todas' : 'Alguna') + ' ▾'; mgFit(); $('#tagF2').innerHTML = tagC(0); tagQDraw();
-  $('#readF').innerHTML = [['', 'Todos'], ...Object.entries(READ)].map(([k, v]) => chip({name: v, color: k ? READ_C[k] : '#888888'}, F.read === k, `setRead('${k}')`, 0, '', k ? cR[k] : N)).join('');
+  const nRe = db.papers.filter(p => p.retracted).length; if (!nRe) F.retr = false;
+  $('#readF').innerHTML = [['', 'Todos'], ...Object.entries(READ)].map(([k, v]) => chip({name: v, color: k ? READ_C[k] : '#888888'}, F.read === k, `setRead('${k}')`, 0, '', k ? cR[k] : N)).join('')
+    + (nRe ? chip({name: '⚠ Retractados', color: '#b3261e'}, !!F.retr, 'put(F,\'retr\',!F.retr,render)', 0, '', nRe) : '');   // v40: solo si hay alguno
   const rp = $('#readP'); rp.hidden = !N; rp.innerHTML = N ? ['leido', 'leyendo'].map(k => `<i style="width:${cR[k] / N * 100}%;background:${READ_C[k]}"></i>`).join('') : '';
   rp.title = `Progreso de lectura: ${cR.leido} leídos, ${cR.leyendo} leyendo y ${cR.por_leer} por leer, de ${N}`;
   $('#minR').textContent = (F.minRating ? '★ ≥ ' + F.minRating : 'Cualquiera') + ' ▾'; $('#minR').classList.toggle('on', !!F.minRating); $('#yFrom').value = F.yFrom || ''; $('#yTo').value = F.yTo || '';
-  actDraw(); favDraw(); recDraw();
+  actDraw(); favDraw(); recDraw(); revDraw0(); rlDraw0();
 }
 const tagsOf = p => p.tagIds.map(tagById).filter(Boolean).map(t => chip(t, 1, '', 0, `tagMenu(event,'${p.id}','${t.id}')`)).join('');
 const EXP = new Set();   // papers con las notas desplegadas en la lista
@@ -308,10 +315,11 @@ const starsHTML = p => `<span class="stv${p.rating ? '' : ' none'}" data-onconte
 const rdHTML = p => `<span class="rd"><button class="rst" style="--c:${READ_C[p.reading]}" title="Clic: cambiar el estado de lectura" data-onclick="cycleRead('${p.id}')">${READ[p.reading]}</button>${starsHTML(p)}</span>`;
 function starMenu(e, id) { ctxShow(e, '<div class="ctxh">Valoración</div>' + [5, 4, 3, 2, 1, 0].map(n => `<button data-onclick="setRating('${id}',${n})">${n ? '★'.repeat(n) + '☆'.repeat(5 - n) : 'Sin valorar'}</button>`).join('')); }
 function setRating(id, n) { const p = db.papers.find(x => x.id === id); ctxClose(); if (!p || p.rating === n) return; logChange(p, `Valoración: ${p.rating || '—'} → ${n || '—'}`); p.rating = n; markDirty(); renderPaper(id); }
-const card = (p, from) => `<article class="card" data-id="${p.id}" draggable="true" ${F.group ? `data-from="${from || ''}"` : ''}><div class="ct"><label class="sel"><input type="checkbox" ${SEL.has(p.id) ? 'checked' : ''} data-onchange="toggleSel('${p.id}')"> Seleccionar</label><button class="sm" data-onclick="openPaper('${p.id}')">Editar</button><button class="sm cpb" data-onclick="copyCardCite('${p.id}',this)" title="Copiar la cita (estilo elegido en Exportar), con cursiva al pegar en Word">📋</button>${pdfBtns(p, true)}${p.tagIds.length ? `<span class="tl">${tagsOf(p)}</span>` : ''}${rdHTML(p)}<button class="x" title="Eliminar" data-onclick="delPaper('${p.id}')">✕</button></div><div class="th">${thumbHTML(p, 'sm')}<h3>${hl(p.alias || p.title, HL.t)}</h3></div>${p.alias ? `<div class="sub">${hl(p.title, HL.t)}</div>` : ''}
+const retrB = p => p.retracted ? '<span class="retr" title="Retractado según OpenAlex: la revista retiró este artículo. Compruébalo antes de citarlo.">⚠ Retractado</span> ' : '';   // v40
+const card = (p, from) => `<article class="card" data-id="${p.id}" draggable="true" ${F.group ? `data-from="${from || ''}"` : ''}><div class="ct"><label class="sel"><input type="checkbox" ${SEL.has(p.id) ? 'checked' : ''} data-onchange="toggleSel('${p.id}')"> Seleccionar</label><button class="sm" data-onclick="openPaper('${p.id}')">Editar</button><button class="sm cpb" data-onclick="copyCardCite('${p.id}',this)" title="Copiar la cita (estilo elegido en Exportar), con cursiva al pegar en Word">📋</button>${pdfBtns(p, true)}${p.tagIds.length ? `<span class="tl">${tagsOf(p)}</span>` : ''}${rdHTML(p)}<button class="x" title="Eliminar" data-onclick="delPaper('${p.id}')">✕</button></div><div class="th">${thumbHTML(p, 'sm')}<h3>${retrB(p)}${hl(p.alias || p.title, HL.t)}</h3></div>${p.alias ? `<div class="sub">${hl(p.title, HL.t)}</div>` : ''}
     <div class="au"><span>${hl(p.authors.join('; '), HL.a)} ${p.year ? '(' + esc(p.year) + ')' : ''}</span></div>
     ${/^https?:/i.test(p.url) ? `<a href="${esc(p.url)}" target="_blank" rel="noopener noreferrer">${esc(p.url)}</a>` : ''}
-    
+    ${txLine(p)}
     <div class="row"><button class="sm" data-onclick="toggleNotes('${p.id}')" data-oncontextmenu="viewNotes(event,'${p.id}')" title="Clic: desplegar notas · Clic derecho: abrir el visor de notas">Notas (${pNotes(p).length}) ${EXP.has(p.id) ? '▾' : '▸'}</button>${relCount(p) ? `<button class="sm" data-onclick="viewRel('${p.id}')" title="Relaciones: relacionados, cita a y citado por">🔗 ${relCount(p)}</button>` : ''}</div>${EXP.has(p.id) ? notesHTML(p) : ''}</article>`;
 /* ---- Columnas de la tabla: se pueden mover (arrastrando la cabecera o con su clic derecho) y ocultar.
    La casilla, la miniatura y ✕ son fijas; el título siempre se ve. Se guardan en db.settings.tblCols, propio de cada dispositivo (no se sincroniza). */
@@ -333,7 +341,7 @@ function setTblCols(order, hidden) {   // como la vista: se recuerda en el JSON 
 }
 const tdSecs = p => p.sectionIds.map(secById).filter(Boolean);
 const CELL = {
-  title: p => `<td class="c-title tt"><a class="tl2" data-onclick="openPaper('${p.id}')" title="${esc(p.alias || p.title)} · Clic: editar">${hl(p.alias || p.title, HL.t)}</a></td>`,
+  title: p => `<td class="c-title tt">${retrB(p)}<a class="tl2" data-onclick="openPaper('${p.id}')" title="${esc(p.alias || p.title)} · Clic: editar">${hl(p.alias || p.title, HL.t)}</a></td>`,
   author: p => `<td class="c-author" title="${esc(p.authors.join('; '))}">${hl(p.authors.join('; '), HL.a)}</td>`,
   year: p => `<td class="c-year">${esc(p.year)}</td>`,
   venue: p => `<td class="c-venue" title="${esc(p.venue)}">${esc(p.venue)}</td>`,
@@ -445,7 +453,7 @@ function fitTags(only) {   // las etiquetas van en la barra superior de la tarje
 let listW = 0; new ResizeObserver(([e]) => { if (Math.abs(e.contentRect.width - listW) > 1) { listW = e.contentRect.width; fitTags(); } }).observe($('#list'));   // también al plegar la barra o cambiar el tamaño
 let RENDER_HOLD = false, RENDER_HELD = false;   // al arrancar se pinta una sola vez, al final (ver bootApp en app.js)
 function render() {
-  CITED = null;
+  CITED = null; SRCH_GEN++;
   if (RENDER_HOLD) { RENDER_HELD = true; return; }
   vwSatNotify();
   epDbChanged();   // lector de EPUB abierto: sus subrayados y marcadores
@@ -464,11 +472,32 @@ function render() {
     <button title="${s.d > 0 ? 'Ascendente (A→Z, antiguo→reciente)' : 'Descendente (Z→A, reciente→antiguo)'}" data-onclick="sortFlip(${i})">${s.d > 0 ? '▲' : '▼'}</button>
     ${F.sorts.length > 1 ? `<button data-onclick="sortDel(${i})">✕</button>` : ''}</div>`).join('')
     + `<button data-onclick="sortAdd('${nextKey}')">+ Añadir criterio</button>`;
+  listDraw(); progDraw(); contDraw(); inboxDraw(); fitBars();   // con los chips y la cuenta ya puestos: ¿caben en la fila?
+}
+function listDraw() {   // solo la lista y su cuenta
   const L = visible(), part = !F.group && L.length > LIST.step;   // sin agrupar, las listas largas se pintan por partes
   LIST.L = L; LIST.shown = part ? LIST.step : L.length;
-  $('#list').innerHTML = (listHTML(part ? L.slice(0, LIST.step) : L) + (part ? moreHTML() : '')) || '<p class="empty">No hay papers que mostrar. Crea uno con «Nuevo paper» o ajusta los filtros.</p>';
+  $('#list').innerHTML = (listHTML(part ? L.slice(0, LIST.step) : L) + (part ? moreHTML() : '')) || emptyHTML();
   fitTags(); hydrateImgs(); moreWatch(); uiSoon(); kMark();
-  LIST.n = L.length; countDraw(); progDraw(); inboxDraw(); fitBars();   // con los chips y la cuenta ya puestos: ¿caben en la fila?
+  LIST.n = L.length; countDraw();
+}
+/* Lista vacía (I1): en un proyecto sin papers, tres formas de empezar; si lo que la vacía son los filtros, cuáles y «Limpiar filtros» */
+function emptyHTML() {
+  if (!db.papers.length) return `<div class="empty0"><h2>Empieza tu biblioteca</h2><p>Añade tu primer paper de una de estas formas (también puedes soltar aquí archivos .bib, .ris o PDF):</p>
+    <div class="e0b"><button data-onclick="openImport('doi')"><b>🔎</b><span>Buscar por DOI, ISBN o título</span><small>CrossRef, DataCite, arXiv y Open Library</small></button>
+    <button data-onclick="openImport('file')"><b>📄</b><span>Importar un archivo</span><small>BibTeX, RIS, CSL-JSON o texto de ScienceDirect</small></button>
+    <button data-onclick="inboxPick()"><b>🗃️</b><span>Añadir un PDF o EPUB</span><small>Lee el DOI y crea la cita</small></button></div>
+    <p><button class="lnk" data-onclick="openPaper()">o escribe uno a mano</button></p></div>`;
+  const A = actList();
+  return A.length ? `<div class="empty1"><p>Ningún paper cumple los filtros: ${A.map(([t]) => `<b>${esc(t)}</b>`).join(', ')}.</p><button class="pri" data-onclick="fClrAll()">Limpiar filtros</button></div>`
+    : '<p class="empty">No hay papers que mostrar.</p>';
+}
+/* Al escribir en el buscador solo cambian la lista, la cuenta, la fila de filtros aplicados y la vista activa: repintar también la barra lateral
+   (chips con sus contadores, Ordenar, Selección) costaba dos tercios de cada tecla (con 2000 papers, ~90 ms en un móvil medio, ~30 de ellos el filtro). */
+function renderQ() {
+  if (RENDER_HOLD || VW.open) return render();
+  CITED = null; $('#d-search').hidden = !F.q && !advRules().length;
+  actDraw(); favDraw(); listDraw(); fitBars();
 }
 const LIST = {L: [], n: 0, shown: 0, get step() { return document.documentElement.classList.contains('mv') ? 40 : 150; }};   // lo que se ve en la lista y cuántos papers lleva pintados (en el móvil caben pocas tarjetas: se pintan de 40 en 40)
 const moreHTML = () => `<p class="more"><button data-onclick="listMore()">Mostrar ${Math.min(LIST.step, LIST.L.length - LIST.shown)} más (quedan ${LIST.L.length - LIST.shown})</button></p>`;
@@ -495,7 +524,7 @@ function renderPaper(id) {   // repinta solo la tarjeta o fila de un paper; si e
   if (!tr) fitTags(nodes[0]); nodes.forEach(n => { n.querySelectorAll('.pimg[data-fpid]').forEach(e => hydrateImgs(false, e)); covHydrate(n); });
 }
 let tQ = 0;   // la búsqueda espera a que dejes de escribir (Enter la aplica al momento)
-function qSet(v, now) { F.q = v; clearTimeout(tQ); if (now) render(); else tQ = setTimeout(render, 150); }
+function qSet(v, now) { F.q = v; clearTimeout(tQ); if (now) renderQ(); else tQ = setTimeout(renderQ, 150); }
 function toggleF(id) { if (F.exTags.delete(id)) return render(); F.tags.has(id) ? F.tags.delete(id) : F.tags.add(id); F.noTag = false; render(); }   // pulsar una excluida solo quita la exclusión
 function tagsAll() { F.tags.clear(); F.exTags.clear(); F.noTag = false; render(); }
 function noTagF() { F.noTag = !F.noTag; if (F.noTag) F.tags.clear(); render(); }
@@ -762,13 +791,30 @@ function cslItem(p) {
   return o;
 }
 const cslJSON = L => JSON.stringify(L.map(cslItem), null, 2);
+/* ---- Clave de cita fija (v40): «Garcia2020redes». Hasta ahora BibTeX la inventaba en cada exportación (podía cambiar y romper un documento LaTeX
+   o Pandoc). Se fija al importarla de un .bib, al escribirla en la ficha, al copiar \cite{…} o [@…] y al exportar a BibTeX; se guarda en «key». ---- */
+const bibBase = p => { const au = p.authorType === 'sin_autor' ? [] : p.authors;
+  return (ascii(au.length ? parse(au.slice(0, 1))[0]?.l : 'anon') + (p.year || '') + (p.title.split(/\s+/).map(ascii).find(w => w.length > 3 && !STOPW.has(w)) || '')) || 'ref'; };
+const keysUsed = (skip) => new Set(db.papers.filter(p => p.key && p.id !== skip).map(p => p.key.toLowerCase()));
+function keyNew(p, used = keysUsed(p.id)) { const b = bibBase(effP(p)); let n = 0, k; do k = b + bibSuf(n++); while (used.has(k.toLowerCase())); return k; }
+function keyFix(id) {   // la clave de un paper de la biblioteca, fijándola si aún no tenía
+  const p = db.papers.find(x => x.id === id); if (!p) return ''; if (p.key) return p.key;
+  p.key = keyNew(p); markDirty(); return p.key;
+}
+let BIB_KEYS = new Map();   // id → clave de la última exportación a BibTeX (la vista previa): al copiarla o guardarla, esas claves se fijan
+function keysFix() {
+  if (ex().fmt !== 'bib') return 0; let n = 0; const used = keysUsed();
+  for (const [id, k] of BIB_KEYS) { const p = db.papers.find(q => q.id === id); if (p && !p.key && KEY_RX.test(k) && !used.has(k.toLowerCase())) { p.key = k; used.add(k.toLowerCase()); n++; } }
+  if (n) markDirty(); return n;
+}
 function bibtex(L) {
   L = L.map(effP);
-  const used = new Map();
+  const used = new Map(), fixed = keysUsed(), out = new Set(); BIB_KEYS = new Map();
   return L.map(p => {
     const au = p.authorType === 'sin_autor' ? [] : p.authors, ty = p.type;
-    const base = (ascii(au.length ? parse(au.slice(0, 1))[0]?.l : 'anon') + (p.year || '') + (p.title.split(/\s+/).map(ascii).find(w => w.length > 3 && !STOPW.has(w)) || '')) || 'ref';
-    const n = used.get(base) || 0; used.set(base, n + 1);
+    let key = p.key && !out.has(p.key.toLowerCase()) ? p.key : '';
+    if (!key) { const base = bibBase(p); let n = used.get(base) || 0; do key = base + bibSuf(n++); while (fixed.has(key.toLowerCase()) || out.has(key.toLowerCase())); used.set(base, n); }
+    out.add(key.toLowerCase()); BIB_KEYS.set(p.id, key);
     let bk = BIBK[ty] || 'misc'; const tf = [];
     if (ty === 'tesis' && p.thesisType && p.thesisType !== 'Tesis doctoral') { bk = 'mastersthesis'; tf.push(['type', texEsc(p.thesisType)]); }
     const dp = okDate(p.pubDate) ? p.pubDate.split('-') : [], pg = String(p.pages || '').replace(/(\d)\s*[-–—]+\s*(\d)/g, '$1--$2');
@@ -777,7 +823,7 @@ function bibtex(L) {
       ['volume', ty === 'articulo' ? texEsc(p.volume || '') : ''], ['number', ty === 'articulo' || ty === 'legislacion' ? texEsc(p.issue || '') : ''], ['pages', shows('pages', ty) ? pg : ''], ['entrysubtype', ty === 'prensa' ? 'newspaper' : ty === 'blog' ? 'blog' : BIBK[ty] === 'misc' && ty !== 'web' ? ty : ''], ...tf,
       ...[['subtype', 'type'], ['authorRole', 'authorrole'], ['userHandle', 'userhandle'], ['seriesNumber', 'seriesnumber'], ['isbn', 'isbn'], ['issn', 'issn'], ['series', 'series'], ['institution', 'institution'], ['docNumber', ty === 'legislacion' ? 'docnumber' : 'number'], ['abbr', 'shorthand'], ['ecli', 'ecli']].filter(([k]) => shows(k, ty) && !(k === 'institution' && ty === 'tesis' && !p.institution)).map(([k, b]) => [b, texEsc(p[k] || '')]),
       ['doi', normDoi(p.doi)], ['url', p.url], ['urldate', p.accessed]].filter(([, v]) => v);
-    return `@${bk}{${base + bibSuf(n)},\n${f.map(([k, v]) => `  ${k} = {${v}}`).join(',\n')}\n}`;
+    return `@${bk}{${key},\n${f.map(([k, v]) => `  ${k} = {${v}}`).join(',\n')}\n}`;
   }).join('\n\n');
 }
 const RISK = {articulo: 'JOUR', libro: 'BOOK', capitulo: 'CHAP', congreso: 'CONF', tesis: 'THES', web: 'ELEC', prensa: 'NEWS', blog: 'BLOG', informe: 'RPRT', norma: 'STAND', patente: 'PAT', mapa: 'MAP', dataset: 'DATA', software: 'COMP', basedatos: 'DBASE', audiovisual: 'VIDEO', audio: 'SOUND', redsocial: 'GEN', ia: 'GEN', diccionario: 'DICT', presentacion: 'SLIDE', personal: 'PCOMM', legislacion: 'STAT', jurisprudencia: 'CASE'};
@@ -792,7 +838,7 @@ function openEx() {   // ventana emergente de exportación; se cierra con un cli
   const o = ex(); if (!STYLES[o.style]) o.style = 'apa'; if (!EXF[o.fmt]) o.fmt = 'txt'; if (!EXO[o.order]) o.order = 'auto';
   EXS = SEL.size ? 'sel' : 'vis';
   $('#ex').innerHTML = `<h2>Exportar</h2><div id="exOpts"></div><textarea id="exText"></textarea>
-    <div class="row" style="margin-top:10px"><button class="pri" data-onclick="exCopy()">Copiar</button><button id="exRich" data-onclick="exCopyRich()" title="Con sangría francesa, para pegar en Word o Docs">Copiar con formato</button><button data-onclick="exSave()">Guardar archivo</button><button data-onclick="sumOpen()" title="Cita completa de cada paper y debajo sus subrayados, comentarios y notas del PDF (Word, PDF o Markdown)">🖍 Resumen de anotaciones…</button><small id="exMsg"></small><button style="margin-left:auto" data-onclick="$('#ex').close()">Cerrar</button></div>`;
+    <div class="row" style="margin-top:10px"><button class="pri" data-onclick="exCopy()">Copiar</button><button id="exRich" data-onclick="exCopyRich()" title="Con sangría francesa, para pegar en Word o Docs">Copiar con formato</button><button data-onclick="exSave()">Guardar archivo</button><button data-onclick="sumOpen()" title="Cita completa de cada paper y debajo sus subrayados, comentarios y notas del PDF (Word, PDF o Markdown)">🖍 Resumen de anotaciones…</button><button data-onclick="obsSave()" title="Un archivo .md por paper (datos en YAML, clave de cita, notas y subrayados) dentro de un ZIP: para Obsidian, Logseq o Notion">🗂 Markdown para Obsidian (.zip)</button><small id="exMsg"></small><button style="margin-left:auto" data-onclick="$('#ex').close()">Cerrar</button></div>`;
   exUI(); drawEx(); $('#ex').showModal();
 }
 function exSet(k, v, quiet) {   // las opciones se recuerdan en el JSON (sin crear pasos de deshacer)
@@ -820,7 +866,7 @@ function drawEx() {
   $('#exText').readOnly = o.fmt === 'doc' || o.fmt === 'docx'; $('#exRich').hidden = !isTl(o.fmt);
   $('#exMsg').textContent = L.length ? `${L.length} papers${EXOM ? ` (${EXOM} omitidos: este estilo no los incluye en la lista)` : ''}` : 'No hay papers para exportar.';
 }
-function exCopy() { const t = $('#exText'); t.select(); document.execCommand('copy'); $('#exMsg').textContent = 'Copiado ✓'; }
+function exCopy() { const t = $('#exText'); t.select(); document.execCommand('copy'); $('#exMsg').textContent = 'Copiado ✓' + (keysFix() ? ' · claves de cita fijadas' : ''); }
 async function clipHtml(html, text, host) {   // HTML + texto: al pegar en Word o Docs conserva el formato
   try { await navigator.clipboard.write([new ClipboardItem({'text/html': new Blob([html], {type: 'text/html'}), 'text/plain': new Blob([text], {type: 'text/plain'})})]); }
   catch { const d = document.createElement('div'); d.contentEditable = true; d.style.cssText = 'position:fixed;left:-9999px;top:0'; d.innerHTML = html; host.appendChild(d);
@@ -838,7 +884,7 @@ async function exCopyRich() {   // con sangría francesa, para pegar en Word o D
 async function exSave() {
   const o = ex(), L = exList(), [lbl, mime] = EXF[o.fmt]; if (!L.length) return say('No hay nada que exportar.');
   const text = o.fmt === 'doc' ? wordDoc(L, o) : o.fmt === 'docx' ? exDocx(L, o) : $('#exText').value;
-  const ext = o.fmt === 'csl' ? 'json' : o.fmt;
+  const ext = o.fmt === 'csl' ? 'json' : o.fmt; keysFix();
   try { if (FSA) { const h = await showSaveFilePicker({suggestedName: 'citas.' + ext, types: [{description: lbl, accept: {[mime]: ['.' + ext]}}]}); await writeTo(h, text); }
     else download(text, 'citas.' + ext, mime); }
   catch (e) { if (e.name !== 'AbortError') say('Error al guardar: ' + e.message); }
@@ -886,17 +932,20 @@ const CMDS = () => [
   ['📤 Exportar citas', () => openEx()], ['💾 Guardar', () => save(false)], ['💾 Guardar como…', () => save(true)], ['📂 Abrir un archivo JSON', () => doOpen()],
   ['⚙️ Configuración', () => openCfg()], ['❓ Ayuda', () => openHelp()], ['🗑️ Papelera', () => trOpen()], ['🕸️ Relaciones', () => grOpen()], ['🧬 Buscar duplicados', () => dpOpen()], ['🛟 Copias de seguridad', () => bkOpen()],
   [db.settings.view === 'table' ? '▦ Ver como tarjetas' : '☰ Ver como tabla', () => viewToggle()], ['☰ Plegar o desplegar la barra lateral', () => sbToggle()], ['☑ Seleccionar los visibles', () => selVisible()],
-  ['✕ Quitar la selección', () => selNone()], ['🧹 Limpiar todos los filtros', () => fClrAll()], ['🔄 Sincronizar con Google Drive', () => syOn() ? syNow() : syConnect()], ['🔍 Buscar en la lista', () => SC_ACT.find()]];
+  ['✕ Quitar la selección', () => selNone()], ['🧹 Limpiar todos los filtros', () => fClrAll()], ['🔄 Sincronizar con Google Drive', () => syOn() ? syNow() : syConnect()], ['🔍 Buscar en la lista', () => SC_ACT.find()],
+  ['📖 Seguir leyendo', () => contRead()], ['🧠 Repaso de subrayados', () => revOpen()], ['📊 Estadísticas de lectura', () => rlOpen()], ['🔗 Buscar relaciones con OpenAlex', () => relFind()], ['⚠ Comprobar si algún paper está retractado', () => retrCheck()],
+  ['🗂 Exportar a Markdown para Obsidian (.zip)', () => obsSave()]];
 let CMD = {q: '', i: 0, L: []};
-function cmdOpen() { CMD = {q: '', i: 0, L: []}; const d = $('#cmdk');
-  d.innerHTML = `<input id="cmdQ" type="search" placeholder="Escribe una acción o el título de un paper…" aria-label="Buscar acción o paper" autocomplete="off" data-oninput="cmdSet(this.value)" data-onkeydown="cmdKey(event)"><div id="cmdL" role="listbox"></div><small class="cmdh">↑/↓ para elegir · Intro para ejecutar · Esc para cerrar</small>`;
+function cmdOpen(rd) { CMD = {q: '', i: 0, L: [], rd: rd ? rdCmds() : null}; const d = $('#cmdk');   // rd: dentro del visor o del lector de EPUB, sus órdenes (v40)
+  d.innerHTML = `<input id="cmdQ" type="search" placeholder="${rd ? 'Escribe una orden del visor (zoom, marcadores, lápiz, modo de lectura…)' : 'Escribe una acción o el título de un paper…'}" aria-label="Buscar acción o paper" autocomplete="off" data-oninput="cmdSet(this.value)" data-onkeydown="cmdKey(event)"><div id="cmdL" role="listbox"></div><small class="cmdh">↑/↓ para elegir · Intro para ejecutar · Esc para cerrar</small>`;
   cmdDraw(); d.showModal(); $('#cmdQ').focus(); }
 function cmdSet(v) { CMD.q = v; CMD.i = 0; cmdDraw(); }
 function cmdDraw() {
   const q = norm(CMD.q).trim(), w = q.split(/\s+/).filter(Boolean), ok = s => w.every(x => norm(s).includes(x));
-  const A = CMDS().filter(([t]) => ok(t)).map(([t, fn]) => ({t, fn}));
-  const P = w.length ? db.papers.filter(p => ok([p.alias, p.title, ...p.authors, p.year].join(' '))).slice(0, 8).map(p => ({t: '📄 ' + (p.alias || p.title) + (p.year ? ` (${p.year})` : ''), fn: () => openPaper(p.id)})) : [];
-  CMD.L = [...A, ...P]; CMD.i = Math.min(CMD.i, Math.max(0, CMD.L.length - 1));
+  if (CMD.rd) { CMD.L = CMD.rd.filter(c => ok(c.t)).map(c => ({t: c.t, fn: () => rdCmdRun(c.on)})); CMD.i = Math.min(CMD.i, Math.max(0, CMD.L.length - 1)); }
+  const A = CMD.rd ? [] : CMDS().filter(([t]) => ok(t)).map(([t, fn]) => ({t, fn}));
+  const P = !CMD.rd && w.length ? db.papers.filter(p => ok([p.alias, p.title, ...p.authors, p.year].join(' '))).slice(0, 8).map(p => ({t: '📄 ' + (p.alias || p.title) + (p.year ? ` (${p.year})` : ''), fn: () => openPaper(p.id)})) : [];
+  if (!CMD.rd) CMD.L = [...A, ...P]; CMD.i = Math.min(CMD.i, Math.max(0, CMD.L.length - 1));
   $('#cmdL').innerHTML = CMD.L.length ? CMD.L.map((c, i) => `<button role="option" class="${i === CMD.i ? 'on' : ''}" aria-selected="${i === CMD.i}" data-onclick="cmdRun(${i})">${esc(c.t)}</button>`).join('') : '<p class="empty">Nada coincide.</p>';
   $('#cmdL .on')?.scrollIntoView({block: 'nearest'});
 }

@@ -54,7 +54,7 @@ async function imgGc() {   // borra las imágenes que ya no usa ninguna copia de
 async function pdfGc() {
   try {
     const keys = (await idb('readonly', st => st.getAllKeys())).filter(k => typeof k === 'string');
-    const mine = keys.filter(k => /^(pdf|pdfb|pdft|img|pdfUp|pdfVis):/.test(k)); if (!mine.length) return 0;
+    const mine = keys.filter(k => /^(pdf|pdfb|pdft|pdftx|img|pdfUp|pdfVis):/.test(k)); if (!mine.length) return 0;
     const used = new Set(), pids = new Set(), byPj = new Map();
     const take = (d, pj) => { if (!d || typeof d !== 'object') throw Error('copia ilegible'); const S = byPj.get(pj) || byPj.set(pj, new Set()).get(pj);
       pdfSlots(d, true).forEach(({key, pf}) => { for (const k of pf.from ? [key, pf.from] : [key]) { used.add(k); S.add(k); } }); syPapersOf(d).forEach(p => pids.add(String(p.id))); };
@@ -101,6 +101,14 @@ function validate(d) {
   const manOk = m => m && typeof m === 'object' && !Array.isArray(m) ? Object.fromEntries(Object.entries(m).filter(([k, v]) => k && Array.isArray(v)).map(([k, v]) => [k === '_' || k === '*' ? k : idFix(k), [...new Set(v.filter(i => typeof i === 'string' && i).map(idFix))]])) : {};   // orden manual: {sección: [ids]}
   d.manual = manOk(d.manual); if (!Object.keys(d.manual).length) delete d.manual;
   d.posSaves = (Array.isArray(d.posSaves) ? d.posSaves : []).filter(x => x && typeof x.id === 'string' && x.id && typeof x.name === 'string').map(x => ({id: idFix(x.id), name: x.name, manual: manOk(x.manual)})); if (!d.posSaves.length) delete d.posSaves;
+  { const L = d.readLog, o = {}, num = (v, hi) => Math.min(hi, Math.max(0, Math.round(+v) || 0));   // v40: estadísticas de lectura, día → dispositivo → {s: segundos, p: páginas, d: papers}; los últimos 400 días
+    if (L && typeof L === 'object' && !Array.isArray(L)) for (const day of Object.keys(L).filter(k => /^\d{4}-\d\d-\d\d$/.test(k)).sort().slice(-400)) {
+      const v = L[day], e = {}; if (!v || typeof v !== 'object' || Array.isArray(v)) continue;
+      for (const [dv, x] of Object.entries(v)) { if (!/^[a-z0-9]{1,12}$/.test(dv) || !x || typeof x !== 'object') continue;
+        const s = num(x.s, 86400), pg = num(x.p, 5000), ids = Array.isArray(x.d) ? [...new Set(x.d.filter(i => typeof i === 'string' && i && i.length <= 64 || Number.isFinite(i)).map(String))].slice(0, 50) : [];
+        if (s || pg) e[dv] = {s, p: pg, ...(ids.length ? {d: ids} : {})}; }
+      if (Object.keys(e).length) o[day] = e; }
+    if (Object.keys(o).length) d.readLog = o; else delete d.readLog; }
   [...d.tags, ...d.sections].forEach(x => { if (x.rk == null) return; x.rk = x.rk && typeof x.rk === 'object' && !Array.isArray(x.rk) ? Object.fromEntries(Object.entries(x.rk).filter(([, v]) => typeof v === 'string' && v).map(([k, v]) => [idFix(k), v])) : {}; if (!Object.keys(x.rk).length) delete x.rk; });
   const sIn = d.settings && typeof d.settings === 'object' ? d.settings : {};
   d.settings = {...defSettings(), ...sIn, shortcuts: {...SC_DEF}};
@@ -111,6 +119,7 @@ function validate(d) {
     delete d.settings.annLbl; if (ok.length) d.settings.annLbl = Object.fromEntries(ok); } d.settings.inboxPos = d.settings.inboxPos === 'top' ? 'top' : 'bottom'; d.settings.inboxBtn = !!d.settings.inboxBtn; d.settings.fmtOpen = !!d.settings.fmtOpen; d.settings.view = d.settings.view === 'table' ? 'table' : 'cards';
   { const c = sIn.tblCols, ok = a => Array.isArray(a) ? [...new Set(a.filter(k => typeof k === 'string' && /^[a-z]+$/.test(k)))] : [];   // columnas de la tabla: orden y ocultas
     delete d.settings.tblCols; if (c && typeof c === 'object') { const o = ok(c.order), h = ok(c.hidden); if (o.length || h.length) d.settings.tblCols = {...(o.length ? {order: o} : {}), ...(h.length ? {hidden: h} : {})}; } }
+  if (d.settings.jsonPretty !== true) delete d.settings.jsonPretty;   // v40: JSON con sangría (opcional)
   if (!Array.isArray(d.settings.templates)) d.settings.templates = defSettings().templates;
   d.settings.templates = d.settings.templates.filter(t => t && typeof t.name === 'string' && typeof t.text === 'string').map(t => ({id: idFix(t.id) || uid(), name: t.name, text: t.text}));
   d.settings.customTypes = [...new Map((Array.isArray(sIn.customTypes) ? sIn.customTypes : []).map(ctClean).filter(Boolean).map(c => [c.id, c])).values()];
@@ -199,15 +208,19 @@ function foldSnap() {   // un cambio que no crea paso de deshacer (opciones de e
   recFlush(); clearTimeout(tFold); tFold = 0;
   if (TYPING) tFold = setTimeout(() => { tFold = 0; if (!tRec) lastSnap = snapDb(); }, 400); else lastSnap = snapDb();
 }
+/* Fuera de los campos de texto, la copia también se hace un momento después (v40): recorrer la biblioteca (~100 ms con 2000 papers en un móvil medio)
+   justo tras el clic retrasaba que se viera el cambio. Se hace cuando el navegador está libre, como mucho a los 250 ms (antes de la copia de trabajo,
+   que sale a los 0,7 s y la reutiliza). Deshacer, rehacer o cualquier otro paso que la necesite la hacen antes (recFlush). */
+const recLater = f => typeof requestIdleCallback === 'function' ? requestIdleCallback(f, {timeout: 250}) : setTimeout(f, 60);
 function markDirty() {
   if (TYPING) { dirty = true; touch(); clearTimeout(tRec); tRec = setTimeout(recFlush, 400); return; }
-  clearTimeout(tRec); tRec = 0; record(); dirty = true; touch(); SNAP_SES = lastSnap;
-}   // la copia de trabajo de dentro de 0,7 s puede usar esta misma copia
+  clearTimeout(tRec); dirty = true; touch(); const t = tRec = setTimeout(() => {}, 0); recLater(() => { if (tRec === t) recFlush(); });   // tRec: marca de copia pendiente (un temporizador vacío, para que clearTimeout no toque otro)
+}
 let SNAP_SES = null;   // copia ya hecha que coincide con el proyecto (la invalida cualquier touch() que no venga de markDirty)
 function undo() { recFlush(); if (UNDO.length) { REDO.push(snapDb()); restore(UNDO.pop()); } }
 function redo() { recFlush(); if (REDO.length) { UNDO.push(snapDb()); restore(REDO.pop()); } }
 function restore(json) {
-  db = unsnap(json); lastSnap = json; lastRecAt = 0; syncTypes(db.settings.customTypes); syncStyles(db.settings.customStyles, db.settings.export);
+  const rl = db.readLog; db = unsnap(json); if (rl) db.readLog = rl; else delete db.readLog; lastSnap = json; lastRecAt = 0; syncTypes(db.settings.customTypes); syncStyles(db.settings.customStyles, db.settings.export);   // deshacer no borra lo leído (estadísticas)
   for (const id of [...SEL]) if (!db.papers.some(p => p.id === id)) SEL.delete(id);
   dirty = true; applySettings(); render(); if ($('#cfg').open) drawCfg(); touch();
 }
