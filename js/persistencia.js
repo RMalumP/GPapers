@@ -54,7 +54,7 @@ async function imgGc() {   // borra las imágenes que ya no usa ninguna copia de
 async function pdfGc() {
   try {
     const keys = (await idb('readonly', st => st.getAllKeys())).filter(k => typeof k === 'string');
-    const mine = keys.filter(k => /^(pdf|pdfb|pdft|img|pdfUp|pdfVis):/.test(k)); if (!mine.length) return 0;
+    const mine = keys.filter(k => /^(pdf|pdfb|pdft|pdftx|img|pdfUp|pdfVis):/.test(k)); if (!mine.length) return 0;
     const used = new Set(), pids = new Set(), byPj = new Map();
     const take = (d, pj) => { if (!d || typeof d !== 'object') throw Error('copia ilegible'); const S = byPj.get(pj) || byPj.set(pj, new Set()).get(pj);
       pdfSlots(d, true).forEach(({key, pf}) => { for (const k of pf.from ? [key, pf.from] : [key]) { used.add(k); S.add(k); } }); syPapersOf(d).forEach(p => pids.add(String(p.id))); };

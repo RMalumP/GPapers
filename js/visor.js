@@ -115,7 +115,7 @@ async function vwOpen(src, file) {
     if (kept) VW.find.txt = kept.txt;
     VW.doc = doc; VW.rot = vwRotMap(); const p1 = await doc.getPage(1), v1 = p1.getViewport({scale: 1, rotation: ((p1.rotate || 0) + vwRot(0)) % 360}), szc = Object.keys(VW.rot).length ? null : vwSzGet(src, file, doc.numPages);
     VW.pages = Array.from({length: doc.numPages}, (_, i) => { const c = szc?.[i]; return {i, w: c ? c[0] : v1.width, h: c ? c[1] : v1.height, vp1: i ? null : v1, proxy: i ? null : p1, el: null, cv: null, rs: 0, tl: null, sized: !i}; });
-    VW.szOk = !!szc;
+    VW.szOk = !!szc; txAfterOpen(src, doc);   // el texto, para buscar desde la lista (v40)
     $('#vwLoad').hidden = true; $('#vwPn').textContent = '/ ' + doc.numPages; $('#vwPg').max = doc.numPages;
     $('#vwPages').innerHTML = VW.pages.map(p => `<div class="vwp" data-i="${p.i}"><div class="vwa"></div></div>`).join('');
     VW.pages.forEach(p => { p.el = $('#vwPages').children[p.i]; vwSize(p); });

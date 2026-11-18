@@ -211,7 +211,7 @@ async function epOpen(src, file) {
     }
     $('#epDoc').appendChild(frag); $('#epLoad').hidden = true;
     EP.len = EP.secs.map(s => s.textContent.length); let c = 0; EP.cum = EP.len.map(n => (c += n) - n); EP.total = Math.max(1, c);
-    epLayout(); epDrawAnn(); epSideShow();
+    epLayout(); epDrawAnn(); epSideShow(); txAfterEpub(src);
     const pf = epHolders()[0], ch = Math.min(EP.secs.length, Math.max(1, pdfPage(pf?.page) || 1)) - 1;
     let loc = {i: ch, f: 0}; try { const r = JSON.parse(localStorage.getItem(EP_POS_K) || '{}')[vwSrcKey(src)]; if (Array.isArray(r) && r[0] === ch && r[1] >= 0 && r[1] < 1) loc.f = r[1]; } catch (e) {}
     epGoLoc(loc, true); epOnScroll(); epImgs(gen); $('#epScroll').focus({preventScroll: true});

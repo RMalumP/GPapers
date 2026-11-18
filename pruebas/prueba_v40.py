@@ -108,7 +108,7 @@ with sync_playwright() as pw:
     A.evaluate("$('#imp').close(); $('#dlg').close()")
 
     # ---- Repaso de subrayados (F7) y Markdown para Obsidian (F8)
-    A.evaluate("""(() => { const p = db.papers[0]; p.pdf = {name: 'prueba.pdf', ann: [{id: 'h1', p: 0, k: 'hl', c: '#ffd400', t: 'Una frase importante', r: [[.1, .1, .5, .12]]}, {id: 'h2', p: 1, k: 'hl', c: '#ffd400', t: 'Otra frase', m: 'mi comentario', r: [[.1, .1, .5, .12]]}]};
+    A.evaluate("""(() => { const p = db.papers[0]; p.pdf = {name: 'prueba.pdf', ann: [{id: 'h1', p: 0, k: 'hl', c: '#ffd400', t: 'Una frase importante', q: [.1, .1, .5, .12]}, {id: 'h2', p: 1, k: 'hl', c: '#ffd400', t: 'Otra frase', m: 'mi comentario', q: [.1, .1, .5, .12]}]};
       p.general = 'Notas generales'; markDirty(); render(); })()"""); A.wait_for_timeout(300)
     eq('la barra lateral ofrece el repaso', A.evaluate("[!$('#sg-rev').hidden, $('#revN').textContent]"), [True, '(2)'])
     A.evaluate("revOpen()"); A.wait_for_timeout(200)
@@ -140,6 +140,7 @@ with sync_playwright() as pw:
     eq('entrada en la barra lateral con lo de hoy', A.evaluate("[!$('#sg-rl').hidden, $('#rlN').textContent]"), [True, '(6 min hoy)'])
     A.evaluate("rlOpen()"); A.wait_for_timeout(150)
     eq('la ventana: hoy, racha, 30 barras y lo más leído', A.evaluate("[$('#rl').open, /6 min/.test($('#rl .rlt b').textContent), document.querySelectorAll('#rl .rlb').length, /1 día/.test($('#rl .rlts').textContent), $('#rl .rlp li').textContent.includes('Uno')]"), [True, True, 30, True, True])
+    eq('y los papers de cada mes (6 meses)', A.evaluate("[...document.querySelectorAll('#rl .rlm')[0].children].map(d => d.querySelector('b').textContent)"), ['0', '0', '0', '0', '0', '1'])
     A.evaluate("$('#rl').close()")
     # leyendo de verdad en el visor: cuenta el tiempo y las páginas al pasar
     A.evaluate(f"(async () => {{ db.settings.pdfTab = 'app'; PDF_FILES.set('a', await {FILE}); pdfOpen('a', 1); }})()"); A.wait_for_timeout(1800)
@@ -150,6 +151,30 @@ with sync_playwright() as pw:
     eq('al cerrar el visor se guarda', A.evaluate(f"[RL.s, db.readLog[{json.dumps(day)}][{json.dumps(dev)}].s]"), [0, 375])
     A.evaluate("render()")
     eq('la barra «Seguir leyendo» aparece en la lista', A.evaluate("[!$('#cont').hidden, /Uno/.test($('#cont').textContent)]"), [True, True])
+
+    # ---- Buscar en el texto de los PDF (F5) y espacio usado (I6)
+    A.wait_for_timeout(500)
+    eq('al abrir un PDF en el visor se guarda su texto', A.evaluate("idb('readonly', st => st.get('pdftx:a')).then(r => r ? [r.name, r.pages.length, /Pagina 2, linea 1/.test(r.pages[1])] : null)"), ['prueba.pdf', 3, True])
+    A.evaluate("qSet('texto:\"pagina 2\"', true)"); A.wait_for_timeout(400)
+    eq('texto: encuentra el paper y dice la página', A.evaluate("[[...document.querySelectorAll('#list .card')].map(c => c.dataset.id), $('#list .txhit b').textContent, $('#list .txhit mark').textContent]"), [['a'], 'p. 2', 'Pagina 2'])
+    A.evaluate("qSet('subrayado con colores', true)")
+    eq('sin la casilla, una palabra normal no mira dentro de los PDF', A.evaluate("document.querySelectorAll('#list .card').length"), 0)
+    A.click('#qPdf', force=True); A.wait_for_timeout(300)
+    eq('con «Incluir el texto de los PDF y EPUB», sí', A.evaluate("[F.inPdf, [...document.querySelectorAll('#list .card')].map(c => c.dataset.id), $('#list .txhit b').textContent]"), [True, ['a'], 'p. 1'])
+    A.evaluate("db.papers[0].pdf.name = 'otro.pdf'; markDirty(); renderQ()")
+    eq('si cambia el archivo, el texto viejo no cuenta', A.evaluate("document.querySelectorAll('#list .card').length"), 0)
+    A.evaluate("db.papers[0].pdf.name = 'prueba.pdf'; markDirty(); qSet('texto:\"linea 3\"', true)")
+    A.click('#list .txhit'); A.wait_for_timeout(2500)
+    eq('la página abre el visor ahí, buscando lo mismo', A.evaluate("[VW.open, VW.cur, $('#vwQ').value, VW.find.hits.length > 0]"), [True, 0, 'linea 3', True])
+    A.evaluate("vwClose()"); A.wait_for_timeout(300)
+    A.evaluate("(async () => { await idb('readwrite', st => st.delete('pdftx:a')); TX.mem = null; const b = await (await fetch('pruebas/prueba.pdf')).blob(); await idb('readwrite', st => st.put(b, 'pdfb:a')); })()")
+    A.evaluate("txBuild()"); A.wait_for_timeout(3000)
+    eq('«Preparar la búsqueda» lo saca de la copia del navegador', A.evaluate("idb('readonly', st => st.get('pdftx:a')).then(r => r && r.pages.length)"), 3)
+    A.evaluate("qSet('', true); put(F, 'inPdf', false); CFG_TAB = 'da'; CFG_OPEN.add('sto'); STO = null; $('#cfg').showModal(); drawCfg()"); A.wait_for_timeout(1200)
+    eq('Configuración → Datos: espacio usado por tipo', A.evaluate("[...document.querySelectorAll('#cfgSto .stot tbody tr')].map(r => r.cells[0].textContent + ':' + r.cells[1].textContent).filter(t => /Copias de los PDF|Texto para buscar/.test(t))"), ['Copias de los PDF y EPUB:1', 'Texto para buscar en los PDF y EPUB:1'])
+    A.evaluate("stoFree('pdftx')"); A.wait_for_timeout(1200)
+    eq('se puede borrar el texto (se vuelve a preparar)', A.evaluate("idb('readonly', st => st.get('pdftx:a')).then(r => r ?? null)"), None)
+    A.evaluate("$('#cfg').close()")
 
     # ---- Accesos directos (I4) y recibir documentos compartidos (F4)
     eq('accesos directos: nuevo, DOI y leer', A.evaluate("[appAction('doi'), $('#imp').open, ($('#imp').close(), appAction('nada'))]"), [True, True, False])

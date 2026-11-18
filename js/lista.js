@@ -84,7 +84,7 @@ function searchTxt(p) {
     ...(F.inNotes ? [p.general, ...p.notes.map(n => n.content), ...Object.values(p.cites), ...pdfsOf(p).flatMap(n => (p[pdfF(n)].ann || []).flatMap(a => [a.t, a.m]))] : [])].join(' ');   // con «Incluir notas», también los subrayados y comentarios de sus PDF
   if (!c || c.raw !== raw) SEARCH.set(p, c = {raw, n: norm(raw)}); c.rev = DB_REV; c.gen = SRCH_GEN; c.inN = F.inNotes; c.t = p.title; return c.n;
 }
-const QP = {autor: 'au', autores: 'au', author: 'au', au: 'au', ano: 'yr', year: 'yr', revista: 've', venue: 've', editorial: 've', doi: 'doi', etiqueta: 'tag', tag: 'tag', seccion: 'sec', section: 'sec'};
+const QP = {autor: 'au', autores: 'au', author: 'au', au: 'au', ano: 'yr', year: 'yr', revista: 've', venue: 've', editorial: 've', doi: 'doi', etiqueta: 'tag', tag: 'tag', seccion: 'sec', section: 'sec', texto: 'tx', text: 'tx'};   // texto: dentro de los PDF y EPUB (v40)
 let QC = {raw: null, T: []};
 function qParse(raw) {   // el texto de la caja → [{k: '' | 'au' | 'yr' | 've' | 'doi' | 'tag' | 'sec', v (normalizado), neg, a, b (años)}]
   if (QC.raw === raw) return QC.T;
@@ -103,7 +103,7 @@ function qParse(raw) {   // el texto de la caja → [{k: '' | 'au' | 'yr' | 've'
 function qTest(p, T) {
   for (const t of T) {
     const v = t.v, k = t.k;
-    const ok = !k ? searchTxt(p).includes(v) : k === 'au' ? norm(p.authors.join('; ')).includes(v) : k === 'yr' ? +p.year > 0 && +p.year >= t.a && +p.year <= t.b
+    const ok = !k ? searchTxt(p).includes(v) || F.inPdf && txHas(p, v) : k === 'tx' ? txHas(p, v) : k === 'au' ? norm(p.authors.join('; ')).includes(v) : k === 'yr' ? +p.year > 0 && +p.year >= t.a && +p.year <= t.b
       : k === 've' ? norm(p.venue).includes(v) : k === 'doi' ? norm(p.doi).includes(v)
       : k === 'tag' ? p.tagIds.some(i => norm(tagById(i)?.name).includes(v)) : p.sectionIds.some(i => norm(secById(i)?.name).includes(v));
     if (ok === t.neg) return false;
@@ -319,7 +319,7 @@ const retrB = p => p.retracted ? '<span class="retr" title="Retractado según Op
 const card = (p, from) => `<article class="card" data-id="${p.id}" draggable="true" ${F.group ? `data-from="${from || ''}"` : ''}><div class="ct"><label class="sel"><input type="checkbox" ${SEL.has(p.id) ? 'checked' : ''} data-onchange="toggleSel('${p.id}')"> Seleccionar</label><button class="sm" data-onclick="openPaper('${p.id}')">Editar</button><button class="sm cpb" data-onclick="copyCardCite('${p.id}',this)" title="Copiar la cita (estilo elegido en Exportar), con cursiva al pegar en Word">📋</button>${pdfBtns(p, true)}${p.tagIds.length ? `<span class="tl">${tagsOf(p)}</span>` : ''}${rdHTML(p)}<button class="x" title="Eliminar" data-onclick="delPaper('${p.id}')">✕</button></div><div class="th">${thumbHTML(p, 'sm')}<h3>${retrB(p)}${hl(p.alias || p.title, HL.t)}</h3></div>${p.alias ? `<div class="sub">${hl(p.title, HL.t)}</div>` : ''}
     <div class="au"><span>${hl(p.authors.join('; '), HL.a)} ${p.year ? '(' + esc(p.year) + ')' : ''}</span></div>
     ${/^https?:/i.test(p.url) ? `<a href="${esc(p.url)}" target="_blank" rel="noopener noreferrer">${esc(p.url)}</a>` : ''}
-    
+    ${txLine(p)}
     <div class="row"><button class="sm" data-onclick="toggleNotes('${p.id}')" data-oncontextmenu="viewNotes(event,'${p.id}')" title="Clic: desplegar notas · Clic derecho: abrir el visor de notas">Notas (${pNotes(p).length}) ${EXP.has(p.id) ? '▾' : '▸'}</button>${relCount(p) ? `<button class="sm" data-onclick="viewRel('${p.id}')" title="Relaciones: relacionados, cita a y citado por">🔗 ${relCount(p)}</button>` : ''}</div>${EXP.has(p.id) ? notesHTML(p) : ''}</article>`;
 /* ---- Columnas de la tabla: se pueden mover (arrastrando la cabecera o con su clic derecho) y ocultar.
    La casilla, la miniatura y ✕ son fijas; el título siempre se ve. Se guardan en db.settings.tblCols, propio de cada dispositivo (no se sincroniza). */

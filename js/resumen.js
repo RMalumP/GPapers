@@ -210,13 +210,20 @@ function rlDraw() {
     return `<div class="rlb" title="${esc(tip)}" aria-label="${esc(tip)}" role="img"><i style="height:${x.s ? Math.max(3, Math.round(x.s / max * 100)) : 0}%"></i></div>`; }).join('');
   const cnt = new Map(); for (let i = 0; i < 30; i++) A.get(rlDay(rlBack(i)))?.d.forEach(id => cnt.set(id, (cnt.get(id) || 0) + 1));
   const top = [...cnt].map(([id, n]) => [db.papers.find(p => String(p.id) === id), n]).filter(x => x[0]).sort((a, b) => b[1] - a[1]).slice(0, 5);
-  const empty = !A.size;
+  const empty = !A.size, mon = [...Array(6)].map((_, i) => { const t = new Date(); t.setDate(1); t.setMonth(t.getMonth() - 5 + i); return t; }), byM = new Map();
+  for (const [day, e] of A) { const k = day.slice(0, 7); const S = byM.get(k) || byM.set(k, new Set()).get(k); e.d.forEach(x => S.add(x)); }
+  const mk = t => `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}`, mMax = Math.max(1, ...mon.map(t => byM.get(mk(t))?.size || 0));
+  const months = `<h3 class="rlh">Papers leídos cada mes</h3><div class="rlm">${mon.map(t => { const v = byM.get(mk(t))?.size || 0, lb = t.toLocaleDateString('es', {month: 'short'});
+    return `<div title="${esc(lb)}: ${v} ${v === 1 ? 'paper' : 'papers'}"><span>${esc(lb)}</span><i style="width:${v / mMax * 100}%"></i><b>${v}</b></div>`; }).join('')}</div>`;
+  const secs = db.sections.map(sc => { const L = db.papers.filter(p => p.sectionIds.includes(sc.id)); return [sc, L.length, L.filter(p => p.reading === 'leido').length]; }).filter(x => x[1]);
+  const prog = secs.length ? `<h3 class="rlh">Avance por sección (papers leídos)</h3><div class="rlm">${secs.map(([sc, n, r]) => `<div title="${esc(sc.name)}: ${r} de ${n} leídos"><span>${esc(shortTxt(sc.name))}</span><i style="width:${r / n * 100}%"></i><b>${r}/${n}</b></div>`).join('')}</div>` : '';
   d.innerHTML = `<div class="dh"><h2>📊 Estadísticas de lectura</h2><div class="dbtn"><button data-onclick="$('#rl').close()">Cerrar ✕</button></div></div>
-    ${empty ? '<p class="hint">Aún no hay lectura guardada. Cuenta el tiempo que lees PDF y EPUB en el visor de la app (de todos tus dispositivos, si usas Google Drive).</p>' : `
+    ${empty ? '<p class="hint">Aún no hay lectura guardada. Cuenta el tiempo que lees PDF y EPUB en el visor de la app (de todos tus dispositivos, si usas Google Drive).</p>' + prog : `
     <div class="rlts">${tile('Hoy', T)}${tile('Últimos 7 días', W)}${tile('Últimos 30 días', M)}<div class="rlt"><small>Racha</small><b>${streak} ${streak === 1 ? 'día' : 'días'}</b><span>seguidos leyendo (≥ 1 min)</span></div></div>
     <h3 class="rlh">Minutos de lectura al día · últimos 30 días</h3>
     <div class="rlc" role="group" aria-label="Minutos de lectura de cada día de los últimos 30">${bars}</div>
     <div class="rlx"><span>${esc(fd(days[0].t))}</span><span>máx. ${rlFmt(Math.max(...days.map(x => x.s)))}</span><span>hoy</span></div>
     ${top.length ? `<h3 class="rlh">Lo que más has leído (30 días)</h3><ol class="rlp">${top.map(([p, n]) => `<li><button class="lnk" data-onclick="$('#rl').close();openPaper('${p.id}')">${esc(shortTxt(p.alias || p.title))}</button> <small>${n} ${n === 1 ? 'día' : 'días'}</small></li>`).join('')}</ol>` : ''}
+    ${months}${prog}
     <p class="hint">Solo cuenta el tiempo que lees de verdad en el visor (con actividad en los últimos 2 minutos o con el avance automático). En el EPUB, una página son unas 2000 letras.</p>`}`;
 }
