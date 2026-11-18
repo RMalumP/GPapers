@@ -90,7 +90,7 @@ async function txBuild() {   // Configuración → Datos: prepara el texto de to
     if (!file) { miss++; continue; }
     try {
       if (isEpub(x.pf.name)) await txPut(x.key, x.pf.name, await txFromEpub(file));
-      else { lib ||= await vwLib(); const doc = await lib.getDocument({data: new Uint8Array(await file.arrayBuffer()), cMapUrl: vwUrl('cmaps/'), cMapPacked: true, standardFontDataUrl: vwUrl('standard_fonts/'), wasmUrl: vwUrl('wasm/'), iccUrl: vwUrl('iccs/'), isEvalSupported: false, enableXfa: false}).promise;
+      else { lib ||= await vwLib(); const doc = await lib.getDocument({data: new Uint8Array(await file.arrayBuffer()), isEvalSupported: false, enableXfa: false}).promise;
         try { await txPut(x.key, x.pf.name, await txFromPdfDoc(doc)); } finally { doc.destroy(); } }
       done++;
     } catch (e) { bad++; }

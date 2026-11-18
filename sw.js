@@ -6,7 +6,7 @@ const V = 'papers-v40.1', FILES = ['./', 'index.html', 'style.css', 'movil.css',
 self.addEventListener('install', e => { e.waitUntil(caches.open(V).then(c => c.addAll(FILES.map(f => new Request(f, {cache: 'reload'}))))); self.skipWaiting(); });
 // Las librerías del visor de PDF (lib/: PDF.js y pdf-lib, unos 5 MB) no se descargan al instalar: solo la primera vez que se abre un PDF.
 // Van en su propia caché, que no se borra con cada versión de la app (solo cambia si cambian las librerías: subir LIBV).
-const LIBV = 'papers-lib-pdfjs-5.7.284';
+const LIBV = 'papers-lib-pdfjs-4.10.38';
 self.addEventListener('activate', e => e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== V && k !== LIBV && k !== SHARE).map(k => caches.delete(k)))).then(() => clients.claim())));
 const net = req => fetch(req, {cache: 'no-cache'}).then(r => { if (r.ok || r.type === 'opaque') { const c = r.clone(); caches.open(V).then(ca => ca.put(req, c)); } return r; });
 /* «Compartir → GPapers» (v40): Android manda lo compartido por POST a ./compartir (share_target de manifest.json, también desde la app Android).

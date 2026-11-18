@@ -249,7 +249,7 @@ const pdfBtns = (p, full) => pdfsOf(p).map(n => { const pf = p[pdfF(n)], a = ann
 async function docSniff(file) {
   if (isEpub(file.name)) { const m = await epMeta(file); return m && {...m, ep: true}; }
   if (!vwCan()) return null; let doc;
-  try { const L = await vwLib(); doc = await L.getDocument({data: new Uint8Array(await file.arrayBuffer()), cMapUrl: vwUrl('cmaps/'), cMapPacked: true, standardFontDataUrl: vwUrl('standard_fonts/'), wasmUrl: vwUrl('wasm/'), iccUrl: vwUrl('iccs/'), isEvalSupported: false}).promise;
+  try { const L = await vwLib(); doc = await L.getDocument({data: new Uint8Array(await file.arrayBuffer()), cMapUrl: vwUrl('cmaps/'), cMapPacked: true, standardFontDataUrl: vwUrl('standard_fonts/'), isEvalSupported: false}).promise;
     return await pdfSniffDoc(doc); } catch (e) { return null; } finally { try { doc?.destroy(); } catch (e) {} }
 }
 const docRef = s => s.ep ? {title: s.title, authors: s.authors, year: s.year, publisher: s.publisher, isbn: s.isbn, type: 'libro'} : {title: s.title};
