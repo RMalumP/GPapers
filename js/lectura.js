@@ -634,3 +634,52 @@ function rdCmds() {
 function rdCmdRun(on) {   // ejecuta una orden como si se pulsara su botón (el mismo minilenguaje data-on…)
   const host = VW.open ? $('#vw') : $('#ep'), b = document.createElement('button'); b.hidden = true; b.setAttribute('data-onclick', on); host.append(b); b.click(); b.remove();
 }
+
+/* ===== Zonas para pasar de página (v40.3, PDF y EPUB, en página a página) =====
+   La página se parte en 3 × 3 casillas (columnas y filas de 30 % · 40 % · 30 %). Cada casilla pasa a la página anterior, a la siguiente o no
+   hace nada (y entonces sigue como siempre: subrayar, ventanitas, pantalla completa). Cuatro formas hechas (izquierda y derecha, como antes;
+   arriba y abajo; al revés; casi todo adelante) y hasta tres personalizadas, que se editan tocando cada casilla.
+   Menú: 📖 Modo de lectura → 👆 Zonas para pasar. Se recuerda en este dispositivo (gp-vw-zonas: {sel, c: [3 rejillas de 9]}).
+   El desplazamiento automático no cambia: izquierda, más despacio; centro, pausa; derecha, más deprisa. */
+const PZ_K = 'gp-vw-zonas';
+const PZ_PRE = {lr: ['Izquierda y derecha', [-1, 0, 1, -1, 0, 1, -1, 0, 1]], tb: ['Arriba y abajo', [-1, -1, -1, 0, 0, 0, 1, 1, 1]],
+  rl: ['Al revés (derecha, anterior)', [1, 0, -1, 1, 0, -1, 1, 0, -1]], fw: ['Casi todo adelante (izquierda, atrás)', [-1, 1, 1, -1, 0, 1, -1, 1, 1]]};
+const pzNorm = g => Array.isArray(g) && g.length === 9 ? g.map(v => v > 0 ? 1 : v < 0 ? -1 : 0) : null;
+function pzGet() {
+  let o = {}; try { o = JSON.parse(localStorage.getItem(PZ_K) || '{}') || {}; } catch (e) {}
+  const c = [0, 1, 2].map(i => pzNorm(o.c?.[i]) || PZ_PRE.lr[1].slice());
+  return {sel: PZ_PRE[o.sel] || /^c[123]$/.test(o.sel) ? o.sel : 'lr', c};
+}
+function pzSave(o) { try { localStorage.setItem(PZ_K, JSON.stringify(o)); } catch (e) {} }
+const pzGrid = (o = pzGet()) => PZ_PRE[o.sel] ? PZ_PRE[o.sel][1] : o.c[+o.sel[1] - 1];
+const pzName = (sel = pzGet().sel) => PZ_PRE[sel] ? PZ_PRE[sel][0] : 'Personalizada ' + sel[1];
+function pzAt(x, y, el) {   // -1 anterior, 1 siguiente, 0 nada: según la casilla del toque dentro de el (la zona de la página)
+  const R = el.getBoundingClientRect(), fx = (x - R.left) / Math.max(1, R.width), fy = (y - R.top) / Math.max(1, R.height);
+  const k = f => f < .3 ? 0 : f > .7 ? 2 : 1;
+  return pzGrid()[k(fy) * 3 + k(fx)] || 0;
+}
+const pzMini = g => `<span class="pzmini" aria-hidden="true">${g.map(v => `<i class="${v < 0 ? 'pv' : v > 0 ? 'nx' : ''}"></i>`).join('')}</span>`;
+function pzMenu(ep) {
+  const o = pzGet(), cur = o.sel, me = `pzMenu(${ep ? 'true' : 'false'})`;
+  const opt = (v, g) => `<button data-keep data-onclick="pzSet('${v}',${ep ? 'true' : 'false'})">${tick(cur === v)}${pzMini(g)}${pzName(v)}</button>`;
+  const lab = v => v < 0 ? '◀ Anterior' : v > 0 ? 'Siguiente ▶' : '—';
+  const ed = PZ_PRE[cur] ? '' : `<div class="ctxh">✎ ${pzName(cur)}: toca cada casilla para cambiarla</div>
+    <div class="pzed" role="group" aria-label="Zonas de la página">${pzGrid(o).map((v, i) => `<button data-keep class="${v < 0 ? 'pv' : v > 0 ? 'nx' : ''}" data-onclick="pzCell(${i},${ep ? 'true' : 'false'})" aria-label="Casilla ${i + 1}: ${lab(v)}">${lab(v)}</button>`).join('')}</div>
+    <div class="epmrow">${Object.keys(PZ_PRE).map(k => `<button data-keep title="Empezar desde «${PZ_PRE[k][0]}»" data-onclick="pzCopy('${k}',${ep ? 'true' : 'false'})">${pzMini(PZ_PRE[k][1])}</button>`).join('')}</div>
+    <div class="vwhint">Cada toque cambia la casilla: anterior, siguiente o nada. Las casillas con «—» siguen como siempre (subrayar, menús, pantalla completa). Los botones de abajo copian una de las formas hechas.</div>`;
+  (ep ? epMenu : vwMenu)(ep ? EP.menuR : VW.menuR, `<button data-keep data-onclick="${ep ? 'epReadMenu()' : 'vwReadMenu()'}">‹ Volver</button><hr><div class="ctxh">👆 Zonas para pasar de página</div>
+    ${Object.keys(PZ_PRE).map(k => opt(k, PZ_PRE[k][1])).join('')}<hr><div class="ctxh">Personalizadas</div>${[0, 1, 2].map(i => opt('c' + (i + 1), o.c[i])).join('')}
+    ${ed ? '<hr>' + ed : ''}<div class="vwhint">Solo en página a página. Deslizar y las flechas del teclado siguen igual.</div>`);
+}
+function pzSet(v, ep) { const o = pzGet(); o.sel = PZ_PRE[v] || /^c[123]$/.test(v) ? v : 'lr'; pzSave(o); pzMenu(ep); pzShow(ep); }
+function pzCell(i, ep) { const o = pzGet(); if (PZ_PRE[o.sel]) return; const g = o.c[+o.sel[1] - 1]; g[i] = g[i] === 0 ? -1 : g[i] < 0 ? 1 : 0; pzSave(o); pzMenu(ep); pzShow(ep); }
+function pzCopy(k, ep) { const o = pzGet(); if (PZ_PRE[o.sel] || !PZ_PRE[k]) return; o.c[+o.sel[1] - 1] = PZ_PRE[k][1].slice(); pzSave(o); pzMenu(ep); pzShow(ep); }
+function pzShow(ep) {   // enseña un momento las zonas sobre la página (azul: anterior; verde: siguiente)
+  const host = $(ep ? '#ep' : '#vw'), sc = $(ep ? '#epScroll' : '#vwScroll'); if (!host || !sc) return;
+  let d = host.querySelector('.pzov'); if (!d) { d = document.createElement('div'); d.className = 'pzov'; d.setAttribute('aria-hidden', 'true'); host.append(d); }
+  const R = sc.getBoundingClientRect(), H = host.getBoundingClientRect();
+  Object.assign(d.style, {left: R.left - H.left + 'px', top: R.top - H.top + 'px', width: R.width + 'px', height: R.height + 'px'});
+  d.innerHTML = pzGrid().map(v => `<i class="${v < 0 ? 'pv' : v > 0 ? 'nx' : ''}">${v < 0 ? '◀' : v > 0 ? '▶' : ''}</i>`).join('');
+  d.classList.add('on'); clearTimeout(pzShow.t); pzShow.t = setTimeout(() => d.classList.remove('on'), 1600);
+}
+const pzBtn = ep => `<button data-keep data-onclick="pzMenu(${ep ? 'true' : 'false'})">👆 Zonas para pasar <small class="vwsub">${esc(pzName())} ›</small></button>`;

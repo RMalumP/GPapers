@@ -275,7 +275,7 @@ function vwMove(e) {
 }
 function vwUp(e) {
   clearTimeout(VW.lpT);
-  const pn = VW.pan; if (pn && pn.id === e.pointerId) { VW.pan = null; const hp = !!VW.pop; if (e.type !== 'pointercancel' && Math.hypot(e.clientX - pn.x, e.clientY - pn.y) < 8 && !vwConcTap() && !vwTapAt(e.clientX, e.clientY) && !vwReadTap(e.clientX, hp)) vwEmptyTap(e.clientX, e.clientY); return; }
+  const pn = VW.pan; if (pn && pn.id === e.pointerId) { VW.pan = null; const hp = !!VW.pop; if (e.type !== 'pointercancel' && Math.hypot(e.clientX - pn.x, e.clientY - pn.y) < 8 && !vwConcTap() && !vwTapAt(e.clientX, e.clientY) && !vwReadTap(e.clientX, e.clientY, hp)) vwEmptyTap(e.clientX, e.clientY); return; }
   const g = VW.drag; if (e.type === 'pointercancel') { if (g?.kind === 'ink') lnInkUp(g, true); VW.drag = null; VW.tap = null; $('#vwBox')?.remove(); return; }
   if (g && g.id === e.pointerId) {
     VW.drag = null; $('#vwBox')?.remove();
@@ -294,7 +294,7 @@ function vwUp(e) {
     const n = e.target.closest?.('.vwnote'); if (n) return vwPopOpen(n.dataset.a);
     if (VW.mode === 'note') { const p = vwPageAt(e.clientX, e.clientY); if (!p) return; const [x, y] = vwToPdf(p, e.clientX, e.clientY), id = uid(), now = vwNow();
       vwAdd({id, k: 'note', p: p.i, q: [x, y, x, y], c: VW_COLORS[VW.color][0], at: now, up: now}); return vwPopOpen(id, true); }
-    if (!vwSelRange()) { const hp = !!VW.pop; if (VW.mode === 'sel' && lnTap(e.clientX, e.clientY) || vwTapAt(e.clientX, e.clientY) || vwReadTap(e.clientX, hp)) return; vwEmptyTap(e.clientX, e.clientY); }
+    if (!vwSelRange()) { const hp = !!VW.pop; if (VW.mode === 'sel' && lnTap(e.clientX, e.clientY) || vwTapAt(e.clientX, e.clientY) || vwReadTap(e.clientX, e.clientY, hp)) return; vwEmptyTap(e.clientX, e.clientY); }
     else if ($('#vw').classList.contains('tsel') && !tsJust()) { tsClear(); $('#vwSel').hidden = true; }   // táctil: tocar fuera quita la selección (el navegador ya no lo hace)
   }
 }
