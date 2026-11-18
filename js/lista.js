@@ -231,7 +231,7 @@ function filtDraw() {   // chips de Secciones, Etiquetas y Lectura, con cuántos
   const rp = $('#readP'); rp.hidden = !N; rp.innerHTML = N ? ['leido', 'leyendo'].map(k => `<i style="width:${cR[k] / N * 100}%;background:${READ_C[k]}"></i>`).join('') : '';
   rp.title = `Progreso de lectura: ${cR.leido} leídos, ${cR.leyendo} leyendo y ${cR.por_leer} por leer, de ${N}`;
   $('#minR').textContent = (F.minRating ? '★ ≥ ' + F.minRating : 'Cualquiera') + ' ▾'; $('#minR').classList.toggle('on', !!F.minRating); $('#yFrom').value = F.yFrom || ''; $('#yTo').value = F.yTo || '';
-  actDraw(); favDraw(); recDraw();
+  actDraw(); favDraw(); recDraw(); revDraw0(); rlDraw0();
 }
 const tagsOf = p => p.tagIds.map(tagById).filter(Boolean).map(t => chip(t, 1, '', 0, `tagMenu(event,'${p.id}','${t.id}')`)).join('');
 const EXP = new Set();   // papers con las notas desplegadas en la lista
@@ -838,7 +838,7 @@ function openEx() {   // ventana emergente de exportación; se cierra con un cli
   const o = ex(); if (!STYLES[o.style]) o.style = 'apa'; if (!EXF[o.fmt]) o.fmt = 'txt'; if (!EXO[o.order]) o.order = 'auto';
   EXS = SEL.size ? 'sel' : 'vis';
   $('#ex').innerHTML = `<h2>Exportar</h2><div id="exOpts"></div><textarea id="exText"></textarea>
-    <div class="row" style="margin-top:10px"><button class="pri" data-onclick="exCopy()">Copiar</button><button id="exRich" data-onclick="exCopyRich()" title="Con sangría francesa, para pegar en Word o Docs">Copiar con formato</button><button data-onclick="exSave()">Guardar archivo</button><button data-onclick="sumOpen()" title="Cita completa de cada paper y debajo sus subrayados, comentarios y notas del PDF (Word, PDF o Markdown)">🖍 Resumen de anotaciones…</button><small id="exMsg"></small><button style="margin-left:auto" data-onclick="$('#ex').close()">Cerrar</button></div>`;
+    <div class="row" style="margin-top:10px"><button class="pri" data-onclick="exCopy()">Copiar</button><button id="exRich" data-onclick="exCopyRich()" title="Con sangría francesa, para pegar en Word o Docs">Copiar con formato</button><button data-onclick="exSave()">Guardar archivo</button><button data-onclick="sumOpen()" title="Cita completa de cada paper y debajo sus subrayados, comentarios y notas del PDF (Word, PDF o Markdown)">🖍 Resumen de anotaciones…</button><button data-onclick="obsSave()" title="Un archivo .md por paper (datos en YAML, clave de cita, notas y subrayados) dentro de un ZIP: para Obsidian, Logseq o Notion">🗂 Markdown para Obsidian (.zip)</button><small id="exMsg"></small><button style="margin-left:auto" data-onclick="$('#ex').close()">Cerrar</button></div>`;
   exUI(); drawEx(); $('#ex').showModal();
 }
 function exSet(k, v, quiet) {   // las opciones se recuerdan en el JSON (sin crear pasos de deshacer)
@@ -932,7 +932,9 @@ const CMDS = () => [
   ['📤 Exportar citas', () => openEx()], ['💾 Guardar', () => save(false)], ['💾 Guardar como…', () => save(true)], ['📂 Abrir un archivo JSON', () => doOpen()],
   ['⚙️ Configuración', () => openCfg()], ['❓ Ayuda', () => openHelp()], ['🗑️ Papelera', () => trOpen()], ['🕸️ Relaciones', () => grOpen()], ['🧬 Buscar duplicados', () => dpOpen()], ['🛟 Copias de seguridad', () => bkOpen()],
   [db.settings.view === 'table' ? '▦ Ver como tarjetas' : '☰ Ver como tabla', () => viewToggle()], ['☰ Plegar o desplegar la barra lateral', () => sbToggle()], ['☑ Seleccionar los visibles', () => selVisible()],
-  ['✕ Quitar la selección', () => selNone()], ['🧹 Limpiar todos los filtros', () => fClrAll()], ['🔄 Sincronizar con Google Drive', () => syOn() ? syNow() : syConnect()], ['🔍 Buscar en la lista', () => SC_ACT.find()]];
+  ['✕ Quitar la selección', () => selNone()], ['🧹 Limpiar todos los filtros', () => fClrAll()], ['🔄 Sincronizar con Google Drive', () => syOn() ? syNow() : syConnect()], ['🔍 Buscar en la lista', () => SC_ACT.find()],
+  ['📖 Seguir leyendo', () => contRead()], ['🧠 Repaso de subrayados', () => revOpen()], ['📊 Estadísticas de lectura', () => rlOpen()], ['🔗 Buscar relaciones con OpenAlex', () => relFind()], ['⚠ Comprobar si algún paper está retractado', () => retrCheck()],
+  ['🗂 Exportar a Markdown para Obsidian (.zip)', () => obsSave()]];
 let CMD = {q: '', i: 0, L: []};
 function cmdOpen() { CMD = {q: '', i: 0, L: []}; const d = $('#cmdk');
   d.innerHTML = `<input id="cmdQ" type="search" placeholder="Escribe una acción o el título de un paper…" aria-label="Buscar acción o paper" autocomplete="off" data-oninput="cmdSet(this.value)" data-onkeydown="cmdKey(event)"><div id="cmdL" role="listbox"></div><small class="cmdh">↑/↓ para elegir · Intro para ejecutar · Esc para cerrar</small>`;

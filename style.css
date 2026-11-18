@@ -337,3 +337,12 @@ button.lnk{background:none;border:0;color:var(--pri);text-decoration:underline;p
 #cont .cmain{flex:1;min-width:0;display:flex;align-items:baseline;gap:8px;border:0;border-radius:0;background:none;text-align:left;padding:8px 12px;white-space:nowrap;overflow:hidden}
 #cont .cmain span{color:var(--pri);font-weight:600}#cont .cmain b{overflow:hidden;text-overflow:ellipsis;font-weight:500;min-width:0}#cont .cmain small{opacity:.7;flex:none}
 #cont .cx{border:0;border-left:1px solid var(--bd);border-radius:0;background:none;padding:0 12px}#cont .cmain:hover{background:color-mix(in srgb,var(--pri) 7%,transparent)}
+/* Repaso de subrayados (v40) */
+#rev{max-width:640px}.revq{margin:10px 0;padding:12px 16px;border-left:5px solid var(--c);background:color-mix(in srgb,var(--c) 14%,transparent);border-radius:6px;font-size:calc(17px * var(--fz,1));line-height:1.5}
+.revm{margin:6px 0}.revs{opacity:.85;margin:8px 0 14px}.revc{margin:0;opacity:.7}#revN{opacity:.7;font-weight:400}
+/* v40: estadísticas de lectura */
+#rl{max-width:640px}.rlts{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin:8px 0 14px}
+.rlt{border:1px solid var(--bd);border-radius:8px;padding:8px 10px;display:flex;flex-direction:column;gap:2px;background:var(--card)}.rlt small{opacity:.75}.rlt b{font-size:1.35em;font-variant-numeric:tabular-nums}.rlt span{font-size:.85em;opacity:.8}
+.rlh{font-size:1em;margin:12px 0 6px}.rlc{display:flex;align-items:flex-end;gap:2px;height:120px;border-bottom:1px solid var(--bd);padding-top:4px}
+.rlb{flex:1;height:100%;display:flex;align-items:flex-end;cursor:default}.rlb i{display:block;width:100%;background:var(--pri);border-radius:4px 4px 0 0;min-height:0}.rlb:hover i{opacity:.75}
+.rlx{display:flex;justify-content:space-between;font-size:.8em;opacity:.75;margin-top:3px}.rlp{margin:4px 0;padding-left:22px}.rlp li{margin:3px 0}

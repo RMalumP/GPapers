@@ -294,23 +294,45 @@ function lnLeftShow() {
 }
 const LNP = {pg: -1, t: 0, acc: 0, chars: 0, secs: 0, pos: -1};
 function lnPaceTick() {   // cada 5 s: cuánto tiempo pasas en cada página (o cuántas letras avanzas en el EPUB), solo leyendo (activo hace poco o con el automático)
-  if (!rdOpen() || document.hidden) { LNP.pg = -1; LNP.pos = -1; return; }
+  if (!rdOpen() || document.hidden) { LNP.pg = -1; LNP.pos = -1; rlFlush(); return; }
   const active = Date.now() - WL.act < 120e3 || VW.open && VW.auto && !VW.autoPaused || typeof EP !== 'undefined' && EP.open && EP.auto && !EP.autoPaused;
+  if (active) rlTick();
   if (VW.open && VW.pages.length) {
     if (LNP.pg !== VW.cur) {
+      if (LNP.pg >= 0 && VW.cur === LNP.pg + (VW.two ? vwSpreadN(vwSpread(LNP.pg)) : 1)) RL.p += VW.cur - LNP.pg;   // estadísticas: páginas leídas (pasar a la siguiente, no saltar)
       if (LNP.pg >= 0 && VW.cur === LNP.pg + (VW.two ? vwSpreadN(vwSpread(LNP.pg)) : 1) && LNP.acc >= 8 && LNP.acc <= 900) {   // pasó a la siguiente: lo que tardó en esa
         const per = LNP.acc / (VW.two ? vwSpreadN(vwSpread(LNP.pg)) : 1), old = lnNum('gp-vw-pace', 75, 5, 1800); try { localStorage.setItem('gp-vw-pace', Math.round(old * .8 + per * .2)); } catch (e) {} }
       LNP.pg = VW.cur; LNP.acc = 0;
     } else if (active) LNP.acc += 5;
   } else if (typeof EP !== 'undefined' && EP.open && EP.secs.length) {
     const l = epLoc(), pos = EP.cum[l.i] + l.f * EP.len[l.i];
-    if (LNP.pos >= 0 && active) { const d = pos - LNP.pos; if (d > 0 && d < 6000) { LNP.chars += d; LNP.secs += 5; } else if (d <= 0) LNP.secs += 5; }
+    if (LNP.pos >= 0 && active) { const d = pos - LNP.pos; if (d > 0 && d < 6000) { LNP.chars += d; LNP.secs += 5; RL.p += d / RL_CH; } else if (d <= 0) LNP.secs += 5; }
     LNP.pos = pos;
     if (LNP.secs >= 60) { if (LNP.chars > 150) { const v = LNP.chars / LNP.secs * 60, old = lnNum('gp-ep-pace', 1300, 100, 20000); try { localStorage.setItem('gp-ep-pace', Math.round(old * .8 + Math.min(8000, v) * .2)); } catch (e) {} } LNP.chars = LNP.secs = 0; }
   }
   lnLeftShow();
 }
 setInterval(lnPaceTick, 5000);
+/* ---- Estadísticas de lectura (v40, F10): tiempo leyendo, páginas y papers de cada día, en el proyecto (db.readLog: día → dispositivo → {s, p, d})
+   para que se sumen los de todos tus dispositivos con Google Drive. Solo cuenta mientras lees de verdad (la misma regla que el ritmo de lectura).
+   Se guarda cada 5 minutos, al cerrar el visor y al salir, sin crear pasos de deshacer. En el EPUB, una página son ~2000 letras. */
+const RL = {s: 0, p: 0, ids: new Set(), at: Date.now()}, RL_CH = 2000;
+const rlDay = (t = new Date()) => `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
+function rlTick() {
+  RL.s += 5; const src = VW.open ? VW.src : typeof EP !== 'undefined' && EP.open ? EP.src : null;
+  if (src?.kind === 'paper' && src.id != null) RL.ids.add(String(src.id));
+  if (Date.now() - RL.at > 300e3) rlFlush();
+}
+function rlFlush() {
+  const pg = Math.floor(RL.p); RL.at = Date.now();
+  if (TAB.passive || RL.s < 5 && !pg) return;
+  const L = db.readLog ||= {}, e = (L[rlDay()] ||= {})[syDev()] ||= {s: 0, p: 0};
+  e.s = Math.min(86400, e.s + RL.s); e.p = Math.min(5000, e.p + pg); if (RL.ids.size) e.d = [...new Set([...(e.d || []), ...RL.ids])].slice(0, 50);
+  RL.s = 0; RL.p -= pg; RL.ids.clear();
+  const ks = Object.keys(L).sort(); if (ks.length > 400) ks.slice(0, ks.length - 400).forEach(k => delete L[k]);
+  foldSnap(); dirty = true; touch(); if (typeof rlDraw0 === 'function') rlDraw0();
+}
+addEventListener('pagehide', () => { try { rlFlush(); } catch (e) {} });
 
 /* ===== Subrayado con línea y tachado, recorte a mano y girar páginas (v39.52) =====
    · Estilo de un subrayado (campo «s» de la anotación: 'u' línea debajo, 'x' tachado; sin él, resaltado como siempre). Se cambia en la

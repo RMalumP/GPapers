@@ -56,7 +56,7 @@ function syVal(x, y, z, hasB, mine) {   // un valor: si solo cambió un lado gan
 function syObj(x, y, z, mine, sub = {}) {   // objeto campo a campo; sub[k] fusiona ese campo a su manera
   x ||= {}; y ||= {}; const o = {}, hasB = !!z; z ||= {};
   for (const k of new Set([...Object.keys(x), ...Object.keys(y)])) {
-    const v = sub[k] ? sub[k](x[k], y[k], z[k], hasB) : syVal(x[k], y[k], z[k], hasB, mine);
+    const f = typeof sub === 'function' ? sub : sub[k], v = f ? f(x[k], y[k], z[k], hasB) : syVal(x[k], y[k], z[k], hasB, mine);   // sub como función: la misma para todos los campos
     if (v !== undefined) o[k] = v;
   }
   return o;
@@ -78,6 +78,8 @@ const syLst = (pick, key) => (x, y, z, h) => syList(x, y, h ? z || [] : null, pi
 const syAnn = syLst((a, b, c) => syObj(a, b, c, (a.up || '') >= (b.up || '')));   // subrayados y comentarios: uno a uno; si los dos cambian el mismo, gana el cambiado más tarde
 const syPdf = mine => (x, y, z, h) => x && y && typeof x === 'object' && typeof y === 'object' && x.name === y.name ? syObj(x, y, h && z && z.name === x.name ? z : null, mine, {ann: syAnn}) : syVal(x, y, z, h, mine);   // el mismo PDF: campo a campo
 function syPaper(a, b, c) { const mine = syWhen(a) >= syWhen(b); return syObj(a, b, c, mine, {notes: syLst((p, q, r) => syObj(p, q, r, mine)), pdf: syPdf(mine), pdf2: syPdf(mine)}); }
+const syMap = f => (x, y, z, h) => { if (!syIsObj(x || {}) || !syIsObj(y || {})) return syVal(x, y, z, h, true); const r = syObj(x, y, h ? (syIsObj(z) ? z : {}) : null, true, f); return Object.keys(r).length ? r : undefined; };
+const syReadLog = syMap(syMap((x, y, z, h) => syVal(x, y, z, h, true)));   // estadísticas de lectura (v40): día → dispositivo → {s, p, d}; cada dispositivo solo escribe lo suyo, así que no chocan
 const syInbox = (a, b, c) => syObj(a, b, c, (a.up || '') >= (b.up || ''), {ann: syAnn});
 function sySettings(x, y, z) {
   const o = syObj(x, y, z, true, {customTypes: syLst(syGen), customStyles: syLst(syGen), templates: syLst(syGen),
@@ -86,7 +88,7 @@ function sySettings(x, y, z) {
   return o;
 }
 function syMerge(L, R, B) {   // L = este dispositivo, R = Google Drive, B = última versión sincronizada (null la primera vez: se unen)
-  const o = syObj(L, R, B, true, {sections: syLst(syTS), tags: syLst(syTS), orders: syLst(syGen), posSaves: syLst(syGen), papers: syLst(syPaper), trash: syLst(syGen, t => t.paper.id), inbox: syLst(syInbox),
+  const o = syObj(L, R, B, true, {sections: syLst(syTS), tags: syLst(syTS), orders: syLst(syGen), posSaves: syLst(syGen), papers: syLst(syPaper), trash: syLst(syGen, t => t.paper.id), inbox: syLst(syInbox), readLog: syReadLog,
     settings: (x, y, z, h) => sySettings(x || {}, y || {}, h ? z || {} : null),
     manual: (x, y, z, h) => { if (!syIsObj(x || {}) || !syIsObj(y || {})) return syVal(x, y, z, h, true); const r = syObj(x, y, h ? (syIsObj(z) ? z : {}) : null, true); return Object.keys(r).length ? r : undefined; }});   // orden manual: sección a sección (antes, entero: ordenar dos secciones en dos dispositivos perdía una)
   o.papers ||= []; o.trash ||= []; o.inbox ||= []; o.tags ||= []; o.sections ||= [];

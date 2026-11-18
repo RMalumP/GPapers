@@ -101,6 +101,14 @@ function validate(d) {
   const manOk = m => m && typeof m === 'object' && !Array.isArray(m) ? Object.fromEntries(Object.entries(m).filter(([k, v]) => k && Array.isArray(v)).map(([k, v]) => [k === '_' || k === '*' ? k : idFix(k), [...new Set(v.filter(i => typeof i === 'string' && i).map(idFix))]])) : {};   // orden manual: {sección: [ids]}
   d.manual = manOk(d.manual); if (!Object.keys(d.manual).length) delete d.manual;
   d.posSaves = (Array.isArray(d.posSaves) ? d.posSaves : []).filter(x => x && typeof x.id === 'string' && x.id && typeof x.name === 'string').map(x => ({id: idFix(x.id), name: x.name, manual: manOk(x.manual)})); if (!d.posSaves.length) delete d.posSaves;
+  { const L = d.readLog, o = {}, num = (v, hi) => Math.min(hi, Math.max(0, Math.round(+v) || 0));   // v40: estadísticas de lectura, día → dispositivo → {s: segundos, p: páginas, d: papers}; los últimos 400 días
+    if (L && typeof L === 'object' && !Array.isArray(L)) for (const day of Object.keys(L).filter(k => /^\d{4}-\d\d-\d\d$/.test(k)).sort().slice(-400)) {
+      const v = L[day], e = {}; if (!v || typeof v !== 'object' || Array.isArray(v)) continue;
+      for (const [dv, x] of Object.entries(v)) { if (!/^[a-z0-9]{1,12}$/.test(dv) || !x || typeof x !== 'object') continue;
+        const s = num(x.s, 86400), pg = num(x.p, 5000), ids = Array.isArray(x.d) ? [...new Set(x.d.filter(i => typeof i === 'string' && i && i.length <= 64 || Number.isFinite(i)).map(String))].slice(0, 50) : [];
+        if (s || pg) e[dv] = {s, p: pg, ...(ids.length ? {d: ids} : {})}; }
+      if (Object.keys(e).length) o[day] = e; }
+    if (Object.keys(o).length) d.readLog = o; else delete d.readLog; }
   [...d.tags, ...d.sections].forEach(x => { if (x.rk == null) return; x.rk = x.rk && typeof x.rk === 'object' && !Array.isArray(x.rk) ? Object.fromEntries(Object.entries(x.rk).filter(([, v]) => typeof v === 'string' && v).map(([k, v]) => [idFix(k), v])) : {}; if (!Object.keys(x.rk).length) delete x.rk; });
   const sIn = d.settings && typeof d.settings === 'object' ? d.settings : {};
   d.settings = {...defSettings(), ...sIn, shortcuts: {...SC_DEF}};
@@ -212,7 +220,7 @@ let SNAP_SES = null;   // copia ya hecha que coincide con el proyecto (la invali
 function undo() { recFlush(); if (UNDO.length) { REDO.push(snapDb()); restore(UNDO.pop()); } }
 function redo() { recFlush(); if (REDO.length) { UNDO.push(snapDb()); restore(REDO.pop()); } }
 function restore(json) {
-  db = unsnap(json); lastSnap = json; lastRecAt = 0; syncTypes(db.settings.customTypes); syncStyles(db.settings.customStyles, db.settings.export);
+  const rl = db.readLog; db = unsnap(json); if (rl) db.readLog = rl; else delete db.readLog; lastSnap = json; lastRecAt = 0; syncTypes(db.settings.customTypes); syncStyles(db.settings.customStyles, db.settings.export);   // deshacer no borra lo leído (estadísticas)
   for (const id of [...SEL]) if (!db.papers.some(p => p.id === id)) SEL.delete(id);
   dirty = true; applySettings(); render(); if ($('#cfg').open) drawCfg(); touch();
 }

@@ -254,7 +254,7 @@ with sync_playwright() as pw:
     pg.on('pageerror', lambda e: errs.append(str(e)))
     ctx.route('https://api.crossref.org/works/**', lambda r: r.fulfill(json={'message': {'DOI': '10.1016/j.cell.2020.01.001', 'type': 'journal-article', 'title': ['Compartido'], 'author': [], 'issued': {'date-parts': [[2020]]}}}))
     man = json.loads((folder / 'manifest.json').read_text(encoding='utf-8'))
-    eq('el manifiesto ofrece compartir con la app', man.get('share_target', {}).get('params'), {'title': 'title', 'text': 'text', 'url': 'url'})
+    eq('el manifiesto ofrece compartir con la app', [man.get('share_target', {}).get(k) for k in ('method', 'enctype', 'params')], ['POST', 'multipart/form-data', {'title': 'title', 'text': 'text', 'url': 'url', 'files': [{'name': 'docs', 'accept': ['application/pdf', '.pdf', 'application/epub+zip', '.epub']}]}])
     pg.goto('file://' + str(folder / 'index.html') + '?title=Un%20art%C3%ADculo&url=https%3A%2F%2Fdoi.org%2F10.1016%2Fj.cell.2020.01.001'); pg.wait_for_timeout(2500)
     eq('lo compartido abre Importar con el DOI encontrado', pg.evaluate("[$('#imp').open, IMP.mode, IMP.refs[0]?.title, location.search]"), [True, 'prev', 'Compartido', ''])
     eq('saca el DOI de un texto con enlaces', pg.evaluate("('Mira https://onlinelibrary.wiley.com/doi/full/10.1002/anie.202000001/full.').match(DOI_RE)[0].replace(/[.,;:)\\]}>'\"]+$/, '').replace(/\\/(full|abstract|pdf|epdf)$/i, '')"), '10.1002/anie.202000001')

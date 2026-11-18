@@ -320,7 +320,7 @@ function impDraw() {
       + `<div class="row" style="margin-top:12px"><button class="pri" data-onclick="fillGo()">Aplicar</button>${close}</div>`;
   } else {
     const R = IMP.refs, nd = R.filter(r => r.dup || r.near).length;
-    h += `<p>${R.length} encontrados${nd ? ` · ${nd} posibles duplicados (desmarcados)` : ''}</p><div class="ilist">${R.map((r, i) => `<label class="irow"><input type="checkbox" ${r.on ? 'checked' : ''} ${r.bad ? 'disabled' : ''} data-onchange="impOn(${i},this.checked)"><span><b>${esc(r.title || '(sin título)')}</b>${r.dup ? ' <span class="tag-dup">Duplicado</span>' : r.near ? ` <span class="tag-dup" title="Parecido a «${esc(r.near)}»">Parecido</span>` : ''}${r.bad ? ' <span class="tag-dup">No legible</span>' : ''}<br><small>${esc(r.authors.join('; '))}${r.year ? ' · ' + esc(r.year) : ''}${r.venue ? ' · ' + esc(r.venue) : ''}</small></span></label>`).join('')}</div>
+    h += (IMP.intro ? `<p class="empty" style="margin-top:0">${esc(IMP.intro)}</p>` : '') + `<p>${R.length} encontrados${nd ? ` · ${nd} posibles duplicados (desmarcados)` : ''}</p><div class="ilist">${R.map((r, i) => `<label class="irow"><input type="checkbox" ${r.on ? 'checked' : ''} ${r.bad ? 'disabled' : ''} data-onchange="impOn(${i},this.checked)"><span><b>${esc(r.title || '(sin título)')}</b>${r.dup ? ' <span class="tag-dup">Duplicado</span>' : r.near ? ` <span class="tag-dup" title="Parecido a «${esc(r.near)}»">Parecido</span>` : ''}${r.bad ? ' <span class="tag-dup">No legible</span>' : ''}<br><small>${esc(r.authors.join('; '))}${r.year ? ' · ' + esc(r.year) : ''}${r.venue ? ' · ' + esc(r.venue) : ''}${r.why ? ' · <b>' + esc(r.why) + '</b>' : r.cites != null ? ' · citado ' + r.cites + (r.cites === 1 ? ' vez' : ' veces') : ''}</small></span></label>`).join('')}</div>
       <div class="grid" style="margin-top:10px"><label>Sección<select id="iSec"><option value="">(ninguna)</option>${db.sections.map(s => `<option value="${s.id}" ${sec1() === s.id ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}</select></label>
       <label>Etiqueta<select id="iTag"><option value="">(ninguna)</option>${db.tags.map(t => `<option value="${t.id}">${esc(t.name)}</option>`).join('')}</select></label>
       <label>Estado de lectura<select id="iRd">${Object.entries(READ).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select></label></div>
@@ -344,13 +344,74 @@ async function doiFill() {   // botón «Buscar» junto al DOI en la ventana de 
 /* ---- Completar con OpenAlex (gratuito, sin clave): resumen, número de citas y PDF en abierto ---- */
 const oaAbstract = ix => { if (!ix || typeof ix !== 'object') return ''; const w = []; for (const [t, ps] of Object.entries(ix)) for (const i of ps) w[i] = t; return cleanText(w.filter(Boolean).join(' ')); };
 async function fetchOpenAlex(doi, title) {
-  const d = normDoi(doi), sel = 'select=id,doi,title,publication_year,cited_by_count,abstract_inverted_index,open_access,best_oa_location,is_retracted';
+  const d = normDoi(doi), sel = 'select=id,doi,title,publication_year,cited_by_count,abstract_inverted_index,open_access,best_oa_location,is_retracted,related_works';
   let w;
   if (d) { try { w = await apiJson(`https://api.openalex.org/works/doi:${encodeURIComponent(d)}?${sel}`, 'OpenAlex'); } catch (e) { if (!/\(404\)/.test(e.message)) throw e; } }
   if (!w && String(title || '').trim().length > 5) w = (await apiJson(`https://api.openalex.org/works?per-page=1&${sel}&search=${encodeURIComponent(title)}`, 'OpenAlex')).results?.[0];
   if (!w) throw Error(d ? 'OpenAlex no encuentra ese DOI.' : 'OpenAlex no encuentra ese título.');
   const pdf = w.best_oa_location?.pdf_url || w.open_access?.oa_url || '';
-  return {title: cleanText(w.title), year: w.publication_year || '', cites: Number.isInteger(w.cited_by_count) ? w.cited_by_count : null, abstract: oaAbstract(w.abstract_inverted_index), pdf: /^https?:/i.test(pdf) ? pdf : '', byDoi: !!d && normDoi(w.doi) === d, retracted: w.is_retracted === true};
+  return {title: cleanText(w.title), year: w.publication_year || '', cites: Number.isInteger(w.cited_by_count) ? w.cited_by_count : null, abstract: oaAbstract(w.abstract_inverted_index), pdf: /^https?:/i.test(pdf) ? pdf : '', byDoi: !!d && normDoi(w.doi) === d, retracted: w.is_retracted === true, related: Array.isArray(w.related_works) ? w.related_works : []};
+}
+/* ---- OpenAlex, más allá de un paper (v40): relaciones «cita a» entre tus papers, lo que te falta y papers parecidos (F3 y F9). Solo al pulsarlo. ---- */
+const oaWid = s => (String(s || '').match(/W\d+$/) || [''])[0];
+const OA_TY = {book: 'libro', 'book-chapter': 'capitulo', dissertation: 'tesis', 'proceedings-article': 'congreso', dataset: 'dataset', report: 'informe', standard: 'norma', preprint: 'articulo', article: 'articulo', review: 'articulo'};
+function fromOpenAlex(w) {   // obra de OpenAlex → referencia de la app (para importarla)
+  const ty = OA_TY[w.type] || 'articulo', b = w.biblio || {}, doi = normDoi(w.doi);
+  return {title: cleanText(w.title || w.display_name), authors: (w.authorships || []).map(a => fixAuthor(cleanText(a.author?.display_name || ''))).filter(Boolean), year: w.publication_year ? String(w.publication_year) : '',
+    venue: cleanText(w.primary_location?.source?.display_name || ''), doi, url: doi ? 'https://doi.org/' + doi : '', type: ty,
+    ...refFields(ty, {volume: cleanText(b.volume), issue: cleanText(b.issue), pages: b.first_page ? normPages(b.first_page + (b.last_page && b.last_page !== b.first_page ? '-' + b.last_page : '')) : ''}),
+    cites: Number.isInteger(w.cited_by_count) ? w.cited_by_count : null};
+}
+const OA_REF = 'id,doi,title,display_name,type,publication_year,authorships,primary_location,biblio,cited_by_count';
+async function oaByIds(ids) {   // obras por su id de OpenAlex (W…), hasta 50 por petición, en el orden pedido
+  const L = [...new Set(ids.map(oaWid).filter(Boolean))], M = new Map(), parts = []; for (let i = 0; i < L.length; i += 50) parts.push(L.slice(i, i + 50));
+  await syPool(parts, async P => { const j = await apiJson(`https://api.openalex.org/works?per-page=50&select=${OA_REF}&filter=openalex:${P.join('|')}`, 'OpenAlex'); for (const w of j.results || []) M.set(oaWid(w.id), w); }, 2);
+  return L.map(i => M.get(i)).filter(Boolean);
+}
+function oaSuggest(works, intro) {   // obras sugeridas → la vista previa de Importar, todas desmarcadas: se eligen a mano
+  const refs = impPrepare(works.map(fromOpenAlex).filter(r => r.title)); refs.forEach(r => { r.on = false; });
+  if (!refs.length) return say('OpenAlex no devolvió ninguna obra.');
+  IMP = {mode: 'prev', refs, intro}; impDraw(); if (!$('#imp').open) $('#imp').showModal();
+}
+let REL = null;   // propuestas de relaciones y lo que te falta
+async function relFind() {
+  const P = db.papers.filter(p => normDoi(p.doi)); if (P.length < 2) return say('Hacen falta al menos dos papers con DOI: OpenAlex busca sus referencias por el DOI.');
+  toast(`Buscando en OpenAlex las referencias de ${P.length} papers…`, [], 60000);
+  let M; try { M = await oaByDois(P.map(p => p.doi), 'id,referenced_works'); } catch (e) { return toast(e.message, [], 6000); }
+  const byW = new Map(), wOf = new Map(); for (const p of P) { const w = M.get(normDoi(p.doi)); if (w) { byW.set(oaWid(w.id), p); wOf.set(p.id, w); } }
+  const props = [], miss = new Map();
+  for (const p of P) { const w = wOf.get(p.id); if (!w) continue;
+    for (const r of new Set(w.referenced_works || [])) { const id = oaWid(r), q = byW.get(id); if (q) { if (q !== p && !(p.refTo || []).includes(q.id)) props.push({a: p.id, b: q.id, on: true}); } else if (id) miss.set(id, (miss.get(id) || 0) + 1); } }
+  REL = {props, miss: [...miss].sort((x, y) => y[1] - x[1]).filter(([, n]) => n >= 2).slice(0, 25), found: wOf.size, n: P.length};
+  toast('Listo.', [], 800); relDraw(); if (!$('#imp').open) $('#imp').showModal();
+}
+function relDraw() {
+  const R = REL, t = id => esc(shortTxt((x => x ? x.alias || x.title : '')(db.papers.find(p => p.id === id)))), on = R.props.filter(x => x.on).length;
+  $('#imp').innerHTML = `<h2>Relaciones con OpenAlex</h2><p class="empty" style="margin-top:0">${R.found} de tus ${R.n} papers con DOI están en OpenAlex. Se comparan sus listas de referencias entre sí.</p>
+    <h3>«Cita a» entre tus papers</h3>${R.props.length ? `<div class="ilist">${R.props.map((x, i) => `<label class="irow"><input type="checkbox" ${x.on ? 'checked' : ''} data-onchange="relOn(${i},this.checked)"><span>«${t(x.a)}» <b>cita a</b> «${t(x.b)}»</span></label>`).join('')}</div>
+      <div class="row" style="margin-top:8px"><button class="pri" data-onclick="relGo()" ${on ? '' : 'disabled'}>Añadir ${on === 1 ? '1 relación' : on + ' relaciones'}</button></div>` : '<p>No hay relaciones nuevas: las que OpenAlex conoce ya están puestas (o tus papers no se citan entre sí).</p>'}
+    <h3>Lo que te falta</h3>${R.miss.length ? `<p>Obras que citan al menos dos de tus papers y aún no tienes (${R.miss.length}).</p><div class="row"><button data-onclick="relMiss()">Ver cuáles son y elegir…</button></div>` : '<p>Ninguna obra la citan dos o más de tus papers sin estar en la biblioteca.</p>'}
+    <div class="row" style="margin-top:12px"><button style="margin-left:auto" data-onclick="$('#imp').close()">Cerrar</button></div>`;
+}
+function relOn(i, v) { REL.props[i].on = v; relDraw(); }
+function relGo() {
+  const L = REL.props.filter(x => x.on); let n = 0;
+  for (const x of L) { const p = db.papers.find(q => q.id === x.a); if (p && db.papers.some(q => q.id === x.b) && !(p.refTo ||= []).includes(x.b)) { p.refTo.push(x.b); logChange(p, 'Relación «cita a» desde OpenAlex'); n++; } }
+  if (!n) return; markDirty(); $('#imp').close(); render(); if ($('#gr').open) grDraw();
+  toast(`${n === 1 ? 'Se añadió 1 relación' : `Se añadieron ${n} relaciones`} «cita a».`, [{t: 'Deshacer', fn: undo}], 6000);
+}
+async function relMiss() {
+  const cnt = new Map(REL.miss); $('#imp').querySelector('h3:last-of-type + p')?.append(' Cargando…');
+  let W; try { W = await oaByIds(REL.miss.map(([id]) => id)); } catch (e) { return say(e.message); }
+  W.forEach(w => { w.__n = cnt.get(oaWid(w.id)) || 0; });
+  oaSuggest(W, 'Obras que citan varios de tus papers y aún no están en la biblioteca. Marca las que quieras importar.');
+  IMP.refs.forEach((r, i) => { r.why = `citada por ${W[i]?.__n || 0} de tus papers`; }); impDraw();
+}
+async function oaRelated() {   // ficha → «Parecidos»: los related_works de OpenAlex, para importar los que quieras (F9)
+  let o; try { o = await fetchOpenAlex(D.doi, D.title); } catch (e) { return say(e.message); }
+  if (!o.related.length) return say('OpenAlex no tiene papers parecidos para este trabajo.');
+  let W; try { W = await oaByIds(o.related.slice(0, 15)); } catch (e) { return say(e.message); }
+  oaSuggest(W, `Papers parecidos a «${shortTxt(D.alias || D.title)}» según OpenAlex${o.byDoi ? '' : ' (encontrado por el título: compruébalo)'}. Marca los que quieras importar.`);
 }
 /* Varios DOI a la vez en OpenAlex (v40): hasta 50 por petición con el filtro doi:a|b|c; devuelve un Map doi → obra (solo con los campos pedidos) */
 async function oaByDois(dois, fields, onStep) {
