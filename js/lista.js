@@ -472,7 +472,7 @@ function render() {
     <button title="${s.d > 0 ? 'Ascendente (A→Z, antiguo→reciente)' : 'Descendente (Z→A, reciente→antiguo)'}" data-onclick="sortFlip(${i})">${s.d > 0 ? '▲' : '▼'}</button>
     ${F.sorts.length > 1 ? `<button data-onclick="sortDel(${i})">✕</button>` : ''}</div>`).join('')
     + `<button data-onclick="sortAdd('${nextKey}')">+ Añadir criterio</button>`;
-  listDraw(); progDraw(); inboxDraw(); fitBars();   // con los chips y la cuenta ya puestos: ¿caben en la fila?
+  listDraw(); progDraw(); contDraw(); inboxDraw(); fitBars();   // con los chips y la cuenta ya puestos: ¿caben en la fila?
 }
 function listDraw() {   // solo la lista y su cuenta
   const L = visible(), part = !F.group && L.length > LIST.step;   // sin agrupar, las listas largas se pintan por partes

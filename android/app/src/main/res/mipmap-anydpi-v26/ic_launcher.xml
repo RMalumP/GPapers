@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Icono adaptable (Android 8+): fondo azul a sangre y el documento dentro de la zona segura, así el sistema lo recorta en círculo, gota o cuadrado sin encogerlo. -->
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@color/iconBackground" />
+    <foreground android:drawable="@mipmap/ic_launcher_foreground" />
+</adaptive-icon>

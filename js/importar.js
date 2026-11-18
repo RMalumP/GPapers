@@ -398,7 +398,13 @@ function openMenu(e) { ctxShow(e, `<div class="ctxh">Importar referencias</div><
 const DOI_RE = /\b10\.\d{4,9}\/[^\s"<>]+/;
 function shareIn() {
   let P; try { P = new URL(location.href).searchParams; } catch (e) { return; }
-  const t = P.get('title') || '', x = P.get('text') || '', l = P.get('url') || ''; if (!t && !x && !l) return false;
+  const ac = P.get('accion'), sh = P.get('share');
+  if (ac || sh) { try { history.replaceState(null, '', location.pathname); } catch (e) {} }
+  if (ac) return appAction(ac);   // accesos directos del icono de la app (manifest.json → shortcuts)
+  if (sh === 'error') toast('No se pudo recibir lo compartido.', [], 5000);
+  const files = sh && sh !== 'error' ? shareFiles() : null;
+  const t = P.get('title') || '', x = P.get('text') || '', l = P.get('url') || ''; if (!t && !x && !l) return !!files;
+  if (files && !/10\.\d{4,9}\/|arxiv|pubmed/i.test([t, x, l].join(' '))) return true;   // con archivos, el texto solo cuenta si trae un identificador
   try { history.replaceState(null, '', location.pathname); } catch (e) {}
   let all = [l, x, t].join(' '); try { all = decodeURIComponent(all); } catch (e) {}
   const doi = (all.match(DOI_RE) || [''])[0].replace(/[.,;:)\]}>'"]+$/, '').replace(/\/(full|abstract|pdf|epdf)$/i, '');
@@ -407,6 +413,31 @@ function shareIn() {
   openImport('doi'); $('#iDoi').value = q; if (q) impDoi();
   return true;
 }
+/* PDF y EPUB compartidos desde otra app (v40): el service worker los deja en la caché «gp-share»; aquí pasan a la bandeja «PDF por citar» */
+async function shareFiles() {
+  try {
+    const c = await caches.open('gp-share'), ks = await c.keys(), L = [];
+    for (const k of ks) { const r = await c.match(k); if (r) { const b = await r.blob(), n = decodeURIComponent(r.headers.get('X-Name') || 'documento.pdf'); if (isDoc({name: n, type: b.type})) L.push({file: new File([b], n, {type: b.type})}); } await c.delete(k); }
+    if (L.length) { await inboxAdd(L); toast(`${L.length === 1 ? '1 documento recibido' : L.length + ' documentos recibidos'}: están en la bandeja «PDF por citar».`, [], 5000); }
+    else toast('Lo compartido no es un PDF ni un EPUB.', [], 5000);
+    return L.length;
+  } catch (e) { toast('No se pudo leer lo compartido: ' + e.message, [], 5000); return 0; }
+}
+/* Accesos directos del icono (v40, manifest.json → shortcuts): nuevo paper, buscar por DOI y seguir leyendo */
+function appAction(a) {
+  if (a === 'nuevo') { openPaper(); return true; }
+  if (a === 'doi') { openImport('doi'); return true; }
+  if (a === 'leer') { contRead(); return true; }
+  return false;
+}
+/* Abrir con GPapers (v40, ordenador: manifest.json → file_handlers): PDF y EPUB a la bandeja, .bib y .ris a Importar, .json como proyecto */
+if ('launchQueue' in window) launchQueue.setConsumer(async lp => {
+  if (!lp.files?.length) return;
+  const docs = [], other = [];
+  for (const h of lp.files) { try { const f = await h.getFile(); (isDoc(f) ? docs : other).push({file: f, h}); } catch (e) {} }
+  if (docs.length) await inboxAdd(docs);
+  for (const {file, h} of other) { const text = await file.text().catch(() => ''); if (/\.json$/i.test(file.name) && !isCsl(text)) await pjOpenFile(text, file.name, h); else if (text) impText(text); }
+});
 /* ---- Soltar archivos en la ventana: .bib, .ris, .txt o CSL-JSON → Importar; un JSON de la aplicación → se abre como proyecto ---- */
 const fileDrag = e => [...(e.dataTransfer?.types || [])].includes('Files');
 /* PDF y EPUB (v39.42): soltados sobre una tarjeta o una fila de la tabla, se enlazan a ese paper; sobre la ficha abierta, a su borrador (en la fila del

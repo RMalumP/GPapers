@@ -113,7 +113,7 @@ function drawCfg() {
     <label>Abrir los PDF (en el ordenador)<select data-onchange="setCfg('pdfTab', this.value)"><option value="tab" ${c.pdfTab !== 'app' ? 'selected' : ''}>En una pestaña nueva (para seguir usando la aplicación a la vez)</option><option value="app" ${c.pdfTab === 'app' ? 'selected' : ''}>Dentro de la aplicación</option></select></label>
     <small class="cfgnote">Ctrl + clic en 📄 hace lo contrario. En el móvil y la tableta se abren siempre dentro. Lo que anotes en la pestaña nueva se guarda en esta.</small>
     <label class="row" style="flex-wrap:nowrap"><input type="checkbox" ${c.annAuto ? 'checked' : ''} data-onchange="setCfg('annAuto', this.checked)"> Mantener al día en cada paper una nota «Anotaciones del PDF» con los subrayados y comentarios</label>
-    <p class="row cfgdr"><button data-onclick="retrCheck()" title="Envía a OpenAlex los DOI de los papers de este proyecto y marca los que la revista retiró">⚠ Comprobar si algún paper está retractado (OpenAlex)</button></p>
+    <p class="row cfgrt"><button data-onclick="retrCheck()" title="Envía a OpenAlex los DOI de los papers de este proyecto y marca los que la revista retiró">⚠ Comprobar si algún paper está retractado (OpenAlex)</button></p>
     <label class="row" style="flex-wrap:nowrap"><input type="checkbox" ${c.jsonPretty ? 'checked' : ''} data-onchange="setCfg('jsonPretty', this.checked)"> Guardar el archivo JSON con sangría (más fácil de leer a mano, pero más grande y algo más lento)</label>
     <small>Estos ajustes son comunes a todos los proyectos y se guardan también en el JSON de cada uno.</small>`};
   $('#cfg').innerHTML = `<div class="dh"><h2>Configuración</h2><div class="dbtn"><button data-onclick="$('#cfg').close()">Cerrar ✕</button></div></div>

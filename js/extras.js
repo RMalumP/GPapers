@@ -154,6 +154,25 @@ function recDraw() {
   const L = REC.map(id => db.papers.find(p => p.id === id)).filter(Boolean).slice(0, 5), g = $('#sg-rec'); if (!g) return; g.hidden = !L.length;
   $('#recL').innerHTML = L.map(p => `<button class="rec" data-onclick="openPaper('${p.id}')" title="${esc(p.title)}">${esc(shortTxt(p.alias || p.title) || '(sin título)')}</button>`).join('');
 }
+/* ---- Seguir leyendo (v40, I2): una franja sobre la lista con el último PDF o EPUB abierto de este proyecto, su página y el tiempo que falta.
+   Se recuerda en el dispositivo (gp-cont:<proyecto>); ✕ la oculta hasta que abras otro documento. ---- */
+const contK = () => 'gp-cont:' + PJ.cur;
+const contGet = () => { try { const o = JSON.parse(localStorage.getItem(contK()) || 'null'); return o && typeof o.id === 'string' ? o : null; } catch (e) { return null; } };
+function contSet(id, n) { try { localStorage.setItem(contK(), JSON.stringify({id, n, at: Date.now()})); } catch (e) {} }
+function contInfo() {   // {p, n, pf, ep, pg, of, left} del último documento, si sigue existiendo
+  const c = contGet(); if (!c || c.off) return null; const p = db.papers.find(x => x.id === c.id), pf = p && p[pdfF(c.n)]; if (!pf) return null;
+  const ep = isEpub(pf.name), pg = pdfPage(pf.page) || 1;   // en el EPUB, «page» es el capítulo (desde 1)
+  let of = 0; try { of = JSON.parse(localStorage.getItem('gp-vw-sz') || '{}')[pdfKey(c.id, c.n)]?.n || 0; } catch (e) {}
+  const left = !ep && of > pg ? lnFmtMin((of - pg) * lnNum('gp-vw-pace', 75, 5, 1800) / 60) : '';
+  return {p, n: c.n, pf, ep, pg, of, left};
+}
+function contDraw() {
+  const el = $('#cont'); if (!el) return; const i = !document.querySelector('dialog[open]') && contInfo(); el.hidden = !i; if (!i) return;
+  const where = i.ep ? `cap. ${i.pg}` : `p. ${i.pg}${i.of ? ` de ${i.of}` : ''}`;
+  el.innerHTML = `<button class="cmain" data-onclick="contRead()" title="Abrir donde lo dejaste">${i.ep ? '📘' : '📖'} <span>Seguir leyendo</span> <b>${esc(shortTxt(i.p.alias || i.p.title))}</b> <small>${where}${i.left ? ' · ' + i.left : ''}</small></button><button class="cx" data-onclick="contOff()" title="Ocultar hasta que abras otro documento" aria-label="Ocultar">✕</button>`;
+}
+function contRead() { const i = contInfo(); if (!i) return toast('Aún no has abierto ningún PDF o EPUB en este proyecto.', [], 3500); pdfOpen(i.p.id, i.n); }
+function contOff() { const c = contGet(); if (c) { c.off = 1; try { localStorage.setItem(contK(), JSON.stringify(c)); } catch (e) {} } contDraw(); }
 function progDraw() {   // barra de progreso de lectura del proyecto, en la cabecera
   const el = $('#pjProg'), n = db.papers.length; el.hidden = !n || !db.settings.showProgress; if (el.hidden) return;
   const c = {leido: 0, leyendo: 0, por_leer: 0}; db.papers.forEach(p => c[p.reading in c ? p.reading : 'por_leer']++);
@@ -217,7 +236,7 @@ async function pdfOpen(id, n = 1, ev) {
   const p = D && D.id === id && $('#dlg').open ? D : db.papers.find(x => x.id === id), pf = p && p[pdfF(n)], key = pdfKey(id, n); if (!pf) return;   // con el editor abierto, el borrador
   try {
     const file = await pdfFile(key, pf); if (!file) return;
-    vwOpenAny({kind: 'paper', id, n}, file, ev, pf.page); covFromOpen(id, n, file);
+    vwOpenAny({kind: 'paper', id, n}, file, ev, pf.page); covFromOpen(id, n, file); contSet(id, n);
   } catch (e) { if (e.name !== 'AbortError') say(`No se pudo abrir el ${docKind(pf.name)}: ` + e.message); }
 }
 const annN = pf => pf?.ann?.length || 0;

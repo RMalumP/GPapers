@@ -177,6 +177,7 @@ with sync_playwright() as pw:
     for nm in ('a.pdf', 'b.pdf'): A.evaluate(f"(async () => inboxAdd([{{file: new File([await (await {FILE}).arrayBuffer()], '{nm}', {{type: 'application/pdf'}})}}]))()"); A.wait_for_timeout(2000)
     A.evaluate("db.inbox[0].doi = '10.9999/bien'; db.inbox[1].doi = '10.9999/mal'; inboxDraw()")
     A.route('https://api.crossref.org/**/10.9999/mal*', lambda r: r.fulfill(status=404, body='Resource not found.'))
+    A.route('https://doi.org/**', lambda r: r.fulfill(status=404, body='DOI Not Found'))   # v40: si CrossRef no lo tiene, se pregunta a doi.org (DataCite…)
     n0 = A.evaluate("db.papers.length"); A.click('#inbox button:has-text("Crear todas las citas")'); A.wait_for_timeout(1500)
     eq('«Crear todas las citas»: crea las que CrossRef encuentra y deja las demás', A.evaluate(f"[db.papers.length - {n0}, db.inbox.map(x => x.name), db.papers.some(p => p.doi === '10.9999/bien' && p.pdf?.name === 'a.pdf')]"), [1, ['b.pdf'], True])
     eq('y dice cuáles fallaron', 'sin datos en CrossRef (b.pdf)' in A.inner_text('#toast'), True)

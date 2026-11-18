@@ -7,6 +7,10 @@ CALLS = []; UPS = {}; SEQ = itertools.count(1)
 CORS = {'access-control-allow-origin': '*', 'access-control-allow-headers': 'authorization, content-type, x-upload-content-type', 'access-control-allow-methods': 'GET, POST, PATCH, PUT, DELETE', 'access-control-expose-headers': 'Location'}
 now = lambda: time.strftime('%Y-%m-%dT%H:%M:%S.000Z', time.gmtime())
 _b = lambda c: c if isinstance(c, (bytes, bytearray)) else (c or '').encode()
+import gzip
+def _gz(i, raw):   # v40: la copia completa llega comprimida (gzip); se guarda descomprimida (así las pruebas la leen igual) y se sirve comprimida
+    if isinstance(raw, (bytes, bytearray)) and raw[:2] == b'\x1f\x8b': STORE[i]['gz'] = True; return gzip.decompress(raw).decode('utf-8')
+    STORE[i].pop('gz', None); return raw.decode('utf-8') if isinstance(raw, (bytes, bytearray)) else raw
 meta = lambda i: {'id': i, 'name': STORE[i]['name'], 'md5Checksum': hashlib.md5(_b(STORE[i]['content'])).hexdigest(), 'modifiedTime': STORE[i]['mt'], 'size': str(len(_b(STORE[i]['content'])))}
 def drive(route, req):
     u = urllib.parse.urlparse(req.url); m = req.method; p = u.path; q = urllib.parse.parse_qs(u.query)
@@ -15,7 +19,7 @@ def drive(route, req):
     if m == 'PUT' and 'upload_id' in q:   # segunda mitad de la subida reanudable (la dirección ya va autorizada)
         up = UPS.pop(q['upload_id'][0]); i = up['id'] or 'f%d' % next(SEQ)
         if not up['id']: STORE[i] = {'name': up['name'], 'parents': up['parents']}
-        body = req.post_data_buffer; body = body.decode('latin-1' if up.get('type') == 'application/pdf' else 'utf-8')   # los PDF, byte a byte (latin-1)
+        body = req.post_data_buffer; body = body.decode('latin-1') if up.get('type') == 'application/pdf' else _gz(i, body)   # los PDF, byte a byte (latin-1)
         STORE[i].update(content=body, mt=now()); CALLS.append(('PUT-reanudable', STORE[i]['name'])); return ok(meta(i))
     if req.headers.get('authorization') != 'Bearer tok': return route.fulfill(status=401, headers=CORS, body='{}')
     CALLS.append((m, p, q.get('uploadType', [''])[0], q.get('alt', [''])[0]))
@@ -31,12 +35,14 @@ def drive(route, req):
         i = p.split('/')[-1]; return ok({'id': i, 'trashed': False}) if i in STORE else route.fulfill(status=404, headers=CORS, body='{}')
     if m == 'POST' and p == '/drive/v3/files':   # crear una carpeta (Drive normal)
         md = json.loads(req.post_data or '{}'); i = 'f%d' % next(SEQ); STORE[i] = {'name': md['name'], 'content': '', 'parents': md.get('parents', ['root']), 'mt': now(), 'mime': md.get('mimeType')}; CALLS.append(('POST-carpeta', md['name'])); return ok({'id': i})
-    if m == 'GET' and p.startswith('/drive/v3/files/'): return route.fulfill(status=200, headers={**CORS, 'content-type': 'application/json'}, body=STORE[p.split('/')[-1]]['content'])
+    if m == 'GET' and p.startswith('/drive/v3/files/'):
+        f = STORE[p.split('/')[-1]]
+        return route.fulfill(status=200, headers={**CORS, 'content-type': 'application/json'}, body=gzip.compress(_b(f['content'])) if f.get('gz') else f['content'])
     if q.get('uploadType') == ['resumable']:
         i = p.split('/')[-1] if m == 'PATCH' else None; md = json.loads(req.post_data or '{}'); k = str(next(SEQ))
         UPS[k] = {'id': i, 'name': md.get('name'), 'parents': md.get('parents'), 'type': req.headers.get('x-upload-content-type')}
         return ok({}, {'location': 'https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable&upload_id=' + k})
-    if m == 'PATCH' and p.startswith('/upload/drive/v3/files/'): i = p.split('/')[-1]; STORE[i].update(content=req.post_data, mt=now()); return ok(meta(i))
+    if m == 'PATCH' and p.startswith('/upload/drive/v3/files/'): i = p.split('/')[-1]; STORE[i].update(content=_gz(i, req.post_data_buffer), mt=now()); return ok(meta(i))
     if m == 'POST' and p == '/upload/drive/v3/files':
         bnd = req.headers['content-type'].split('boundary=')[1]
         parts = [x.split('\r\n\r\n', 1)[1] for x in req.post_data.split('--' + bnd) if '\r\n\r\n' in x]

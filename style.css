@@ -332,3 +332,8 @@ button.lnk{background:none;border:0;color:var(--pri);text-decoration:underline;p
 /* Retractados (v40) */
 .retr{display:inline-block;font-size:calc(11.5px * var(--fz,1));font-weight:600;color:#fff;background:var(--red);border-radius:4px;padding:0 5px;margin-right:4px;vertical-align:2px;white-space:nowrap}
 .retrw{background:color-mix(in srgb,var(--red) 12%,transparent);border:1px solid var(--red);border-radius:8px;padding:8px 10px}
+/* Seguir leyendo (v40) */
+#cont{display:flex;align-items:stretch;gap:0;margin:0 0 10px;border:1px solid var(--bd);border-radius:10px;background:var(--card);overflow:hidden}
+#cont .cmain{flex:1;min-width:0;display:flex;align-items:baseline;gap:8px;border:0;border-radius:0;background:none;text-align:left;padding:8px 12px;white-space:nowrap;overflow:hidden}
+#cont .cmain span{color:var(--pri);font-weight:600}#cont .cmain b{overflow:hidden;text-overflow:ellipsis;font-weight:500;min-width:0}#cont .cmain small{opacity:.7;flex:none}
+#cont .cx{border:0;border-left:1px solid var(--bd);border-radius:0;background:none;padding:0 12px}#cont .cmain:hover{background:color-mix(in srgb,var(--pri) 7%,transparent)}

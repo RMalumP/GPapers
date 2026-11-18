@@ -12,14 +12,17 @@ android {
         applicationId 'io.github.rmalump.gpapers'
         minSdk 24
         targetSdk 35
-        versionCode 2
-        versionName '1.1'
+        versionCode 3
+        versionName '1.2'
         manifestPlaceholders = [hostName: host, launchUrl: startUrl]
         resValue 'string', 'appName', 'GPapers'
         resValue 'string', 'launcherName', 'GPapers'
         resValue 'string', 'assetStatements', """[{ "relation": ["delegate_permission/common.handle_all_urls"], "target": {"namespace": "web", "site": "https://${host}"} }]"""
         resValue 'color', 'colorPrimary', '#2457c5'
         resValue 'color', 'backgroundColor', '#f7f8fa'
+        resValue 'color', 'iconBackground', '#2457c5'
+        // «Compartir → GPapers»: lo mismo que share_target en manifest.json (las comillas van escapadas para el XML de recursos)
+        resValue 'string', 'shareTarget', '{\\"action\\": \\"https://' + host + '/GPapers/compartir\\", \\"method\\": \\"POST\\", \\"enctype\\": \\"multipart/form-data\\", \\"params\\": {\\"title\\": \\"title\\", \\"text\\": \\"text\\", \\"url\\": \\"url\\", \\"files\\": [{\\"name\\": \\"docs\\", \\"accept\\": [\\"application/pdf\\", \\"application/epub+zip\\", \\".pdf\\", \\".epub\\"]}]}}'
     }
     // Firma: la clave no está en el repositorio. Se lee de variables de entorno (en GitHub, de los «secrets» del repositorio).
     signingConfigs {

@@ -270,11 +270,19 @@ const syLsFor = (tok, N) => syLs(tok, [SY_IDX, N.snap, N.legacy].filter(Boolean)
 const syGcDue = () => { try { return Date.now() - (+localStorage.getItem('gp-sy-gc') || 0) > 864e5; } catch (e) { return true; } };   // la limpieza de proyectos borrados, una vez al día
 const syGcDone = () => { try { localStorage.setItem('gp-sy-gc', String(Date.now())); } catch (e) {} };
 const syVer = f => f.md5Checksum || `${f.modifiedTime}:${f.size}`;
-const syGet = async (tok, id) => (await syDrive(tok, `/drive/v3/files/${id}?alt=media`)).json();
+/* Copia completa comprimida (v40, R6): «gpapers-snap.json» (y la de cada proyecto) se sube en gzip, de 5 a 10 veces más pequeña: menos datos móviles
+   y vueltas más cortas. Se lee igual comprimida o no (los cambios sueltos y el índice siguen en JSON plano, son pequeños). */
+const SY_GZ = typeof CompressionStream === 'function' && typeof DecompressionStream === 'function';
+const syGz = s => new Response(new Blob([s]).stream().pipeThrough(new CompressionStream('gzip'))).blob().then(b => new Blob([b], {type: 'application/gzip'}));
+const syGet = async (tok, id) => {
+  const b = new Uint8Array(await (await syDrive(tok, `/drive/v3/files/${id}?alt=media`)).arrayBuffer());
+  if (b[0] === 0x1f && b[1] === 0x8b) { if (!SY_GZ) throw Error('formato'); return JSON.parse(await new Response(new Blob([b]).stream().pipeThrough(new DecompressionStream('gzip'))).text()); }
+  return JSON.parse(new TextDecoder().decode(b));
+};
 const syDel = (tok, id) => syDrive(tok, '/drive/v3/files/' + id, {method: 'DELETE'}).catch(() => {});
 async function syUpload(tok, id, name, body, type) {   // id: sustituye ese archivo; sin id, lo crea. Devuelve {id, md5Checksum, modifiedTime, size}
   const F = '&fields=id,md5Checksum,modifiedTime,size', meta = JSON.stringify(id ? {} : {name, parents: ['appDataFolder']});
-  if (new Blob([body]).size > SY_CFG.big) {   // grande: subida reanudable, sin el límite de 5 MB de las otras (se pide la dirección de subida y se envía ahí)
+  if (body instanceof Blob || new Blob([body]).size > SY_CFG.big) {   // grande (o binaria, como la copia comprimida): subida reanudable, sin el límite de 5 MB de las otras (se pide la dirección de subida y se envía ahí)
     const r = await syDrive(tok, `/upload/drive/v3/files${id ? '/' + id : ''}?uploadType=resumable${F}`, {method: id ? 'PATCH' : 'POST', headers: {'Content-Type': 'application/json; charset=UTF-8', 'X-Upload-Content-Type': type}, body: meta});
     const loc = r.headers.get('Location'); if (!loc) throw Error('reanudable');
     const u = await fetch(loc, {method: 'PUT', headers: {'Content-Type': type}, body, cache: 'no-store'});
@@ -310,7 +318,8 @@ async function syRemote(tok, files, N) {   // el proyecto en Drive (con huellas 
   return {w, c, sf, lf, all, files, n: ds.length, N};
 }
 async function syCompact(tok, R, mw, refs) {   // reescribe la copia completa y borra lo que ya incluye: los cambios sueltos, la copia antigua y las imágenes que nadie usa
-  const inc = R.all.map(f => f.name), f = await syUpload(tok, R.sf && R.sf.id, R.N.snap, JSON.stringify({app: 'gpapers', v: 2, at: new Date().toISOString(), inc, db: mw}), 'application/json');
+  const inc = R.all.map(f => f.name), js = JSON.stringify({app: 'gpapers', v: 2, at: new Date().toISOString(), inc, db: mw});
+  const f = SY_GZ ? await syUpload(tok, R.sf && R.sf.id, R.N.snap, await syGz(js), 'application/gzip') : await syUpload(tok, R.sf && R.sf.id, R.N.snap, js, 'application/json');
   R.c.snap = {ver: syVer(f), inc, db: mw}; R.c.deltas = {}; await syCacheSet(R.N, R.c);
   const old = Date.now() - 864e5;   // una imagen que otro dispositivo acaba de subir aún no está en esta copia: solo se borran las de más de un día
   await syPool([...R.all, ...(R.lf ? [R.lf] : []), ...R.files.filter(x => x.name.startsWith(R.N.img) && !refs.has(x.name.slice(R.N.img.length)) && Date.parse(x.modifiedTime) < old)], x => syDel(tok, x.id));
