@@ -601,3 +601,34 @@ function p2Close(keep) {
   if (!keep) setTimeout(() => { if (VW.open && VW.fit) vwFitW(true); }, 60);
 }
 window.addEventListener('resize', () => { if (P2.doc) { vwSplitMode(); clearTimeout(P2.rt); P2.rt = setTimeout(() => P2.pgs.forEach(p => { if (p.vis) p2Render(p); }), 200); } });
+/* ===== Buscar órdenes dentro del visor y del lector de EPUB (v40): Ctrl+K =====
+   Las órdenes salen de los propios menús (⋯ y sus submenús, que se recorren sin mostrarlos) y de los botones visibles de la barra:
+   así cualquier opción nueva de un menú aparece sola en la paleta. */
+function rdCmds() {
+  const ep = !VW.open && typeof EP !== 'undefined' && EP.open, menuFn = ep ? 'epMenu' : 'vwMenu', S = ep ? EP : VW, keepR = S.menuR, orig = window[menuFn], out = [], seen = new Set();
+  const fake = {stopPropagation() {}, currentTarget: {getBoundingClientRect: () => ({left: 0, top: 0, right: innerWidth - 8, bottom: 52, width: 0, height: 0})}};
+  const label = el => { const c = el.cloneNode(true); c.querySelectorAll('small').forEach(s => s.remove()); return (el.getAttribute('aria-label') || c.textContent || el.title || '').replace(/\s+/g, ' ').replace(/\s*›\s*$/, '').trim(); };
+  const queue = [[ep ? () => epMore(fake) : () => vwMore(fake), []]]; let html = '';
+  window[menuFn] = (r, h) => { html = h; };
+  try {
+    while (queue.length) {
+      const [fn, path] = queue.shift(); html = ''; try { fn(); } catch (e) { continue; }
+      const box = document.createElement('div'); box.innerHTML = html; let head = '';
+      for (const el of box.querySelectorAll('.ctxh, button[data-onclick]')) {
+        if (el.classList.contains('ctxh')) { head = el.textContent.replace(/\s+/g, ' ').trim(); continue; }
+        const on = el.getAttribute('data-onclick'), t = label(el);
+        if (!t || el.disabled || /Back\(\)$|^cmdOpen/.test(on) || /\bevent\b|\bthis\b/.test(on)) continue;
+        if (/^\w+Menu\(\)$/.test(on)) { const f = window[on.slice(0, -2)]; if (!seen.has(on) && path.length < 2 && typeof f === 'function') { seen.add(on); queue.push([() => f(), [...path, t]]); } continue; }
+        out.push({t: [...path, head, t].filter(Boolean).join(' › '), on});
+      }
+    }
+  } finally { window[menuFn] = orig; S.menuR = keepR; }
+  for (const b of (ep ? $('#ep') : $('#vw')).querySelectorAll('button[data-onclick]')) {   // la barra de arriba (lo que se ve)
+    if (b.closest('.vwmenu, #vwPages, #epDoc') || !b.offsetParent) continue; const on = b.getAttribute('data-onclick'), t = label(b);
+    if (t && !/\bevent\b|\bthis\b|^cmdOpen/.test(on) && !out.some(o => o.on === on)) out.push({t, on});
+  }
+  return out;
+}
+function rdCmdRun(on) {   // ejecuta una orden como si se pulsara su botón (el mismo minilenguaje data-on…)
+  const host = VW.open ? $('#vw') : $('#ep'), b = document.createElement('button'); b.hidden = true; b.setAttribute('data-onclick', on); host.append(b); b.click(); b.remove();
+}

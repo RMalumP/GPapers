@@ -176,6 +176,20 @@ with sync_playwright() as pw:
     eq('se puede borrar el texto (se vuelve a preparar)', A.evaluate("idb('readonly', st => st.get('pdftx:a')).then(r => r ?? null)"), None)
     A.evaluate("$('#cfg').close()")
 
+    # ---- Órdenes dentro del visor (I5)
+    A.evaluate("pdfOpen('a', 1)"); A.wait_for_timeout(1800)
+    A.keyboard.press('Control+k'); A.wait_for_timeout(300)
+    eq('Ctrl+K en el visor abre la paleta con sus órdenes', A.evaluate("[$('#cmdk').open, !!CMD.rd, CMD.L.length > 15, CMD.L.some(c => c.t === 'Descargar el PDF con las anotaciones' || /Descargar el PDF/.test(c.t))]"), [True, True, True, True])
+    eq('incluye las de los submenús, con su ruta', A.evaluate("CMD.rd.some(c => /^📖 Modo de lectura › .*Doble página/.test(c.t)) && CMD.rd.some(c => /^🔖 Marcadores › /.test(c.t))"), True)
+    A.keyboard.type('doble pagina'); A.wait_for_timeout(150)
+    eq('se filtra escribiendo', A.evaluate("CMD.L.map(c => c.t).filter(t => /Doble/.test(t)).length >= 1 && CMD.L.every(c => /doble/i.test(c.t))"), True)
+    A.keyboard.press('Enter'); A.wait_for_timeout(500)
+    eq('Intro la ejecuta en el visor', A.evaluate("[$('#cmdk').open, VW.two, VW.open, $('#vwMenu')?.hidden ?? true]"), [False, True, True, True])
+    A.evaluate("vwRdSet('two', 0); vwClose()"); A.wait_for_timeout(300)
+    A.keyboard.press('Control+k'); A.wait_for_timeout(200)
+    eq('fuera del visor, la paleta de siempre', A.evaluate("[$('#cmdk').open, CMD.rd]"), [True, None])
+    A.keyboard.press('Escape')
+
     # ---- Accesos directos (I4) y recibir documentos compartidos (F4)
     eq('accesos directos: nuevo, DOI y leer', A.evaluate("[appAction('doi'), $('#imp').open, ($('#imp').close(), appAction('nada'))]"), [True, True, False])
     A.evaluate("""(async () => { const c = await caches.open('gp-share'), b = await (await fetch('pruebas/prueba.pdf')).blob();

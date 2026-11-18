@@ -19,6 +19,7 @@ document.addEventListener('keydown', e => {
   if (act === 'bold' || act === 'italic') { const ed = e.target.closest?.('.ned'), ce = e.target.closest?.('.ced'); if (ed || ce) { e.preventDefault(); ed ? edCmd(ed.dataset.key, act) : citeCmd(act); } return; }   // solo dentro de una nota o de una cita
   const inText = /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName) || e.target.isContentEditable;
   // Dentro de campos de texto o con una ventana abierta, solo funciona Guardar; lo demás es el comportamiento nativo (p. ej. Ctrl+Z en una nota)
+  if (act === 'palette' && !inText && typeof rdOpen === 'function' && rdOpen() && !$('#cmdk').open) { e.preventDefault(); return cmdOpen(true); }   // en el visor: sus órdenes (v40)
   if (act !== 'save' && (inText || document.querySelector('dialog[open]') && !act.startsWith('ui'))) return;   // el tamaño del texto también con una ventana o el visor abiertos
   e.preventDefault(); SC_ACT[act]();
 });

@@ -936,15 +936,16 @@ const CMDS = () => [
   ['📖 Seguir leyendo', () => contRead()], ['🧠 Repaso de subrayados', () => revOpen()], ['📊 Estadísticas de lectura', () => rlOpen()], ['🔗 Buscar relaciones con OpenAlex', () => relFind()], ['⚠ Comprobar si algún paper está retractado', () => retrCheck()],
   ['🗂 Exportar a Markdown para Obsidian (.zip)', () => obsSave()]];
 let CMD = {q: '', i: 0, L: []};
-function cmdOpen() { CMD = {q: '', i: 0, L: []}; const d = $('#cmdk');
-  d.innerHTML = `<input id="cmdQ" type="search" placeholder="Escribe una acción o el título de un paper…" aria-label="Buscar acción o paper" autocomplete="off" data-oninput="cmdSet(this.value)" data-onkeydown="cmdKey(event)"><div id="cmdL" role="listbox"></div><small class="cmdh">↑/↓ para elegir · Intro para ejecutar · Esc para cerrar</small>`;
+function cmdOpen(rd) { CMD = {q: '', i: 0, L: [], rd: rd ? rdCmds() : null}; const d = $('#cmdk');   // rd: dentro del visor o del lector de EPUB, sus órdenes (v40)
+  d.innerHTML = `<input id="cmdQ" type="search" placeholder="${rd ? 'Escribe una orden del visor (zoom, marcadores, lápiz, modo de lectura…)' : 'Escribe una acción o el título de un paper…'}" aria-label="Buscar acción o paper" autocomplete="off" data-oninput="cmdSet(this.value)" data-onkeydown="cmdKey(event)"><div id="cmdL" role="listbox"></div><small class="cmdh">↑/↓ para elegir · Intro para ejecutar · Esc para cerrar</small>`;
   cmdDraw(); d.showModal(); $('#cmdQ').focus(); }
 function cmdSet(v) { CMD.q = v; CMD.i = 0; cmdDraw(); }
 function cmdDraw() {
   const q = norm(CMD.q).trim(), w = q.split(/\s+/).filter(Boolean), ok = s => w.every(x => norm(s).includes(x));
-  const A = CMDS().filter(([t]) => ok(t)).map(([t, fn]) => ({t, fn}));
-  const P = w.length ? db.papers.filter(p => ok([p.alias, p.title, ...p.authors, p.year].join(' '))).slice(0, 8).map(p => ({t: '📄 ' + (p.alias || p.title) + (p.year ? ` (${p.year})` : ''), fn: () => openPaper(p.id)})) : [];
-  CMD.L = [...A, ...P]; CMD.i = Math.min(CMD.i, Math.max(0, CMD.L.length - 1));
+  if (CMD.rd) { CMD.L = CMD.rd.filter(c => ok(c.t)).map(c => ({t: c.t, fn: () => rdCmdRun(c.on)})); CMD.i = Math.min(CMD.i, Math.max(0, CMD.L.length - 1)); }
+  const A = CMD.rd ? [] : CMDS().filter(([t]) => ok(t)).map(([t, fn]) => ({t, fn}));
+  const P = !CMD.rd && w.length ? db.papers.filter(p => ok([p.alias, p.title, ...p.authors, p.year].join(' '))).slice(0, 8).map(p => ({t: '📄 ' + (p.alias || p.title) + (p.year ? ` (${p.year})` : ''), fn: () => openPaper(p.id)})) : [];
+  if (!CMD.rd) CMD.L = [...A, ...P]; CMD.i = Math.min(CMD.i, Math.max(0, CMD.L.length - 1));
   $('#cmdL').innerHTML = CMD.L.length ? CMD.L.map((c, i) => `<button role="option" class="${i === CMD.i ? 'on' : ''}" aria-selected="${i === CMD.i}" data-onclick="cmdRun(${i})">${esc(c.t)}</button>`).join('') : '<p class="empty">Nada coincide.</p>';
   $('#cmdL .on')?.scrollIntoView({block: 'nearest'});
 }
