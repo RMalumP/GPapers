@@ -403,3 +403,4 @@ html.simple #sg-fav,html.simple #fs-adv,html.simple #tbCols,html.simple #sbFoot 
 /* v40.6: barra lateral */
 #sg-search:not(.qon) label.qinc{display:none}#fs-rat .fh2.yrs+.fh2.yrs{margin-top:2px}#fs-rat .fht{font-weight:600;font-size:calc(13px * var(--fz,1))}
 .ctabs[hidden]{display:none}#cfg .cblk>.csb{gap:2px}#cfg .cblk>.csb>.ci>label:not(.cchk){margin:4px 0}
+#cfg .ctabs .cfgn{font-size:calc(11px * var(--fz,1));padding:0 6px;border-radius:9px;background:var(--pri);color:var(--onpri)}#cfg .ctabs .cfg0{opacity:.45}#cfg .ctabs .cfg0 .cfgn{background:var(--bd);color:var(--fg)}

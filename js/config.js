@@ -144,13 +144,19 @@ function cfgFilter() {
   box.querySelectorAll('details').forEach(d => { if (!d.closest('.ci') && top.some(e => d.contains(e))) d.hidden = !vis(d); });
   box.querySelectorAll('.cfgsr').forEach(s => s.hidden = !vis(s));
   box.querySelector('.cfgnone').hidden = [...box.querySelectorAll('.cfgsr')].some(s => !s.hidden);
+  if (mvOn()) return;   // en el ordenador, las pestañas siguen: cada una dice cuántos ajustes coinciden y se ve solo la elegida
+  const n = Object.fromEntries([...box.querySelectorAll('.cfgsr')].map(s => [s.dataset.t, top.filter(e => s.contains(e) && !e.hidden).length]));
+  if (!n[CFG_TAB]) { const k = CFG_TABS.map(([k]) => k).find(k => n[k]); if (k) CFG_TAB = k; }
+  document.querySelectorAll('#cfg .ctabs button').forEach((b, i) => { const k = CFG_TABS[i][0]; b.classList.toggle('on', k === CFG_TAB); b.setAttribute('aria-selected', k === CFG_TAB); b.classList.toggle('cfg0', !n[k]); b.innerHTML = esc(CFG_TABS[i][1]) + ` <small class="cfgn">${n[k]}</small>`; });
+  box.querySelectorAll('.cfgsr').forEach(s => { s.hidden = s.dataset.t !== CFG_TAB || !n[s.dataset.t]; s.querySelector('h3').hidden = true; });
 }
-function cfgQSet(v) { CFG_Q = v; $('#cfgB').innerHTML = cfgBody(); $('#cfg .ctabs').hidden = !!norm(v).trim(); cfgFilter(); }
+function cfgQSet(v) { CFG_Q = v; $('#cfgB').innerHTML = cfgBody(); $('#cfg .ctabs').hidden = mvOn() && !!norm(v).trim(); if (norm(v).trim()) return cfgFilter();
+  document.querySelectorAll('#cfg .ctabs button').forEach((b, i) => { const k = CFG_TABS[i][0]; b.textContent = CFG_TABS[i][1]; b.classList.remove('cfg0'); b.classList.toggle('on', k === CFG_TAB); b.setAttribute('aria-selected', k === CFG_TAB); }); }
 function drawCfg() {
   const q = !!norm(CFG_Q).trim();
   $('#cfg').innerHTML = `<div class="dh"><h2>Configuración</h2><div class="dbtn"><button data-onclick="$('#cfg').close()">Cerrar ✕</button></div></div>
     <input id="cfgQ" type="search" placeholder="🔍 Buscar un ajuste (p. ej. PDF, color, Drive)" aria-label="Buscar un ajuste" value="${esc(CFG_Q)}" data-oninput="cfgQSet(this.value)">
-    <div class="ctabs" role="tablist" ${q ? 'hidden' : ''}>${CFG_TABS.map(([k, t]) => `<button role="tab" aria-selected="${CFG_TAB === k}" class="${CFG_TAB === k ? 'on' : ''}" data-onclick="cfgTab('${k}')">${t}</button>`).join('')}</div>
+    <div class="ctabs" role="tablist" ${q && mvOn() ? 'hidden' : ''}>${CFG_TABS.map(([k, t]) => `<button role="tab" aria-selected="${CFG_TAB === k}" class="${CFG_TAB === k ? 'on' : ''}" data-onclick="cfgTab('${k}')">${t}</button>`).join('')}</div>
     <div id="cfgB">${cfgBody()}</div>`;
   cfgFilter();
 }
