@@ -543,7 +543,7 @@ const BASADO = 'Basado en: Chicago 17.ª ed., MLA 8.ª/9.ª, APA 7.ª, UNE-ISO 6
 /* ===== Tipos de documento propios (Configuración → settings.customTypes del JSON) =====
    Un tipo propio (clave ct_<id>) decide qué campos enseña el formulario y cómo se llaman; los estilos de serie lo tratan como
    el tipo predefinido en «Se cita como» y los estilos propios pueden tener plantilla específica para él. */
-const CT_NAMES = {volume: 'Volumen', issue: 'Número', pages: 'Páginas', publisher: 'Editorial (del libro o actas)', place: 'Lugar de edición', edition: 'Edición', editors: 'Editores del libro', pubDate: 'Fecha de publicación completa', thesisType: 'Tipo de trabajo',
+const CT_NAMES = {volume: 'Volumen', issue: 'Número', pages: 'Páginas', publisher: 'Editorial (del libro o actas)', place: 'Lugar de edición', edition: 'Edición', editors: 'Editores del libro', pubDate: 'Fecha de publicación completa', origYear: 'Año de la publicación original', thesisType: 'Tipo de trabajo',
   isbn: 'ISBN', issn: 'ISSN', institution: 'Institución', series: 'Serie o colección', seriesNumber: 'Número en la serie', docNumber: 'Número de documento', conferenceName: 'Nombre del congreso', conferencePlace: 'Lugar del congreso', conferenceDates: 'Fechas del congreso',
   subtype: 'Designación', authorRole: 'Función del autor', userHandle: 'Usuario (@)', abbr: 'Abreviatura', ecli: 'ECLI'};
 const CTYPES = new Map();   // clave ct_<id> → {id, name, like, fields, labels}
@@ -560,12 +560,27 @@ function syncTypes(list) {
   for (const k of [...CTYPES.keys()]) delete TYPES[k]; CTYPES.clear();
   for (const t of list || []) { CTYPES.set('ct_' + t.id, t); TYPES['ct_' + t.id] = t.name; }
 }
-for (const k of Object.keys(STYLES)) { const s = STYLES[k], f = s.fn, it = s.inText, om = s.omit;   // estilos de serie: aceptan tipos propios
-  s.fn = (p, o) => f(effP(p), o); s.inText = (p, o, loc) => it(effP(p), o, loc); if (om) s.omit = p => om(effP(p)); }
+/* Año de la publicación original (opcional, v40.4): en todos los estilos de serie va entre corchetes justo después del año de la edición
+   que se cita: «(2018) [1995]», «Madrid: Alianza, 2018 [1995].», «(Freud, 2018 [1995], p. 24)». Se busca el año en la cita ya hecha,
+   saltando el título y la revista por si lo llevan; si el año va entre paréntesis seguido de punto (APA), los corchetes van detrás del paréntesis. */
+const origY = p => String(p.origYear ?? '').trim();
+function origIns(s, p, o, inText) {
+  const oy = origY(p), y = String(p.year ?? '').trim(); if (!s || !oy || !y || oy === y || typeof s !== 'string') return s;
+  let m = s; for (const v of [p.title, p.venue, p.series, p.publisher, p.place, p.conferenceName].map(x => ea(String(x ?? '').replace(/\.$/, ''))))
+    if (v && v.includes(y)) m = m.split(v).join('\u0000'.repeat(v.length));   // se tapan los textos que podrían llevar el año
+  const R = [...m.matchAll(new RegExp(`(?<!\\d)${y.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}${o?.ys ? `(?:${o.ys})?` : ''}(?!\\d)`, 'g'))];
+  for (const r of (inText ? R : R.slice(0, 1)).reverse()) {   // en la bibliografía, la primera vez; en el texto, todas («primera / siguientes»)
+    let at = r.index + r[0].length; const c = inText ? -1 : s.indexOf(')', at);
+    if (c >= 0 && c - at < 20 && !s.slice(at, c).includes('(') && s[c + 1] === '.') at = c + 1;   // fecha sola entre paréntesis: APA «(2018).» → «(2018) [1995].», IEEE «(2021, March 9).»; Chicago «(2018): 1-9» → «(2018 [1995]): 1-9»
+    s = s.slice(0, at) + ` [${ea(oy)}]` + s.slice(at); }
+  return s;
+}
+for (const k of Object.keys(STYLES)) { const s = STYLES[k], f = s.fn, it = s.inText, om = s.omit;   // estilos de serie: aceptan tipos propios y el año original
+  s.fn = (p, o) => origIns(f(effP(p), o), p, o || ex()); s.inText = (p, o, loc) => (it(effP(p), o, loc) || []).map(x => x && typeof x.t === 'string' ? {...x, t: origIns(x.t, p, o || ex(), 1)} : x); if (om) s.omit = p => om(effP(p)); }
 /* ===== Estilos de cita personalizados (Configuración → se guardan en settings.customStyles del JSON) =====
    Plantilla por tipo de documento: texto con {campos}, [grupos opcionales] (solo salen si todos sus campos tienen valor) y modificadores
    {campo:i:q|alternativa}. Un estilo propio se comporta como los de serie: sale en Exportar y en la pestaña Cita. */
-const CU_F = [['authors', 'Autores'], ['author1', 'Primer autor'], ['authorsShort', 'Apellidos (cita en el texto)'], ['editors', 'Editores'], ['title', 'Título'], ['year', 'Año (con a/b si hace falta)'],
+const CU_F = [['authors', 'Autores'], ['author1', 'Primer autor'], ['authorsShort', 'Apellidos (cita en el texto)'], ['editors', 'Editores'], ['title', 'Título'], ['year', 'Año (con a/b si hace falta)'], ['origYear', 'Año de la publicación original (p. ej. {origYear:br})'],
   ['date', 'Fecha completa de publicación'], ['datey', 'Fecha completa o, si no hay, el año'], ['venue', 'Revista / editorial / sitio'], ['publisher', 'Editorial del libro o actas'], ['place', 'Lugar de edición'], ['edition', 'Edición'], ['volume', 'Volumen'], ['issue', 'Número'],
   ['pages', 'Páginas'], ['loc', 'Página citada (solo cita en el texto)'], ['doi', 'DOI (sin https://doi.org/)'], ['doiurl', 'DOI como enlace'], ['url', 'URL'], ['link', 'Enlace (DOI o URL según el paper)'], ['accessed', 'Fecha de consulta'],
   ['isbn', 'ISBN'], ['issn', 'ISSN'], ['institution', 'Institución'], ['docNumber', 'Número de documento'], ['series', 'Serie o colección'], ['seriesNumber', 'Número en la serie'], ['conferenceName', 'Nombre del congreso'],
@@ -576,7 +591,7 @@ const CU_LAST = {auto: 'Según idioma (y / &)', ' y ': ' y ', ' & ': ' & ', ' an
 const CU_DATE = {long: '24 de octubre de 2017', export: 'Como en Exportar', iso: '2017-10-24', dmy: '24-10-2017', my: 'octubre 2017'};
 const cuNew = (name = 'Mi estilo') => ({id: uid(), name, order: 'alpha', numbered: false, numFmt: 'br', dis: true, dateFmt: 'long', lang: 'export',
   au: {fmt: 'ap_ini', sep: ', ', last: 'auto', max: 0, show: 1, etAl: 'et al.', upper: false, firstOnly: false},
-  tpl: {'*': '[{authors}. ]({year|s.f.}). {title}. [{venue:i}][, {volume}][({issue})][, {pages:pp}]. [{link}]'}, inText: '({authorsShort}, {year|s.f.}[, {loc:pp}])'});
+  tpl: {'*': '[{authors}. ]({year|s.f.})[ {origYear:br}]. {title}. [{venue:i}][, {volume}][({issue})][, {pages:pp}]. [{link}]'}, inText: '({authorsShort}, {year|s.f.}[ {origYear:br}][, {loc:pp}])'});
 function cuClean(c) {   // lo que viene de un JSON no se fía: forma y límites
   if (!c || typeof c !== 'object') return null;
   const d = cuNew(String(c.name || 'Estilo').slice(0, 60)); d.id = String(c.id || uid()).replace(/[^\w-]/g, '') || uid();
@@ -647,6 +662,7 @@ function cuValue(k, p, o, cs, op = {}) {
     case 'editors': return cuAuthors(parse(p.editors || []), o, {...cs.au, ...cuAuO(op)});
     case 'title': return ea(p.title || '');
     case 'year': return p.year ? ea(p.year + (o.ys || '')) : '';
+    case 'origYear': return origY(p) && origY(p) !== String(p.year ?? '').trim() ? ea(origY(p)) : '';
     case 'date': return okDate(p.pubDate) ? cuDate(p.pubDate, op.fmt || cs.dateFmt, o, op.pat) : '';
     case 'datey': return okDate(p.pubDate) && fdOk(p) ? cuDate(p.pubDate, op.fmt || cs.dateFmt, o, op.pat) : p.year ? ea(p.year + (o.ys || '')) : '';
     case 'venue': return ea(p.venue || '');

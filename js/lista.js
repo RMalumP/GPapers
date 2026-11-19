@@ -782,7 +782,7 @@ function cslItem(p) {
   p = effP(p); const ty = p.type, o = {id: p.id, type: CSLT[ty] || 'document', title: p.title};
   const au = p.authorType === 'sin_autor' ? [] : p.authors; if (au.length) o.author = au.map(a => cslName(p, a));
   if (p.editors?.length) o.editor = p.editors.map(a => cslName({}, a));
-  const is = cslDate(p.year, p.pubDate); if (is) o.issued = is; if (okDate(p.accessed)) o.accessed = cslDate(0, p.accessed);
+  const is = cslDate(p.year, p.pubDate); if (is) o.issued = is; if (/^\d{1,4}$/.test(String(p.origYear || '').trim())) o['original-date'] = {'date-parts': [[+p.origYear]]}; if (okDate(p.accessed)) o.accessed = cslDate(0, p.accessed);
   if (p.venue) o[CSL_PUB.has(ty) ? 'publisher' : 'container-title'] = p.venue;
   if (p.publisher && !o.publisher) o.publisher = p.publisher;
   const f = {place: 'publisher-place', volume: 'volume', issue: 'issue', pages: 'page', edition: 'edition', isbn: 'ISBN', issn: 'ISSN', thesisType: 'genre', docNumber: 'number', ecli: 'authority', shorthand: 'title-short'};
@@ -818,7 +818,7 @@ function bibtex(L) {
     let bk = BIBK[ty] || 'misc'; const tf = [];
     if (ty === 'tesis' && p.thesisType && p.thesisType !== 'Tesis doctoral') { bk = 'mastersthesis'; tf.push(['type', texEsc(p.thesisType)]); }
     const dp = okDate(p.pubDate) ? p.pubDate.split('-') : [], pg = String(p.pages || '').replace(/(\d)\s*[-–—]+\s*(\d)/g, '$1--$2');
-    const f = [['author', au.map(a => bibName(p, a)).join(' and ')], ['editor', (p.editors || []).map(a => bibName({}, a)).join(' and ')], ['title', `{${texEsc(p.title)}}`], ['year', p.year], ['month', dp[1] && +dp[1]], ['day', dp[2] && +dp[2]],
+    const f = [['author', au.map(a => bibName(p, a)).join(' and ')], ['editor', (p.editors || []).map(a => bibName({}, a)).join(' and ')], ['title', `{${texEsc(p.title)}}`], ['year', p.year], ['origdate', texEsc(String(p.origYear || '').trim())], ['month', dp[1] && +dp[1]], ['day', dp[2] && +dp[2]],
       [BIBV[ty] || 'howpublished', texEsc(p.venue || '')], ['publisher', ['capitulo', 'congreso', 'jurisprudencia'].includes(ty) ? texEsc(p.publisher || '') : ''], ['address', shows('place', ty) ? texEsc(p.place || '') : ''], ['edition', shows('edition', ty) ? texEsc(p.edition || '') : ''],
       ['volume', ty === 'articulo' ? texEsc(p.volume || '') : ''], ['number', ty === 'articulo' || ty === 'legislacion' ? texEsc(p.issue || '') : ''], ['pages', shows('pages', ty) ? pg : ''], ['entrysubtype', ty === 'prensa' ? 'newspaper' : ty === 'blog' ? 'blog' : BIBK[ty] === 'misc' && ty !== 'web' ? ty : ''], ...tf,
       ...[['subtype', 'type'], ['authorRole', 'authorrole'], ['userHandle', 'userhandle'], ['seriesNumber', 'seriesnumber'], ['isbn', 'isbn'], ['issn', 'issn'], ['series', 'series'], ['institution', 'institution'], ['docNumber', ty === 'legislacion' ? 'docnumber' : 'number'], ['abbr', 'shorthand'], ['ecli', 'ecli']].filter(([k]) => shows(k, ty) && !(k === 'institution' && ty === 'tesis' && !p.institution)).map(([k, b]) => [b, texEsc(p[k] || '')]),
