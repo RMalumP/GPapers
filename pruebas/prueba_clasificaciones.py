@@ -29,7 +29,7 @@ with sync_playwright() as pw:
     eq('números romanos', pg.evaluate("['I', 'iv', 'IX', 'XIV', 'MCMXCIV', 'ABC'].map(v => ordVal({fmt: 'roman'}, v))"), [1, 4, 9, 14, 1994, None])
     eq('texto libre y vacío', pg.evaluate("[ordVal({fmt: 'text'}, ' Beta '), ordVal({fmt: 'num'}, '')]"), ['Beta', None])
     # ---- crear una clasificación desde Gestionar etiquetas y poner valores
-    pg.evaluate("openMg('tags')"); pg.click('#mg button:has-text("Nueva clasificación")'); pg.fill('#mgoName', 'Días'); pg.click('#mg .mgof button:has-text("Guardar")'); pg.wait_for_timeout(100)
+    pg.evaluate("openMg('tags')"); pg.click('#mg details.mgod > summary'); pg.click('#mg button:has-text("Nueva clasificación")'); pg.fill('#mgoName', 'Días'); pg.click('#mg .mgof button:has-text("Guardar")'); pg.wait_for_timeout(100)
     eq('se crea, de etiquetas y con números, y queda elegida', pg.evaluate("[db.orders.length, db.orders[0].name, db.orders[0].of, db.orders[0].fmt, MGO === db.orders[0].id, document.querySelectorAll('#mg .mgk').length]"), [1, 'Días', 'tags', 'num', True, 5])
     V = {'lunes': '1', 'martes': '2', 'miércoles': '3', 'jueves': '4', 'viernes': '5'}
     for i, d in enumerate(DAYS): pg.fill(f'#mg .mgr >> nth={i} >> .mgk', V[d])

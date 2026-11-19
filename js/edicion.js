@@ -12,7 +12,7 @@ function pubSync() {   // fecha de publicación → rellena «Año» si está va
   const w = $('#pdWarn'); if (w) w.textContent = pdWarn(); }
 function drawD() {
   if (!TYPES[D.type]) D.type = 'articulo';
-  const T = {all: 'Ver todo', data: 'Datos', cite: 'Cita', notes: 'Notas', cls: 'Secciones, etiquetas y relacionados', hist: 'Historial'};
+  const T = {all: 'Ver todo', data: 'Datos', cite: 'Cita', notes: 'Notas', cls: 'Secciones, etiquetas y relacionados', ...uiSimple() ? {} : {hist: 'Historial'}}; if (!T[tab] && tab !== 'notes') tab = 'all';   // v40.6: en el modo Sencillo de la app no hay Historial
   const blk = (id, t, body, always) => tab === 'all' || tab === 'cls' ? `<details class="cs" ${ALL_FOLD.has(id) ? '' : 'open'} data-ontoggle="setHas(ALL_FOLD,'${id}',!this.open)"><summary>${t}</summary><div class="csb">${body}</div></details>`   // en «Ver todo» cada bloque lleva su título y se pliega
     : (always ? `<h2 class="grp">${t}</h2>` : '') + body;
   const dock = $('#dlg').classList.contains('vwdock'); if (dock) tab = 'notes';   // al lado del PDF: solo las notas, con una cabecera corta que cabe en un panel estrecho
@@ -22,18 +22,18 @@ function drawD() {
   if (tab === 'notes' || tab === 'all') h += blk('gen', 'Notas generales', edBox('gen', D.general), true);
   
   if (tab === 'notes' || tab === 'all') h += blk('notes', 'Notas por sección', (db.sections.length ? '' : '<p class="empty">Crea primero una sección con «Gestionar secciones».</p>') +
-    D.notes.map((n, i) => `<div class="card"><div class="row"><select data-onchange="noteSec(${i},this.value)">${db.sections.map(s => `<option value="${s.id}" ${n.sectionId === s.id ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}</select>
-      <button class="danger" data-onclick="noteDel(${i})">Quitar</button></div>${edBox(n.id, n.content)}</div>`).join('') +
-    (db.sections.length ? `<button data-onclick="addNote()" data-oncontextmenu="addNoteMenu(event)" title="Clic derecho: nueva nota con plantilla">+ Añadir nota</button><button data-onclick="addNoteMenu(event)" title="Nueva nota con plantilla">▾</button>${PDF_N.filter(n => annN(D[pdfF(n)])).map(n => `<button data-onclick="annFromDraft(${n})" title="Una nota con los subrayados y comentarios del PDF (si ya existe, se pone al día)">📄 Traer anotaciones del PDF${n === 2 ? ' 2' : ''}</button>`).join('')}` : ''), true);
+    D.notes.map((n, i) => { const sc = db.sections.find(x => x.id === n.sectionId), pv = shortTxt(String(n.content || '').replace(/<[^>]*>/g, ' ').replace(/[*_#>`]/g, '').replace(/\s+/g, ' ').trim(), 60);
+      return `<details class="card nfold" ${NOTE_FOLD.has(n.id) ? '' : 'open'} data-ontoggle="setHas(NOTE_FOLD,'${n.id}',!this.open)"><summary><span class="ndot" style="background:${esc(sc?.color || '#888')}"></span><b>${esc(sc?.name || 'Sin sección')}</b><small class="npv">${esc(pv)}</small><button class="sm nmore" title="Más: cambiar de sección o quitar la nota" aria-label="Más opciones de la nota" data-onclick="event.preventDefault();noteMenu(event,${i})">⋯</button></summary>${edBox(n.id, n.content)}</details>`; }).join('') +
+    (db.sections.length ? `<button data-onclick="addNotePick(event)" data-oncontextmenu="addNoteMenu(event)" title="Nueva nota: elige su sección · Clic derecho: con plantilla">+ Añadir nota</button><button data-onclick="addNoteMenu(event)" title="Nueva nota con plantilla">▾</button>${PDF_N.filter(n => annN(D[pdfF(n)])).map(n => `<button data-onclick="annFromDraft(${n})" title="Una nota con los subrayados y comentarios del PDF (si ya existe, se pone al día)">📄 Traer anotaciones del PDF${n === 2 ? ' 2' : ''}</button>`).join('')}` : ''), true);
   const citeOne = (k, s) => `<h3>${s.name}${D.cites[k] != null ? ' (editada a mano)' : ''}</h3>${typeWarn(k, D.type) ? `<small>⚠ ${esc(typeWarn(k, D.type))}</small>` : ''}
     <div class="ced" id="c_${k}" data-k="${k}" contenteditable="true" role="textbox" aria-multiline="true" aria-label="Cita ${esc(s.name)}" data-oninput="put(D.cites,'${k}',ceVal(this))">${ceHtml(D.cites[k] ?? s.fn(D))}</div>
-    <div class="row"><button data-onclick="copyC('${k}',0,this)">Copiar</button><button data-onclick="copyC('${k}',1,this)" title="Con cursiva, para pegar en Word o Docs">Copiar con formato</button><button data-onclick="citeDel('${k}')">Regenerar desde los datos</button></div>${ex().inText ? `<div class="itx" id="it_${k}">${itHtml(k)}</div>` : ''}`;
+    <div class="row cbtns"><button class="${k === mainSty() ? 'pri' : ''}" data-onclick="copyC('${k}',0,this)">Copiar</button><button data-onclick="copyC('${k}',1,this)" title="Con cursiva, para pegar en Word o Docs">Copiar con formato</button>${k === mainSty() ? `<button data-onclick="keyCopy('tex')" title="Copiar \\cite{clave} para LaTeX">\\cite{}</button><button data-onclick="keyCopy('md')" title="Copiar [@clave] para Pandoc o Markdown">[@]</button>` : ''}${D.cites[k] != null ? `<button data-onclick="citeDel('${k}')" title="Quitar los cambios hechos a mano y volver a la cita hecha con los datos">↺ Volver a la cita automática</button>` : ''}</div>${ex().inText ? `<div class="itx" id="it_${k}">${itHtml(k)}</div>` : ''}`;
   const fold = tab === 'all' || tab === 'cls';   // «Ver todo» y la pestaña de clasificación comparten diseño: bloques plegables
   if (tab === 'cite' || tab === 'all') {
-    const M = mainSty(), only = db.settings.citeOnlyMain && !CITE_ALL;
+    const M = mainSty(), only = (db.settings.citeOnlyMain || uiSimple()) && !CITE_ALL;
     h += blk('cite', 'Cita', citeBar() + (ex().inText ? `<label>Página o parte citada (opcional, para la cita en el texto y las notas)<input id="locIn" value="${esc(CLOC)}" placeholder="${LAW_T.has(baseT(D.type)) ? 'p. ej. 22.1 (artículo) o 3 (FJ, FD o apartado)' : 'p. ej. 87 o 87-90'}" data-oninput="clocSet(this.value)"></label>` : '')
       + (tab === 'all' ? `<label>Estilo<select data-onchange="citeSelSet(this.value)">${styOpts(citeSel())}</select></label>` + citeOne(citeSel(), STYLES[citeSel()])
-        : `<h2 class="grp">Estilo principal</h2>` + citeOne(M, STYLES[M]) + (only ? `<p><button data-onclick="citeAllOn()">Ver todos los estilos</button> <small>Configuración → Notas y citas: «mostrar solo el estilo principal».</small></p>`
+        : `<h2 class="grp">Estilo principal</h2>` + citeOne(M, STYLES[M]) + (only ? `<p><button data-onclick="citeAllOn()">Ver todos los estilos</button> <small>${uiSimple() ? 'Modo Sencillo de la app (Configuración → Apariencia).' : 'Configuración → Notas y citas: «En “Cita”, solo el estilo principal».'}</small></p>`
           : STY_G.map(([g, t]) => { const E = Object.entries(STYLES).filter(([k, s]) => k !== M && styGroup(s) === g), id = g || 'gen';   // el resto, en secciones plegables (cerradas salvo que las abras)
             return E.length ? `<details class="cs cgrp" data-g="${id}" ${CITE_OPEN.has(id) ? 'open' : ''} data-ontoggle="setHas(CITE_OPEN,'${id}',this.open)"><summary>${t} <small>(${E.length})</small></summary><div class="csb">${E.map(([k, s]) => citeOne(k, s)).join('')}</div></details>` : ''; }).join(''))), false);
   }
@@ -44,10 +44,10 @@ function drawD() {
   if (fold) {
     const chips = (ids, color, del) => ids.map(id => db.papers.find(p => p.id === id)).filter(Boolean).map(p => chip({name: shortTxt(p.alias || p.title) + (del ? ' ✕' : ''), color}, 1, del ? `${del}('${p.id}')` : '')).join('');
     const by = db.papers.filter(q => (q.refTo || []).includes(D.id)).map(q => q.id);
-    h += blk('rel', 'Relacionados', `<div><small>Relacionados</small></div><div>${chips(D.related, '#6b45c2', 'relDel') || '<small>Ninguno.</small>'}</div>
-      <div style="margin-top:6px"><small>Este paper cita a</small></div><div>${chips(D.refTo, '#0f8b8d', 'refDel') || '<small>Ninguno.</small>'}</div>
-      <div style="margin-top:6px"><small>Citado por (otros papers que lo citan)</small></div><div>${chips(by, '#888888') || '<small>Ninguno.</small>'}</div>
-      <div class="row" style="margin-top:8px;flex-wrap:nowrap"><select style="width:auto" aria-label="Tipo de relación" data-onchange="reltSet(this.value)"><option value="rel" ${RELT === 'rel' ? 'selected' : ''}>Relacionar con</option><option value="ref" ${RELT === 'ref' ? 'selected' : ''}>Cita a</option></select><input id="relQ" placeholder="Buscar un paper…" data-oninput="relSearch()" style="flex:1;min-width:0"></div><div id="relRes"></div>`);
+    const RK = {rel: ['Relacionado', '#6b45c2', 'relDel'], ref: ['Cita a', '#0f8b8d', 'refDel'], by: ['Citado por', '#888888', '']};   // v40.6: una sola lista, con el tipo de cada relación
+    const rows = [...D.related.map(id => ['rel', id]), ...D.refTo.map(id => ['ref', id]), ...by.map(id => ['by', id])].map(([k, id]) => [k, db.papers.find(p => p.id === id)]).filter(x => x[1]);
+    h += blk('rel', `Relacionados${rows.length ? ` <small class="dgn">(${rows.length})</small>` : ''}`, `<div class="rell">${rows.map(([k, p]) => `<div class="relrow"><span class="relk" style="--rc:${RK[k][1]}">${RK[k][0]}</span><span class="relt">${esc(shortTxt(p.alias || p.title))} <small>${esc((p.authors[0] || '') + (p.year ? ' · ' + p.year : ''))}</small></span>${RK[k][2] ? `<button class="sm" title="Quitar esta relación" aria-label="Quitar esta relación" data-onclick="${RK[k][2]}('${p.id}')">✕</button>` : `<small class="relh" title="Se quita desde la ficha del otro paper">desde el otro paper</small>`}</div>`).join('') || '<small class="empty">Sin relaciones todavía.</small>'}</div>
+      <div class="row relad" style="margin-top:8px;flex-wrap:nowrap"><select style="width:auto" aria-label="Tipo de relación" data-onchange="reltSet(this.value)"><option value="rel" ${RELT === 'rel' ? 'selected' : ''}>＋ Relacionar con</option><option value="ref" ${RELT === 'ref' ? 'selected' : ''}>＋ Este paper cita a</option></select><input id="relQ" placeholder="Buscar un paper…" data-oninput="relSearch()" style="flex:1;min-width:0"></div><div id="relRes"></div>`);
   }
   if (tab === 'hist') h += `<div class="hist">${D.history.filter(e => isToday(e.t)).reverse().map(e => `<div class="he"><small>${new Date(e.t).toLocaleString('es-ES')}</small> ${esc(e.s)}</div>`).join('') || '<small>Sin cambios hoy.</small>'}</div><small>Solo lectura. Solo muestra los cambios de hoy y no se guarda en el archivo. Creado el ${D.created ? new Date(D.created).toLocaleDateString('es-ES') : '—'}.</small>`;
   $('#dlg').innerHTML = h; hydrateImgs(); dPrevPaint();
@@ -326,9 +326,10 @@ function ceVal(el) {   // DOM del cuadro de cita → texto con marcas
   return run(el, {});
 }
 const citeRaw = k => { const e = document.getElementById('c_' + k); return e ? ceVal(e) : D.cites[k] ?? STYLES[k].fn(D); };
-const citeBar = () => { const o = ex(), sel = (k, opts, tt) => `<select title="${tt}" data-onchange="citeOpt('${k}',this.value)">${Object.entries(opts).map(([v, t]) => `<option value="${v}" ${v === o[k] ? 'selected' : ''}>${t}</option>`).join('')}</select>`;
-  return `<div class="cbar" data-onmousedown="noBtnFocus(event)"><div class="cbg"><span class="cbt">Formato</span><button data-onclick="citeCmd('italic')" title="Cursiva en lo seleccionado de la cita (${esc(db.settings.shortcuts.italic)})"><i>K</i> Cursiva</button><button data-onclick="citeCmd('bold')" title="Negrita en lo seleccionado de la cita"><b>N</b> Negrita</button></div>
-    <div class="cbg"><span class="cbt">Idioma</span>${sel('lang', {es: 'Español (y, En, consultado)', en: 'English (&, In, cited)'}, 'Idioma de los conectores de la cita')}<span class="cbt">Fecha de consulta</span>${sel('dateFmt', {long: '20 de octubre de 2026', dmy: '20-10-2026', iso: '2026-10-20'}, 'Cómo se escribe la fecha de consulta (el «[consultado el …]» de las páginas web)')}</div>
+const citeBar = () => { const o = ex(), sel = (k, opts, tt) => `<select title="${tt}" data-onchange="citeOpt('${k}',this.value)">${Object.entries(opts).map(([v, t]) => `<option value="${v}" ${v === o[k] ? 'selected' : ''}>${t}</option>`).join('')}</select>`;   // v40.6: una línea; idioma y fecha, plegados
+  const LG = {es: 'Español', en: 'English'}, DF = {long: '20 de octubre de 2026', dmy: '20-10-2026', iso: '2026-10-20'};
+  return `<div class="cbar" data-onmousedown="noBtnFocus(event)"><div class="cbg"><button data-onclick="citeCmd('italic')" title="Cursiva en lo seleccionado de la cita (${esc(db.settings.shortcuts.italic)})" ><i>K</i> Cursiva</button><button data-onclick="citeCmd('bold')" title="Negrita en lo seleccionado de la cita"><b>N</b> Negrita</button></div>
+    <details class="cbopt" ${CFG_OPEN.has('citeopt') ? 'open' : ''} data-ontoggle="setHas(CFG_OPEN,'citeopt',this.open)"><summary>Opciones <span class="cbsum">${LG[o.lang] || ''} · ${DF[o.dateFmt] || ''}</span></summary><div class="cbg"><span class="cbt">Idioma</span>${sel('lang', {es: 'Español (y, En, consultado)', en: 'English (&, In, cited)'}, 'Idioma de los conectores de la cita')}<span class="cbt">Fecha de consulta</span>${sel('dateFmt', DF, 'Cómo se escribe la fecha de consulta (el «[consultado el …]» de las páginas web)')}</div></details>
     </div>`; };
 document.addEventListener('focusin', e => { if (e.target.classList?.contains('ced')) CITE_TA = e.target.id; });
 document.addEventListener('paste', e => { const el = e.target.closest?.('.ced'); if (!el) return;   // se pega como texto, sin el formato de otra página
@@ -338,13 +339,23 @@ function citeCmd(cmd) {   // Cursiva o negrita en la cita con el foco (o en la p
   if (!el.contains(getSelection().anchorNode)) el.focus();
   document.execCommand('styleWithCSS', false, false); document.execCommand(cmd); el.dispatchEvent(new Event('input'));
 }
-function citeOpt(k, v) { ex()[k] = v; foldSnap(); dirty = true; touch(); drawD(); }   // mismo ajuste que en Exportar (sin pasos de deshacer)
+function citeOpt(k, v) { CFG_OPEN.add('citeopt'); ex()[k] = v; foldSnap(); dirty = true; touch(); drawD(); }   // mismo ajuste que en Exportar (sin pasos de deshacer)
 const tplText = t => t.text.replace(/\{fecha\}/g, new Date().toLocaleDateString('es-ES')).replace(/\{paper\}/g, D?.title || '');
 function tplMenu(e, key) {
   ctxShow(e, '<div class="ctxh">Insertar plantilla</div>' + (db.settings.templates.map(t => `<button data-onclick="tplInsert('${key}','${t.id}')">${esc(t.name)}</button>`).join('') || '<div class="ctxh">No hay plantillas (créalas en Configuración)</div>'));
 }
 function tplInsert(key, id) { const t = db.settings.templates.find(x => x.id === id); ctxClose(); if (t) edInsert(key, tplText(t)); }
-function addNote(tid) { const t = tid && db.settings.templates.find(x => x.id === tid); D.notes.push({id: uid(), sectionId: sec1() || db.sections[0].id, content: t ? tplText(t) : ''}); drawD(); }
+function addNote(tid, sid) { const t = tid && db.settings.templates.find(x => x.id === tid); D.notes.push({id: uid(), sectionId: sid || sec1() || db.sections[0].id, content: t ? tplText(t) : ''}); drawD(); }
+const NOTE_FOLD = new Set();   // notas plegadas en la ficha (se recuerdan)
+function addNotePick(e) {   // v40.6: «+ Añadir nota» pregunta la sección (si hay más de una)
+  if (db.sections.length < 2) return addNote();
+  ctxShow(e, '<div class="ctxh">¿En qué sección?</div>' + db.sections.map(s => `<button data-onclick="ctxClose();addNote('','${s.id}')"><span class="ndot" style="background:${esc(s.color)}"></span> ${esc(s.name)}</button>`).join(''));
+}
+function noteMenu(e, i) {
+  const n = D.notes[i]; if (!n) return;
+  ctxShow(e, '<div class="ctxh">Mover a la sección</div>' + db.sections.map(s => `<button class="${s.id === n.sectionId ? 'on' : ''}" data-onclick="ctxClose();noteSec(${i},'${s.id}')"><span class="ndot" style="background:${esc(s.color)}"></span> ${esc(s.name)}</button>`).join('') + `<hr><button class="danger" data-onclick="ctxClose();noteDelU(${i})">🗑 Quitar esta nota</button>`);
+}
+function noteDelU(i) { const n = D.notes[i]; if (!n) return; D.notes.splice(i, 1); drawD(); toast('Nota quitada (se borra al guardar el paper).', [{t: 'Deshacer', fn: () => { D.notes.splice(Math.min(i, D.notes.length), 0, n); drawD(); }}], 6000); }
 function addNoteMenu(e) {
   ctxShow(e, '<div class="ctxh">Nueva nota con plantilla</div>' + (db.settings.templates.map(t => `<button data-onclick="ctxClose();addNote('${t.id}')">${esc(t.name)}</button>`).join('') || '<div class="ctxh">No hay plantillas (créalas en Configuración)</div>'));
 }
@@ -459,7 +470,7 @@ function grData() {   // nodos y aristas del ámbito elegido (todos o solo los v
 }
 function grOpen() {
   let seen = false; try { seen = !!localStorage.getItem('gp-gr-seen'); localStorage.setItem('gp-gr-seen', '1'); } catch (e) {}
-  GR.help = !seen; grDraw(); $('#gr').showModal();   // quien lo abre por primera vez ve la explicación; después, el gráfico
+  GR.help = !seen; grDraw(); $('#gr').showModal();   // quien lo abre por primera vez ve la explicación (v40.6: debajo del gráfico); después, solo el gráfico
 }
 function grDraw() {
   const {nodes, E} = grData(), W = 880, H = 560, ix = new Map(nodes.map((p, i) => [p.id, i])), P = grLayout(nodes.length, E.map(e => [ix.get(e.a), ix.get(e.b)]), W, H);
@@ -467,10 +478,10 @@ function grDraw() {
   $('#gr').innerHTML = `<h2>Relaciones entre papers</h2>
     <div class="row"><label class="row"><input type="checkbox" ${GR.vis ? 'checked' : ''} data-onchange="put(GR,'vis',this.checked,grDraw)"> Solo los papers visibles con los filtros actuales</label><label class="row"><input type="checkbox" ${GR.all ? 'checked' : ''} data-onchange="put(GR,'all',this.checked,grDraw)"> Incluir los que no tienen relaciones</label><button class="sm" style="margin-left:auto" data-onclick="put(GR,'help',!GR.help,grDraw)" aria-expanded="${GR.help}">${GR.help ? 'Ocultar la explicación' : '❓ ¿Para qué sirve?'}</button></div>
     <small id="grInfo">${nodes.length} papers · ${E.length} relaciones · <span style="color:#7c5cc4">━ relacionado</span> · <span style="color:#0f8b8d">➜ cita a</span> · clic en un paper para abrirlo</small>
-    ${E.length ? (GR.help ? grHelp(true) : '') : grHelp()}
+    ${E.length ? '' : grHelp()}
     ${nodes.length ? `<svg id="grSvg" viewBox="0 0 ${W} ${H}" role="img" aria-label="Gráfico de relaciones"><defs><marker id="grAr" viewBox="0 0 10 10" refX="17" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#0f8b8d"/></marker></defs>
       ${E.map(e => { const a = P[ix.get(e.a)], b = P[ix.get(e.b)]; return `<line class="ed" data-a="${e.a}" data-b="${e.b}" x1="${a.x.toFixed(1)}" y1="${a.y.toFixed(1)}" x2="${b.x.toFixed(1)}" y2="${b.y.toFixed(1)}" stroke="${e.dir ? '#0f8b8d' : '#7c5cc4'}" stroke-width="1.6" ${e.dir ? 'marker-end="url(#grAr)"' : ''}/>`; }).join('')}
-      ${nodes.map((p, i) => `<g class="nd" data-id="${p.id}" data-onclick="grGo('${p.id}')" tabindex="0" data-onkeydown="onEnter(event,grGo,'${p.id}')"><title>${esc(p.title)}</title><circle cx="${P[i].x.toFixed(1)}" cy="${P[i].y.toFixed(1)}" r="8" fill="var(--pri)" stroke="var(--card)" stroke-width="2"/><text x="${(P[i].x + 12).toFixed(1)}" y="${(P[i].y + 4).toFixed(1)}">${lbl(p)}</text></g>`).join('')}</svg>` : ''}
+      ${nodes.map((p, i) => `<g class="nd" data-id="${p.id}" data-onclick="grGo('${p.id}')" tabindex="0" data-onkeydown="onEnter(event,grGo,'${p.id}')"><title>${esc(p.title)}</title><circle cx="${P[i].x.toFixed(1)}" cy="${P[i].y.toFixed(1)}" r="8" fill="var(--pri)" stroke="var(--card)" stroke-width="2"/><text x="${(P[i].x + 12).toFixed(1)}" y="${(P[i].y + 4).toFixed(1)}">${lbl(p)}</text></g>`).join('')}</svg>` : ''}${E.length && GR.help ? grHelp(true) : ''}
     <div class="row" style="margin-top:12px"><button data-onclick="relFind()" title="Envía a OpenAlex los DOI de tus papers: propone las relaciones «cita a» entre ellos y te dice qué obras citan varios de ellos y aún no tienes">🔗 Buscar relaciones con OpenAlex</button><button style="margin-left:auto" data-onclick="$('#gr').close()">Cerrar</button></div>`;
 }
 function grGo(id) { $('#gr').close(); openPaper(id); }
@@ -720,14 +731,34 @@ function mgOrdSortList() {   // reordena las etiquetas o secciones según sus va
   db[MG] = db[MG].map((x, i) => ({x, i, v: v(x)})).sort((a, b) => (a.v == null) - (b.v == null) || (a.v == null ? 0 : typeof a.v === 'number' ? a.v - b.v : COLL.compare(a.v, b.v)) || a.i - b.i).map(e => e.x);
   markDirty(); drawMg(); render();
 }
-function drawMg() {
-  const o = !MGO_FORM && ordOf(MG).find(x => x.id === MGO), kv = x => x.rk?.[o.id] || '';
-  $('#mg').innerHTML = `<h2>${MG === 'tags' ? 'Etiquetas' : 'Secciones'}</h2>` + mgOrdHTML() + db[MG].map(x => `<div class="row mgr ${MG === 'sections' ? 'mgs' : 'mgt'}${o ? ' mgkon' : ''}" style="margin-bottom:6px">
+function drawMg() {   // v40.6: una fila por línea (color, nombre, descripción, cuántos papers, ↑ ↓, fusionar y 🗑); las clasificaciones, abajo y plegadas
+  const o = !MGO_FORM && ordOf(MG).find(x => x.id === MGO), kv = x => x.rk?.[o.id] || '', T = MG === 'tags', w = T ? 'etiqueta' : 'sección';
+  const cnt = id => db.papers.reduce((n, p) => n + ((T ? p.tagIds : p.sectionIds).includes(id) ? 1 : 0), 0);
+  const ordOpen = !!(MGO || MGO_FORM || CFG_OPEN.has('mgo') || ordOf(MG).length), ordOn = !uiSimple() || MGO || MGO_FORM;
+  $('#mg').innerHTML = `<div class="dh"><h2>${T ? 'Etiquetas' : 'Secciones'}</h2><div class="dbtn"><button data-onclick="$('#mg').close();render()">Cerrar ✕</button></div></div>` + db[MG].map(x => `<div class="mgr ${T ? 'mgt' : 'mgs'}${o ? ' mgkon' : ''}">
     ${o ? `<input class="mgk${kv(x) && ordVal(o, kv(x)) == null ? ' bad' : ''}" value="${esc(kv(x))}" placeholder="${ORD_PH[o.fmt]}" aria-label="Valor en «${esc(o.name)}»" title="Valor en «${esc(o.name)}»" data-oninput="mgRk('${x.id}',this)">` : ''}
     <input class="mgc" type="color" value="${esc(x.color || '#888888')}" aria-label="Color" data-oninput="upd('${x.id}','color',this.value)"><input class="mgn" value="${esc(x.name)}" aria-label="Nombre" data-oninput="upd('${x.id}','name',this.value)">
-    ${MG === 'sections' ? `<input class="mgd" placeholder="Descripción" aria-label="Descripción" value="${esc(x.description || '')}" data-oninput="upd('${x.id}','description',this.value)">` : ''}
-    <button class="mgu" title="Subir" aria-label="Subir" data-onclick="moveM('${x.id}',-1)">↑</button><button class="mgw" title="Bajar" aria-label="Bajar" data-onclick="moveM('${x.id}',1)">↓</button><button class="danger mgx" title="Eliminar" aria-label="Eliminar" data-onclick="delM('${x.id}')"><span class="mgxl">Eliminar</span><span class="mgxi" hidden>🗑</span></button></div>`).join('') +
-    `<div class="row"><button class="pri" data-onclick="mgAdd('${uid()}')">+ Añadir</button><button data-onclick="$('#mg').close();render()">Cerrar</button></div>`;
+    ${T ? '' : `<input class="mgd" placeholder="Descripción (opcional)" aria-label="Descripción" value="${esc(x.description || '')}" data-oninput="upd('${x.id}','description',this.value)">`}
+    <small class="mgn2" title="Papers con esta ${w}">${cnt(x.id)} ${cnt(x.id) === 1 ? 'paper' : 'papers'}</small>
+    <span class="mgb"><button class="mgu" title="Subir" aria-label="Subir" data-onclick="moveM('${x.id}',-1)">↑</button><button class="mgw" title="Bajar" aria-label="Bajar" data-onclick="moveM('${x.id}',1)">↓</button>${db[MG].length > 1 ? `<button class="mgm" title="Fusionar con otra ${w}" aria-label="Fusionar con otra ${w}" data-onclick="mgMergeMenu(event,'${x.id}')">⤵</button>` : ''}<button class="danger mgx" title="Eliminar" aria-label="Eliminar" data-onclick="delM('${x.id}')">🗑</button></span></div>`).join('') +
+    `<div class="row mgadd"><button class="pri" data-onclick="mgAdd('${uid()}')">+ Añadir ${w}</button></div>` +
+    (ordOn ? `<details class="cs mgod" ${ordOpen ? 'open' : ''} data-ontoggle="setHas(CFG_OPEN,'mgo',this.open)"><summary>Clasificaciones para ordenar <small class="dgn">(avanzado)</small></summary><div class="csb"><small class="mgoh">Para ordenar los papers por un valor de cada ${w} (p. ej. un número o un día de la semana).</small>${mgOrdHTML()}</div></details>` : '');
+}
+function mgMergeMenu(e, id) {   // v40.6: juntar dos etiquetas o secciones en una
+  const x = db[MG].find(y => y.id === id); if (!x) return;
+  ctxShow(e, `<div class="ctxh">Juntar «${esc(x.name)}» con…</div>` + db[MG].filter(y => y.id !== id).map(y => `<button data-onclick="ctxClose();mgMerge('${id}','${y.id}')"><span class="ndot" style="background:${esc(y.color || '#888')}"></span> ${esc(y.name)}</button>`).join(''));
+}
+async function mgMerge(from, to) {
+  const T = MG === 'tags', a = db[MG].find(y => y.id === from), b = db[MG].find(y => y.id === to); if (!a || !b) return;
+  if (!await askOk(`¿Juntar «${a.name}» con «${b.name}»? Los papers ${T ? 'con' : 'de'} «${a.name}» pasan a «${b.name}»${T ? '' : ', con sus notas'}, y «${a.name}» desaparece. Se puede deshacer.`, {ok: 'Juntar'})) return;
+  let n = 0;
+  db.papers.forEach(p => { const L = T ? p.tagIds : p.sectionIds; if (!L.includes(from)) return; n++;
+    const nl = [...new Set(L.map(i => i === from ? to : i))]; if (T) p.tagIds = nl; else { p.sectionIds = nl; p.notes.forEach(q => { if (q.sectionId === from) q.sectionId = to; }); }
+    logChange(p, `${T ? 'Etiqueta' : 'Sección'}: ${a.name} → ${b.name}`); });
+  if (T) { db.sections.forEach(s => { if (s.tagIds.includes(from)) s.tagIds = [...new Set(s.tagIds.map(i => i === from ? to : i))]; }); if (F.tags.delete(from)) F.tags.add(to); F.exTags.delete(from); }
+  else if (F.secs.delete(from)) F.secs.add(to);
+  db[MG] = db[MG].filter(y => y.id !== from); markDirty(); drawMg(); render();
+  toast(`«${a.name}» junta con «${b.name}» (${n === 1 ? '1 paper' : n + ' papers'}).`, [{t: 'Deshacer', fn: () => { undo(); if ($('#mg').open) drawMg(); }}], 6000);
 }
 function upd(id, k, v) { db[MG].find(x => x.id === id)[k] = v; markDirty(); }
 function moveM(id, d) { const a = db[MG], i = a.findIndex(x => x.id === id), j = i + d;
