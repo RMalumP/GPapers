@@ -5,11 +5,11 @@ const src = [...fs.readFileSync(path.join(dir, 'index.html'), 'utf8').matchAll(/
 const cut = (a, b) => src.slice(src.indexOf(a), src.indexOf(b));
 const code = `
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-let OPT = {lang:'es', dateFmt:'long', vanAll:false, ppChap:true}; const ex = () => OPT;
+let OPT = {lang:'es', dateFmt:'long', vanAll:false, ppChap:true}; const ex = () => OPT; const uid = () => 'u' + Math.random().toString(36).slice(2);
 const normDoi = s => String(s || '').trim().replace(/^(https?:\\/\\/(dx\\.)?doi\\.org\\/|doi:\\s*)/i, '').trim().toLowerCase();
 ${cut('const TYPES', 'function NEWF')}
 ${cut('/* ===== Citas', '/* ===== Persistencia')}
-return {TYPES, shows, NEWS, typeWarn, TYPE_WARN, STYLES, chiFn, isNum, yE, citeTxt, citeHtml, ini, isOrg, fdate, citeLink, pAuth, edLbl, numLbl, yearSuffixes, abcLetters, setOpt: o => OPT = {...OPT, ...o}, reset: () => OPT = {lang:'es', dateFmt:'long', vanAll:false, ppChap:true}};`;
+return {TYPES, shows, NEWS, typeWarn, TYPE_WARN, STYLES, chiFn, isNum, yE, citeTxt, citeHtml, ini, isOrg, fdate, citeLink, pAuth, edLbl, numLbl, yearSuffixes, abcLetters, syncStyles, cuNew, setOpt: o => OPT = {...OPT, ...o}, reset: () => OPT = {lang:'es', dateFmt:'long', vanAll:false, ppChap:true}};`;
 const T = new Function(code)();
 let fail = 0, n = 0;
 const eq = (name, got, want) => { n++; if (got !== want) { fail++; console.log('FALLA', name, '\n  got :', JSON.stringify(got), '\n  want:', JSON.stringify(want)); } };
@@ -882,5 +882,30 @@ T.reset(); for (const k of Object.keys(T.STYLES)) for (const ty of ['libro', 'ar
   const q = xp({type: ty, authors: ['Ruiz, A.'], venue: 'Ed', title: 'A*B', year: 2020, cites: {[k]: 'a mano'}}), j = JSON.stringify(q), r = T.STYLES[k].inText(q, undefined, '5');
   eq(`F4 ${k}/${ty} no modifica el paper`, JSON.stringify(q), j); eq(`F4 ${k}/${ty} devuelve líneas de texto`, r.length > 0 && r.every(x => typeof x.t === 'string' && x.t.length > 0 && typeof x.k === 'string'), true);
   eq(`F4 ${k}/${ty} paper vacío no falla`, T.STYLES[k].inText({...base, type: ty, title: '', authors: [], year: ''}).every(x => typeof x.t === 'string'), true); }
+
+// ===== v40.4: año de la publicación original, entre corchetes, en todos los estilos =====
+const fr = P({type:'libro', authors:['Freud, Sigmund'], year:2018, origYear:'1930', title:'El malestar en la cultura', venue:'Alianza', place:'Madrid'});
+const ar = P({authors:['Ruiz, Ana'], year:2018, origYear:'1995', title:'Ensayo de 2018', venue:'Revista', volume:'3', issue:'2', pages:'1-9', doi:'10.1/2018.5'});
+const SO = (k, p, o) => T.citeTxt(T.STYLES[k].fn(p, o));
+eq('orig APA libro', SO('apa', fr), 'Freud, S. (2018) [1930]. El malestar en la cultura. Alianza.');
+eq('orig APA artículo (título y DOI con el año)', SO('apa', ar), 'Ruiz, A. (2018) [1995]. Ensayo de 2018. Revista, 3(2), 1-9. https://doi.org/10.1/2018.5');
+eq('orig APA 2018a', SO('apa', fr, {ys:'a'}), 'Freud, S. (2018a) [1930]. El malestar en la cultura. Alianza.');
+eq('orig APA web fecha completa', SO('apa', P({type:'web', authors:['Medina, O.'], year:2014, origYear:'2001', pubDate:'2014-09-26', title:'A', venue:'JD'})), 'Medina, O. (26 de septiembre, 2014) [2001]. A. JD.');
+eq('orig APA sin autor', SO('apa', P({type:'libro', title:'El poema', year:2015, origYear:'1140', venue:'Anaya'})), 'El poema. (2015) [1140]. Anaya.');
+eq('orig APA en el texto', T.STYLES.apa.inText(fr, undefined, '24').map(x => x.t).join(' | '), '(Freud, 2018 [1930], p. 24) | Freud (2018 [1930], p. 24)');
+eq('orig Vancouver', SO('vancouver', fr), 'Freud S. El malestar en la cultura. Madrid: Alianza; 2018 [1930].');
+eq('orig MLA', SO('mla', fr), 'Freud, Sigmund. El malestar en la cultura. Alianza, 2018 [1930].');
+eq('orig IEEE', SO('ieee', fr), 'S. Freud, El malestar en la cultura. Madrid: Alianza, 2018 [1930].');
+eq('orig Chicago autor-fecha', SO('chicago_af', fr), 'Freud, Sigmund. 2018 [1930]. El malestar en la cultura. Madrid: Alianza.');
+eq('orig Chicago notas, artículo', SO('chicago_nb', ar), 'Ruiz, Ana. “Ensayo de 2018”. Revista 3, n.º 2 (2018 [1995]): 1-9. https://doi.org/10.1/2018.5.');
+eq('orig UNE nombre-fecha', SO('une_nf', fr), 'FREUD, Sigmund, 2018 [1930]. El malestar en la cultura. Madrid: Alianza.');
+eq('orig vacío no cambia nada', SO('apa', {...fr, origYear:''}), 'Freud, S. (2018). El malestar en la cultura. Alianza.');
+eq('orig igual al año no se repite', SO('apa', {...fr, origYear:'2018'}), 'Freud, S. (2018). El malestar en la cultura. Alianza.');
+eq('orig sin año no sale', SO('apa', {...fr, year:''}), 'Freud, S. (s.f.). El malestar en la cultura. Alianza.');
+T.syncStyles([{...T.cuNew('Mío'), id:'o1'}]);
+eq('orig estilo propio nuevo', SO('cu_o1', fr), 'Freud, S. (2018) [1930]. El malestar en la cultura. Alianza.');
+eq('orig estilo propio en el texto', T.STYLES.cu_o1.inText(fr, undefined, '24')[0].t, '(Freud, 2018 [1930], p. 24)');
+eq('orig estilo propio sin dato', SO('cu_o1', {...fr, origYear:''}), 'Freud, S. (2018). El malestar en la cultura. Alianza.');
+T.syncStyles([]);
 
 console.log(`${n - fail}/${n} pruebas correctas`); process.exit(fail ? 1 : 0);

@@ -2,6 +2,13 @@
 
 Lo más reciente arriba. Hasta la v39.53 estas notas estaban en el README; van de la más nueva a la más antigua (algunas rondas antiguas no tenían número de versión).
 
+## v40.4: año de la publicación original en las citas
+- **Campo nuevo, opcional: «Año de la publicación original»** (en los datos del paper, en «Mostrar todos los campos»; si tiene datos, se ve siempre). Sirve para las reediciones y traducciones: se cita la edición que se ha leído y, entre corchetes, el año en que se publicó la obra por primera vez.
+- Sale en **todos los estilos de serie**, justo después del año de la edición: APA «Freud, S. (2018) [1930].», Chicago, MLA, IEEE, Vancouver y UNE «…, 2018 [1930].», y en la cita en el texto «(Freud, 2018 [1930], p. 24)». Si el campo está vacío o coincide con el año, la cita no cambia.
+- **Estilos propios**: campo nuevo `{origYear}`; con `[ {origYear:br}]` sale entre corchetes solo si tiene valor. Los estilos nuevos y los creados «a partir de» uno de serie ya lo llevan detrás del año.
+- Se exporta como `original-date` (CSL JSON) y `origdate` (BibTeX/biblatex).
+- Pruebas nuevas en `node pruebas/pruebas_citas.js .`
+
 ## v40.3: zonas para pasar de página, a elegir
 - **👆 Zonas para pasar** (📖 Modo de lectura, en página a página, en el PDF y en el EPUB). Antes solo se pasaba tocando a la izquierda o a la derecha. Ahora la página se parte en 3 × 3 casillas y se elige qué hace cada una:
   - **Izquierda y derecha** (como antes, por defecto), **Arriba y abajo** (arriba vuelve, abajo pasa), **Al revés** (derecha, anterior) y **Casi todo adelante** (solo la columna izquierda vuelve).

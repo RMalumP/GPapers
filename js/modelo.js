@@ -76,11 +76,12 @@ const TYPES = {articulo: 'Artículo de revista', libro: 'Libro', capitulo: 'Cap�
 const LINK_MODES = {auto: 'Automático (DOI si hay; si no, URL)', doi: 'Solo DOI', url: 'Solo URL (Disponible en)', none: 'Ninguno'};   // enlace que se escribe en la cita
 const AUTH_T = {auto: 'Automático', persona: 'Persona', entidad: 'Entidad (organización)', sin_autor: 'Sin autor'};
 const THESIS = ['Tesis doctoral', 'Trabajo fin de grado', 'Trabajo fin de máster', 'Proyecto fin de carrera'];
-const STR_F = ['volume', 'issue', 'pages', 'publisher', 'place', 'edition', 'pubDate', 'thesisType',
+const STR_F = ['volume', 'issue', 'pages', 'publisher', 'place', 'edition', 'pubDate', 'origYear', 'thesisType',
   'isbn', 'issn', 'series', 'seriesNumber', 'institution', 'docNumber', 'conferenceName', 'conferencePlace', 'conferenceDates', 'subtype', 'authorRole', 'userHandle', 'abbr', 'ecli'];   // campos de texto (F1a y, desde F3a, los P2: aún sin plantilla de cita)
 const FLD_T = {volume: ['articulo'], issue: ['articulo', 'legislacion'], pages: ['articulo', 'capitulo', 'congreso', 'prensa', 'legislacion', 'diccionario'], publisher: ['capitulo', 'congreso', 'jurisprudencia'],
   place: ['libro', 'capitulo', 'congreso', 'tesis', 'web', 'informe', 'norma', 'patente', 'mapa', 'software', 'basedatos', 'audiovisual', 'legislacion', 'jurisprudencia'],
   edition: ['libro', 'norma', 'mapa', 'dataset', 'software', 'ia', 'diccionario'], editors: ['capitulo'],
+  origYear: Object.keys(TYPES).filter(t => !['personal', 'legislacion', 'jurisprudencia'].includes(t)),   // año de la publicación original (v40.4): opcional, en todos los estilos
   pubDate: ['articulo', 'web', 'prensa', 'blog', 'informe', 'norma', 'patente', 'dataset', 'software', 'audiovisual', 'audio', 'redsocial', 'ia', 'presentacion', 'personal', 'legislacion', 'jurisprudencia'], thesisType: ['tesis'],
   isbn: ['libro'], issn: ['articulo'], institution: ['tesis'], series: ['informe', 'mapa', 'audiovisual', 'audio', 'ia', 'jurisprudencia'], seriesNumber: ['informe', 'mapa', 'audiovisual', 'audio', 'jurisprudencia'], docNumber: ['informe', 'norma', 'patente', 'mapa', 'legislacion', 'jurisprudencia'],
   conferenceName: [], conferencePlace: [], conferenceDates: [],

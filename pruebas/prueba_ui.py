@@ -460,7 +460,7 @@ with sync_playwright() as pw:
     eq('crear al vuelo: se crea, se asigna al paper y se abre Configuración', pg.evaluate("[db.settings.customTypes.length, D.type === 'ct_' + db.settings.customTypes[0].id, $('#cfg').open, CFG_OPEN.has('ct')]"), [1, True, True, True])
     pg.fill('#cfg input[data-oninput*="ctSet(\'name\'"]', 'Pódcast local')
     pg.select_option('#cfg select:has(option[value=audio])', 'audio'); pg.wait_for_timeout(200)
-    eq('al cambiar «Se cita como» los campos no se pisan solos', pg.evaluate("db.settings.customTypes[0].fields.sort().join()"), 'issn,issue,pages,pubDate,volume')
+    eq('al cambiar «Se cita como» los campos no se pisan solos', pg.evaluate("db.settings.customTypes[0].fields.sort().join()"), 'issn,issue,origYear,pages,pubDate,volume')
     pg.click('#cfg button:has-text("Usar los campos de")'); pg.wait_for_timeout(200)
     eq('y se pueden recargar con el botón', pg.evaluate("db.settings.customTypes[0].fields.sort().join()"), pg.evaluate("ctFieldsOf('audio').sort().join()"))
     pg.check('#cfg .ctr:has-text("ISBN") input[type=checkbox]'); pg.fill('#cfg input[data-oninput*="ctLabel(\'venue\'"]', 'Canal'); pg.fill('#cfg .ctr:has-text("ISBN") input:not([type=checkbox])', 'Código del episodio')
