@@ -214,3 +214,4 @@ html.tb:not(.mv) main>.row .chip{white-space:nowrap;max-width:100%;overflow:hidd
 html.tb:not(.mv) #ctx.mvfm button{min-height:40px;padding:6px 12px}
 /* Barra lateral ordenada (v39.32): en el móvil el cajón se desplaza entero; el pie (iconos y texto de la app) va al final */
 html.mv #sbMain,html.mv #sbFoot{flex:none}html.mv #sbFoot{margin-top:8px;padding:6px 8px 4px}html.mv .sbf .sh.sfi{min-height:44px}
+html.mv .dauto .row{flex-wrap:wrap!important}html.mv .dauto .row input{flex-basis:100%!important}

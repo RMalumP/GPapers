@@ -2,6 +2,14 @@
 
 Lo más reciente arriba. Hasta la v39.53 estas notas estaban en el README; van de la más nueva a la más antigua (algunas rondas antiguas no tenían número de versión).
 
+## v40.5: pestaña «Datos» más clara, en bloques y con modo Sencillo o Avanzado
+- **Bloques con título, plegables**: Identificación (imagen, título, título personalizado, autores, año, tipo, lectura y valoración), Publicación, Fechas, Enlaces y archivos (URL, PDF/EPUB, enlace en la cita) y Ajustes de la cita (clave de cita, clave de orden, tipo de autor). La app recuerda los que pliegas.
+- **Modo Sencillo | Avanzado**, arriba: Sencillo (por defecto) muestra lo básico, lo que usa tu estilo principal y lo que tiene datos; Avanzado, todos los campos. Ya no hay «Otros campos»: en Sencillo, cada bloque nombra al pie lo que esconde («+ 4 campos más: Año original, Fecha completa…») y se abre con un clic, sin pasar a Avanzado.
+- **DOI arriba, con «Rellenar»** (CrossRef), OpenAlex y Parecidos: lo primero que se rellena trae casi todo lo demás.
+- **Etiquetas cortas**: el ejemplo va como texto de fondo («p. ej. 73-98») y la explicación, en un **ⓘ** que se abre al pulsarlo.
+- **Vista previa de la cita** en el estilo principal al pie de Datos, que cambia mientras escribes.
+- No se pierde ningún campo ni botón; en el móvil, todo en una columna.
+
 ## v40.4: año de la publicación original en las citas
 - **Campo nuevo, opcional: «Año de la publicación original»** (en los datos del paper, en «Mostrar todos los campos»; si tiene datos, se ve siempre). Sirve para las reediciones y traducciones: se cita la edición que se ha leído y, entre corchetes, el año en que se publicó la obra por primera vez.
 - Sale en **todos los estilos de serie**, justo después del año de la edición: APA «Freud, S. (2018) [1930].», Chicago, MLA, IEEE, Vancouver y UNE «…, 2018 [1930].», y en la cita en el texto «(Freud, 2018 [1930], p. 24)». Si el campo está vacío o coincide con el año, la cita no cambia.

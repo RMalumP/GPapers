@@ -50,8 +50,8 @@ with sync_playwright() as pw:
     pg.evaluate("$('#ex').close()")
     # ---- formulario del tipo Jurisprudencia
     pg.evaluate("openPaper('j2'); tab = 'data'; drawD()")
-    labels = pg.evaluate("[...document.querySelectorAll('#dlg label')].map(l => l.childNodes[0].textContent.trim())")
-    for l in ['Tribunal u órgano (p. ej. Tribunal Supremo)', 'Sala y sección (p. ej. Sala de lo Penal, Sección 1.ª; Pleno)', 'Número de la resolución (p. ej. 1229/2017)', 'Fecha de la resolución', 'Tipo de resolución (por defecto, Sentencia)', 'Base de datos (opcional; p. ej. Aranzadi Instituciones, CENDOJ)']:
+    labels = pg.evaluate("[...document.querySelectorAll('#dlg label')].map(l => [(l.querySelector('.lt')?.firstChild || l.childNodes[0]).textContent.trim(), l.querySelector('input,select,textarea')?.placeholder || '', l.querySelector('.hlpt')?.textContent || ''].join(' | '))")   # v40.5: etiqueta corta | texto de fondo (el ejemplo) | ayuda ⓘ
+    for l in ['Tribunal u órgano | Tribunal Supremo | ', 'Sala y sección | Sala de lo Penal, Sección 1.ª; Pleno | ', 'Número de la resolución | 1229/2017 | ', 'Fecha de la resolución |  | ', 'Tipo de resolución |  | Por defecto, Sentencia.', 'Base de datos | Aranzadi Instituciones, CENDOJ | Opcional.']:
         eq('Formulario de jurisprudencia: ' + l, l in labels, True)
     eq('Formulario de jurisprudencia: ECLI y abreviatura', [any(x.startswith('ECLI') for x in labels), any(x.startswith('Abreviatura propia') for x in labels)], [True, True])
     eq('Formulario: «Jurisprudencia» en el desplegable Tipo', pg.evaluate("[...document.querySelectorAll('#dlg select option')].some(o => o.value === 'jurisprudencia' && o.selected)"), True)
@@ -60,8 +60,8 @@ with sync_playwright() as pw:
     pg.evaluate("db.settings.mainStyle = 'derecho'; drawD()")
     eq('con Derecho como estilo principal, la fecha de consulta sí sale', pg.evaluate("!!document.querySelector('#dlg input[data-k=accessed]')"), True)
     pg.evaluate("db.settings.mainStyle = 'apa'; DATA_ALL = true; drawD()")
-    labels = pg.evaluate("[...document.querySelectorAll('#dlg label')].map(l => l.childNodes[0].textContent.trim())")
-    eq('Formulario de legislación: rango y abreviatura', ['Rango (opcional; se deduce del título)' in labels, 'Abreviatura (p. ej. CE, LOPJ, LRJSP)' in labels], [True, True])
+    labels = pg.evaluate("[...document.querySelectorAll('#dlg label')].map(l => [(l.querySelector('.lt')?.firstChild || l.childNodes[0]).textContent.trim(), l.querySelector('input,select,textarea')?.placeholder || '', l.querySelector('.hlpt')?.textContent || ''].join(' | '))")
+    eq('Formulario de legislación: rango y abreviatura', ['Rango |  | Opcional; se deduce del título.' in labels, 'Abreviatura | CE, LOPJ, LRJSP | ' in labels], [True, True])
     # ---- pestaña Cita: secciones y cita en el texto
     pg.evaluate("ex().inText = true; openPaper('j2'); tab = 'cite'; CLOC = '3'; drawD()")
     eq('Cita: títulos de sección', pg.evaluate("[...document.querySelectorAll('#dlg h2.grp, #dlg details.cgrp > summary')].map(h => h.textContent)"), ['Estilo principal', 'Estilos generales (9)', 'Derecho y jurisprudencia (1)'])

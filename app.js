@@ -3,7 +3,7 @@
    ON_VARS da acceso a las variables y funciones flecha (const/let no están en window); las funciones normales se encuentran solas. */
 const ON_VARS = {
   get $() { return $; }, get F() { return F; }, get D() { return D; }, get DATA_ALL() { return DATA_ALL; }, get GR() { return GR; }, get LK() { return LK; }, get SV() { return SV; },
-  get CU() { return CU; }, get CTS() { return CTS; }, get DP_IGN() { return DP_IGN; }, get ALL_FOLD() { return ALL_FOLD; }, get CITE_OPEN() { return CITE_OPEN; },
+  get CU() { return CU; }, get CTS() { return CTS; }, get DP_IGN() { return DP_IGN; }, get ALL_FOLD() { return ALL_FOLD; }, get DATA_FOLD() { return DATA_FOLD; }, get CITE_OPEN() { return CITE_OPEN; },
   get HELP_OPEN() { return HELP_OPEN; }, get CFG_OPEN() { return CFG_OPEN; }, get ctxClose() { return ctxClose; }, get fmClose() { return fmClose; }, get svSave() { return svSave; }, get syAuto() { return syAuto; },
 };
 function put(o, k, v, then) { o[k] = v; if (then) then(); }   // asigna y, si se pide, redibuja: put(F,'mode',this.value,render)
@@ -39,7 +39,7 @@ function mgAdd(id) { db[MG].push({id, name: 'Nueva', color: '#2457c5', tagIds: [
    Aparte del JSON, la app guarda (1) una copia de trabajo, para reabrir justo donde lo dejaste aunque no hayas guardado, y
    (2) el estado de la interfaz (filtros, orden, barra lateral, bloques plegados). Viven fuera de la caché de la aplicación,
    así que las actualizaciones no los tocan y no hace falta borrar datos para recibir una versión nueva. */
-const APP_V = '40.4';   // debe coincidir con la versión de sw.js
+const APP_V = '40.5';   // debe coincidir con la versión de sw.js
 let BOOTED = false, RELOADING = false, SWREG = null, tSes = 0, tUi = 0, lastUi = '';
 const sessionNow = fast => { clearTimeout(tSes); if (!BOOTED || TAB.passive) return Promise.resolve();   // fast (desde sessionSoon): si acaba de hacerse la copia para deshacer, se usa esa (un JSON entero menos por cambio)   // copia de trabajo del proyecto abierto (y la lista de proyectos)
   const p = pjCur(); if (p) { Object.assign(p, {n: db.papers.length, file: path, dirty}); delete p.remote; }
@@ -52,7 +52,7 @@ function sesWarn(e) {   // antes el fallo se callaba: con el disco lleno la copi
 }
 const sessionSoon = () => { clearTimeout(tSes); tSes = setTimeout(() => sessionNow(true), 700); };
 const uiState = () => ({v: 1, F: {sorts: F.sorts, group: F.group, secs: [...F.secs], sec: sec1(), tags: [...F.tags], read: F.read, minRating: F.minRating, inNotes: F.inNotes, mode: F.mode, tbSec: F.tbSec, tbTag: F.tbTag, ...fExtra()},
-  side: {min: $('#side').classList.contains('min'), w: sbW(), fold: [...document.querySelectorAll('#side .sg.fold')].map(e => e.id), more: !$('#sg-more').classList.contains('fold'), sortOpen: !$('#sg-sort').classList.contains('fold'), ff: [...document.querySelectorAll('#side .fs.fold')].filter(e => e.id !== 'fs-adv').map(e => e.id), adv: !$('#fs-adv').classList.contains('fold')}, cite: CITE_SEL, dataAll: DATA_ALL, citeOpen: [...CITE_OPEN], allFold: [...ALL_FOLD], cfg: [...CFG_OPEN], help: [...HELP_OPEN]});
+  side: {min: $('#side').classList.contains('min'), w: sbW(), fold: [...document.querySelectorAll('#side .sg.fold')].map(e => e.id), more: !$('#sg-more').classList.contains('fold'), sortOpen: !$('#sg-sort').classList.contains('fold'), ff: [...document.querySelectorAll('#side .fs.fold')].filter(e => e.id !== 'fs-adv').map(e => e.id), adv: !$('#fs-adv').classList.contains('fold')}, cite: CITE_SEL, dataAll: DATA_ALL, dataFold: [...DATA_FOLD], citeOpen: [...CITE_OPEN], allFold: [...ALL_FOLD], cfg: [...CFG_OPEN], help: [...HELP_OPEN]});
 const uiNow = () => { clearTimeout(tUi); if (!BOOTED || TAB.sat) return Promise.resolve(); const s = JSON.stringify(uiState()); if (s === lastUi) return Promise.resolve(); lastUi = s; return idb('readwrite', st => st.put(JSON.parse(s), 'ui')).catch(() => {}); };
 const uiSoon = () => { clearTimeout(tUi); tUi = setTimeout(uiNow, 500); };
 function applyUI(u) {   // lo guardado nunca se fía: cada dato se valida contra el estado actual (un paper o etiqueta borrados no rompen nada)
@@ -62,7 +62,7 @@ function applyUI(u) {   // lo guardado nunca se fía: cada dato se valida contra
   F.read = Object.hasOwn(READ, f.read) ? f.read : ''; F.minRating = Number.isInteger(f.minRating) && f.minRating >= 0 && f.minRating <= 5 ? f.minRating : 0; F.inNotes = !!f.inNotes; F.mode = f.mode === 'all' ? 'all' : 'any'; F.tbSec = !!f.tbSec; F.tbTag = f.tbTag !== false; fExtraLoad(f);
   const sd = u.side || {}; $('#side').classList.toggle('min', !!sd.min); sbWidth(Number.isFinite(sd.w) ? sd.w : 0); document.querySelectorAll('#side .sg').forEach(e => e.classList.toggle('fold', strs(sd.fold).includes(e.id)));
   $('#sg-more').classList.toggle('fold', sd.more !== true); ['sec', 'tag', 'read'].forEach(k => fsToggle(k, strs(sd.ff).includes('fs-' + k))); fsToggle('adv', sd.adv !== true); $('#side .shm').setAttribute('aria-expanded', sd.more === true); $('#sg-sort').classList.toggle('fold', sd.sortOpen !== true);   // Ordenar: una línea con el orden actual, plegado salvo que lo dejaras abierto
-  CITE_SEL = typeof u.cite === 'string' && STYLES[u.cite] ? u.cite : ''; DATA_ALL = u.dataAll === true; strs(u.citeOpen).filter(g => STY_G.some(([x]) => (x || 'gen') === g)).forEach(g => CITE_OPEN.add(g)); strs(u.allFold).forEach(x => ALL_FOLD.add(x)); strs(u.cfg).forEach(x => CFG_OPEN.add(x)); strs(u.help).forEach(x => HELP_OPEN.add(x));
+  CITE_SEL = typeof u.cite === 'string' && STYLES[u.cite] ? u.cite : ''; DATA_ALL = u.dataAll === true; strs(u.citeOpen).filter(g => STY_G.some(([x]) => (x || 'gen') === g)).forEach(g => CITE_OPEN.add(g)); strs(u.allFold).forEach(x => ALL_FOLD.add(x)); strs(u.dataFold).filter(g => DGRP.some(([x]) => x === g)).forEach(g => DATA_FOLD.add(g)); strs(u.cfg).forEach(x => CFG_OPEN.add(x)); strs(u.help).forEach(x => HELP_OPEN.add(x));
   $('#grpChk').checked = F.group; render();
 }
 function toastHome(t) {   // el aviso va dentro de la ventana abierta encima (el visor, la ficha…): si no, no se podría pulsar «Deshacer»
