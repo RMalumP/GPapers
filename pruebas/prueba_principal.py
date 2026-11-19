@@ -100,7 +100,7 @@ with sync_playwright() as pw:
     eq('«Ver todo» arranca con el estilo principal', pg.evaluate("$('#dlg select[data-onchange^=citeSelSet]').value"), 'derecho')
     # ---- barra de formato de la cita
     pg.evaluate("db.settings.mainStyle = 'apa'; ex().style = 'apa'; db.settings.citeOnlyMain = false; tab = 'cite'; drawD()")
-    eq('barra de formato: formato, idioma y fecha', pg.evaluate("[...document.querySelectorAll('#dlg .cbar .cbt')].map(s => s.textContent)"), ['Formato', 'Idioma', 'Fecha de consulta'])
+    eq('barra de formato: formato, idioma y fecha', pg.evaluate("[...document.querySelectorAll('#dlg .cbar .cbt')].map(s => s.textContent)"), ['Idioma', 'Fecha de consulta'])   # v40.6: la cursiva y la negrita sin título; idioma y fecha en «Opciones», plegado
     eq('la barra no lleva texto de explicación', (pg.evaluate("!!$('#dlg .cbar small')"), 'Un asterisco literal se escribe' in pg.inner_text('#dlg')), (False, False))
     eq('la cita se ve en cursiva real, sin asteriscos', pg.evaluate("[$('#c_apa i')?.textContent, $('#c_apa').textContent.includes('*')]"), ['Nature', False])
     eq('y por dentro se guarda con las marcas de siempre', pg.evaluate("citeRaw('apa') === STYLES.apa.fn(D)"), True)
@@ -116,6 +116,7 @@ with sync_playwright() as pw:
     pg.evaluate("D.cites.apa = 'Cita con *cursiva*, un \\\\* literal y **negrita**'; drawD()")
     eq('una cita editada con marcas se muestra con formato y se lee igual', pg.evaluate("[$('#c_apa').innerHTML, ceVal($('#c_apa'))]"), ['Cita con <i>cursiva</i>, un * literal y <b>negrita</b>', 'Cita con *cursiva*, un \\* literal y **negrita**'])
     pg.evaluate("delete D.cites.apa; drawD()")
+    pg.click('#dlg .cbopt > summary')   # v40.6: idioma y fecha, en «Opciones» (plegado)
     pg.select_option('#dlg .cbar select[data-onchange*=lang]', 'en')
     eq('Idioma: el mismo ajuste que Exportar, y la cita cambia', pg.evaluate("[ex().lang, citeRaw('apa').includes('& Bengio')]"), ['en', True])
     pg.select_option('#dlg .cbar select[data-onchange*=dateFmt]', 'iso')

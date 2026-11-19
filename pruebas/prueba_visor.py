@@ -277,7 +277,7 @@ with sync_playwright() as pw:
     eq('si no cambia, no se vuelve a subir', len([f for f in STORE.values() if f['name'].endswith('.pdf') and f.get('parents') != ['appDataFolder']]), n1)
     # ---- v39.1: Drive con su estado en el botón y «Cerrar sesión» en Configuración
     eq('el botón de Drive dice que hay sesión (en el móvil se lee en el menú ⋯)', D1.evaluate("$('#syncBtn .syl').textContent"), 'Google Drive · Sincronizado')
-    D1.evaluate("openCfg('da')"); eq('Configuración → Datos: sincronizar y cerrar sesión', D1.evaluate("[...document.querySelectorAll('#cfg .cfgdr button')].map(b => b.textContent)"), ['🔄 Sincronizar ahora', '🚪 Cerrar sesión de Google Drive']); D1.evaluate("$('#cfg').close()")
+    D1.evaluate("openCfg('da')"); eq('Configuración → Datos: sincronizar y cerrar sesión', D1.evaluate("[...document.querySelectorAll('#cfg .cfgdr button')].map(b => b.textContent)"), ['🔄 Sincronizar ahora', '🚪 Cerrar sesión']); D1.evaluate("$('#cfg').close()")
     eq('se apunta cuánto tardó la última vuelta', D1.evaluate("SY.ms > 0"), True)
     cD.close()
     # ---- v39.1: el visor en una pestaña aparte

@@ -2,6 +2,18 @@
 
 Lo más reciente arriba. Hasta la v39.53 estas notas estaban en el README; van de la más nueva a la más antigua (algunas rondas antiguas no tenían número de versión).
 
+## v40.6: más fácil sin perder nada (Exportar, Configuración, ficha, Secciones y Etiquetas)
+- **Modo de la app: Sencillo o Completo** (Configuración → Apariencia, arriba). Sencillo esconde Vistas, Búsqueda avanzada, Relaciones, Columnas de la tabla, el Historial de la ficha, las clasificaciones de Secciones y Etiquetas y los demás estilos en «Cita». No borra nada; «Completo» lo enseña todo. Se guarda en el JSON (`settings.uiMode`: `full` por defecto o `simple`) y llega a los otros dispositivos.
+- **Exportar**: arriba solo papers, formato y estilo; debajo la vista previa y Copiar, Copiar con formato y Guardar. Lo demás va en **«Más opciones»**, plegado, con un resumen («Automático · Español · consulta: 20 de octubre de 2026»). «Listar todos los autores» sale solo con Vancouver y «pp.» solo con APA; las explicaciones, en ⓘ. Resumen de anotaciones y Markdown para Obsidian, en una línea aparte.
+- **Configuración**: un **buscador** arriba («pdf», «color», «Drive»…). En el ordenador las pestañas siguen a la vista: cada una dice cuántos ajustes coinciden y se ve la elegida; en el móvil salen todos los que coinciden, uno tras otro. Apariencia y Datos y Drive van en bloques plegables (Google Drive, PDF y anotaciones, PDF por citar, Espacio y herramientas), con textos cortos y las explicaciones en ⓘ. Lo que solo vale en este navegador lleva la marca «este dispositivo».
+- **Ficha → Cita**: Cursiva y Negrita en una línea; idioma y fecha de consulta, en «Opciones» (plegado). Junto a la cita principal, `\cite{}` y `[@]`. «↺ Volver a la cita automática» sale solo si la cita está editada a mano.
+- **Ficha → Relacionados**: una sola lista con el tipo de cada relación (Relacionado, Cita a, Citado por), sin los «Ninguno.».
+- **Ficha → Notas por sección**: cada nota se pliega por su título, con el punto de color de su sección y el principio del texto. Su ⋯ la cambia de sección o la quita (con Deshacer). «+ Añadir nota» pregunta en qué sección va.
+- **Gestionar secciones y etiquetas**: una fila por línea con color, nombre, descripción, **cuántos papers** tiene, ↑ ↓ y 🗑. Nuevo **⤵ Fusionar** dos etiquetas (o secciones, con sus notas) en una, con Deshacer. Las clasificaciones para ordenar van abajo, plegadas (abiertas si ya tienes alguna).
+- **Barra lateral**: «Incluir notas…» e «Incluir el texto de los PDF…» salen al escribir en el buscador (o si están marcadas). Valoración y Años, en dos líneas con su nombre.
+- **Relaciones**: la primera vez, la explicación sale debajo del gráfico en vez de encima.
+- Pruebas actualizadas: las 40 de navegador y las 3 de node pasan.
+
 ## v40.5: pestaña «Datos» más clara, en bloques y con modo Sencillo o Avanzado
 - **Bloques con título, plegables**: Identificación (imagen, título, título personalizado, autores, año, tipo, lectura y valoración), Publicación, Fechas, Enlaces y archivos (URL, PDF/EPUB, enlace en la cita) y Ajustes de la cita (clave de cita, clave de orden, tipo de autor). La app recuerda los que pliegas.
 - **Modo Sencillo | Avanzado**, arriba: Sencillo (por defecto) muestra lo básico, lo que usa tu estilo principal y lo que tiene datos; Avanzado, todos los campos. Ya no hay «Otros campos»: en Sencillo, cada bloque nombra al pie lo que esconde («+ 4 campos más: Año original, Fecha completa…») y se abre con un clic, sin pasar a Avanzado.

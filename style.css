@@ -61,7 +61,7 @@ aside.min .dot{position:absolute;top:6px;right:6px}.sb .chip{margin:2px 4px 2px 
 .rst{font-size:calc(12px * var(--fz,1));padding:0 9px;border:1px solid var(--c);color:var(--c);border-radius:99px;background:none}.stv{color:#e0a100;letter-spacing:1px;font-size:calc(14px * var(--fz,1))}
 .ilist{max-height:45vh;overflow:auto;border:1px solid var(--bd);border-radius:8px}.irow{display:flex;gap:8px;align-items:flex-start;padding:6px 10px;border-bottom:1px solid var(--bd);font-size:calc(14px * var(--fz,1))}
 .irow input{width:auto;margin-top:4px}.tag-dup{font-size:calc(11px * var(--fz,1));border:1px solid var(--red);color:var(--red);border-radius:99px;padding:0 6px}#imp textarea{width:100%}
-#ex textarea{width:100%;min-height:240px;margin-top:8px}.exchk{display:flex;flex-wrap:wrap;gap:4px 16px}.exchk label.row{flex-direction:row;align-items:center;gap:6px}
+#ex textarea{width:100%;min-height:220px;margin-top:4px}.exchk{display:flex;flex-wrap:wrap;gap:4px 16px}.exchk label.row{flex-direction:row;align-items:center;gap:6px}
 .relr{display:block;width:100%;text-align:left;margin-top:4px}.hist{display:flex;flex-direction:column;gap:6px;margin-bottom:8px}.he small{opacity:.7;margin-right:6px}
 .ntx{white-space:normal}.md p{margin:.3em 0}.md ul,.md ol{margin:.3em 0;padding-left:1.4em}
 .fmt{display:flex;gap:4px;flex-wrap:wrap;margin:6px 0 4px}.fmt button{font-size:calc(13px * var(--fz,1));padding:1px 9px}.fmt button.on{border-color:var(--pri);color:var(--pri)}
@@ -375,3 +375,32 @@ small.hlpt{display:none;font-weight:400;opacity:.8;margin:2px 0 4px}small.hlpt.o
 .dprevc{margin-top:4px;line-height:1.45;overflow-wrap:anywhere}
 details.dg>.grid{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}details.dg .titlecol input{width:100%}
 @media(max-width:560px){details.dg>.grid{grid-template-columns:minmax(0,1fr)}.dauto .row{flex-wrap:wrap!important}.dauto .row input{flex-basis:100%!important}}
+/* v40.6: Exportar en dos niveles */
+#ex .exmain .lt{display:flex;align-items:center;gap:2px}#ex .exwarn{opacity:.85}
+#ex details.exmore{margin:10px 0 8px}#ex details.exmore>summary{font-size:calc(14px * var(--fz,1));flex-wrap:wrap}#ex .exsum{font-weight:400;color:var(--fg);opacity:.7;font-size:calc(12px * var(--fz,1))}
+#ex .exbtn{margin-top:10px}#ex .exalt{margin-top:6px;gap:4px 10px;align-items:center}#ex .exalt small{opacity:.75}#ex .exalt button.lnk{text-decoration:none;font-size:calc(13px * var(--fz,1))}#ex .exalt button.lnk:hover{text-decoration:underline}
+#ex .exchk label.row small.hlpt{flex-basis:100%}#ex .exchk label.row{flex-wrap:wrap}
+@media(max-width:560px){#ex .exalt small{flex-basis:100%}}
+/* v40.6: Configuración (buscador, bloques, «este dispositivo») */
+#cfgQ{width:100%;margin:2px 0 6px}#cfg .cblk>.csb{display:flex;flex-direction:column;gap:6px}#cfg .cblk>.csb>.ci>details.cs{margin:2px 0}
+#cfg .cchk{flex-wrap:nowrap;align-items:flex-start;gap:6px}#cfg .cchk input{margin-top:3px}#cfg .ci small.hlpt{margin-left:24px}
+#cfg .ci label>.lt{display:flex;align-items:center;gap:2px}.cdev{display:inline-block;font-size:calc(11px * var(--fz,1));font-weight:400;padding:0 6px;border:1px solid var(--bd);border-radius:9px;opacity:.8;vertical-align:middle;white-space:nowrap}
+#cfg .cfgsr>h3{margin:14px 0 2px;font-size:calc(13px * var(--fz,1));text-transform:uppercase;letter-spacing:.04em;opacity:.7}.cfgfoot{margin:12px 0 0;opacity:.8}#cfg .cmode{margin:0}
+/* v40.6: ficha (cita, notas plegables, relacionados en una lista) */
+.cbar{gap:6px 14px}.cbar .cbh{flex-basis:auto!important;opacity:.6}.cbopt>summary{cursor:pointer;font-size:calc(13px * var(--fz,1));font-weight:600;color:var(--pri)}.cbopt>summary .cbsum{font-size:calc(12px * var(--fz,1));font-weight:400;color:var(--fg);opacity:.7}.cbopt[open]>.cbg{margin-top:6px}
+.cbtns{flex-wrap:wrap;gap:6px}
+details.nfold{padding:0}details.nfold>summary{display:flex;align-items:center;gap:8px;padding:8px 10px;cursor:pointer;list-style:none}details.nfold>summary::-webkit-details-marker{display:none}
+details.nfold>summary::before{content:"▸";transition:transform .15s;display:inline-block;opacity:.6}details.nfold[open]>summary::before{transform:rotate(90deg)}details.nfold[open]>summary{border-bottom:1px solid var(--bd)}
+details.nfold>summary .npv{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;opacity:.65}details.nfold[open]>summary .npv{visibility:hidden}details.nfold>summary .nmore{margin-left:auto;padding:1px 9px}details.nfold>:not(summary){margin:8px 10px 10px}
+.ndot{display:inline-block;width:10px;height:10px;border-radius:50%;flex:none;vertical-align:middle}
+.rell{display:flex;flex-direction:column;gap:4px}.relrow{display:flex;align-items:center;gap:8px;min-width:0}.relk{flex:none;font-size:calc(11px * var(--fz,1));font-weight:600;padding:1px 8px;border-radius:9px;color:var(--rc);border:1px solid var(--rc);background:var(--card)}
+.relt{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.relt small{opacity:.65}.relrow .sm{padding:1px 8px}.relh{opacity:.55;font-size:calc(11px * var(--fz,1));white-space:nowrap}
+/* v40.6: modo Sencillo de la app: se esconde lo que menos se usa (sigue en Ctrl+K) */
+html.simple #sg-fav,html.simple #fs-adv,html.simple #tbCols,html.simple #sbFoot [data-onclick="grOpen()"]{display:none!important}
+/* v40.6: Gestionar secciones y etiquetas */
+#mg .mgr{display:flex;align-items:center;gap:6px;margin:0 0 6px;flex-wrap:nowrap}#mg .mgr .mgn{flex:1 1 30%;min-width:0}#mg .mgr .mgd{flex:1 1 40%;min-width:0}#mg .mgr .mgc{flex:none;width:38px;height:34px;padding:2px}
+#mg .mgn2{flex:none;opacity:.65;white-space:nowrap;min-width:5.5em;text-align:right}#mg .mgb{display:flex;gap:4px;flex:none}#mg .mgb button{padding:4px 9px}#mg .mgadd{margin:8px 0 4px}#mg .mgoh{display:block;opacity:.75;margin-bottom:6px}#mg details.mgod>summary{font-size:calc(14px * var(--fz,1))}
+/* v40.6: barra lateral */
+#sg-search:not(.qon) label.qinc{display:none}#fs-rat .fh2.yrs+.fh2.yrs{margin-top:2px}#fs-rat .fht{font-weight:600;font-size:calc(13px * var(--fz,1))}
+.ctabs[hidden]{display:none}#cfg .cblk>.csb{gap:2px}#cfg .cblk>.csb>.ci>label:not(.cchk){margin:4px 0}
+#cfg .ctabs .cfgn{font-size:calc(11px * var(--fz,1));padding:0 6px;border-radius:9px;background:var(--pri);color:var(--onpri)}#cfg .ctabs .cfg0{opacity:.45}#cfg .ctabs .cfg0 .cfgn{background:var(--bd);color:var(--fg)}

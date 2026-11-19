@@ -464,7 +464,7 @@ function render() {
   tg('#tbSec', F.tbSec, 'Sección', F.secs.size || F.noSec); tg('#tbTag', F.tbTag, 'Etiquetas', F.tags.size || F.exTags.size || F.noTag);
   $('#secF2').hidden = !F.tbSec; $('#tagF2').hidden = !F.tbTag; $('#grpChk').checked = F.group;
   selDraw(0);
-  $('#d-search').hidden = !F.q && !advRules().length; advDraw(); $('#d-tr').hidden = !db.trash.length; $('#trLbl').textContent = $('#side .trb').title = 'Papelera' + (db.trash.length ? ` (${db.trash.length})` : ''); $('#tbView').innerHTML = db.settings.view === 'table' ? '▦<span class="bl"> Tarjetas</span>' : '☰<span class="bl"> Tabla</span>'; $('#tbCols').hidden = db.settings.view !== 'table';
+  $('#d-search').hidden = !F.q && !advRules().length; $('#sg-search').classList.toggle('qon', !!(F.q || F.inNotes || F.inPdf)); advDraw(); $('#d-tr').hidden = !db.trash.length; $('#trLbl').textContent = $('#side .trb').title = 'Papelera' + (db.trash.length ? ` (${db.trash.length})` : ''); $('#tbView').innerHTML = db.settings.view === 'table' ? '▦<span class="bl"> Tarjetas</span>' : '☰<span class="bl"> Tabla</span>'; $('#tbCols').hidden = db.settings.view !== 'table';
   F.sorts = F.sorts.filter(s => Object.hasOwn(sortOpts(), s.k)); if (!F.sorts.length) F.sorts = [{k: 'title', d: 1}];   // una clasificación borrada deja de ordenar
   const nextKey = Object.keys(SORTS).find(k => !F.sorts.some(s => s.k === k)) || 'title';
   const so = sortOpts(); $('#sortSum').textContent = F.sorts.map(s => (so[s.k] || s.k).replace(/ \(.*\)$/, '') + (s.d > 0 ? ' ▲' : ' ▼')).join(' · ') + (F.group ? ' · por sección' : '');   // el orden actual, en la cabecera de Ordenar
@@ -496,7 +496,7 @@ function emptyHTML() {
    (chips con sus contadores, Ordenar, Selección) costaba dos tercios de cada tecla (con 2000 papers, ~90 ms en un móvil medio, ~30 de ellos el filtro). */
 function renderQ() {
   if (RENDER_HOLD || VW.open) return render();
-  CITED = null; $('#d-search').hidden = !F.q && !advRules().length;
+  CITED = null; $('#d-search').hidden = !F.q && !advRules().length; $('#sg-search').classList.toggle('qon', !!(F.q || F.inNotes || F.inPdf));   // v40.6: las casillas «Incluir…» salen al escribir (o si están marcadas)
   actDraw(); favDraw(); listDraw(); fitBars();
 }
 const LIST = {L: [], n: 0, shown: 0, get step() { return document.documentElement.classList.contains('mv') ? 40 : 150; }};   // lo que se ve en la lista y cuántos papers lleva pintados (en el móvil caben pocas tarjetas: se pintan de 40 en 40)
@@ -524,7 +524,7 @@ function renderPaper(id) {   // repinta solo la tarjeta o fila de un paper; si e
   if (!tr) fitTags(nodes[0]); nodes.forEach(n => { n.querySelectorAll('.pimg[data-fpid]').forEach(e => hydrateImgs(false, e)); covHydrate(n); });
 }
 let tQ = 0;   // la búsqueda espera a que dejes de escribir (Enter la aplica al momento)
-function qSet(v, now) { F.q = v; clearTimeout(tQ); if (now) renderQ(); else tQ = setTimeout(renderQ, 150); }
+function qSet(v, now) { F.q = v; $('#sg-search').classList.toggle('qon', !!(v || F.inNotes || F.inPdf)); clearTimeout(tQ); if (now) renderQ(); else tQ = setTimeout(renderQ, 150); }
 function toggleF(id) { if (F.exTags.delete(id)) return render(); F.tags.has(id) ? F.tags.delete(id) : F.tags.add(id); F.noTag = false; render(); }   // pulsar una excluida solo quita la exclusión
 function tagsAll() { F.tags.clear(); F.exTags.clear(); F.noTag = false; render(); }
 function noTagF() { F.noTag = !F.noTag; if (F.noTag) F.tags.clear(); render(); }
@@ -837,28 +837,36 @@ const ris = L => L.map(effP).map(p => { const ty = p.type, pg = /^(.+?)\s*[-–�
 function openEx() {   // ventana emergente de exportación; se cierra con un clic fuera
   const o = ex(); if (!STYLES[o.style]) o.style = 'apa'; if (!EXF[o.fmt]) o.fmt = 'txt'; if (!EXO[o.order]) o.order = 'auto';
   EXS = SEL.size ? 'sel' : 'vis';
-  $('#ex').innerHTML = `<h2>Exportar</h2><div id="exOpts"></div><textarea id="exText"></textarea>
-    <div class="row" style="margin-top:10px"><button class="pri" data-onclick="exCopy()">Copiar</button><button id="exRich" data-onclick="exCopyRich()" title="Con sangría francesa, para pegar en Word o Docs">Copiar con formato</button><button data-onclick="exSave()">Guardar archivo</button><button data-onclick="sumOpen()" title="Cita completa de cada paper y debajo sus subrayados, comentarios y notas del PDF (Word, PDF o Markdown)">🖍 Resumen de anotaciones…</button><button data-onclick="obsSave()" title="Un archivo .md por paper (datos en YAML, clave de cita, notas y subrayados) dentro de un ZIP: para Obsidian, Logseq o Notion">🗂 Markdown para Obsidian (.zip)</button><small id="exMsg"></small><button style="margin-left:auto" data-onclick="$('#ex').close()">Cerrar</button></div>`;
+  $('#ex').innerHTML = `<div class="dh"><h2>Exportar citas</h2><div class="dbtn"><button data-onclick="$('#ex').close()" aria-label="Cerrar">Cerrar ✕</button></div></div><div id="exOpts"></div><textarea id="exText" aria-label="Vista previa (se puede editar antes de copiar)"></textarea>
+    <div class="row exbtn"><button class="pri" data-onclick="exCopy()">Copiar</button><button id="exRich" data-onclick="exCopyRich()" title="Con sangría francesa, para pegar en Word o Docs">Copiar con formato</button><button data-onclick="exSave()">Guardar archivo</button><small id="exMsg"></small></div>
+    <div class="row exalt"><small>Otras formas de exportar:</small><button class="lnk" data-onclick="sumOpen()" title="Cita completa de cada paper y debajo sus subrayados, comentarios y notas del PDF (Word, PDF o Markdown)">🖍 Resumen de anotaciones…</button><button class="lnk" data-onclick="obsSave()" title="Un archivo .md por paper (datos en YAML, clave de cita, notas y subrayados) dentro de un ZIP: para Obsidian, Logseq o Notion">🗂 Markdown para Obsidian (.zip)</button></div>`;
   exUI(); drawEx(); $('#ex').showModal();
 }
 function exSet(k, v, quiet) {   // las opciones se recuerdan en el JSON (sin crear pasos de deshacer)
   ex()[k] = v; foldSnap(); dirty = true; touch(); if (!quiet) exUI(); drawEx();
 }
+/* v40.6: Exportar en dos niveles. A la vista: qué papers, formato y estilo (lo que casi siempre se toca), la vista previa y los botones.
+   «Más opciones» (plegado; se recuerda en el dispositivo): orden, idioma, fecha, numeración, título y casillas. Las casillas de un solo estilo salen solo con ese estilo, y las explicaciones van en ⓘ. */
+const exVan = s => /^vancouver/.test(s) || !!STYLES[s]?.custom, exApa = s => /^apa|^derecho$/.test(s) || !!STYLES[s]?.custom;
 function exUI() {
-  const o = ex(), tl = isTl(o.fmt);
+  const o = ex(), tl = isTl(o.fmt), St = STYLES[o.style] || {};
   const sel = (k, opts, cur) => `<select data-onchange="exSet('${k}',this.value)">${Object.entries(opts).map(([v, t]) => `<option value="${v}" ${v === cur ? 'selected' : ''}>${t}</option>`).join('')}</select>`;
-  const chk = (k, t) => `<label class="row"><input type="checkbox" ${o[k] ? 'checked' : ''} data-onchange="exSet('${k}',this.checked)"> ${t}</label>`;
-  $('#exOpts').innerHTML = `<div class="grid">
+  const chk = (k, t, help) => `<label class="row"><input type="checkbox" ${o[k] ? 'checked' : ''} data-onchange="exSet('${k}',this.checked)"> ${t}${help ? hlp(help) : ''}</label>`;
+  const DF = {long: '20 de octubre de 2026', dmy: '20-10-2026', iso: '2026-10-20'}, LG = {es: 'Español (y, En, consultado)', en: 'English (&, In, cited)'};
+  const warns = tl ? (exList(), EXTYPES).map(t => typeWarn(o.style, t)).filter(Boolean) : [];
+  const sum = [EXO[o.order].split(' (')[0], tl && (St.fixedLang ? (St.fixedLang === 'en' ? 'English' : 'Español') : LG[o.lang].split(' (')[0]), tl && 'consulta: ' + DF[o.dateFmt], tl && (St.numbered || o.num) && 'numerado', tl && o.notes && 'con notas'].filter(Boolean).join(' · ');
+  const more = `<div class="grid">
+      <label>Orden${sel('order', EXO, o.order)}</label>
+      ${tl ? `<label>Idioma de los conectores${St.fixedLang ? `<select disabled><option>${St.fixedLang === 'en' ? 'English (fijo en este estilo)' : 'Español (fijo en este estilo)'}</option></select>` : sel('lang', LG, o.lang)}</label><label>Fecha de consulta${sel('dateFmt', DF, o.dateFmt)}</label>` : ''}
+      ${tl && isNum(o) ? `<label>Formato de la numeración${sel('numFmt', {auto: 'Según el estilo', dot: '1.', br: '[1]', par: '(1)'}, o.numFmt)}</label>` : ''}
+      ${tl ? `<label>Título del documento<input value="${esc(o.title)}" placeholder="Referencias" data-oninput="exSet('title',this.value,1)"></label>` : ''}
+      <div class="w exchk">${tl ? (St.numbered ? '' : chk('num', 'Numerar')) + chk('notes', 'Incluir notas') + (exVan(o.style) ? chk('vanAll', 'Listar todos los autores', 'Vancouver: por defecto, los 6 primeros y «et al.».') : '') + (exApa(o.style) ? chk('ppChap', '«pp.» antes de las páginas de un capítulo', 'APA: «En J. Pérez (Ed.), Título (pp. 73-98)».') : '') + (St.dis ? chk('disamb', 'Distinguir obras del mismo autor y año (2020a, 2020b)') : '') + (St.sections ? chk('abbrList', 'Lista de abreviaturas al principio (legislación y jurisprudencia)') : '') : ''}${chk('particles', 'Ignorar partículas al ordenar (de, del, la, van…)', 'Para un caso concreto («de la Torre» bajo la T o bajo la D), rellena «Clave de orden» en la pestaña Datos del paper: tiene prioridad.')}</div></div>`;
+  $('#exOpts').innerHTML = `<div class="grid exmain">
     <label>Papers<select data-onchange="exsSet(this.value)"><option value="sel" ${EXS === 'sel' ? 'selected' : ''}>Seleccionados (${SEL.size})</option><option value="vis" ${EXS === 'vis' ? 'selected' : ''}>Visibles con los filtros (${visible().length})</option><option value="all" ${EXS === 'all' ? 'selected' : ''}>Todos (${db.papers.length})</option></select></label>
     <label>Formato${sel('fmt', Object.fromEntries(Object.entries(EXF).map(([k, v]) => [k, v[0]])), o.fmt)}</label>
-    ${tl ? `<label>Estilo de cita<select data-onchange="exSet('style',this.value)">${styOpts(o.style)}</select></label>` : ''}
-    <label>Orden${sel('order', EXO, o.order)}</label>
-    ${tl ? `<label>Idioma de los conectores${STYLES[o.style]?.fixedLang ? `<select disabled><option>${STYLES[o.style].fixedLang === 'en' ? 'English (fijo en este estilo)' : 'Español (fijo en este estilo)'}</option></select>` : sel('lang', {es: 'Español (y, En, consultado)', en: 'English (&, In, cited)'}, o.lang)}</label><label>Fecha de consulta${sel('dateFmt', {long: '20 de octubre de 2026', dmy: '20-10-2026', iso: '2026-10-20'}, o.dateFmt)}</label>` : ''}
-    ${tl && isNum(o) ? `<label>Formato de la numeración${sel('numFmt', {auto: 'Según el estilo', dot: '1.', br: '[1]', par: '(1)'}, o.numFmt)}</label>` : ''}
-    ${tl ? `<label>Título del documento<input value="${esc(o.title)}" placeholder="Referencias" data-oninput="exSet('title',this.value,1)"></label>` : ''}
-    <div class="w exchk">${tl ? (STYLES[o.style]?.numbered ? '' : chk('num', 'Numerar')) + chk('notes', 'Incluir notas') + chk('vanAll', 'Vancouver: listar todos los autores (por defecto, 6 y «et al.»)') + chk('ppChap', 'APA: «pp.» antes de las páginas de un capítulo') + (STYLES[o.style]?.dis ? chk('disamb', 'Distinguir obras del mismo autor y año (2020a, 2020b)') : '') + (STYLES[o.style]?.sections ? chk('abbrList', 'Lista de abreviaturas al principio (legislación y jurisprudencia)') : '') : ''}${chk('particles', 'Ignorar partículas al ordenar (de, del, la, van…)')}</div>
-    ${tl ? `<small class="w">${STYLES[o.style]?.note ? esc(STYLES[o.style].note) + '<br>' : ''}${(exList(), EXTYPES).map(t => typeWarn(o.style, t)).filter(Boolean).map(w => '⚠ ' + esc(w) + '<br>').join('')}${esc(BASADO)}</small>` : ''}
-    <small class="w">Para un caso concreto («de la Torre» bajo la T o bajo la D), rellena «Clave de orden» en la pestaña Datos del paper: tiene prioridad.</small></div>`;
+    ${tl ? `<label class="w"><span class="lt">Estilo de cita${hlp((St.note ? St.note + ' ' : '') + BASADO)}</span><select data-onchange="exSet('style',this.value)">${styOpts(o.style)}</select></label>` : ''}
+    ${warns.length ? `<small class="w exwarn">${warns.map(w => '⚠ ' + esc(w)).join('<br>')}</small>` : ''}</div>
+    <details class="cs exmore" ${CFG_OPEN.has('exmore') ? 'open' : ''} data-ontoggle="setHas(CFG_OPEN,'exmore',this.open)"><summary>Más opciones <small class="exsum">${esc(sum)}</small></summary><div class="csb">${more}</div></details>`;
 }
 function drawEx() {
   const o = ex(), L = exList();

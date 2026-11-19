@@ -171,7 +171,7 @@ with sync_playwright() as pw:
     P1.evaluate("openPaper('k1'); tab = 'data'; drawD()"); P1.click('#dlg .pdfrow button:has-text("Enlazar")'); P1.wait_for_timeout(200); P1.evaluate("commit()"); P1.wait_for_timeout(3800)
     eq('con la opción desactivada el PDF no se sube', names('gpapers-pdf-'), [])
     P1.evaluate("openCfg('da')")
-    eq('en Configuración está la opción, con su explicación', ('Subir a mi Google Drive los PDF enlazados' in P1.inner_text('#cfg'), 'carpeta privada y oculta' in P1.inner_text('#cfg')), (True, True))
+    eq('en Configuración está la opción, con su explicación', ('Subir a mi Google Drive los PDF enlazados' in P1.inner_text('#cfg'), 'carpeta privada y oculta' in P1.text_content('#cfg')), (True, True))
     P1.click('#cfg label:has-text("Subir a mi Google Drive") input'); P1.wait_for_timeout(300); P1.evaluate("$('#cfg').close()"); P1.wait_for_timeout(4200)
     eq('al activarla se sube el PDF a la carpeta oculta, tal cual', (names('gpapers-pdf-'), [f['content'] for f in STORE.values() if f['name'].startswith('gpapers-pdf-')], [f['parents'] for f in STORE.values() if f['name'].startswith('gpapers-pdf-')]), (['gpapers-pdf-k1'], ['%PDF-1.4 prueba'], [['appDataFolder']]))
     P1.evaluate("""window.showOpenFilePicker = async () => [{name: 'sup.pdf', queryPermission: async () => 'granted', requestPermission: async () => 'granted', getFile: async () => new File(['%PDF-1.4 dos'], 'sup.pdf', {type: 'application/pdf'})}]; null""")

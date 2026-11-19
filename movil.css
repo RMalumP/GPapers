@@ -168,15 +168,9 @@ html.tb #ctx button.ex{text-decoration:line-through;opacity:.75}
 
 /* --- Gestionar secciones y etiquetas: dos líneas por sección (color, nombre, ↑ ↓ · descripción, eliminar); una por etiqueta --- */
 html.mv #mg .mgr{display:grid;gap:6px;align-items:center;margin:0 0 8px!important;padding-bottom:8px;border-bottom:1px solid var(--bd)}
-html.mv #mg .mgr>*{margin:0;min-width:0;width:100%}
-html.mv #mg .mgr input[type=color]{width:44px;height:40px;padding:2px}
-html.mv #mg .mgr button{min-height:40px;padding:4px 0}
-html.mv #mg .mgr.mgs{grid-template-columns:44px minmax(0,1fr) 44px 44px;grid-template-areas:"c n u d" "s s x x"}
-html.mv #mg .mgr.mgt{grid-template-columns:44px minmax(0,1fr) 44px 44px 44px;grid-template-areas:"c n u d x"}
-html.mv #mg .mgc{grid-area:c}html.mv #mg .mgn{grid-area:n}html.mv #mg .mgd{grid-area:s}html.mv #mg .mgu{grid-area:u}html.mv #mg .mgw{grid-area:d}html.mv #mg .mgx{grid-area:x}
-html.mv #mg .mgt .mgx .mgxl{display:none}html.mv #mg .mgx .mgxi{display:none}html.mv #mg .mgt .mgx .mgxi{display:inline}
-html.mv #mg .mgr.mgs.mgkon{grid-template-columns:52px 44px minmax(0,1fr) 44px 44px;grid-template-areas:"k c n u d" "s s s x x"}
-html.mv #mg .mgr.mgt.mgkon{grid-template-columns:52px 44px minmax(0,1fr) 44px 44px 44px;grid-template-areas:"k c n u d x"}
+html.mv #mg .mgr>*{margin:0;min-width:0}html.mv #mg .mgr input[type=color]{width:44px;height:40px;padding:2px}html.mv #mg .mgr button{min-height:40px;min-width:40px}
+html.mv #mg .mgr{grid-template-columns:44px minmax(0,1fr);grid-template-areas:"c n" "s s" "q b"}html.mv #mg .mgr.mgkon{grid-template-columns:52px 44px minmax(0,1fr);grid-template-areas:"k c n" "s s s" "q q b"}
+html.mv #mg .mgk{grid-area:k}html.mv #mg .mgc{grid-area:c}html.mv #mg .mgn{grid-area:n;width:100%}html.mv #mg .mgd{grid-area:s;width:100%}html.mv #mg .mgn2{grid-area:q}html.mv #mg .mgb{grid-area:b;justify-self:end}
 html.mv #mg .mgk{grid-area:k;text-align:center}
 html.mv #mg .mgo select{width:100%}
 html.mv #ctx.colm{max-height:min(75dvh,600px);overflow-y:auto;overscroll-behavior:contain}html.mv #ctx .colr .colmv{min-width:44px;padding:8px 0;text-align:center}   /* columnas de la tabla: casillas grandes, sin pulsaciones largas */
