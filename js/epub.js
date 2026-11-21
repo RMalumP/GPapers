@@ -157,7 +157,7 @@ function epBuild() {
       <button class="vwib" id="epMoreB" data-onclick="epMore(event)" title="Más: modo de lectura, marcadores, descargar…" aria-label="Más">⋯</button></div>
     <div class="vwtb" role="toolbar" aria-label="Herramientas">
       <button class="vwm vwun" data-onclick="epUndo()" title="Deshacer (Ctrl+Z)" aria-label="Deshacer"><span>↶</span><small>Deshacer</small></button>
-      <span class="vwcs" role="group" aria-label="Color al subrayar" title="Selecciona texto y elige un color para subrayarlo">${sw('epColor')}</span>
+      <span class="vwcs" role="group" aria-label="Color al subrayar" title="Selecciona texto y elige un color para subrayarlo">${vwSwBar('epColor')}</span>
       <button class="vwm" data-onclick="epFontBy(-1)" title="Letra más pequeña (−)" aria-label="Letra más pequeña"><span>A−</span></button><button class="vwm" data-onclick="epFontBy(1)" title="Letra más grande (+)" aria-label="Letra más grande"><span>A+</span></button>
       <button class="vwm" id="epBmB" data-onclick="epBmToggle()" title="Marcar o quitar este punto (B)"><span>🔖</span><small>Marcador</small></button>
       <button class="vwm eptc" data-onclick="epPanel('toc')" title="Índice del libro (I)"><span>📑</span><small>Índice</small></button>
@@ -585,7 +585,7 @@ function epAutoTick(t) {   // la velocidad va en líneas: con letra más grande,
 /* ---- Menús, pantalla completa, teclado ---- */
 function epMenu(r, html) {
   let m = $('#epMenu'); if (!m) { m = document.createElement('div'); m.id = 'epMenu'; m.className = 'vwfloat vwmenu'; $('#ep').append(m); m.addEventListener('click', ev => { const b = ev.target.closest('button'); if (b && !b.hasAttribute('data-keep')) setTimeout(() => m.hidden = true); }); }
-  m.innerHTML = html; m.hidden = false; const w = m.offsetWidth; r ||= {right: innerWidth - 8, bottom: 52}; m.style.left = Math.max(8, Math.min(r.right - w, innerWidth - w - 8)) + 'px'; m.style.top = (r.bottom + 4) + 'px';
+  m.innerHTML = html; m.hidden = false; const w = m.offsetWidth; r ||= EP.menuR = menuAnchor('#epMoreB'); m.style.left = Math.max(8, Math.min(r.right - w, innerWidth - w - 8)) + 'px'; m.style.top = (r.bottom + 4) + 'px';
   m.style.maxHeight = `calc(100dvh - ${Math.round(r.bottom + 12)}px)`; m.style.overflow = 'auto';
   setTimeout(() => document.addEventListener('pointerdown', ev => { if (!m.contains(ev.target)) m.hidden = true; }, {once: true, capture: true}));
 }

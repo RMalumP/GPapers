@@ -9,6 +9,15 @@
    como anotaciones estándar (resaltado con su color y su comentario, nota adhesiva), que se ven en Acrobat, Foxit y cualquier lector (js/visor.js, vwPdfOut).
    Desde file:// el navegador no deja cargar PDF.js (módulos): se abre el visor del navegador, como antes. */
 const VW_COLORS = [['#ffd400', 'Amarillo'], ['#5fd068', 'Verde'], ['#4dabf7', 'Azul'], ['#ff6b6b', 'Rojo'], ['#b197fc', 'Morado']];
+/* v40.7: en el móvil, la paleta de la barra de herramientas se pliega en el color elegido (si no, los nombres de los botones no caben y se montan):
+   al tocarlo se abren los cinco; al elegir uno, o al tocar fuera, se vuelve a plegar. En el ordenador no cambia nada. */
+const vwSwBar = fn => VW_COLORS.map(([c, t], i) => `<button class="vwc" data-c="${i}" style="--c:${c}" title="${t}" aria-label="Color ${t}" data-onclick="vwSw(event,${i},'${fn}')"></button>`).join('');
+function vwSw(e, i, fn) {
+  const cs = e?.target?.closest?.('.vwcs'), b = e?.target?.closest?.('.vwc');
+  if (cs && document.documentElement.classList.contains('mv') && !cs.classList.contains('open') && b?.classList.contains('on')) { cs.classList.add('open'); return; }
+  cs?.classList.remove('open'); (fn === 'epColor' ? epColor : vwColor)(i);
+}
+document.addEventListener('pointerdown', e => { if (!e.target.closest?.('.vwtb .vwcs')) document.querySelectorAll('.vwtb .vwcs.open').forEach(x => x.classList.remove('open')); }, true);
 const VW_LIB = 'lib/pdfjs/', VW_GAP = 12;
 const VW = {open: false, tab: 'ann', kind: '', src: null, file: null, doc: null, pages: [], scale: 1, fit: true, mode: 'sel', color: 0, cur: 0, io: null, queue: new Set(), busy: false,
   sel: null, pop: null, foreign: null, filt: '', pushed: false, gen: 0, find: {q: '', hits: [], i: -1, txt: new Map()}, side: false, dirty: false, startPage: 0};
@@ -69,7 +78,7 @@ function vwBuild() {
       <button class="vwm" data-m="hl" data-onclick="vwMode('hl')" title="Subrayar: arrastra sobre el texto (con el dedo, el lápiz o el ratón)"><span>🖍</span><small>Subrayar</small></button>
       <button class="vwm" data-m="area" data-onclick="vwMode('area')" title="Zona: arrastra para marcar un recuadro (PDF escaneados, figuras)"><span>▭</span><small>Zona</small></button>
       <button class="vwm" data-m="note" data-onclick="vwMode('note')" title="Nota: toca la página donde quieras dejarla"><span>🗒</span><small>Nota</small></button>
-      <span class="vwcs" role="group" aria-label="Color">${sw}</span>
+      <span class="vwcs" role="group" aria-label="Color">${vwSwBar('vwColor')}</span>
       <button class="vwm vwtc" data-onclick="vwPanel('toc')" title="Índice del PDF y miniaturas de las páginas"><span>📑</span><small>Índice</small></button>
       <button class="vwm vwnb" data-onclick="vwNotes()" title="Notas del paper (generales y por sección) al lado del PDF, con todas las opciones del editor"><span>📝</span><small>Notas</small></button>
       <button class="vwm vwfsb" data-onclick="vwTbHide(true)" title="Ocultar esta barra (se vuelve a sacar con la pestaña ▾; su sitio se elige en ⋯ → Modo de lectura)"><span>▴</span><small>Ocultar</small></button>

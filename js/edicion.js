@@ -327,9 +327,9 @@ function ceVal(el) {   // DOM del cuadro de cita → texto con marcas
 }
 const citeRaw = k => { const e = document.getElementById('c_' + k); return e ? ceVal(e) : D.cites[k] ?? STYLES[k].fn(D); };
 const citeBar = () => { const o = ex(), sel = (k, opts, tt) => `<select title="${tt}" data-onchange="citeOpt('${k}',this.value)">${Object.entries(opts).map(([v, t]) => `<option value="${v}" ${v === o[k] ? 'selected' : ''}>${t}</option>`).join('')}</select>`;   // v40.6: una línea; idioma y fecha, plegados
-  const LG = {es: 'Español', en: 'English'}, DF = {long: '20 de octubre de 2026', dmy: '20-10-2026', iso: '2026-10-20'};
+  const LG = {es: 'Español', en: 'English'}, DF = dfOpts();
   return `<div class="cbar" data-onmousedown="noBtnFocus(event)"><div class="cbg"><button data-onclick="citeCmd('italic')" title="Cursiva en lo seleccionado de la cita (${esc(db.settings.shortcuts.italic)})" ><i>K</i> Cursiva</button><button data-onclick="citeCmd('bold')" title="Negrita en lo seleccionado de la cita"><b>N</b> Negrita</button></div>
-    <details class="cbopt" ${CFG_OPEN.has('citeopt') ? 'open' : ''} data-ontoggle="setHas(CFG_OPEN,'citeopt',this.open)"><summary>Opciones <span class="cbsum">${LG[o.lang] || ''} · ${DF[o.dateFmt] || ''}</span></summary><div class="cbg"><span class="cbt">Idioma</span>${sel('lang', {es: 'Español (y, En, consultado)', en: 'English (&, In, cited)'}, 'Idioma de los conectores de la cita')}<span class="cbt">Fecha de consulta</span>${sel('dateFmt', DF, 'Cómo se escribe la fecha de consulta (el «[consultado el …]» de las páginas web)')}</div></details>
+    <details class="cbopt" ${CFG_OPEN.has('citeopt') ? 'open' : ''} data-ontoggle="setHas(CFG_OPEN,'citeopt',this.open)"><summary>Opciones <span class="cbsum">${LG[o.lang] || ''} · fecha ${DF_NAME[o.dateFmt] || ''}</span></summary><div class="cbg"><span class="cbt">Idioma</span>${sel('lang', {es: 'Español (y, En, consultado)', en: 'English (&, In, cited)'}, 'Idioma de los conectores de la cita')}<span class="cbt">Fecha de consulta</span>${sel('dateFmt', DF, 'Cómo se escribe la fecha de consulta (el «[consultado el …]» de las páginas web)')}</div></details>
     </div>`; };
 document.addEventListener('focusin', e => { if (e.target.classList?.contains('ced')) CITE_TA = e.target.id; });
 document.addEventListener('paste', e => { const el = e.target.closest?.('.ced'); if (!el) return;   // se pega como texto, sin el formato de otra página
@@ -454,10 +454,11 @@ const svSave = () => saveText(svMarkdown(), 'notas.md', 'text/markdown', 'md', '
 let GR = {all: false, vis: false, help: false};   // help: explicación desplegada con relaciones (la primera vez que se abre y con el botón ❓)
 function grLayout(n, edges, W, H) {   // disposición de fuerzas determinista: repulsión entre nodos, muelles en las aristas y gravedad al centro
   const P = Array.from({length: n}, (_, i) => ({x: W / 2 + Math.cos(2 * Math.PI * i / Math.max(n, 1)) * W * .35, y: H / 2 + Math.sin(2 * Math.PI * i / Math.max(n, 1)) * H * .35, vx: 0, vy: 0}));
+  const REP = 40000, LEN = W < 600 ? 150 : 200;   // v40.7: un poco más separados, para que quepan los títulos (en el móvil el gráfico mide lo que la pantalla)
   const its = n <= 200 ? 300 : Math.max(40, Math.round(300 * 4e4 / (n * n)));   // cada pasada compara todos los nodos entre sí: con muchos, menos pasadas (1000 nodos tardaban 2,5 s)
   for (let it = 0; it < its; it++) {
-    for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) { let dx = P[i].x - P[j].x, dy = P[i].y - P[j].y, d2 = Math.max(dx * dx + dy * dy, 1), d = Math.sqrt(d2), f = 40000 / d2; P[i].vx += dx / d * f; P[i].vy += dy / d * f; P[j].vx -= dx / d * f; P[j].vy -= dy / d * f; }
-    for (const [a, b] of edges) { const dx = P[b].x - P[a].x, dy = P[b].y - P[a].y, d = Math.max(Math.hypot(dx, dy), 1), f = (d - 170) * .02; P[a].vx += dx / d * f; P[a].vy += dy / d * f; P[b].vx -= dx / d * f; P[b].vy -= dy / d * f; }
+    for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) { let dx = P[i].x - P[j].x, dy = P[i].y - P[j].y, d2 = Math.max(dx * dx + dy * dy, 1), d = Math.sqrt(d2), f = REP / d2; P[i].vx += dx / d * f; P[i].vy += dy / d * f; P[j].vx -= dx / d * f; P[j].vy -= dy / d * f; }
+    for (const [a, b] of edges) { const dx = P[b].x - P[a].x, dy = P[b].y - P[a].y, d = Math.max(Math.hypot(dx, dy), 1), f = (d - LEN) * .02; P[a].vx += dx / d * f; P[a].vy += dy / d * f; P[b].vx -= dx / d * f; P[b].vy -= dy / d * f; }
     for (const q of P) { q.vx += (W / 2 - q.x) * .004; q.vy += (H / 2 - q.y) * .004; q.x = Math.min(W - 40, Math.max(40, q.x + q.vx * .5)); q.y = Math.min(H - 30, Math.max(30, q.y + q.vy * .5)); q.vx *= .8; q.vy *= .8; }
   }
   return P;
@@ -473,8 +474,10 @@ function grOpen() {
   GR.help = !seen; grDraw(); $('#gr').showModal();   // quien lo abre por primera vez ve la explicación (v40.6: debajo del gráfico); después, solo el gráfico
 }
 function grDraw() {
-  const {nodes, E} = grData(), W = 880, H = 560, ix = new Map(nodes.map((p, i) => [p.id, i])), P = grLayout(nodes.length, E.map(e => [ix.get(e.a), ix.get(e.b)]), W, H);
-  const lbl = p => esc(shortTxt(p.alias || p.title, 28)) + (p.year ? ' · ' + p.year : '');
+  const W = Math.min(880, Math.max(300, Math.round(Math.min(920, innerWidth * .96) - 36))), H = W >= 600 ? 560 : Math.round(W * 1.25);   // v40.7: el dibujo, del ancho de la ventana (en el móvil, a tamaño real)
+  const {nodes, E} = grData(), ix = new Map(nodes.map((p, i) => [p.id, i])), P = grLayout(nodes.length, E.map(e => [ix.get(e.a), ix.get(e.b)]), W, H);
+  const cut = (t, k) => { t = String(t ?? '').replace(/\s+/g, ' ').trim(); return t.length > k ? t.slice(0, k - 1).trimEnd() + '…' : t; };   // v40.7: de verdad corto (shortTxt dejaba hasta 60 letras)
+  const lbl = p => esc(cut(p.alias || p.title, W < 600 ? 22 : 28)) + (p.year ? ' · ' + p.year : '');
   $('#gr').innerHTML = `<h2>Relaciones entre papers</h2>
     <div class="row"><label class="row"><input type="checkbox" ${GR.vis ? 'checked' : ''} data-onchange="put(GR,'vis',this.checked,grDraw)"> Solo los papers visibles con los filtros actuales</label><label class="row"><input type="checkbox" ${GR.all ? 'checked' : ''} data-onchange="put(GR,'all',this.checked,grDraw)"> Incluir los que no tienen relaciones</label><button class="sm" style="margin-left:auto" data-onclick="put(GR,'help',!GR.help,grDraw)" aria-expanded="${GR.help}">${GR.help ? 'Ocultar la explicación' : '❓ ¿Para qué sirve?'}</button></div>
     <small id="grInfo">${nodes.length} papers · ${E.length} relaciones · <span style="color:#7c5cc4">━ relacionado</span> · <span style="color:#0f8b8d">➜ cita a</span> · clic en un paper para abrirlo</small>
@@ -483,6 +486,23 @@ function grDraw() {
       ${E.map(e => { const a = P[ix.get(e.a)], b = P[ix.get(e.b)]; return `<line class="ed" data-a="${e.a}" data-b="${e.b}" x1="${a.x.toFixed(1)}" y1="${a.y.toFixed(1)}" x2="${b.x.toFixed(1)}" y2="${b.y.toFixed(1)}" stroke="${e.dir ? '#0f8b8d' : '#7c5cc4'}" stroke-width="1.6" ${e.dir ? 'marker-end="url(#grAr)"' : ''}/>`; }).join('')}
       ${nodes.map((p, i) => `<g class="nd" data-id="${p.id}" data-onclick="grGo('${p.id}')" tabindex="0" data-onkeydown="onEnter(event,grGo,'${p.id}')"><title>${esc(p.title)}</title><circle cx="${P[i].x.toFixed(1)}" cy="${P[i].y.toFixed(1)}" r="8" fill="var(--pri)" stroke="var(--card)" stroke-width="2"/><text x="${(P[i].x + 12).toFixed(1)}" y="${(P[i].y + 4).toFixed(1)}">${lbl(p)}</text></g>`).join('')}</svg>` : ''}${E.length && GR.help ? grHelp(true) : ''}
     <div class="row" style="margin-top:12px"><button data-onclick="relFind()" title="Envía a OpenAlex los DOI de tus papers: propone las relaciones «cita a» entre ellos y te dice qué obras citan varios de ellos y aún no tienes">🔗 Buscar relaciones con OpenAlex</button><button style="margin-left:auto" data-onclick="$('#gr').close()">Cerrar</button></div>`;
+  requestAnimationFrame(() => grFit(W));
+}
+function grFit(W) {   // v40.7: cada título con su fondo (las líneas ya no lo tachan); si se sale por la derecha, al otro lado del punto; si pisa a otro, un poco más arriba o abajo
+  const done = [], hit = b => done.some(d => b.x < d.x + d.width && d.x < b.x + b.width && b.y < d.y + d.height && d.y < b.y + b.height);
+  for (const t of document.querySelectorAll('#grSvg .nd text')) {
+    let b; try { b = t.getBBox(); } catch (e) { return; } if (!b.width) return;
+    const c = t.previousElementSibling, cx = +c.getAttribute('cx');
+    if (b.x + b.width > W - 4) {   // no cabe a la derecha: al otro lado si hay sitio; si no, en el lado con más sitio y acortado
+      const left = cx - 16 > W - cx - 16; if (left) { t.setAttribute('x', (cx - 12).toFixed(1)); t.setAttribute('text-anchor', 'end'); }
+      const room = left ? cx - 16 : W - cx - 16; for (let s = t.textContent; t.getComputedTextLength() > room && s.length > 4;) { s = s.slice(0, -2).trimEnd(); t.textContent = s + '…'; }
+      b = t.getBBox(); }
+    if (done.length < 300 && hit(b)) { const y0 = +t.getAttribute('y'), h = b.height + 2;
+      for (const dy of [h, -h, 2 * h, -2 * h]) { t.setAttribute('y', (y0 + dy).toFixed(1)); const c2 = t.getBBox(); if (!hit(c2)) { b = c2; break; } t.setAttribute('y', y0.toFixed(1)); } b = t.getBBox(); }
+    done.push(b);
+    const r = document.createElementNS('http://www.w3.org/2000/svg', 'rect'); r.setAttribute('class', 'grbg');
+    [['x', b.x - 3], ['y', b.y - 1], ['width', b.width + 6], ['height', b.height + 2]].forEach(([k, v]) => r.setAttribute(k, v.toFixed(1))); r.setAttribute('rx', 3); t.before(r);
+  }
 }
 function grGo(id) { $('#gr').close(); openPaper(id); }
 function grHelp(on) {   // sin relaciones: qué es esta función y cómo empezar, atenuado porque es un texto provisional; on = pedido con el botón ❓ (con relaciones), sin atenuar
@@ -752,13 +772,15 @@ async function mgMerge(from, to) {
   const T = MG === 'tags', a = db[MG].find(y => y.id === from), b = db[MG].find(y => y.id === to); if (!a || !b) return;
   if (!await askOk(`¿Juntar «${a.name}» con «${b.name}»? Los papers ${T ? 'con' : 'de'} «${a.name}» pasan a «${b.name}»${T ? '' : ', con sus notas'}, y «${a.name}» desaparece. Se puede deshacer.`, {ok: 'Juntar'})) return;
   let n = 0;
-  db.papers.forEach(p => { const L = T ? p.tagIds : p.sectionIds; if (!L.includes(from)) return; n++;
-    const nl = [...new Set(L.map(i => i === from ? to : i))]; if (T) p.tagIds = nl; else { p.sectionIds = nl; p.notes.forEach(q => { if (q.sectionId === from) q.sectionId = to; }); }
-    logChange(p, `${T ? 'Etiqueta' : 'Sección'}: ${a.name} → ${b.name}`); });
+  for (const p of db.papers.concat(db.trash.map(t => t.paper))) {   // v40.7: también las notas de esa sección en papers que no la tienen marcada, y los de la papelera
+    const L = T ? p.tagIds : p.sectionIds, has = L.includes(from), hasN = !T && p.notes.some(q => q.sectionId === from); if (!has && !hasN) continue;
+    if (has) { const nl = [...new Set(L.map(i => i === from ? to : i))]; if (T) p.tagIds = nl; else p.sectionIds = nl; }
+    if (hasN) p.notes.forEach(q => { if (q.sectionId === from) q.sectionId = to; });
+    if (db.papers.includes(p)) { n++; logChange(p, `${T ? 'Etiqueta' : 'Sección'}: ${a.name} → ${b.name}`); } }
   if (T) { db.sections.forEach(s => { if (s.tagIds.includes(from)) s.tagIds = [...new Set(s.tagIds.map(i => i === from ? to : i))]; }); if (F.tags.delete(from)) F.tags.add(to); F.exTags.delete(from); }
   else if (F.secs.delete(from)) F.secs.add(to);
   db[MG] = db[MG].filter(y => y.id !== from); markDirty(); drawMg(); render();
-  toast(`«${a.name}» junta con «${b.name}» (${n === 1 ? '1 paper' : n + ' papers'}).`, [{t: 'Deshacer', fn: () => { undo(); if ($('#mg').open) drawMg(); }}], 6000);
+  toast(`«${a.name}» se ha juntado con «${b.name}» (${n === 1 ? '1 paper' : n + ' papers'}).`, [{t: 'Deshacer', fn: () => { undo(); if ($('#mg').open) drawMg(); }}], 6000);
 }
 function upd(id, k, v) { db[MG].find(x => x.id === id)[k] = v; markDirty(); }
 function moveM(id, d) { const a = db[MG], i = a.findIndex(x => x.id === id), j = i + d;

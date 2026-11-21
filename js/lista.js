@@ -91,6 +91,7 @@ function qParse(raw) {   // el texto de la caja → [{k: '' | 'au' | 'yr' | 've'
   const T = [], re = /(-?)(?:([\p{L}]+):)?(?:"([^"]*)"?|(\S+))/gu; let m;
   while ((m = re.exec(raw || ''))) {
     const [, neg, pre, ph, w] = m; let v = ph ?? w ?? '', k = '';
+    if (!pre && ph == null && (/^[-#]+$/.test(v) || /^\p{L}+:$/u.test(v) && QP[norm(v.slice(0, -1))])) continue;   // v40.7: «autor:», «#» o «-» a medio escribir no vacían la lista
     if (pre) { k = QP[norm(pre)] || ''; if (!k) v = pre + ':' + v; }   // «http://…» o un prefijo desconocido: se busca tal cual
     if (!k && !ph && v.length > 1 && v[0] === '#') { k = 'tag'; v = v.slice(1); }
     v = norm(v).trim(); if (!v) continue;
@@ -347,8 +348,8 @@ const CELL = {
   venue: p => `<td class="c-venue" title="${esc(p.venue)}">${esc(p.venue)}</td>`,
   reading: p => `<td class="c-reading"><button class="rst" style="--c:${READ_C[p.reading]}" title="Clic: cambiar el estado de lectura" data-onclick="cycleRead('${p.id}')">${READ[p.reading]}</button></td>`,
   rating: p => `<td class="c-rating">${starsHTML(p)}</td>`,
-  sections: p => `<td class="c-sections" title="${esc(tdSecs(p).map(s => s.name).join(', '))}">${tdSecs(p).map(s => chip(s, 1)).join('')}</td>`,
-  tags: p => `<td class="c-tags" data-onclick="tagPick(event,'${p.id}')" title="${esc([p.tagIds.map(tagById).filter(Boolean).map(t => t.name).join(', '), 'Clic: poner o quitar etiquetas'].filter(Boolean).join(' · '))}">${tagsOf(p)}</td>`,
+  sections: p => `<td class="c-sections" title="${esc(tdSecs(p).map(s => s.name).join(', '))}"><span class="tch">${tdSecs(p).map(s => chip(s, 1)).join('')}</span></td>`,
+  tags: p => `<td class="c-tags" data-onclick="tagPick(event,'${p.id}')" title="${esc([p.tagIds.map(tagById).filter(Boolean).map(t => t.name).join(', '), 'Clic: poner o quitar etiquetas'].filter(Boolean).join(' · '))}"><span class="tch">${tagsOf(p)}</span></td>`,
   notes: p => `<td class="c-notes nw"><button class="sm cpb" data-onclick="copyCardCite('${p.id}',this)" title="Copiar la cita (estilo elegido en Exportar), con cursiva al pegar en Word">📋</button>${pdfBtns(p)}<button class="sm" data-onclick="toggleNotes('${p.id}')" data-oncontextmenu="viewNotes(event,'${p.id}')" title="Clic: desplegar · Clic derecho: visor de notas">${pNotes(p).length} ${EXP.has(p.id) ? '▾' : '▸'}</button>${relCount(p) ? `<button class="sm" data-onclick="viewRel('${p.id}')" title="Relaciones">🔗 ${relCount(p)}</button>` : ''}</td>`};
 function thSort(k) {   // clic en una cabecera: ese criterio pasa a ser el principal; otro clic invierte el sentido
   F.sorts = F.sorts[0]?.k === k ? [{k, d: -F.sorts[0].d}, ...F.sorts.slice(1)] : [{k, d: 1}, ...F.sorts.filter(x => x.k !== k).slice(0, 2)]; render();
@@ -829,7 +830,7 @@ function bibtex(L) {
 const RISK = {articulo: 'JOUR', libro: 'BOOK', capitulo: 'CHAP', congreso: 'CONF', tesis: 'THES', web: 'ELEC', prensa: 'NEWS', blog: 'BLOG', informe: 'RPRT', norma: 'STAND', patente: 'PAT', mapa: 'MAP', dataset: 'DATA', software: 'COMP', basedatos: 'DBASE', audiovisual: 'VIDEO', audio: 'SOUND', redsocial: 'GEN', ia: 'GEN', diccionario: 'DICT', presentacion: 'SLIDE', personal: 'PCOMM', legislacion: 'STAT', jurisprudencia: 'CASE'};
 const RISV = {libro: 'PB', tesis: 'PB', capitulo: 'T2', congreso: 'T2', web: 'T2', blog: 'T2', diccionario: 'T2', informe: 'PB', norma: 'PB', patente: 'PB', mapa: 'PB', dataset: 'PB', software: 'PB', basedatos: 'PB', audiovisual: 'PB', audio: 'PB', redsocial: 'PB', ia: 'PB', presentacion: 'PB', personal: 'PB', legislacion: 'PB', jurisprudencia: 'PB'};   // etiqueta RIS donde va «venue» (por defecto JO)
 const ris = L => L.map(effP).map(p => { const ty = p.type, pg = /^(.+?)\s*[-–—]\s*(.+)$/.exec(String(p.pages || '')) || [0, p.pages || ''], dd = d => d.replace(/-/g, '/') + '/';
-  return ['TY  - ' + (RISK[ty] || 'GEN'), ...(p.authorType === 'sin_autor' ? [] : p.authors.map(a => 'AU  - ' + a)), ...(p.editors || []).map(e => 'A2  - ' + e), 'TI  - ' + p.title, p.year && 'PY  - ' + p.year, okDate(p.pubDate) && 'DA  - ' + dd(p.pubDate),
+  return ['TY  - ' + (RISK[ty] || 'GEN'), ...(p.authorType === 'sin_autor' ? [] : p.authors.map(a => 'AU  - ' + a)), ...(p.editors || []).map(e => 'A2  - ' + e), 'TI  - ' + p.title, p.year && 'PY  - ' + p.year, /^\d{1,4}$/.test(String(p.origYear || '').trim()) && 'OP  - ' + String(p.origYear).trim(), okDate(p.pubDate) && 'DA  - ' + dd(p.pubDate),
     p.venue && `${RISV[ty] || 'JO'}  - ${p.venue}`, ['capitulo', 'congreso'].includes(ty) && p.publisher && 'PB  - ' + p.publisher, ty === 'jurisprudencia' && p.publisher && 'DB  - ' + p.publisher, ty === 'articulo' && p.volume && 'VL  - ' + p.volume, ty === 'articulo' && p.issue && 'IS  - ' + p.issue,
     shows('pages', ty) && pg[1] && 'SP  - ' + pg[1], shows('pages', ty) && pg[2] && 'EP  - ' + pg[2], shows('place', ty) && p.place && 'CY  - ' + p.place,
     shows('edition', ty) && p.edition && 'ET  - ' + p.edition, shows('subtype', ty) && p.subtype && 'M3  - ' + p.subtype, shows('authorRole', ty) && p.authorRole && 'C1  - ' + p.authorRole, shows('userHandle', ty) && p.userHandle && 'C2  - ' + p.userHandle, shows('docNumber', ty) && p.docNumber && 'M1  - ' + p.docNumber, shows('abbr', ty) && p.abbr && 'J2  - ' + p.abbr, shows('ecli', ty) && p.ecli && 'C3  - ' + p.ecli, ty === 'legislacion' && p.issue && 'IS  - ' + p.issue, ['redsocial', 'ia'].includes(ty) && 'N1  - gestor:' + ty, ty === 'tesis' && p.thesisType && 'M3  - ' + p.thesisType, shows('isbn', ty) && p.isbn && 'SN  - ' + p.isbn, shows('issn', ty) && p.issn && 'SN  - ' + p.issn, shows('series', ty) && p.series && 'T3  - ' + p.series, shows('seriesNumber', ty) && p.seriesNumber && 'IS  - ' + p.seriesNumber, shows('conferencePlace', ty) && p.conferencePlace && 'AD  - ' + p.conferencePlace,
@@ -847,14 +848,17 @@ function exSet(k, v, quiet) {   // las opciones se recuerdan en el JSON (sin cre
 }
 /* v40.6: Exportar en dos niveles. A la vista: qué papers, formato y estilo (lo que casi siempre se toca), la vista previa y los botones.
    «Más opciones» (plegado; se recuerda en el dispositivo): orden, idioma, fecha, numeración, título y casillas. Las casillas de un solo estilo salen solo con ese estilo, y las explicaciones van en ⓘ. */
+const dfOpts = () => { const t = new Date(), d = `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;   // v40.7: formatos de la fecha de consulta, con la fecha de hoy de ejemplo (antes, una fija que parecía la de verdad)
+  return {long: `Larga (${fdate(d, {dateFmt: 'long', lang: 'es'})})`, dmy: `Corta (${fdate(d, {dateFmt: 'dmy'})})`, iso: `ISO (${d})`}; };
+const DF_NAME = {long: 'larga', dmy: 'corta', iso: 'ISO'};
 const exVan = s => /^vancouver/.test(s) || !!STYLES[s]?.custom, exApa = s => /^apa|^derecho$/.test(s) || !!STYLES[s]?.custom;
 function exUI() {
   const o = ex(), tl = isTl(o.fmt), St = STYLES[o.style] || {};
   const sel = (k, opts, cur) => `<select data-onchange="exSet('${k}',this.value)">${Object.entries(opts).map(([v, t]) => `<option value="${v}" ${v === cur ? 'selected' : ''}>${t}</option>`).join('')}</select>`;
-  const chk = (k, t, help) => `<label class="row"><input type="checkbox" ${o[k] ? 'checked' : ''} data-onchange="exSet('${k}',this.checked)"> ${t}${help ? hlp(help) : ''}</label>`;
-  const DF = {long: '20 de octubre de 2026', dmy: '20-10-2026', iso: '2026-10-20'}, LG = {es: 'Español (y, En, consultado)', en: 'English (&, In, cited)'};
+  const chk = (k, t, help) => `<label class="row"><input type="checkbox" ${o[k] ? 'checked' : ''} data-onchange="exSet('${k}',this.checked)"><span class="ckt">${t}${help ? hlpB(help) : ''}</span>${help ? hlpT(help) : ''}</label>`;   // v40.7: el texto y su ⓘ en un bloque: en el móvil ya no se separan de la casilla
+  const DF = dfOpts(), LG = {es: 'Español (y, En, consultado)', en: 'English (&, In, cited)'};
   const warns = tl ? (exList(), EXTYPES).map(t => typeWarn(o.style, t)).filter(Boolean) : [];
-  const sum = [EXO[o.order].split(' (')[0], tl && (St.fixedLang ? (St.fixedLang === 'en' ? 'English' : 'Español') : LG[o.lang].split(' (')[0]), tl && 'consulta: ' + DF[o.dateFmt], tl && (St.numbered || o.num) && 'numerado', tl && o.notes && 'con notas'].filter(Boolean).join(' · ');
+  const sum = [EXO[o.order].split(' (')[0], tl && (St.fixedLang ? (St.fixedLang === 'en' ? 'English' : 'Español') : LG[o.lang].split(' (')[0]), tl && 'fecha de consulta ' + (DF_NAME[o.dateFmt] || ''), tl && (St.numbered || o.num) && 'numerado', tl && o.notes && 'con notas'].filter(Boolean).join(' · ');
   const more = `<div class="grid">
       <label>Orden${sel('order', EXO, o.order)}</label>
       ${tl ? `<label>Idioma de los conectores${St.fixedLang ? `<select disabled><option>${St.fixedLang === 'en' ? 'English (fijo en este estilo)' : 'Español (fijo en este estilo)'}</option></select>` : sel('lang', LG, o.lang)}</label><label>Fecha de consulta${sel('dateFmt', DF, o.dateFmt)}</label>` : ''}

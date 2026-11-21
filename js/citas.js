@@ -564,9 +564,20 @@ function syncTypes(list) {
    que se cita: «(2018) [1995]», «Madrid: Alianza, 2018 [1995].», «(Freud, 2018 [1995], p. 24)». Se busca el año en la cita ya hecha,
    saltando el título y la revista por si lo llevan; si el año va entre paréntesis seguido de punto (APA), los corchetes van detrás del paréntesis. */
 const origY = p => String(p.origYear ?? '').trim();
-function origIns(s, p, o, inText) {
+/* v40.7: el volumen, el número, las páginas o el DOI pueden ser el mismo número que el año (vol. 2018, pp. 2018-2030): se hace la cita otra vez
+   con ese número tapado en todos los campos del paper menos los de fecha, y el año se busca en esa copia (mide lo mismo, así que la posición vale). */
+const ORIG_KEEP = new Set(['year', 'origYear', 'pubDate', 'accessed', 'id', 'type', 'authorType', 'linkMode']);
+function origMask(p) {
+  const oy = origY(p), y = String(p.year ?? '').trim(); if (!oy || !y || oy === y) return null;
+  const re = new RegExp(`(?<!\\d)${y.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?!\\d)`, 'g'), M = '\uE000'.repeat(y.length);
+  let hit = false; const mk = v => typeof v === 'string' ? v.replace(re, () => { hit = true; return M; }) : Array.isArray(v) ? v.map(mk) : v;
+  const q = {}; for (const [k, v] of Object.entries(p)) q[k] = ORIG_KEEP.has(k) ? v : mk(v);
+  return hit ? q : null;
+}
+function origIns(s, p, o, inText, ms) {
   const oy = origY(p), y = String(p.year ?? '').trim(); if (!s || !oy || !y || oy === y || typeof s !== 'string') return s;
-  let m = s; for (const v of [p.title, p.venue, p.series, p.publisher, p.place, p.conferenceName].map(x => ea(String(x ?? '').replace(/\.$/, ''))))
+  let m = s; if (typeof ms === 'string' && ms.length === s.length) m = ms;   // la copia con los otros números tapados
+  else for (const v of [p.title, p.venue, p.series, p.publisher, p.place, p.conferenceName].map(x => ea(String(x ?? '').replace(/\.$/, ''))))
     if (v && v.includes(y)) m = m.split(v).join('\u0000'.repeat(v.length));   // se tapan los textos que podrían llevar el año
   const R = [...m.matchAll(new RegExp(`(?<!\\d)${y.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}${o?.ys ? `(?:${o.ys})?` : ''}(?!\\d)`, 'g'))];
   for (const r of (inText ? R : R.slice(0, 1)).reverse()) {   // en la bibliografía, la primera vez; en el texto, todas («primera / siguientes»)
@@ -576,7 +587,9 @@ function origIns(s, p, o, inText) {
   return s;
 }
 for (const k of Object.keys(STYLES)) { const s = STYLES[k], f = s.fn, it = s.inText, om = s.omit;   // estilos de serie: aceptan tipos propios y el año original
-  s.fn = (p, o) => origIns(f(effP(p), o), p, o || ex()); s.inText = (p, o, loc) => (it(effP(p), o, loc) || []).map(x => x && typeof x.t === 'string' ? {...x, t: origIns(x.t, p, o || ex(), 1)} : x); if (om) s.omit = p => om(effP(p)); }
+  s.fn = (p, o) => { const q = origMask(p); return origIns(f(effP(p), o), p, o || ex(), 0, q && f(effP(q), o)); };
+  s.inText = (p, o, loc) => { const q = origMask(p), Q = q && (it(effP(q), o, loc) || []); return (it(effP(p), o, loc) || []).map((x, i) => x && typeof x.t === 'string' ? {...x, t: origIns(x.t, p, o || ex(), 1, Q?.[i]?.t)} : x); };
+  if (om) s.omit = p => om(effP(p)); }
 /* ===== Estilos de cita personalizados (Configuración → se guardan en settings.customStyles del JSON) =====
    Plantilla por tipo de documento: texto con {campos}, [grupos opcionales] (solo salen si todos sus campos tienen valor) y modificadores
    {campo:i:q|alternativa}. Un estilo propio se comporta como los de serie: sale en Exportar y en la pestaña Cita. */
