@@ -133,6 +133,9 @@ html.mv #mvNav button{display:flex;flex-direction:column;align-items:center;just
 html.mv #mvNav .ic{font-size:calc(20px * var(--fz,1));width:auto;position:relative}html.mv #mvNav .mvfd{top:-2px;right:-8px}
 html.mv #mvNav .mvnew .ic{background:var(--pri);color:var(--onpri);width:46px;height:34px;border-radius:17px;display:flex;align-items:center;justify-content:center;font-size:calc(22px * var(--fz,1))}
 html.mv.mv-dr #mvNav{z-index:50}
+/* v40.7: móvil en horizontal (poca altura): la barra de abajo, con el icono al lado del nombre y más baja, y el buscador se va al desplazar; así la lista tiene casi el doble de sitio */
+@media (orientation:landscape) and (max-height:500px){html.mv{--mvnav:44px}html.mv #mvNav button{flex-direction:row;gap:6px;padding:2px 0}html.mv #mvNav .ic{font-size:calc(18px * var(--fz,1))}
+  html.mv #mvNav{grid-template-columns:minmax(0,1fr) auto minmax(0,1fr)}html.mv #mvNav .mvnew{padding:0 10px}html.mv #mvNav .mvnew .ic{height:30px;width:42px}html.mv #mvTop{position:static}}
 html.mv #toast{bottom:calc(var(--mvnav) + var(--mvsafe) + 10px);max-width:calc(100vw - 20px);flex-wrap:wrap}
 
 /* --- Ventanas a pantalla completa --- */
@@ -150,7 +153,7 @@ html.mv dialog{overflow-x:hidden}
 html.mv dialog :is(input:not([type=checkbox]):not([type=radio]):not([type=color]),select,textarea){max-width:100%;min-width:0}
 html.mv dialog .grid label>*{max-width:100%}
 html.mv label.row{flex-wrap:nowrap;align-items:flex-start}html.mv label.row>input[type=checkbox]{flex-shrink:0;margin-top:3px}
-html.mv dialog .ctabs{display:flex;overflow-x:auto;flex-wrap:nowrap;scrollbar-width:none}html.mv dialog .ctabs::-webkit-scrollbar{display:none}html.mv dialog .ctabs button{white-space:nowrap;flex-shrink:0}
+html.mv dialog .ctabs{display:flex;overflow-x:auto;flex-wrap:nowrap;scrollbar-width:none}html.mv dialog .ctabs::-webkit-scrollbar{display:none}html.mv dialog .ctabs button{white-space:nowrap;flex-shrink:0}html.mv dialog .ctabs[hidden]{display:none}html.mv #ex .exchk .ckt .hlp,html.mv .dmode>small .hlp{margin-top:-12px;margin-bottom:-12px}   /* el ⓘ (alto para el dedo) no estira la línea: la casilla queda a la altura del texto */   /* v40.7: al buscar en Configuración no se ven las pestañas (salen todos los ajustes que coinciden) */
 /* ventanas sin cabecera propia: botón ✕ fijo arriba a la derecha */
 .mvdx{display:none}
 html.mv dialog>.mvdx{display:flex;position:sticky;top:0;float:right;z-index:5;margin:6px -6px 0 8px;font-size:calc(20px * var(--fz,1));background:var(--bg);border:1px solid var(--bd);border-radius:50%;width:44px;height:44px}

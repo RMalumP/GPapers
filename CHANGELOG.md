@@ -2,6 +2,25 @@
 
 Lo más reciente arriba. Hasta la v39.53 estas notas estaban en el README; van de la más nueva a la más antigua (algunas rondas antiguas no tenían número de versión).
 
+## v40.7: arreglos tras una revisión completa (datos, citas y pantallas)
+- **Fusionar secciones** ya no deja notas sueltas: las notas que estaban en la sección que desaparece pasan a la que queda aunque el paper no tuviera marcada esa sección, y también en los papers de la papelera. El aviso dice ««A» se ha juntado con «B»».
+- **Año de la publicación original**: se lee al importar (`origdate` de BibTeX/biblatex, `original-date` de CSL JSON y `OP` de RIS) y se exporta también a RIS. Antes se exportaba pero se perdía al volver a importar.
+- **Año original en la cita**: si el volumen, el número, las páginas o el DOI llevan el mismo número que el año («vol. 2018», «pp. 2018-2030»), los corchetes ya no van detrás del volumen (MLA, IEEE…), sino detrás del año.
+- **Visor en el móvil**: la paleta de la barra de abajo se pliega en el color elegido (al tocarlo se abren los cinco) y «Deshacer» va solo con su icono; así caben los nombres de los botones. En móviles pequeños (360 px), solo iconos. Ningún texto se monta sobre otro.
+- **Visor en una ventana estrecha del ordenador** (menos de 900 px): la barra del PDF va solo con iconos, con su título; antes «Anotaciones» quedaba fuera.
+- **Visor y lector de EPUB**: sin la franja vacía de 16 px encima de la cabecera.
+- **Ctrl+K → «Zonas para pasar»** (y los demás menús del visor abiertos desde Ctrl+K) sale debajo de ⋯, no en la esquina, y sin error.
+- **Exportar en el móvil**: cada casilla, en la misma línea que su texto, con el ⓘ al final; la explicación se abre debajo.
+- **Fecha de consulta** (Exportar y ficha → Cita): los formatos se enseñan con la fecha de hoy («Larga (21 de noviembre de 2026)», «Corta», «ISO»), y el resumen dice el formato. Antes salía siempre «20 de octubre de 2026», que parecía la fecha guardada.
+- **Configuración en el móvil**: al buscar, las pestañas se esconden (salen todos los ajustes que coinciden).
+- **Relaciones**: el dibujo mide lo que la ventana (en el móvil, a tamaño real; antes se encogía y no se leía); los títulos, cortos de verdad (28 letras), con fondo para que las líneas no los tachen, sin salirse por la derecha y sin pisarse.
+- **Tabla**: las secciones y etiquetas que no caben acaban en «…» y las que no entran se esconden (están en el título de la celda); antes se cortaban a secas.
+- **Datos**: la frase «Los campos que usa…» va seguida, con su ⓘ al final (en el móvil se partía en trozos).
+- **Buscador**: «autor:», «año:», «#» o «-» a medio escribir ya no vacían la lista.
+- **Móvil en horizontal**: la barra de abajo es más baja (icono y nombre en una línea) y el buscador se va al desplazar; la lista tiene casi el doble de sitio.
+- **Service worker**: ya no guarda las consultas a CrossRef, OpenAlex, doi.org… en la caché (cada respuesta «opaca» ocupa unos 7 MB de la cuota de Chrome). De otras webs solo guarda las imágenes (portadas), en su propia caché y como mucho las 80 últimas.
+- Pruebas nuevas: `python3 pruebas/prueba_v407.py .` y más casos en `node pruebas/pruebas_citas.js .`
+
 ## v40.6: más fácil sin perder nada (Exportar, Configuración, ficha, Secciones y Etiquetas)
 - **Modo de la app: Sencillo o Completo** (Configuración → Apariencia, arriba). Sencillo esconde Vistas, Búsqueda avanzada, Relaciones, Columnas de la tabla, el Historial de la ficha, las clasificaciones de Secciones y Etiquetas y los demás estilos en «Cita». No borra nada; «Completo» lo enseña todo. Se guarda en el JSON (`settings.uiMode`: `full` por defecto o `simple`) y llega a los otros dispositivos.
 - **Exportar**: arriba solo papers, formato y estilo; debajo la vista previa y Copiar, Copiar con formato y Guardar. Lo demás va en **«Más opciones»**, plegado, con un resumen («Automático · Español · consulta: 20 de octubre de 2026»). «Listar todos los autores» sale solo con Vancouver y «pp.» solo con APA; las explicaciones, en ⓘ. Resumen de anotaciones y Markdown para Obsidian, en una línea aparte.

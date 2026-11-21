@@ -74,12 +74,17 @@ html.mv #vw.find .vwt{display:none}html.mv .vwf input{width:auto;flex:1;min-widt
 html.mv .vwtb{order:3;border-top:1px solid var(--bd);border-bottom:0;padding:4px 4px calc(4px + env(safe-area-inset-bottom,0px));justify-content:space-between}
 html.mv .vwm{flex-direction:column;gap:0;padding:2px 4px;min-width:0;font-size:calc(11px * min(var(--fz,1),1));min-height:48px}html.mv .vwm span{font-size:calc(20px * min(var(--fz,1),1.1))}   /* v39.41: no crece con el texto (los iconos, poco) de la interfaz (si no, los botones se pisan) */
 html.mv .vwtb .vwcs{gap:3px;margin:0 1px}html.mv .vwtb .vwc{width:24px;height:24px;min-width:24px;min-height:24px}
+/* v40.7: en el móvil la paleta de la barra se pliega en el color elegido (se abre al tocarlo), «Deshacer» va solo con su icono y, si aun así no cabe, los nombres se cortan con «…» en vez de montarse */
+html.mv .vwtb .vwcs:not(.open):has(.vwc.on) .vwc:not(.on){display:none}html.mv .vwtb:has(.vwcs.open) .vwm small{display:none}
+html.mv .vwm{flex:0 1 auto;overflow:hidden}html.mv .vwm small{display:block;max-width:100%;overflow:hidden;text-overflow:ellipsis}html.mv .vwm.vwun small{display:none}
+@media(max-width:380px){html.mv #vw .vwtb .vwm small{display:none}html.mv #vw .vwtb .vwm{flex:1 1 0;justify-content:center}}   /* móviles pequeños (360 px): en el PDF no caben los nombres; solo iconos, con su título */
 html.mv .vwsb{margin-left:0;position:relative}html.mv .vwm.vwsb small{display:none}html.mv .vwm b{position:absolute;top:0;right:0}
 html.mv #vwSide{position:fixed;left:0;right:0;top:auto;bottom:0;width:auto;max-height:70dvh;border-radius:14px 14px 0 0;border-left:0;box-shadow:0 -6px 24px #0004;z-index:7;padding-bottom:env(safe-area-inset-bottom,0px)}
 html.mv .vwpop{position:fixed;left:0!important;right:0;bottom:0;top:auto!important;width:auto;border-radius:14px 14px 0 0;padding:12px 14px calc(12px + env(safe-area-inset-bottom,0px));z-index:8}
 html.mv .vwpoph .vwc{width:30px;height:30px;min-width:30px;min-height:30px}
 html.mv #vwSel{position:fixed;gap:8px}html.mv #vwSel .vwc{width:32px;height:32px;min-width:32px;min-height:32px}
 @media(max-width:520px){.vwm small{display:none}html.mv .vwm small{display:block}}
+@media(max-width:900px){html:not(.mv) #vw .vwtb .vwm small{display:none}}   /* v40.7: en una ventana estrecha del ordenador la barra del PDF no cabía con los nombres («Anotaciones» quedaba fuera): solo iconos, con su título */
 /* ---- Bandeja «PDF por citar» (js/bandeja.js), encima de la lista ---- */
 #inbox{margin:10px 0 4px;border:1px solid var(--bd);border-left:4px solid #ffd400;border-radius:10px;background:var(--card);padding:8px 10px}
 #inbox[hidden]{display:none}
@@ -244,6 +249,7 @@ html.mv #epSel{position:fixed;gap:8px}html.mv #epSel .vwc{width:32px;height:32px
 /* v39.45: selección propia en táctil (js/visor.js, TS): el navegador no selecciona (ni saca su menú) y GPapers pinta la selección */
 #vw.tsel .textLayer,#vw.tsel .textLayer *,#ep.tsel #epDoc,#ep.tsel #epDoc *{-webkit-user-select:none;user-select:none}
 #vw,#ep{-webkit-touch-callout:none}
+#vw>:first-child,#ep>:first-child{margin-top:0}   /* v40.7: sin la franja de 16 px que los diálogos dejan encima de su primer elemento */
 .tsov{position:absolute;pointer-events:none;overflow:hidden;z-index:4}.tsov[hidden],.tsh[hidden]{display:none}
 .tsov i{position:absolute;background:color-mix(in srgb,var(--pri) 32%,transparent);border-radius:2px}
 /* v39.45: en táctil, los subrayados con transparencia en vez de «multiplicar» (mucho más barato para la gráfica de un móvil) */

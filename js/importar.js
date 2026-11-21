@@ -12,18 +12,19 @@ const RIST = {RPRT: 'informe', STAND: 'norma', PAT: 'patente', MAP: 'mapa', DATA
 const CRT = {dataset: 'dataset', report: 'informe', 'report-component': 'informe', 'report-series': 'informe', standard: 'norma', 'journal-article': 'articulo', book: 'libro', monograph: 'libro', 'edited-book': 'libro', 'book-chapter': 'capitulo', 'reference-entry': 'capitulo', 'proceedings-article': 'congreso', dissertation: 'tesis'};
 const P2_F = ['isbn', 'issn', 'series', 'seriesNumber', 'institution', 'docNumber', 'conferenceName', 'conferencePlace', 'conferenceDates'];
 const P3_F = ['subtype', 'authorRole', 'userHandle', 'abbr', 'ecli'];   // F3d–F3e · abreviatura y ECLI (Derecho)
-const IMP_F = ['volume', 'issue', 'pages', 'publisher', 'place', 'edition', 'pubDate', 'thesisType', ...P2_F, ...P3_F, 'editors', 'authorType', 'accessed'];   // campos que traen los importadores además de los básicos
+const IMP_F = ['volume', 'issue', 'pages', 'publisher', 'place', 'edition', 'pubDate', 'origYear', 'thesisType', ...P2_F, ...P3_F, 'editors', 'authorType', 'accessed'];   // campos que traen los importadores además de los básicos
 const MON = {jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6, jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12, ene: 1, abr: 4, ago: 8, dic: 12};
 const monNum = m => { m = String(m ?? '').trim().toLowerCase(); return /^\d{1,2}$/.test(m) ? (+m >= 1 && +m <= 12 ? +m : 0) : MON[m.slice(0, 3)] || 0; };
 const isoDate = (y, m, d) => { y = String(y ?? '').match(/\d{4}/)?.[0]; m = monNum(m); d = +(String(d ?? '').match(/\d{1,2}/)?.[0] || 0);   // solo si hay año, mes y día
   return y && m && d >= 1 && d <= 31 ? `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}` : ''; };
+const origOf = v => String(v ?? '').trim().match(/^(\d{1,4})(?!\d)/)?.[1] || '';   // v40.7: año de la publicación original (origdate de biblatex, original-date de CSL, OP de RIS)
 const normPages = s => String(s ?? '').replace(/\s*(--|–|—)\s*/g, '-').replace(/\s+/g, ' ').trim();
 const thesisFrom = (kind, bib) => { const k = String(kind ?? '').toLowerCase();   // texto libre → uno de THESIS
   if (/doctor|ph\.?d|dissert/.test(k)) return 'Tesis doctoral'; if (/grado|bachelor|undergrad|tfg/.test(k)) return 'Trabajo fin de grado';
   if (/m[aá]ster|master|tfm/.test(k)) return 'Trabajo fin de máster'; if (/carrera|pfc/.test(k)) return 'Proyecto fin de carrera';
   return bib === 'phdthesis' ? 'Tesis doctoral' : bib === 'mastersthesis' ? 'Trabajo fin de máster' : ''; };
 const refFields = (ty, o) => {   // deja solo los campos que el tipo usa (FLD_T) y rellena el resto con valores vacíos
-  const r = {volume: '', issue: '', pages: '', publisher: '', place: '', edition: '', pubDate: '', thesisType: '', ...Object.fromEntries([...P2_F, ...P3_F].map(k => [k, ''])), editors: [], authorType: 'auto', accessed: ''};
+  const r = {volume: '', issue: '', pages: '', publisher: '', place: '', edition: '', pubDate: '', origYear: '', thesisType: '', ...Object.fromEntries([...P2_F, ...P3_F].map(k => [k, ''])), editors: [], authorType: 'auto', accessed: ''};
   for (const k of IMP_F) if (o[k] != null && o[k] !== '' && (!FLD_T[k] || shows(k, ty))) r[k] = o[k];
   return r; };
 
@@ -59,7 +60,7 @@ function parseBib(t) {   // recorrido propio: las expresiones regulares fallan c
     const bkey = body.slice(0, body.indexOf(',')).trim();
     out.push({key: KEY_RX.test(bkey) ? bkey : '', title: g('title'), year: (g('year') || dt).match(/\d{4}/)?.[0] || '', venue, doi: normDoi(g('doi')), url: g('url'), type: ty, authors: raw.map(nm),
       ...refFields(ty, {volume: g('volume'), issue: pick('issue', 'number'), pages: normPages(g('pages')), publisher: pub && pub !== venue ? pub : '', place: pick('address', 'location'), edition: g('edition'),
-        pubDate: /^\d{4}-\d{2}-\d{2}$/.test(dt) ? dt : isoDate(g('year'), g('month'), g('day')), thesisType: ty === 'tesis' ? thesisFrom(g('type'), type) : '', editors: names(f.editor).map(nm),
+        pubDate: /^\d{4}-\d{2}-\d{2}$/.test(dt) ? dt : isoDate(g('year'), g('month'), g('day')), origYear: origOf(g('origdate') || g('origyear')), thesisType: ty === 'tesis' ? thesisFrom(g('type'), type) : '', editors: names(f.editor).map(nm),
         isbn: g('isbn'), issn: g('issn'), series: g('series'), seriesNumber: g('seriesnumber'), institution: g('institution') !== venue ? g('institution') : '',
         docNumber: g('docnumber') || (ty === 'legislacion' ? '' : g('number')), subtype: g('type'), authorRole: g('authorrole'), userHandle: g('userhandle'), abbr: g('shorthand'), ecli: g('ecli'), conferenceName: ty === 'congreso' || ty === 'capitulo' ? '' : g('booktitle'), conferencePlace: '', conferenceDates: '',
         authorType: raw.length && raw.every(a => /^\{[^,]*\}$/.test(a)) ? 'entidad' : 'auto', accessed: /^\d{4}-\d{2}-\d{2}$/.test(g('urldate')) ? g('urldate') : ''})});
@@ -73,7 +74,7 @@ function finRis(r) {   // convierte los campos RIS acumulados (r.raw) en una ref
   const venue = V || f('JO', 'JF', 'J2', 'T2', 'PB'), da = (R.DA || '').split('/'), y2 = (R.Y2 || '').split('/');
   const pages = R.SP && R.EP ? (R.SP === R.EP ? R.SP : `${R.SP}-${R.EP}`) : normPages(R.SP || '');
   return {title: f('TI', 'T1'), authors: r.authors, year: f('PY', 'Y1', 'DA').match(/\d{4}/)?.[0] || '', venue, doi: normDoi(R.DO || ''), url: R.UR || '', type: ty,
-    ...refFields(ty, {volume: R.VL, issue: R.IS, pages, publisher: ty === 'jurisprudencia' ? R.DB : R.PB && R.PB !== venue ? R.PB : '', place: R.CY, edition: R.ET, pubDate: isoDate(...da), thesisType: ty === 'tesis' ? thesisFrom(R.M3, '') : '',
+    ...refFields(ty, {volume: R.VL, issue: R.IS, pages, publisher: ty === 'jurisprudencia' ? R.DB : R.PB && R.PB !== venue ? R.PB : '', place: R.CY, edition: R.ET, pubDate: isoDate(...da), origYear: origOf(R.OP), thesisType: ty === 'tesis' ? thesisFrom(R.M3, '') : '',
       editors: r.editors, accessed: isoDate(...y2),
       isbn: ty === 'articulo' ? '' : R.SN, issn: ty === 'articulo' ? R.SN : '', series: R.T3, seriesNumber: ty === 'articulo' ? '' : R.IS, conferencePlace: R.AD, docNumber: R.M1, subtype: R.M3, authorRole: R.C1, userHandle: R.C2, abbr: R.J2, ecli: R.C3})};
 }
@@ -154,7 +155,7 @@ function parseCsl(t) {
     const pub = CSL_PUB.has(ty);
     return {title: cleanText(x.title), authors: (x.author || []).map(nm).filter(Boolean), year: is[0] ? String(is[0]) : '', venue: cleanText(pub ? x.publisher || x['container-title'] : x['container-title'] || ''), doi: normDoi(x.DOI), url: x.URL || '', type: ty,
       ...refFields(ty, {volume: str(x.volume), issue: str(x.issue), pages: normPages(x.page), publisher: pub ? '' : cleanText(x.publisher), place: str(x['publisher-place']), edition: str(x.edition), editors: (x.editor || []).map(nm).filter(Boolean),
-        pubDate: is.length === 3 ? isoDate(...is) : '', accessed: ac.length === 3 ? isoDate(...ac) : '', isbn: str(x.ISBN), issn: str(x.ISSN), authorType: ent ? 'entidad' : 'auto'}),
+        pubDate: is.length === 3 ? isoDate(...is) : '', origYear: origOf(dt(x['original-date'])[0]), accessed: ac.length === 3 ? isoDate(...ac) : '', isbn: str(x.ISBN), issn: str(x.ISSN), authorType: ent ? 'entidad' : 'auto'}),
       general: cleanText(x.abstract || '')}; });
 }
 /* ---- Buscar por ISBN (Open Library) o por título (CrossRef) ---- */

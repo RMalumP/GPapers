@@ -11,8 +11,10 @@ function vwMore(e) {
     <hr><button data-onclick="cmdOpen(true)">🔎 Buscar una orden… <small class="vwsub">${esc(db.settings.shortcuts.palette || '')}</small></button>
 `);
 }
+const menuAnchor = sel => { const r = $(sel)?.getBoundingClientRect(); return r && r.width ? {right: r.right, bottom: r.bottom} : {right: innerWidth - 8, bottom: 52}; };   // dónde sale un menú del visor si no hay botón que lo abra
 function vwMenu(r, html) {   // menú desplegable dentro del visor (el de la aplicación queda debajo del visor)
   let m = $('#vwMenu'); if (!m) { m = document.createElement('div'); m.id = 'vwMenu'; m.className = 'vwfloat vwmenu'; $('#vw').append(m); m.addEventListener('click', ev => { const b = ev.target.closest('button'); if (b && !b.hasAttribute('data-keep')) setTimeout(() => m.hidden = true); }); }   // data-keep: abre un submenú
+  r ||= VW.menuR = menuAnchor('#vwMoreB');   // v40.7: abierto desde Ctrl+K (sin pasar por ⋯), debajo de ⋯ y no en la esquina
   m.innerHTML = html; m.hidden = false; const w = m.offsetWidth; m.style.left = Math.max(8, Math.min(r.right - w, innerWidth - w - 8)) + 'px'; m.style.top = (r.bottom + 4) + 'px';
   m.style.maxHeight = `calc(100dvh - ${Math.round(r.bottom + 12)}px)`; m.style.overflow = 'auto';   // los menús largos (⚙ Ajustes) se desplazan
   setTimeout(() => document.addEventListener('pointerdown', ev => { if (!m.contains(ev.target)) m.hidden = true; }, {once: true, capture: true}));

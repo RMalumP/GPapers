@@ -902,6 +902,13 @@ eq('orig UNE nombre-fecha', SO('une_nf', fr), 'FREUD, Sigmund, 2018 [1930]. El m
 eq('orig vacío no cambia nada', SO('apa', {...fr, origYear:''}), 'Freud, S. (2018). El malestar en la cultura. Alianza.');
 eq('orig igual al año no se repite', SO('apa', {...fr, origYear:'2018'}), 'Freud, S. (2018). El malestar en la cultura. Alianza.');
 eq('orig sin año no sale', SO('apa', {...fr, year:''}), 'Freud, S. (s.f.). El malestar en la cultura. Alianza.');
+// v40.7: volumen, número o páginas iguales al año: el año original va tras el año, no tras el volumen
+const vy = P({authors:['Ruiz, Ana'], year:2018, origYear:'1995', title:'Ensayo', venue:'Revista', volume:'2018', issue:'3', pages:'2018-2030', doi:'10.1/x.2018.5'});
+for (const k of ['apa', 'vancouver', 'mla', 'ieee', 'chicago_af', 'chicago_nb', 'une_nf', 'une_num']) { const t = SO(k, vy); eq(`orig ${k}: una vez y no tras el volumen`, (t.match(/\[1995\]/g) || []).length === 1 && !/vol\. 2018 \[1995\]|;2018 \[1995\]|2018 \[1995\]\(|2018 \[1995\]-2030|2018 \[1995\]–2030/.test(t), true); }
+eq('orig MLA vol. = año', SO('mla', vy), 'Ruiz, Ana. “Ensayo”. Revista, vol. 2018, núm. 3, 2018 [1995], pp. 2018-2030, https://doi.org/10.1/x.2018.5.');
+eq('orig IEEE pp. = año', SO('ieee', vy).includes('pp. 2018-2030, 2018 [1995]'), true);
+eq('orig Vancouver volumen = año', SO('vancouver', vy).includes('2018 [1995]'), true);
+eq('orig en el texto con volumen = año', T.STYLES.apa.inText(vy, undefined, '24')[0].t, '(Ruiz, 2018 [1995], p. 24)');
 T.syncStyles([{...T.cuNew('Mío'), id:'o1'}]);
 eq('orig estilo propio nuevo', SO('cu_o1', fr), 'Freud, S. (2018) [1930]. El malestar en la cultura. Alianza.');
 eq('orig estilo propio en el texto', T.STYLES.cu_o1.inText(fr, undefined, '24')[0].t, '(Freud, 2018 [1930], p. 24)');
