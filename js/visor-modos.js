@@ -23,7 +23,7 @@ function vwFlipShow() {   // página a página: solo se ven la actual y su parej
   for (const p of VW.pages) p.el.classList.toggle('cur', !!VW.flip && p.i >= s && p.i < s + n);
 }
 function vwStep(d) {   // página (o par) siguiente o anterior
-  if (!VW.pages.length) return; const s = vwSpread(VW.cur);
+  if (!VW.pages.length || vxColStep(d)) return; const s = vwSpread(VW.cur);   // v40.8: columna a columna
   vwGo(d > 0 ? s + (vwOne() ? 1 : vwSpreadN(s)) : vwSpread(Math.max(0, s - 1)));
 }
 function vwShowAt(p, y) {   // lleva a la vista el punto y (en puntos de la página) de la página p, a un tercio de la altura
@@ -38,6 +38,7 @@ function vwReadTap(x, y, hadPop) {   // toque en una zona vacía de la página: 
   return false;
 }
 function vwRdSet(k, v) {
+  if (VW.col && (k === 'flip' && !v || k === 'two' && v)) { vxColOff(); VW.fit = true; }   // v40.8: columna a columna va con página a página y una página
   VW[k] = !!v; const flipOn = k === 'one' && VW.one && VW.two && !VW.flip; if (flipOn) VW.flip = true;   // de una en una: se pasa con toques (página a página)
   vwRdSave(); if ((k === 'flip' || flipOn) && VW.flip && VW.auto) vwAutoStop();
   if (k === 'zPinch' || k === 'zDbl') return toast(VW[k] ? (k === 'zPinch' ? 'Pellizca con dos dedos para acercar o alejar.' : 'Doble toque: acerca donde tocas; otro doble toque vuelve a ajustar.') : 'Gesto desactivado.', [], 2200);
@@ -63,6 +64,7 @@ function vwReadMenu() {
     <hr><button data-keep data-onclick="vwAutoMenu()">⏬ Desplazamiento automático <small class="vwsub">${VW.auto ? (VW.autoPaused ? 'en pausa' : 'en marcha') : 'parado'}${vwConcOn() ? ' · concentración' : ''} ›</small></button>
     <hr><button data-onclick="vwRdSet('crop',${VW.crop ? 0 : 1})" title="Quita los márgenes en blanco de las páginas para que el texto se vea más grande">${tick(VW.crop)}✂ Recortar los márgenes${VW.cropM?.hand ? ' (a mano)' : ' (automático)'}</button>
     ${VW.crop ? '<button data-keep data-onclick="lnCropMenu()">✂ Ajustar el recorte… <small class="vwsub">›</small></button>' : ''}
+    ${vxReadBtns()}
     <hr><button data-keep data-onclick="lnRotate(VW.cur);vwReadMenu()">↻ Girar la página ${VW.cur + 1}${vwRot(VW.cur) ? ` <small class="vwsub">${vwRot(VW.cur)}°</small>` : ''}</button><button data-keep data-onclick="lnRotate('*');vwReadMenu()">↻ Girar todas las páginas</button>${Object.keys(VW.rot || {}).length ? '<button data-keep data-onclick="lnRotate(null);vwReadMenu()">↺ Quitar los giros</button>' : ''}${sayCan() ? '<hr>' + sayMenuBtn(false) : ''}
 `);
 }
@@ -79,6 +81,7 @@ function vwCfgHtml(ep) {
     <div class="ctxh">🖍 Al cambiar el color de un subrayado</div>${b(annColOnly(), 'annColSet(1)', '🎯 Solo cambia ese subrayado')}${b(!annColOnly(), 'annColSet(0)', 'Ese y los siguientes (también el color para subrayar)')}
     ${ep ? '' : `<hr><div class="ctxh">👆 Gestos de zoom</div>${b(VW.zPinch, `vwRdSet('zPinch',${VW.zPinch ? 0 : 1})`, '🤏 Pellizcar con dos dedos')}${b(VW.zDbl, `vwRdSet('zDbl',${VW.zDbl ? 0 : 1})`, '👆 Doble toque: acercar y volver a ajustar', 'En pantalla completa el doble toque sigue sacando los colores')}
     <hr><div class="ctxh">⛶ Pantalla completa: pestaña ▾ de la barra oculta</div>${[['l', '◧ A la izquierda'], ['c', '▣ En el centro'], ['r', '◨ A la derecha']].map(([v, t]) => b(VW.tbPos === v, `vwTabPos('${v}')`, t)).join('')}
+    <hr>${b(vxMapOn(), `vxMapSet(${vxMapOn() ? 0 : 1})`, '▮ Marcas junto a la barra de desplazamiento', 'Subrayados, marcadores y resultados de la búsqueda, a lo largo del PDF')}
     <hr><div class="ctxh">🌙 Modo noche y sepia</div>${[['off', '☀ Normal'], ['sepia', '📜 Sepia (más cálido)'], ['on', '🌙 Noche'], ['auto', 'Como el sistema (noche con el modo oscuro)']].map(([v, t]) => b(vwNightPref() === v, `vwNight('${v}')`, t)).join('')}`}
     ${rdCfgHtml(b, ep)}
     <hr><div class="ctxh">Aa Tamaño del texto de la interfaz</div><div class="epmrow">${UI_FZ.map(z => `<button data-keep class="${uiFz() === z ? 'on' : ''}" data-onclick="uiFzSet(${z});${me}">${Math.round(z * 100)} %</button>`).join('')}</div>
@@ -155,7 +158,7 @@ function vwAutoShow() {
 }
 function vwAutoStart() {
   if (!VW.open) return;
-  if (VW.flip) { VW.flip = false; VW.zLock = false; vwRdSave(); const i = VW.cur; vwRdClass(); vwFlipShow(); vwFitW(); vwGo(i, true); toast('El desplazamiento automático usa la vista seguida.', [], 2200); }
+  if (VW.flip) { vxColOff(); VW.flip = false; VW.zLock = false; vwRdSave(); const i = VW.cur; vwRdClass(); vwFlipShow(); vwFitW(); vwGo(i, true); toast('El desplazamiento automático usa la vista seguida.', [], 2200); }
   Object.assign(VW, {auto: true, autoPaused: false, autoHold: false, autoLv: vwAutoLv(), autoY: $('#vwScroll').scrollTop, autoT: 0});
   vwAutoShow(); cancelAnimationFrame(VW.autoRaf); VW.autoRaf = requestAnimationFrame(vwAutoTick);
 }
@@ -230,7 +233,7 @@ function vwBmSet(L) {
   const P = VW.src.kind === 'paper' && db.papers.find(p => p.id === VW.src.id); if (P && hs.includes(P[pdfF(VW.src.n)])) P.modified = vwNow();
   VW.dirty = true; markDirty(); vwBmDraw(); vwSatPush();
 }
-function vwBmDraw() { const S = new Set(vwBms()); for (const p of VW.pages) p.el?.classList.toggle('bm', S.has(p.i)); }
+function vwBmDraw() { const S = new Set(vwBms()); for (const p of VW.pages) p.el?.classList.toggle('bm', S.has(p.i)); vxMapDraw(); }
 function vwBmToggle(i = VW.cur) {
   if (!VW.pages[i]) return; const L = vwBms(), on = L.includes(i);
   vwBmSet(on ? L.filter(x => x !== i) : [...L, i]);
@@ -240,7 +243,7 @@ function vwBmStep(d) {   // al marcador siguiente o anterior (desde la página, 
   const L = vwBms(); if (!L.length) return toast('Aún no hay marcadores: pon uno con ⋯ → 🔖 Marcadores (o la tecla B).', [], 2500);
   const s = vwSpread(VW.cur), e = s + vwSpreadN(s) - 1, i = d > 0 ? L.find(x => x > e) : L.findLast(x => x < s);
   if (i == null) return toast(d > 0 ? 'No hay más marcadores después de esta página.' : 'No hay más marcadores antes de esta página.', [], 1800);
-  vwGo(i); if (VW.fs) vwPgTip();
+  vxGoH(i); if (VW.fs) vwPgTip();   // v40.8: con «atrás»
 }
 function vwBmClear() { const n = vwBms().length; if (!n) return; vwBmSet([]); toast(`${n} ${n === 1 ? 'marcador quitado' : 'marcadores quitados'}.`, [{t: 'Deshacer', fn: () => undo()}], 4000); }
 function vwBmMenu() {
@@ -248,7 +251,7 @@ function vwBmMenu() {
   vwMenu(VW.menuR, `<button data-keep data-onclick="vwMoreBack()">‹ Volver</button><hr>
     <button data-onclick="vwBmToggle()">${on ? `✕ Quitar el marcador de la página ${c}` : `🔖 Marcar la página ${c}`} <small class="vwsub">B</small></button>
     ${L.length ? `<button data-onclick="vwBmStep(-1)">⤒ Marcador anterior <small class="vwsub">[</small></button><button data-onclick="vwBmStep(1)">⤓ Marcador siguiente <small class="vwsub">]</small></button>
-    <hr><div class="ctxh">Marcadores (${L.length})</div><div class="vwbml">${L.map(i => `<button data-onclick="vwGo(${i})">${i === VW.cur ? '▸ ' : ''}🔖 Página ${i + 1}</button>`).join('')}</div>
+    <hr><div class="ctxh">Marcadores (${L.length})</div><div class="vwbml">${L.map(i => `<button data-onclick="vxGoH(${i})">${i === VW.cur ? '▸ ' : ''}🔖 Página ${i + 1}</button>`).join('')}</div>
     <button data-onclick="vwBmClear()">🗑 Quitar todos</button>` : '<p class="vwbme">Aún no hay marcadores. Marca una página para volver a ella de un toque; se guardan con este PDF.</p>'}`);
 }
 

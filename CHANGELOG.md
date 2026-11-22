@@ -2,6 +2,22 @@
 
 Lo más reciente arriba. Hasta la v39.53 estas notas estaban en el README; van de la más nueva a la más antigua (algunas rondas antiguas no tenían número de versión).
 
+## v40.8: doce mejoras del visor de PDF
+- **Añadir a GPapers desde una cita**: al tocar una referencia ([12] o «Autor, 2019»), la vista previa dice si ese paper ya está en la biblioteca («✓ Ya en tu biblioteca» y «📝 Abrir») o deja «➕ Añadir a GPapers»: busca el DOI (o el título) y abre Importar ya rellenado. El paper nuevo queda enlazado en Relaciones con el que estabas leyendo.
+- **Columna a columna** (Lectura → «Columna a columna»): en papers a dos columnas, cada toque o → enseña el siguiente trozo de columna a todo el ancho; ← vuelve. Pensado para el móvil.
+- **Zonas como imagen**: una zona dibujada se puede copiar como imagen, guardar como PNG o poner como imagen del paper.
+- **Atrás y adelante**: «↩ Volver» guarda también el «adelante» (Alt+← / Alt+→ y los botones laterales del ratón). Cuentan los enlaces, el índice, las anotaciones y las búsquedas.
+- **Marcas junto a la barra de desplazamiento**: subrayados, notas, marcadores y resultados de la búsqueda, con un clic para ir. Se quitan en ⚙.
+- **Pestaña 🖼 Figuras**: lista las figuras y tablas del PDF (por su pie, «Figure 2.», «Tabla 1:»…) con miniatura; un toque lleva a ella.
+- **Siglas**: al seleccionar una sigla («RNN», «fMRI») sale 🔤, que dice qué significa, dónde se define y cuántas veces sale.
+- **Regla de lectura** (Lectura o tecla M): una franja clara que sigue al ratón (o se arrastra con el dedo) y oscurece lo demás; fina, media o ancha.
+- **Texto adaptado** (Lectura o tecla T): el texto del PDF como en un libro, con tamaño y letra a elegir y sin desplazarse a lo ancho. Para leer en el móvil.
+- **Reconocer el texto (OCR)** en ⋯: en PDF escaneados, reconoce el texto de la página o de todas en el propio navegador (Tesseract, español e inglés; la primera vez descarga unos 9 MB). Después se puede seleccionar, subrayar y buscar. Se guarda en el dispositivo.
+- **Exportar a Anki**: en Anotaciones, «🃏 Anki» descarga un archivo para importar en Anki (anverso, reverso y etiquetas).
+- **Diferencias PDF 1 / PDF 2**: con dos PDF abiertos, ≠ marca las frases que solo están en uno de ellos y permite ir de una a otra.
+- **Móvil**: la barra de selección (con 🔤) cabe en 412 px y en 320 px se desliza; la regla se arrastra con el dedo por su asa; «🃏 Anki» va junto a «⬇ PDF anotado» para no quitar sitio a la lista.
+- Pruebas: `python3 pruebas/prueba_visor_v408.py .` y, en el móvil en vertical (Pixel 7 y 320 px), `python3 pruebas/prueba_visor_v408_movil.py .`
+
 ## v40.7: arreglos tras una revisión completa (datos, citas y pantallas)
 - **Fusionar secciones** ya no deja notas sueltas: las notas que estaban en la sección que desaparece pasan a la que queda aunque el paper no tuviera marcada esa sección, y también en los papers de la papelera. El aviso dice ««A» se ha juntado con «B»».
 - **Año de la publicación original**: se lee al importar (`origdate` de BibTeX/biblatex, `original-date` de CSL JSON y `OP` de RIS) y se exporta también a RIS. Antes se exportaba pero se perdía al volver a importar.

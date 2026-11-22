@@ -25,7 +25,7 @@ function vwDrawAnn() {
   if (!VW.pages.length) return vwCount();
   const by = VW.annBy = new Map(); for (const a of vwAnns()) { if (!by.has(a.p)) by.set(a.p, []); by.get(a.p).push(a); }
   for (const p of VW.pages) vwAnnPage(p);
-  vwCount(); if (VW.side) vwSideDraw();
+  vwCount(); if (VW.side) vwSideDraw(); vxMapDraw();
 }
 function vwAnnPage(p) {
   const L = vwAnnOf(p.i), layer = p.el?.querySelector('.vwa'); if (!layer) return;
@@ -82,7 +82,7 @@ function vwSelShow() {
   const bar = $('#vwSel'), r = VW.mode === 'sel' && !VW.drag && vwSelRange();
   if (!r) { bar.hidden = true; return; }
   const rs = [...r.getClientRects()].filter(c => c.width > 1), last = rs[rs.length - 1] || r.getBoundingClientRect(), first = rs[0] || last, d = $('#vw').getBoundingClientRect();
-  bar.hidden = false; const bw = bar.offsetWidth, bh = bar.offsetHeight, mv = document.documentElement.classList.contains('mv');
+  vxAcrBtn(r); bar.hidden = false; const bw = bar.offsetWidth, bh = bar.offsetHeight, mv = document.documentElement.classList.contains('mv');
   let x = Math.min(Math.max(8, (mv ? first.left : last.right) - bw / 2), d.width - bw - 8), y = mv ? first.top - bh - 44 : last.bottom + 10;   // en el móvil, encima: debajo salen los tiradores y el menú del sistema
   if (y < 56) y = last.bottom + 40; if (y + bh > d.height - 8) y = Math.max(56, first.top - bh - 10);
   bar.style.left = x + 'px'; bar.style.top = y + 'px';
@@ -114,7 +114,7 @@ function tsSet(A, B) { if (tsBefore(B, A)) [A, B] = [B, A]; const r = document.c
 function tsRange(st) { const s = getSelection(); if (!s.rangeCount || s.isCollapsed) return null; const r = s.getRangeAt(0), a = r.commonAncestorContainer, el = a.nodeType === 1 ? a : a.parentElement; return el?.closest(st.text) && st.root.contains(el) ? r : null; }
 function tsBind(root, sc, text, o = {}) {   // root: el visor (#vw o #ep); sc: lo que se desplaza; text: dónde está el texto
   const st = {root, sc, text, o, lp: null, drag: null, hd: null}; TS.all.push(st);
-  root.addEventListener('contextmenu', e => { if (!e.target.closest('input, textarea, select, [contenteditable]:not([contenteditable=false])')) e.preventDefault(); });   // ni el menú largo de Chrome ni el del clic derecho dentro del visor
+  root.addEventListener('contextmenu', e => { if (!e.target.closest('input, textarea, select, [contenteditable]:not([contenteditable=false]), .vxflow')) e.preventDefault(); });   // ni el menú largo de Chrome ni el del clic derecho dentro del visor
   sc.addEventListener('pointerdown', e => {
     tsCancel(st); if (e.pointerType === 'mouse' || !root.classList.contains('tsel') || !e.isPrimary || !e.target.closest?.(text) || o.can && !o.can()) return;
     const x = e.clientX, y = e.clientY; st.lp = {x, y, id: e.pointerId, t: setTimeout(() => tsStart(st, x, y, e.pointerId), 450)};
@@ -312,7 +312,7 @@ function vwPopOpen(id, focus) {
   pp.innerHTML = `<div class="vwpoph"><span class="vwk">${a.k === 'note' ? '🗒 Nota' : a.k === 'area' ? '▭ Zona' : a.k === 'ink' ? '✏ Trazo a mano' : '🖍 Subrayado'} · p. ${a.p + 1}${annLbl(a.c) ? ' · ' + esc(annLbl(a.c)) : ''}</span><span class="vwcs">${VW_COLORS.map(([c, t], i) => `<button class="vwc${a.c === c ? ' on' : ''}" style="--c:${c}" title="${t}" aria-label="Color ${t}" data-onclick="vwPopColor(${i})"></button>`).join('')}</span><button class="vwib" data-onclick="vwPopClose()" aria-label="Cerrar">✕</button></div>
     ${a.t ? `<blockquote class="vwq">${esc(a.t.length > 400 ? a.t.slice(0, 400) + '…' : a.t)}</blockquote>` : ''}
     <textarea id="vwCm" rows="3" placeholder="${a.k === 'note' ? 'Escribe la nota…' : 'Comentario (opcional)…'}" data-oninput="vwCmIn()">${esc(a.m || '')}</textarea>
-    <div class="row vwpopb">${a.k === 'hl' ? lnStyRow(a, 'vwPopStyle') : ''}${a.t ? '<button data-onclick="vwPopCopy()" title="Copiar el texto subrayado">📋 Copiar</button>' : ''}${P ? '<button data-onclick="vwToNote()" title="Añadir a las notas del paper, con la página, para citarlo">📝 A las notas</button>' : ''}<button class="danger" data-onclick="vwPopDel()">🗑 Borrar</button></div>`;
+    <div class="row vwpopb">${a.k === 'hl' ? lnStyRow(a, 'vwPopStyle') : ''}${vxAreaBtns(a)}${a.t ? '<button data-onclick="vwPopCopy()" title="Copiar el texto subrayado">📋 Copiar</button>' : ''}${P ? '<button data-onclick="vwToNote()" title="Añadir a las notas del paper, con la página, para citarlo">📝 A las notas</button>' : ''}<button class="danger" data-onclick="vwPopDel()">🗑 Borrar</button></div>`;
   pp.hidden = false; vwPopPlace(); document.querySelectorAll('#vw .on[data-a]').forEach(e => e.classList.remove('on')); document.querySelectorAll(`#vw [data-a="${id}"]`).forEach(e => e.classList.add('on'));
   if (focus) setTimeout(() => $('#vwCm')?.focus(), 30);
   vwHandles();
@@ -356,6 +356,7 @@ function vwSideDraw() {
   if (t === 'toc') return vwTocDraw(s, head);
   if (t === 'th') return vwThDraw(s, head);
   if (t === 'find') return lnFindDraw(s, head);
+  if (t === 'fig') return vxFigDraw(s, head);   // v40.8
   vwAnnDraw(s, head);
 }
 function vwAnnDraw(s, head) {
@@ -372,7 +373,7 @@ function vwAnnDraw(s, head) {
     ${frV.length ? `<details class="vwfr"><summary>${frV.length} ${frV.length === 1 ? 'anotación que ya traía' : 'anotaciones que ya traía'} el PDF</summary>${frV.slice(0, 300).map(x => `<button class="vwi" style="--c:${x.c}" data-onclick="vwGoForeign('${x.id}')"><small>p. ${x.p + 1} · ${esc(x.sub)}${x.who ? ' · ' + esc(x.who) : ''}</small>${x.m ? `<span class="vwim">${esc(x.m.slice(0, 300))}</span>` : ''}</button>`).join('')}<button class="pri" data-onclick="vwImport()" title="Pasan a ser tuyas: se pueden cambiar, comentar y sincronizar">Hacerlas editables</button></details>` : ''}
     ${all.length ? `<div class="vwsx vwexp"><small>${n ? `${n} ${n === 1 ? 'elegida' : 'elegidas'}` : f || k ? 'Las del filtro' : 'Todas'}:</small><select data-onchange="vwExpFmt(this.value)" aria-label="Formato" title="Formato al copiar o llevar a las notas">${ANN_FMTS.map(([k, t]) => `<option value="${k}" ${db.settings.annFmt === k ? 'selected' : ''}>${t}</option>`).join('')}</select>
       <button data-onclick="vwExpCopy()" title="Copiar al portapapeles, para pegarlas en otro sitio">📋 Copiar</button><button data-onclick="vwExpNotes()" title="${n || f || k ? 'Añadirlas como nota nueva del paper' : 'Una nota «Anotaciones del PDF» en el paper: si ya existe, se actualiza'}">📝 A las notas</button><button data-onclick="vwExpMd()" title="Descargar como resumen en Markdown">⬇ .md</button></div>` : ''}
-    <div class="vwsx"><button data-onclick="vwOut()" title="Descargar el PDF con los subrayados y comentarios dentro (se ven en Acrobat, Foxit y otros lectores)">⬇ PDF anotado</button></div>`;
+    <div class="vwsx"><button data-onclick="vwOut()" title="Descargar el PDF con los subrayados y comentarios dentro (se ven en Acrobat, Foxit y otros lectores)">⬇ PDF anotado</button>${all.length ? '<button data-onclick="vxAnki()" title="Tarjetas para Anki: el texto subrayado delante; el comentario y la cita detrás">🃏 Anki</button>' : ''}</div>`;
 }
 const vwTop = a => { const p = VW.pages[a.p], b = p && vwBoxes(p, a.q, true)[0]; return b ? b.y : 0; };
 function vwFilt(f) { VW.filt = f; vwSideDraw(); }
@@ -435,7 +436,7 @@ function vwNightApply() {
 try { matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => vwNightApply()); } catch (e) {}
 function vwJump(id) {
   const a = vwAnns().find(x => x.id === id); if (!a) return; const p = VW.pages[a.p]; if (!p) return;
-  const b = vwBoxes(p, a.q, true)[0]; vwShowAt(p, b ? b.y : 0);
+  const b = vwBoxes(p, a.q, true)[0]; lnPush(); vwShowAt(p, b ? b.y : 0);   // v40.8: con «atrás»
   if (document.documentElement.classList.contains('mv')) vwSide(false);
   setTimeout(() => { vwFlash(id); vwPopOpen(id); }, 120);
 }
@@ -481,7 +482,7 @@ function vwHideDups() {   // las ya importadas, y las que escribió GPapers en u
   }
   if (ch) { VW.pages.forEach(p => { if (p.cv) { p.rs = 0; VW.queue.add(p.i); } }); vwPump(); }
 }
-function vwGoForeign(id) { const f = VW.foreign?.find(x => x.id === id), p = f && VW.pages[f.p]; if (!p) return; const b = vwBoxes(p, f.q, true)[0]; vwShowAt(p, b ? b.y : 0); }
+function vwGoForeign(id) { const f = VW.foreign?.find(x => x.id === id), p = f && VW.pages[f.p]; if (!p) return; const b = vwBoxes(p, f.q, true)[0]; lnPush(); vwShowAt(p, b ? b.y : 0); }
 function vwNear(hex) {   // el color de la paleta más parecido
   const h = s => [1, 3, 5].map(k => parseInt(s.slice(k, k + 2), 16)), a = h(hex);
   return VW_COLORS.map(([c]) => c).sort((x, y) => h(x).reduce((s, v, k) => s + (v - a[k]) ** 2, 0) - h(y).reduce((s, v, k) => s + (v - a[k]) ** 2, 0))[0];
@@ -494,11 +495,12 @@ function vwImport(ids) {   // ids: solo esas (si no, todas las que traía el PDF
 
 /* ---- Buscar en el PDF ---- */
 function vwFindToggle(on) { VW.findOpen = on ?? !VW.findOpen; $('#vw').classList.toggle('find', VW.findOpen); if (VW.findOpen) { $('#vwQ').focus(); $('#vwQ').select(); } else { vwFindReset(true); } }
-function vwFindReset(clear) { const had = VW.find.hits.length; VW.find.hits = []; VW.find.i = -1; $('#vwQn').textContent = ''; if (had || clear) lnFindUi(); document.querySelectorAll('#vw .vwfh').forEach(e => e.remove()); if (clear) { $('#vwQ').value = ''; VW.find.q = ''; } }
+function vwFindReset(clear) { const had = VW.find.hits.length; VW.find.hits = []; VW.find.i = -1; $('#vwQn').textContent = ''; if (had || clear) { lnFindUi(); vxMapDraw(); } document.querySelectorAll('#vw .vwfh').forEach(e => e.remove()); if (clear) { $('#vwQ').value = ''; VW.find.q = ''; } }
 async function vwFindKey(e) { if (e.key === 'Enter') { e.preventDefault(); await vwFind(e.shiftKey ? -1 : 1); } else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); vwFindToggle(false); } }
 async function vwPageText(p) {   // texto de una página y, para cada letra, el trozo de texto de donde viene
   if (VW.find.txt.has(p.i)) return VW.find.txt.get(p.i);
-  p.proxy ||= await VW.doc.getPage(p.i + 1); const tc = await p.proxy.getTextContent(), items = tc.items.filter(x => typeof x.str === 'string');
+  p.proxy ||= await VW.doc.getPage(p.i + 1); const tc = await p.proxy.getTextContent(); let items = tc.items.filter(x => typeof x.str === 'string');
+  if (!items.some(x => x.str.trim()) && VX.ocr.has(p.i)) { vwVp(p); items = vxOcrItems(p) || []; }   // v40.8: un escaneado con el texto reconocido
   let s = ''; const map = []; for (const it of items) { const n = norm(it.str); for (let k = 0; k < n.length; k++) map.push([it, k / Math.max(1, n.length), (k + 1) / Math.max(1, n.length)]); s += n; if (it.hasEOL) { s += ' '; map.push(null); } }
   const r = {s, map}; VW.find.txt.set(p.i, r); return r;
 }
@@ -508,11 +510,12 @@ async function vwFind(dir) {
     VW.find.q = q; VW.find.hits = []; VW.find.i = -1; $('#vwQn').textContent = 'Buscando…'; const gen = VW.gen;
     for (const p of VW.pages) { if (gen !== VW.gen || VW.find.q !== q) return; const {s, map} = await vwPageText(p); let k = s.indexOf(q);
       while (k >= 0) { VW.find.hits.push({p: p.i, k, n: q.length, map}); k = s.indexOf(q, k + 1); } }
-    VW.find.i = -1; document.querySelectorAll('#vw .vwfh').forEach(e => e.remove()); VW.pages.forEach(p => p.tl && vwFindMark(p)); lnFindUi();
+    VW.find.i = -1; document.querySelectorAll('#vw .vwfh').forEach(e => e.remove()); VW.pages.forEach(p => p.tl && vwFindMark(p)); lnFindUi(); vxMapDraw();
   }
   const H = VW.find.hits; if (!H.length) { $('#vwQn').textContent = 'Sin resultados'; return; }
   let j; if (VW.find.i < 0) { j = H.findIndex(h => h.p >= VW.cur); j = dir > 0 ? (j < 0 ? 0 : j) : (j <= 0 ? H.length - 1 : j - 1); }
   else j = (VW.find.i + dir + H.length) % H.length;
+  if (LN.findQ !== VW.find.q) { lnPush(); LN.findQ = VW.find.q; }   // v40.8: «atrás» vuelve a donde estabas antes de buscar
   vwFindGo(j); if (VW.side && VW.tab === 'find') lnFindCur();
 }
 function vwFindGo(j) {   // a un resultado (también desde la lista del panel, v39.50)
