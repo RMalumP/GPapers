@@ -43,7 +43,7 @@ const TPL_DEF = [   // plantillas de nota de serie; {fecha} y {paper} se sustitu
   {id: 't_res', name: 'Resumen del paper', text: '**Objetivo:** \n**Método:** \n**Resultados:** \n**Limitaciones:** '},
   {id: 't_cit', name: 'Cita textual', text: '**Cita:** \n**Página:** \n**Comentario:** '},
   {id: 't_ide', name: 'Idea propia', text: '**Idea:** \n**Relación con mi tema:** \n**Siguiente paso:** '}];
-const defSettings = () => ({uiMode: 'full', palette: 'azul', appName: 'Papers', showFile: true, showImg: true, showProgress: false, showRev: false, showStats: false, pdfDrive: false, pdfVis: false, showInbox: true, pdfTab: 'tab', annAuto: false, annFmt: 'txt', inboxPos: 'bottom', inboxBtn: false, customTypes: [], customStyles: [], mainStyle: 'apa', citeOnlyMain: false, aliasInMore: false, shortcuts: {...SC_DEF}, fmtOpen: false, view: 'cards', templates: TPL_DEF.map(t => ({...t})), export: {fmt: 'txt', style: 'apa', order: 'auto', num: false, notes: false, particles: false, title: '', lang: 'es', dateFmt: 'long', vanAll: false, ppChap: true, numFmt: 'auto', disamb: true, abbrList: true, inText: false}});   // ajustes por defecto (se guardan en el JSON)
+const defSettings = () => ({uiMode: 'full', vwMode: '', vwFeat: {s: {}, f: {}}, palette: 'azul', appName: 'Papers', showFile: true, showImg: true, showProgress: false, showRev: false, showStats: false, pdfDrive: false, pdfVis: false, showInbox: true, pdfTab: 'tab', annAuto: false, annFmt: 'txt', inboxPos: 'bottom', inboxBtn: false, customTypes: [], customStyles: [], mainStyle: 'apa', citeOnlyMain: false, aliasInMore: false, shortcuts: {...SC_DEF}, fmtOpen: false, view: 'cards', templates: TPL_DEF.map(t => ({...t})), export: {fmt: 'txt', style: 'apa', order: 'auto', num: false, notes: false, particles: false, title: '', lang: 'es', dateFmt: 'long', vanAll: false, ppChap: true, numFmt: 'auto', disamb: true, abbrList: true, inText: false}});   // ajustes por defecto (se guardan en el JSON)
 let db = {version: 1, sections: [], tags: [], papers: [], trash: [], inbox: [], settings: defSettings()}, path = null, dirty = false, auto = false, D, tab = 'data', MG, timer;
 const F = {q: '', inPdf: false, sorts: [{k: 'title', d: 1}], group: false, secs: new Set(), tags: new Set(), read: '', minRating: 0, inNotes: false, mode: 'any', tbSec: false, tbTag: true, exTags: new Set(), noTag: false, noSec: false, yFrom: 0, yTo: 0, adv: {mode: 'all', rules: []}};   // secs: secciones elegidas (vale cualquiera de ellas) · exTags: etiquetas excluidas · noTag / noSec: solo papers sin etiquetas / sin sección · yFrom, yTo: años (0 = sin límite) · adv: búsqueda avanzada
 const SEL = new Set();   // ids de papers seleccionados
@@ -223,3 +223,55 @@ for (const type of ON_EV) document.addEventListener(type, e => {   // se registr
     if (e.cancelBubble) { e.stopImmediatePropagation(); break; }   // stopPropagation() en un manejador también para a los demás oyentes del documento
   }
 }, ON_CAPT.has(type));
+
+/* v40.10: funciones del visor de PDF y EPUB (el resto en js/visor-funciones.js) */
+const VF_GROUPS = [['an', 'Anotar'], ['rd', 'Leer'], ['pg', 'Página y zoom'], ['nv', 'Navegar'], ['sl', 'Con el texto seleccionado'], ['tl', 'Herramientas']];
+// [id, grupo, nombre, en el Sencillo de serie, explicación corta]
+const VF = [
+  ['note', 'an', '🗒 Notas sueltas en la página', 1, 'Herramienta Nota (tecla N)'],
+  ['notes', 'an', '📝 Notas del paper al lado del PDF', 1, 'Botón 📝 Notas de la barra (tecla E)'],
+  ['area', 'an', '▭ Zonas (recuadros) y copiarlas como imagen', 0, 'Herramienta Zona (tecla R)'],
+  ['ink', 'an', '✏ Lápiz', 0, 'Dibujar o escribir a mano (⋯)'],
+  ['ustyle', 'an', 'U̲ Línea debajo y S̶ tachado', 0, 'Otros estilos de subrayado'],
+  ['lbl', 'an', '🏷 Significado de los colores', 0, 'Un nombre para cada color'],
+  ['bm', 'an', '🔖 Marcadores', 0, 'Teclas B, [ y ]'],
+  ['two', 'rd', '▯▯ Doble página', 1, 'Tecla D'],
+  ['flip', 'rd', '👆 Página a página, con toques', 1, 'Tecla P'],
+  ['auto', 'rd', '⏬ Desplazamiento automático', 1, 'Tecla A'],
+  ['fs', 'rd', '⛶ Pantalla completa', 1, 'Tecla F'],
+  ['night', 'rd', '🌙 Modo noche y sepia', 1, 'En ⚙ Ajustes del visor (PDF)'],
+  ['conc', 'rd', '🧘 Modo concentración', 0, 'Con el desplazamiento automático (tecla C)'],
+  ['col', 'rd', '▥ Columna a columna', 0, 'Papers a dos columnas, en el móvil'],
+  ['flow', 'rd', '📄 Texto adaptado a la pantalla', 0, 'Tecla T'],
+  ['rl', 'rd', '📏 Regla de lectura', 0, 'Tecla M'],
+  ['say', 'rd', '🔊 Leer en voz alta', 0, 'Con la voz del sistema'],
+  ['lock', 'pg', '🔒 Candado del tamaño', 1, 'Con página a página (tecla K)'],
+  ['crop', 'pg', '✂ Recorte de márgenes', 1, 'Automático o a mano'],
+  ['rot', 'pg', '↻ Girar páginas', 0, ''],
+  ['zonas', 'pg', '👆 Zonas para pasar (3 × 3)', 0, 'Sin ellas, se pasa tocando a la izquierda o a la derecha'],
+  ['tbpos', 'pg', '▾ Pestaña de la barra a un lado', 0, 'En pantalla completa; sin ella, en el centro'],
+  ['toc', 'nv', '📑 Índice y miniaturas', 1, 'Tecla I'],
+  ['find', 'nv', '🔍 Buscar', 1, 'Ctrl+F'],
+  ['findL', 'nv', '☰ Lista de resultados de la búsqueda', 0, ''],
+  ['fwd', 'nv', '↪ Adelante, además de ↩ Volver', 0, 'Alt+→ y los botones del ratón'],
+  ['map', 'nv', '▮ Marcas junto a la barra de desplazamiento', 0, 'Subrayados, marcadores y resultados'],
+  ['fig', 'nv', '🖼 Pestaña Figuras', 0, 'Las figuras y tablas del PDF'],
+  ['left', 'nv', '⏱ Tiempo que falta', 0, 'A tu ritmo de lectura'],
+  ['cmdk', 'nv', '🔎 Buscar una orden (Ctrl+K)', 0, 'Dentro del visor'],
+  ['cite', 'sl', '❝ Copiar con la cita', 0, '⋯ de la barra de la selección'],
+  ['web', 'sl', '📖 Definición, traducir y Google Académico', 0, '⋯ de la barra de la selección'],
+  ['acr', 'sl', '🔤 Siglas', 0, 'Qué significa una sigla seleccionada'],
+  ['refadd', 'sl', '➕ Añadir a GPapers desde una cita', 0, 'En la vista previa de una referencia'],
+  ['p2', 'tl', '⧉ Ver el PDF 2 al lado', 0, 'Si el paper tiene dos PDF'],
+  ['diff', 'tl', '≠ Diferencias entre PDF 1 y PDF 2', 0, ''],
+  ['ocr', 'tl', '🔠 Reconocer el texto (OCR)', 0, 'PDF escaneados'],
+  ['anki', 'tl', '🃏 Exportar a Anki', 0, 'En Anotaciones'],
+  ['md', 'tl', '⬇ Resumen de subrayados (.md)', 0, '⋯ del visor']
+];
+const VF_BY = Object.fromEntries(VF.map(f => [f[0], f]));
+function vfNorm(s) {   // persistencia: lo que llega del JSON
+  s.vwMode = s.vwMode === 'simple' || s.vwMode === 'full' ? s.vwMode : '';
+  const o = s.vwFeat && typeof s.vwFeat === 'object' ? s.vwFeat : {}, out = {s: {}, f: {}};
+  for (const k of ['s', 'f']) for (const [id, v] of Object.entries(o[k] || {})) if (VF_BY[id] && typeof v === 'boolean') out[k][id] = v;
+  s.vwFeat = out;
+}

@@ -19,7 +19,7 @@ document.addEventListener('keydown', e => {
   if (act === 'bold' || act === 'italic') { const ed = e.target.closest?.('.ned'), ce = e.target.closest?.('.ced'); if (ed || ce) { e.preventDefault(); ed ? edCmd(ed.dataset.key, act) : citeCmd(act); } return; }   // solo dentro de una nota o de una cita
   const inText = /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName) || e.target.isContentEditable;
   // Dentro de campos de texto o con una ventana abierta, solo funciona Guardar; lo demás es el comportamiento nativo (p. ej. Ctrl+Z en una nota)
-  if (act === 'palette' && !inText && typeof rdOpen === 'function' && rdOpen() && !$('#cmdk').open) { e.preventDefault(); return cmdOpen(true); }   // en el visor: sus órdenes (v40)
+  if (act === 'palette' && !inText && typeof rdOpen === 'function' && rdOpen() && !$('#cmdk').open) { e.preventDefault(); return vfOn('cmdk') ? cmdOpen(true) : undefined; }   // en el visor: sus órdenes (v40)
   if (act !== 'save' && (inText || document.querySelector('dialog[open]') && !act.startsWith('ui'))) return;   // el tamaño del texto también con una ventana o el visor abiertos
   e.preventDefault(); SC_ACT[act]();
 });
@@ -57,6 +57,7 @@ function applySettings() {
   VARS.forEach(k => v[k] ? root.setProperty('--' + k, v[k]) : root.removeProperty('--' + k));
   $('#appName').textContent = c.appName || 'Papers';   // solo cambia la cabecera; el título «Gestor de papers» no se toca
   document.documentElement.classList.toggle('simple', c.uiMode === 'simple');   // v40.6: modo Sencillo de toda la app (lo esconde movil/style.css)
+  vfApply();   // v40.10: funciones del visor (sigue al modo de la app mientras no se elige otro)
   hdr(); progDraw();
 }
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applySettings);
@@ -99,7 +100,8 @@ function cfgBodies() {
   const c = db.settings, on = syOn(), p = syP();
   return {
     ap: cfgBlk('mode', 'Modo de la app', ci(`<div class="dmode cmode"><div class="seg" role="group" aria-label="Modo de la app"><button class="${uiSimple() ? 'on' : ''}" aria-pressed="${uiSimple()}" data-onclick="uiModeSet('simple')">Sencillo</button><button class="${uiSimple() ? '' : 'on'}" aria-pressed="${!uiSimple()}" data-onclick="uiModeSet('full')">Completo</button></div>
-      <small>${uiSimple() ? `Se esconde lo que menos se usa: ${UI_SIMPLE_HIDES}.` : 'Se ve todo.'}${hlp(`Sencillo esconde ${UI_SIMPLE_HIDES}. No se borra nada ni cambia ningún dato: con «Completo» vuelve a verse todo, y Relaciones sigue en Ctrl+K. La elección se guarda en el JSON del proyecto y llega a tus otros dispositivos.`)}</small></div>`))
+      <small>${uiSimple() ? `Se esconde lo que menos se usa: ${UI_SIMPLE_HIDES}.` : 'Se ve todo.'}${hlp(`Sencillo esconde ${UI_SIMPLE_HIDES}. No se borra nada ni cambia ningún dato: Con «Completo» vuelve a verse todo, y Relaciones sigue en Ctrl+K. La elección se guarda en el JSON del proyecto y llega a tus otros dispositivos.`)}</small></div>`))
+    + cfgBlk('vwf', 'Visor de PDF y EPUB', vfCfgHtml())
     + cfgBlk('look', 'Aspecto', ci(`<label>Nombre de la aplicación<input value="${esc(c.appName)}" maxlength="30" data-oninput="setCfg('appName', this.value)"></label>`)
     + ci(cfgSec('pal', 'Paleta de colores', `<label class="thm">Tema <select data-onchange="setTheme(this.value)" aria-label="Tema">${Object.entries(THEMES).map(([k, v]) => `<option value="${k}" ${themeGet() === k ? 'selected' : ''}>${v}</option>`).join('')}</select> ${cDev}</label><div style="margin:6px 0 10px">${Object.entries(PAL).map(([k, p]) => chip({name: p.n, color: p.c}, c.palette === k, `setCfg('palette','${k}');drawCfg()`)).join('')}${chip({name: 'Personalizada', color: c.custom?.pri || '#888888'}, c.palette === 'custom', 'pickCustom()')}</div>${c.palette === 'custom' && c.custom ? `<div class="cpick">${LAB.map(([k, t]) => `<label class="row"><input type="color" value="${c.custom[k]}" data-oninput="setCustom('${k}', this.value)"> ${t}</label>`).join('')}<button data-onclick="resetPal()">Restablecer a Azul</button></div>` : ''}`))
     + ci(`<div class="row uifz"><span>Tamaño del texto de la interfaz ${cDev}${hlpB(`También con ${c.shortcuts.uiBig || '—'} y ${c.shortcuts.uiSmall || '—'}.`)}</span><span class="row" role="group" aria-label="Tamaño del texto de la interfaz">${UI_FZ.map(z => `<button class="${uiFz() === z ? 'pri' : ''}" aria-pressed="${uiFz() === z}" data-onclick="uiFzSet(${z})" style="font-size:${Math.round(13 * z)}px">${Math.round(z * 100)} %</button>`).join('')}</span>${hlpT(`También con ${c.shortcuts.uiBig || '—'} y ${c.shortcuts.uiSmall || '—'}.`)}</div>`))

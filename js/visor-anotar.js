@@ -345,13 +345,13 @@ const vwSideOn = () => { try { return localStorage.getItem('gp-vw-side') !== '0'
 function vwSide(on) { VW.side = on ?? !VW.side; try { localStorage.setItem('gp-vw-side', VW.side ? '1' : '0'); } catch (e) {} vwSideShow(); }
 function vwSideShow() { const s = $('#vwSide'); s.hidden = !VW.side; $('#vw').classList.toggle('side', VW.side); document.querySelector('#vw .vwsb')?.classList.toggle('on', VW.side && VW.tab === 'ann'); document.querySelector('#vw .vwtc')?.classList.toggle('on', VW.side && (VW.tab === 'toc' || VW.tab === 'th')); if (VW.side) vwSideDraw(); else VW.thIo?.disconnect(); }
 const VW_TABS = [['ann', '💬 Anotaciones'], ['toc', '📑 Índice'], ['th', '▦ Páginas']];
-function vwPanel(t) { if (VW.side && VW.tab === t) return vwSide(false); VW.tab = t; VW.side ? vwSideShow() : vwSide(true); }
+function vwPanel(t) { if (t === 'toc' && !vfOn('toc')) return; if (VW.side && VW.tab === t) return vwSide(false); VW.tab = t; VW.side ? vwSideShow() : vwSide(true); }
 function vwTab(t) { VW.tab = t; vwSideShow(); }
 const vwKindOf = a => a.k === 'note' ? 'note' : 'hl';   // las notas 🗒, aparte de los subrayados y zonas
 const vwSideList = () => { const f = VW.filt, k = VW.kind; const T = new Map(); return vwAnns().filter(a => (!f || (f === 'cm' ? a.m : a.c === f)) && (!k || vwKindOf(a) === k)).map(a => (T.set(a, vwTop(a)), a)).sort((a, b) => a.p - b.p || T.get(a) - T.get(b)); };   // la altura, una vez por anotación
 function vwSideDraw() {
   const s = $('#vwSide'), t = VW.tab || 'ann';
-  const tabs = VW.find.hits.length || t === 'find' ? [...VW_TABS, ['find', `🔍 ${VW.find.hits.length || ''}`]] : VW_TABS;   // v39.50: los resultados de la búsqueda, solo si hay
+  const tabs = (VW.find.hits.length || t === 'find' ? [...VW_TABS, ['find', `🔍 ${VW.find.hits.length || ''}`]] : VW_TABS).filter(([k]) => vfOn({toc: 'toc', th: 'toc', fig: 'fig', find: 'findL'}[k] || 'x'));   // v39.50: los resultados de la búsqueda, solo si hay
   const head = `<div class="vwst"><div class="vwstt" role="tablist">${tabs.map(([k, n]) => `<button role="tab" aria-selected="${t === k}" class="${t === k ? 'on' : ''}${k === 'find' ? ' lntab' : ''}" data-onclick="vwTab('${k}')">${n}</button>`).join('')}</div><button class="vwib" data-onclick="vwSide(false)" aria-label="Cerrar el panel">✕</button></div>`;
   if (t === 'toc') return vwTocDraw(s, head);
   if (t === 'th') return vwThDraw(s, head);
@@ -369,11 +369,11 @@ function vwAnnDraw(s, head) {
     ${pk ? `<div class="vwpkb"><button data-onclick="vwPickAll()">${L.length && L.every(a => pk.has(a.id)) ? '☐ Ninguna' : '☑ Todas las de la lista'}</button><button class="danger" data-onclick="vwPickDel()" ${n ? '' : 'disabled'}>🗑 Borrar${n ? ` (${n})` : ''}</button></div>` : ''}
     <div class="vwsf"><button class="${f ? '' : 'on'}" data-onclick="vwFilt('')">Todas</button>${annFiltChips(all, f, 'vwFilt')}<button class="${f === 'cm' ? 'on' : ''}" data-onclick="vwFilt('cm')" title="Solo las que tienen comentario">💬</button></div>
     <div class="vwsl">${L.length ? grp
-      : `<p class="empty">${all.length ? 'Ninguna con este filtro.' : 'Aún no hay anotaciones. Selecciona texto y elige un color, o usa 🖍 Subrayar, ▭ Zona o 🗒 Nota.'}</p>`}</div>
+      : `<p class="empty">${all.length ? 'Ninguna con este filtro.' : `Aún no hay anotaciones. Selecciona texto y elige un color, o usa 🖍 Subrayar${vfOn('area') ? ', ▭ Zona' : ''}${vfOn('note') ? ' o 🗒 Nota' : ''}.`}</p>`}</div>
     ${frV.length ? `<details class="vwfr"><summary>${frV.length} ${frV.length === 1 ? 'anotación que ya traía' : 'anotaciones que ya traía'} el PDF</summary>${frV.slice(0, 300).map(x => `<button class="vwi" style="--c:${x.c}" data-onclick="vwGoForeign('${x.id}')"><small>p. ${x.p + 1} · ${esc(x.sub)}${x.who ? ' · ' + esc(x.who) : ''}</small>${x.m ? `<span class="vwim">${esc(x.m.slice(0, 300))}</span>` : ''}</button>`).join('')}<button class="pri" data-onclick="vwImport()" title="Pasan a ser tuyas: se pueden cambiar, comentar y sincronizar">Hacerlas editables</button></details>` : ''}
     ${all.length ? `<div class="vwsx vwexp"><small>${n ? `${n} ${n === 1 ? 'elegida' : 'elegidas'}` : f || k ? 'Las del filtro' : 'Todas'}:</small><select data-onchange="vwExpFmt(this.value)" aria-label="Formato" title="Formato al copiar o llevar a las notas">${ANN_FMTS.map(([k, t]) => `<option value="${k}" ${db.settings.annFmt === k ? 'selected' : ''}>${t}</option>`).join('')}</select>
       <button data-onclick="vwExpCopy()" title="Copiar al portapapeles, para pegarlas en otro sitio">📋 Copiar</button><button data-onclick="vwExpNotes()" title="${n || f || k ? 'Añadirlas como nota nueva del paper' : 'Una nota «Anotaciones del PDF» en el paper: si ya existe, se actualiza'}">📝 A las notas</button><button data-onclick="vwExpMd()" title="Descargar como resumen en Markdown">⬇ .md</button></div>` : ''}
-    <div class="vwsx"><button data-onclick="vwOut()" title="Descargar el PDF con los subrayados y comentarios dentro (se ven en Acrobat, Foxit y otros lectores)">⬇ PDF anotado</button>${all.length ? '<button data-onclick="vxAnki()" title="Tarjetas para Anki: el texto subrayado delante; el comentario y la cita detrás">🃏 Anki</button>' : ''}</div>`;
+    <div class="vwsx"><button data-onclick="vwOut()" title="Descargar el PDF con los subrayados y comentarios dentro (se ven en Acrobat, Foxit y otros lectores)">⬇ PDF anotado</button>${all.length && vfOn('anki') ? '<button data-onclick="vxAnki()" title="Tarjetas para Anki: el texto subrayado delante; el comentario y la cita detrás">🃏 Anki</button>' : ''}</div>`;
 }
 const vwTop = a => { const p = VW.pages[a.p], b = p && vwBoxes(p, a.q, true)[0]; return b ? b.y : 0; };
 function vwFilt(f) { VW.filt = f; vwSideDraw(); }
@@ -425,7 +425,7 @@ async function vwThumb(b) {   // miniatura de una página (pequeña: poca memori
 function vwThCur() { const b = document.querySelector('#vwSide .vwth'); if (!b) return; b.querySelector('.vwtp.on')?.classList.remove('on'); b.querySelector(`.vwtp[data-i="${VW.cur}"]`)?.classList.add('on'); }
 
 /* ---- Modo noche: fondo oscuro y letra clara; las imágenes del PDF no se tocan ---- */
-const vwNightPref = () => { try { return localStorage.getItem('gp-vw-night') || 'off'; } catch (e) { return 'off'; } };
+const vwNightPref = () => { if (!vfOn('night')) return 'off'; try { return localStorage.getItem('gp-vw-night') || 'off'; } catch (e) { return 'off'; } };
 const vwNightOn = () => { const p = vwNightPref(); return p === 'on' || p === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches; };
 const vwPC = () => VW.night ? {background: '#1c1e23', foreground: '#dcdde1'} : VW.theme === 'sepia' ? {background: '#f4ecd8', foreground: '#433422'} : null;   // v39.51: también sepia
 function vwNight(v) { try { localStorage.setItem('gp-vw-night', v); } catch (e) {} vwNightApply(); }
