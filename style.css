@@ -13,7 +13,7 @@ input,select,textarea,button{font:inherit;color:inherit;background:var(--card);b
 textarea{width:100%;min-height:90px}button{cursor:pointer}button.pri{background:var(--pri);color:var(--onpri);border-color:var(--pri)}
 button.danger{color:var(--red)}input[type=color]{padding:0;width:36px;height:32px}
 .card{background:var(--card);border:1px solid var(--bd);border-radius:8px;padding:12px;margin-top:10px}
-.card h3{margin:0 0 4px}.card a,dialog a{color:var(--pri);word-break:break-all}.empty{opacity:.7}
+.card h3{margin:0 0 4px}.card a,dialog a{color:var(--pri);word-break:break-all}.card a.ctl{color:inherit;word-break:normal;overflow-wrap:anywhere;cursor:pointer}.card a.ctl:hover{color:var(--pri);text-decoration:underline}.empty{opacity:.7}
 .chip{display:inline-block;margin:2px 4px 2px 0;padding:2px 10px;border-radius:99px;border:2px solid color-mix(in srgb,var(--c) 55%,var(--bg));color:color-mix(in srgb,var(--fg) 80%,var(--bg));font-size:calc(13px * var(--fz,1));user-select:none}
 .chip.on{background:var(--c);border-color:var(--c);color:#fff;opacity:1;text-shadow:0 0 2px #0008}.chip[onclick]{cursor:pointer}
 dialog{width:min(760px,96vw);max-height:92vh;overflow:auto;background:var(--bg);color:var(--fg);border:1px solid var(--bd);border-radius:10px}

@@ -2,6 +2,13 @@
 
 Lo más reciente arriba. Hasta la v39.53 estas notas estaban en el README; van de la más nueva a la más antigua (algunas rondas antiguas no tenían número de versión).
 
+## v40.9: arreglos en el móvil (ficha del paper, tarjetas y enlaces en la app de Android)
+- **Tarjetas**: tocar (o hacer clic en) el título abre la ficha para editar, como en la tabla. Mantenerlo pulsado en el móvil sigue sirviendo para arrastrar la tarjeta.
+- **Enlaces a otras webs en la app de Android**: el DOI de una tarjeta (y cualquier enlace que se abría en una pestaña nueva) dejaba la pantalla en negro y, al volver atrás, se cerraba la app. Ahora, dentro de la app, se abre en la misma ventana con la barra de Chrome (con ✕), y «Atrás» vuelve a GPapers. Antes se guarda la copia de trabajo. En el navegador y en la PWA instalada se sigue abriendo en una pestaña nueva. No hace falta un APK nuevo.
+- **Ficha de un paper en el móvil**: cabecera en una sola fila (✕, el título en dos líneas como mucho y «Guardar»), pestañas con nombre corto («Todo», «Clasificar») que caben sin desplazarlas (también en 320 px), «Ver todo» sin cajas dentro de cajas, imagen más pequeña junto al título, botones de Lectura y estrellas más grandes, «Rellenar / OpenAlex / Parecidos» repartidos a lo ancho.
+- **Enlazar un PDF en el móvil**: la fila del PDF es una tarjeta: el nombre del archivo, debajo «Cambiar…», «Abrir» y «Página» al lado de su casilla, y después la copia en Drive a lo ancho con ✕. «Relacionar con» y «Buscar un paper…», uno debajo del otro.
+- Pruebas: `python3 pruebas/prueba_v409.py .`
+
 ## v40.8: doce mejoras del visor de PDF
 - **Añadir a GPapers desde una cita**: al tocar una referencia ([12] o «Autor, 2019»), la vista previa dice si ese paper ya está en la biblioteca («✓ Ya en tu biblioteca» y «📝 Abrir») o deja «➕ Añadir a GPapers»: busca el DOI (o el título) y abre Importar ya rellenado. El paper nuevo queda enlazado en Relaciones con el que estabas leyendo.
 - **Columna a columna** (Lectura → «Columna a columna»): en papers a dos columnas, cada toque o → enseña el siguiente trozo de columna a todo el ancho; ← vuelve. Pensado para el móvil.

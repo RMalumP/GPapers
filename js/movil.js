@@ -179,7 +179,7 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
   document.addEventListener('touchstart', e => {
     end(); if (!mvOn() || e.touches.length !== 1) return;
     const el = e.target.closest?.('#list .card[data-id], #list tr.rw[data-id]');
-    if (!el || e.target.closest('button, a, input, select, textarea, label, .pimg, [contenteditable], [data-oncontextmenu]')) return;
+    if (!el || e.target.closest('button, a:not(.ctl), input, select, textarea, label, .pimg, [contenteditable], [data-oncontextmenu]')) return;
     const t = e.touches[0]; S = {el, id: el.dataset.id, from: el.dataset.from || '', x: t.clientX, y: t.clientY, on: false};
     T = setTimeout(() => {
       if (!S) return; S.on = true; el.classList.add('drag'); document.documentElement.classList.add('mvdrag'); navigator.vibrate?.(20);
@@ -207,3 +207,24 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
   document.addEventListener('touchcancel', end, {passive: true});
   document.addEventListener('contextmenu', e => { if (S && mvOn()) e.preventDefault(); }, true);   // la pulsación larga no abre el menú del sistema
 })();
+
+/* ---- v40.9: enlaces a otras webs dentro de la app de Android (TWA)
+   En la app, un enlace que se abría en una pestaña nueva (target=_blank o window.open), p. ej. el DOI de una tarjeta, dejaba la pantalla
+   en negro y, al volver atrás, se cerraba la app. Ahí se abre en la misma ventana: Chrome lo enseña con su barra de pestaña (con ✕) y «Atrás»
+   vuelve a GPapers. Antes se guarda la copia de trabajo, que se recupera al volver. En el navegador y en la PWA instalada no cambia nada. */
+const TWA = (() => { try { if (document.referrer.startsWith('android-app://io.github.rmalump.gpapers')) sessionStorage.setItem('gp-twa', '1'); return sessionStorage.getItem('gp-twa') === '1'; } catch (e) { return document.referrer.startsWith('android-app://'); } })();
+const extUrl = u => { try { const x = new URL(u, location.href); return /^https?:$/.test(x.protocol) && x.origin !== location.origin && x.hostname !== 'accounts.google.com' ? x.href : ''; } catch (e) { return ''; } };   // el inicio de sesión de Google (Drive) sigue en su ventana emergente
+function twaGo(u) {   // en la app de Android: abrir otra web en la misma ventana, sin el aviso de «¿Salir del sitio?» si no hay una ficha a medio editar
+  const go = () => { if (!document.querySelector('#dlg[open]')) window.onbeforeunload = null; location.assign(u); };
+  Promise.race([Promise.resolve(typeof sessionNow === 'function' && sessionNow()).catch(() => {}), new Promise(r => setTimeout(r, 800))]).then(go);
+}
+if (TWA) {
+  document.documentElement.classList.add('twa');
+  document.addEventListener('click', e => {
+    const a = e.target.closest?.('a[href]'); if (!a || e.defaultPrevented || a.hasAttribute('download')) return;
+    const u = extUrl(a.getAttribute('href')); if (!u) return;
+    e.preventDefault(); twaGo(u);
+  });
+  const wo = window.open.bind(window);
+  window.open = (u, ...r) => { const x = extUrl(u); if (x) { twaGo(x); return null; } return wo(u, ...r); };
+}
