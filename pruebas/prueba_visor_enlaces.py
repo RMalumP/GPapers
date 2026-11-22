@@ -56,7 +56,7 @@ with sync_playwright() as pw:
     A.click('#vwLk .pri'); A.wait_for_timeout(600)
     eq('«Ir» lleva a la página 3 y sale «↩ Volver»', A.evaluate("[VW.cur, !$('#vwBack').hidden, $('#vwBack button').textContent, $('#vwLk').hidden]"), [2, True, '↩ Volver a la p. 1', True])
     A.click('#vwBack button'); A.wait_for_timeout(500)
-    eq('«↩ Volver» regresa a la página 1 y se quita', A.evaluate("[VW.cur, $('#vwBack').hidden]"), [0, True])
+    eq('«↩ Volver» regresa a la página 1 y deja solo «Adelante»', A.evaluate("[VW.cur, $('#vwBack .lnbk').hidden, $('#vwBack .lnfw').textContent]"), [0, True, 'p. 3 ›'])
     A.evaluate("lnSet('go')"); x, y = A.evaluate(LINK + "(0)"); A.mouse.click(x, y); A.wait_for_timeout(700)
     eq('con «Ir directamente», salta sin vista previa', A.evaluate("[VW.cur, $('#vwLk').hidden, LN.back.length]"), [2, True, 1])
     A.keyboard.press('Alt+ArrowLeft'); A.wait_for_timeout(400)

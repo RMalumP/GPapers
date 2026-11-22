@@ -12,7 +12,7 @@
      frase donde aparece, para ir directamente al que interesa.
    Preferencias en este dispositivo: gp-vw-link ('prev' | 'go') y gp-vw-wake ('read' | 'auto' | 'off'). */
 const LN_K = 'gp-vw-link', WL_K = 'gp-vw-wake', WL_IDLE = 5 * 60e3;
-const LN = {back: [], ep: [], t: null, findQ: null};
+const LN = {back: [], fwd: [], ep: [], t: null, findQ: null};
 const lnPref = () => { try { return localStorage.getItem(LN_K) === 'go' ? 'go' : 'prev'; } catch (e) { return 'prev'; } };
 function lnSet(v) { try { localStorage.setItem(LN_K, v === 'go' ? 'go' : 'prev'); } catch (e) {} }
 const wlPref = () => { try { const v = localStorage.getItem(WL_K); return v === 'auto' || v === 'off' ? v : 'read'; } catch (e) { return 'read'; } };
@@ -114,6 +114,7 @@ async function lnPrev(t, R) {   // la vista previa del destino: el trozo de la p
     await p.proxy.render({canvasContext: cv.getContext('2d', {alpha: false}), viewport: vp, pageColors: vwPC()}).promise;
     if (gen !== VW.gen || LN.t !== t) return; box.replaceChildren(cv); lnPlace(pp, R, $('#vw'));
   } catch (e) { if (LN.t === t) pp.querySelector('.lncv').innerHTML = '<p class="empty">No se pudo pintar la vista previa.</p>'; }
+  if (LN.t === t && !pp.hidden) vxRefInfo(t, pp, R);   // v40.8: «➕ Añadir a GPapers» o «✓ Ya en tu biblioteca»
 }
 async function lnCol(p, t) {   // qué trozo enseñar: desde el destino hacia abajo y, en un PDF a dos columnas, solo su columna (si no, la letra sale diminuta)
   const v = vwVp(p), c = vwCropOn(), L = c ? c.l : 0, Rr = p.w - (c ? c.r : 0), y0 = Math.max(0, t.y - 6);
@@ -129,7 +130,11 @@ async function lnCol(p, t) {   // qué trozo enseñar: desde el destino hacia ab
   return {x: x0, y: y0, w: Math.max(40, x1 - x0), h: Math.min(Math.max(60, p.h - y0), 170)};
 }
 function lnGoPrev() { const t = LN.t; lnClose(); if (t) lnGo(t); }
-function lnPush() { const a = vwAnchor(); if (!a) return; LN.back.push({i: VW.cur, a, sl: $('#vwScroll').scrollLeft}); if (LN.back.length > 30) LN.back.shift(); lnBackShow(); }
+function lnPush() {   // v40.8: un salto nuevo borra «adelante» (como en el navegador); el mismo sitio dos veces no se repite
+  const a = vwAnchor(); if (!a) return; const l = LN.back.at(-1); LN.fwd = [];
+  if (!(l && l.i === VW.cur && Math.abs(l.a.f - a.f) < .05)) { LN.back.push({i: VW.cur, a, sl: $('#vwScroll').scrollLeft}); if (LN.back.length > 40) LN.back.shift(); }
+  lnBackShow();
+}
 function lnGo(t) {   // a un punto de una página, con «↩ Volver»
   const p = VW.pages[t.i]; if (!p) return; lnPush(); const sc = $('#vwScroll');
   if (VW.flip && !p.el.classList.contains('cur')) vwGo(t.i, true);
@@ -138,15 +143,17 @@ function lnGo(t) {   // a un punto de una página, con «↩ Volver»
   const m = document.createElement('i'); m.className = 'lnfl'; m.style.top = vwPx(Math.max(0, t.y - 2)); p.el.append(m); setTimeout(() => m.remove(), 1900);   // dónde has caído
 }
 function lnBack() {
-  const b = LN.back.pop(); if (!b) return lnBackShow(); if (VW.flip) vwGo(b.i, true);
+  const b = LN.back.pop(); if (!b) return lnBackShow(); const a = vwAnchor(); if (a) { LN.fwd.push({i: VW.cur, a, sl: $('#vwScroll').scrollLeft}); if (LN.fwd.length > 40) LN.fwd.shift(); }
+  if (VW.flip) vwGo(b.i, true);
   vwAnchorSet(b.a); $('#vwScroll').scrollLeft = b.sl; if (!VW.flip) VW.cur = b.i; vwOnScroll(); lnBackShow();
 }
-function lnBackClear() { LN.back = []; LN.findQ = null; lnBackShow(); }
+function lnBackClear() { LN.back = []; LN.fwd = []; LN.findQ = null; lnBackShow(); }
 function lnBackShow() {
   const body = $('#vw .vwbody'); if (!body) return; let b = $('#vwBack');
-  if (!LN.back.length) { if (b) b.hidden = true; return; }
-  if (!b) { body.insertAdjacentHTML('beforeend', `<div id="vwBack" class="vwfloat lnback"><button data-onclick="lnBack()" title="Volver a donde estabas (Alt + ←)"></button><button class="vwib" data-onclick="lnBackClear()" title="Quitar" aria-label="Quitar">✕</button></div>`); b = $('#vwBack'); }
-  b.firstElementChild.textContent = `↩ Volver a la p. ${LN.back.at(-1).i + 1}`; b.hidden = false;
+  if (!LN.back.length && !LN.fwd.length) { if (b) b.hidden = true; return; }
+  if (!b) { body.insertAdjacentHTML('beforeend', `<div id="vwBack" class="vwfloat lnback"><button class="lnbk" data-onclick="lnBack()" title="Volver a donde estabas (Alt + ←)"></button><button class="lnfw" data-onclick="lnFwd()" title="Adelante: a donde ibas (Alt + →)"></button><button class="vwib" data-onclick="lnBackClear()" title="Quitar" aria-label="Quitar">✕</button></div>`); b = $('#vwBack'); }
+  const bk = b.querySelector('.lnbk'), fw = b.querySelector('.lnfw'); bk.hidden = !LN.back.length; fw.hidden = !LN.fwd.length;
+  bk.textContent = LN.back.length ? (LN.fwd.length ? `‹ p. ${LN.back.at(-1).i + 1}` : `↩ Volver a la p. ${LN.back.at(-1).i + 1}`) : ''; fw.textContent = LN.fwd.length ? `p. ${LN.fwd.at(-1).i + 1} ›` : ''; b.hidden = false;
 }
 function lnHover(e) {   // con el ratón, la mano sobre los enlaces
   if (e.pointerType !== 'mouse' || e.buttons || VW.mode !== 'sel') return; const n = Date.now(); if (n - (LN.hv || 0) < 80) return; LN.hv = n;
@@ -389,8 +396,8 @@ function lnRotPage(p) {
   p.vp1 = v; p.sized = true; p.w = v.width; p.h = v.height; vwSize(p); p.annSig = '';
   if (p.task) try { p.task.cancel(); } catch (e) {}
   if (p.cv) { p.cv.width = p.cv.height = 0; p.cv.remove(); p.cv = null; } p.rs = 0; p.det?.remove(); p.det = null;
-  if (p.tl) { p.tl.cancel?.(); p.el.querySelector('.textLayer')?.remove(); p.tl = null; }
-  vwAnnPage(p); if (VW.find.q) vwFindMark(p); if (p.vis) VW.queue.add(p.i);
+  if (p.tl) { p.tl.cancel?.(); p.el.querySelector('.textLayer:not(.vxocr)')?.remove(); p.tl = null; }
+  vwAnnPage(p); if (VW.find.q) vwFindMark(p); if (p.vis) VW.queue.add(p.i); if (VX.ocr.has(p.i)) { VX.lines.delete(p.i); VX.cols.delete(p.i); vxOcrLayer(p); }
 }
 
 /* ===== Leer en voz alta, lápiz a mano y los dos PDF a la vez (v39.53) =====
@@ -571,7 +578,7 @@ async function p2Open() {
   if (g !== P2.gen || !VW.open) { doc.destroy(); return; }
   Object.assign(P2, {doc, n, z: 1, name: pf.name, pgs: []});
   const pane = document.createElement('div'); pane.id = 'lnP2'; pane.className = 'lnp2'; pane.setAttribute('role', 'region'); pane.setAttribute('aria-label', 'PDF ' + n);
-  pane.innerHTML = `<div class="lnp2h"><b>📄 PDF ${n}</b><span class="lnp2n" title="${esc(pf.name)}">${esc(pf.name)}</span><small id="lnP2pg"></small><button data-onclick="p2Zoom(-1)" title="Alejar" aria-label="Alejar">−</button><button data-onclick="p2Zoom(1)" title="Acercar" aria-label="Acercar">＋</button><button data-onclick="p2Close()" title="Cerrar el PDF ${n}" aria-label="Cerrar">✕</button></div><div class="lnp2s" id="lnP2s"></div>`;
+  pane.innerHTML = `<div class="lnp2h"><b>📄 PDF ${n}</b><span class="lnp2n" title="${esc(pf.name)}">${esc(pf.name)}</span><small id="lnP2pg"></small><button data-onclick="vxDiff()" title="Marcar las frases que cambian entre los dos PDF" aria-label="Diferencias">≠</button><button data-onclick="p2Zoom(-1)" title="Alejar" aria-label="Alejar">−</button><button data-onclick="p2Zoom(1)" title="Acercar" aria-label="Acercar">＋</button><button data-onclick="p2Close()" title="Cerrar el PDF ${n}" aria-label="Cerrar">✕</button></div><div class="lnp2s" id="lnP2s"></div>`;
   const body = vw$('.vwbody'); body.insertBefore(pane, $('#vwSide')); body.insertBefore(vwSplitEl(), pane); vwSplitSet(vwSplitGet()); $('#vw').classList.add('lnp2on'); vwSplitMode();
   if (VW.side && (vwMv() || innerWidth < 1500)) { VW.side = false; vwSideShow(); }   // como con las notas: sin el panel de anotaciones, cada PDF tiene su mitad
   const p1 = await doc.getPage(1); if (g !== P2.gen) return; const v1 = p1.getViewport({scale: 1}), s = $('#lnP2s');
@@ -598,7 +605,7 @@ function p2Zoom(d) {
 function p2Pg() { const s = $('#lnP2s'), o = $('#lnP2pg'); if (!s || !o || !P2.pgs.length) return; const y = s.getBoundingClientRect().top + 8; let i = 0; for (const p of P2.pgs) { if (p.el.getBoundingClientRect().bottom > y) { i = p.i; break; } } o.textContent = `p. ${i + 1}/${P2.pgs.length}`; }
 function p2Redraw() { for (const p of P2.pgs || []) { p.dirty = true; if (p.vis) p2Render(p); } }   // otro tema (noche, sepia)
 function p2Close(keep) {
-  P2.gen++; P2.io?.disconnect(); P2.io = null; try { P2.doc?.destroy(); } catch (e) {} P2.doc = null; P2.pgs = [];
+  vxDiffClear(); P2.gen++; P2.io?.disconnect(); P2.io = null; try { P2.doc?.destroy(); } catch (e) {} P2.doc = null; P2.pgs = [];
   const pane = $('#lnP2'); if (!pane) return; pane.remove(); if (!vwDocked() && !keep) $('#vwSplit')?.remove(); $('#vw')?.classList.remove('lnp2on');
   if (!keep) setTimeout(() => { if (VW.open && VW.fit) vwFitW(true); }, 60);
 }

@@ -301,7 +301,7 @@ async function impDoi() {   // un DOI, un ISBN o un título (este da varios resu
     impDraw();
   } catch (e) { $('#iMsg').textContent = e.message; }
 }
-function impPick(i) { const r = IMP.refs[i]; if (!r) return; r.on = !r.bad; IMP = {mode: 'prev', refs: [r]}; impDraw(); }
+function impPick(i) { const r = IMP.refs[i]; if (!r) return; r.on = !r.bad; IMP = {mode: 'prev', refs: [r], from: IMP.from, intro: IMP.intro}; impDraw(); }   // from: desde una cita del visor (v40.8)
 function impDraw() {
   const m = IMP.mode, close = `<button data-onclick="$('#imp').close()">Cancelar</button>`;
   let h = `<h2>${m === 'fill' ? 'Datos de CrossRef' : m === 'oa' ? 'Datos de OpenAlex' : 'Importar referencias'}</h2>`;
@@ -337,9 +337,10 @@ function impGo() {
   const L = IMP.refs.filter(r => r.on); if (!L.length) return say('No hay ninguna referencia marcada.');
   const sec = $('#iSec').value, tag = $('#iTag').value, rd = $('#iRd').value, now = new Date().toISOString();
   const used = keysUsed();
-  L.forEach(r => db.papers.push(NEWF({id: uid(), created: now, ...(r.key && !used.has(r.key.toLowerCase()) && used.add(r.key.toLowerCase()) ? {key: r.key} : {}), title: r.title, alias: '', reading: rd, rating: 0, sectionIds: sec ? [sec] : [], authors: r.authors, year: r.year ? +r.year : '', url: r.url || '', type: r.type,
+  const n0 = db.papers.length; L.forEach(r => db.papers.push(NEWF({id: uid(), created: now, ...(r.key && !used.has(r.key.toLowerCase()) && used.add(r.key.toLowerCase()) ? {key: r.key} : {}), title: r.title, alias: '', reading: rd, rating: 0, sectionIds: sec ? [sec] : [], authors: r.authors, year: r.year ? +r.year : '', url: r.url || '', type: r.type,
     venue: r.venue || '', doi: r.doi || '', ...Object.fromEntries(IMP_F.filter(k => r[k] != null).map(k => [k, r[k]])), general: r.general || '', tagIds: tag ? [tag] : [], notes: [], cites: {}, related: [], refTo: [], history: [{t: now, s: 'Importado'}]})));
-  markDirty(); $('#imp').close(); render(); toast(`Se añadieron ${L.length === 1 ? "1 paper" : L.length + " papers"}.`, [{t: "Deshacer", fn: undo}], 6000);   // una sola operación: un único Ctrl+Z la deshace
+  const rel = typeof vxRefLink === 'function' ? vxRefLink(db.papers.slice(n0).map(p => p.id)) : 0;   // v40.8: desde una cita del visor, queda en Relaciones
+  markDirty(); $('#imp').close(); if (VW.open) RENDER_VW = true; else render(); toast(`Se añadieron ${L.length === 1 ? "1 paper" : L.length + " papers"}.${rel ? ' En Relaciones, como citado por el que lees.' : ''}`, [{t: "Deshacer", fn: undo}], 6000);   // una sola operación: un único Ctrl+Z la deshace
 }
 async function doiFill() {   // botón «Buscar» junto al DOI en la ventana de editar
   try { IMP = {mode: 'fill', ref: await fetchDoi(D.doi)}; impDraw(); $('#imp').showModal(); } catch (e) { say(e.message); }

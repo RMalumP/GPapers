@@ -329,3 +329,48 @@ html.mv .lnsayb{bottom:calc(64px + env(safe-area-inset-bottom,0px))}
 .vwmenu .pzed button.pv{background:color-mix(in srgb,#3b82f6 30%,transparent)}.vwmenu .pzed button.nx{background:color-mix(in srgb,#22c55e 30%,transparent)}.vwmenu .epmrow .pzmini{margin:0}
 .pzov{position:absolute;z-index:5;pointer-events:none;display:grid;grid-template-columns:3fr 4fr 3fr;grid-template-rows:3fr 4fr 3fr;gap:3px;opacity:0;transition:opacity .35s}.pzov.on{opacity:.85}
 .pzov i{display:flex;align-items:center;justify-content:center;font-style:normal;font-size:28px;color:#fff;background:transparent}
+
+/* ===== v40.8: doce mejoras del visor (js/visor-extra.js) ===== */
+/* 4 · atrás y adelante */
+.lnback>button.lnfw{border:0;background:color-mix(in srgb,var(--pri) 14%,transparent);border-radius:99px;padding:6px 12px;font-size:calc(13px * var(--fz,1));white-space:nowrap}
+.lnback>button[hidden]{display:none}
+/* 5 · marcas junto a la barra de desplazamiento */
+.vxmap{position:absolute;z-index:4;width:12px;pointer-events:auto;cursor:pointer}.vxmap[hidden]{display:none}
+.vxmapm{position:absolute;inset:0}.vxmk{position:absolute;left:1px;right:1px;height:3px;margin-top:-1px;background:var(--c);border-radius:2px;box-shadow:0 0 0 .5px #0005;pointer-events:none}
+.vxmk.bm{background:#e8590c;height:5px;margin-top:-2px;left:3px;right:3px}.vxmk.fh{background:#ff9f1c;left:3px;right:3px;box-shadow:none;opacity:.95}
+.vxmapc{position:absolute;left:0;right:0;background:color-mix(in srgb,var(--fg) 14%,transparent);border-radius:3px;pointer-events:none;min-height:3px}
+html.mv .vxmap{width:10px}
+#vw.conc .vxmap,#vw.vxfl .vxmap{display:none}
+/* 3 · zona → imagen; 1 · cita ya en la biblioteca */
+.vxrefok{align-self:center;font-size:calc(13px * var(--fz,1));color:#2b8a3e;font-weight:600}#vw.night .vxrefok{color:#8ce99a}
+/* 6 · figuras y tablas */
+.vxfig .vxfigi{display:block;min-height:40px;border:1px solid var(--bd);border-radius:6px;overflow:hidden;background:#fff}.vxfig .vxfigi canvas{display:block;width:100%;height:auto}
+#vw.night .vxfig .vxfigi{background:#1c1e23}
+.vwst button[role=tab]{min-width:0;overflow:hidden;text-overflow:ellipsis}.vwst button[role=tab].on{flex:0 0 auto}   /* 4 pestañas: la elegida entera, las demás se recortan */
+/* 7 · siglas */
+.vxacrd{margin:2px 0 4px;font-size:calc(15px * var(--fz,1));line-height:1.35}.vxacrp{opacity:.7;font-size:calc(12px * var(--fz,1))}
+/* 8 · regla de lectura */
+.vxrl{position:absolute;z-index:4;pointer-events:none;overflow:hidden}.vxrl[hidden]{display:none}
+.vxrl i{position:absolute;left:0;right:0;background:rgb(0 0 0 / .5);pointer-events:none}.vxrl .vxrlt{top:0}.vxrl .vxrlb{bottom:0}
+#vw.night .vxrl i{background:rgb(0 0 0 / .66)}
+.vxrlg{position:absolute;right:6px;transform:translateY(-50%);pointer-events:auto;width:30px;height:30px;min-height:30px;padding:0;border-radius:99px;border:1px solid var(--bd);background:var(--card);box-shadow:0 2px 8px #0004;font-size:16px;line-height:1;cursor:ns-resize;touch-action:none;opacity:.85}
+@media (pointer:fine){.vxrlg{opacity:.45}.vxrlg:hover{opacity:1}}
+/* 9 · texto adaptado */
+.vxflow{position:absolute;inset:0;z-index:5;display:flex;flex-direction:column;background:var(--bg)}.vxflow[hidden]{display:none}
+#vw.sepia .vxflow{background:#f4ecd8;color:#433422}#vw.night .vxflow{background:#16171b;color:#dcdde1}
+.vxflh{display:flex;align-items:center;gap:6px;padding:6px 10px;border-bottom:1px solid var(--bd);background:var(--card)}.vxflh b{font-size:calc(14px * var(--fz,1))}.vxflh small{flex:1;opacity:.7;white-space:nowrap}
+.vxflh button{padding:4px 10px;font-size:calc(13px * var(--fz,1))}
+.vxfls{flex:1;overflow:auto;outline:none;overscroll-behavior:contain}
+.vxfls article{max-width:38em;margin:0 auto;padding:14px 18px 40vh;line-height:1.6;font-family:system-ui,sans-serif;-webkit-user-select:text;user-select:text;overflow-wrap:anywhere}
+.vxfls article.serif{font-family:Georgia,'Times New Roman',serif}
+.vxfls article p{margin:0 0 .85em;text-align:start;hyphens:auto}.vxfls article h3{font-size:1.15em;margin:1.2em 0 .5em;line-height:1.3}
+.vxflpn{text-align:center;font-size:.72em;opacity:.55;margin:1.4em 0 .8em;font-family:system-ui,sans-serif}.vxflno{opacity:.65;font-style:italic;font-size:.9em}
+.vxflprev{display:block;margin:0 auto 8px;font-size:calc(13px * var(--fz,1))}
+html.mv .vxfls article{padding:10px 16px 40vh}
+/* 10 · texto reconocido (OCR): como la capa de texto de PDF.js */
+.textLayer.vxocr span{line-height:1}
+/* 12 · diferencias entre el PDF 1 y el PDF 2 */
+.vxdif{position:absolute;z-index:2;pointer-events:none;background:rgb(255 99 71 / .2);border-bottom:2px solid #f03e3e;border-radius:2px}
+
+.vxdf{display:flex;align-items:center;gap:6px;padding:4px 8px;border-bottom:1px solid var(--bd);background:color-mix(in srgb,#f03e3e 10%,var(--card));font-size:calc(13px * var(--fz,1))}
+.vxdf span{flex:1}.vxdf button{border:0;background:none;padding:2px 8px;font-size:calc(15px * var(--fz,1))}.vxdf small{opacity:.7}
