@@ -10,6 +10,7 @@ const pdWarn = () => okDate(D.pubDate) && D.year && D.pubDate.slice(0, 4) !== St
 function pubSync() {   // fecha de publicación → rellena «Año» si está vacío y avisa si no coinciden (sin redibujar el formulario)
   if (okDate(D.pubDate) && !D.year) { D.year = +D.pubDate.slice(0, 4); const y = $('#dlg input[data-k="year"]'); if (y) y.value = D.year; }
   const w = $('#pdWarn'); if (w) w.textContent = pdWarn(); }
+const TAB_SHORT = {all: 'Todo', cls: 'Clasificar'};   // nombres cortos de las pestañas en el móvil: así caben todas sin desplazarlas
 function drawD() {
   if (!TYPES[D.type]) D.type = 'articulo';
   const T = {all: 'Ver todo', data: 'Datos', cite: 'Cita', notes: 'Notas', cls: 'Secciones, etiquetas y relacionados', ...uiSimple() ? {} : {hist: 'Historial'}}; if (!T[tab] && tab !== 'notes') tab = 'all';   // v40.6: en el modo Sencillo de la app no hay Historial
@@ -17,7 +18,7 @@ function drawD() {
     : (always ? `<h2 class="grp">${t}</h2>` : '') + body;
   const dock = $('#dlg').classList.contains('vwdock'); if (dock) tab = 'notes';   // al lado del PDF: solo las notas, con una cabecera corta que cabe en un panel estrecho
   let h = dock ? `<div class="dh vwdh"><h2 title="${esc(D.alias || D.title)}">📝 ${esc(D.alias || D.title) || 'Notas'}</h2><div class="dbtn"><button class="pri" data-onclick="commit()" title="Guardar las notas">💾<span> Guardar</span></button><button data-onclick="$('#dlg').close()" title="Cancelar: cerrar sin guardar" aria-label="Cancelar">✕</button><button data-onclick="vwNotesHide()" title="Ver el PDF; lo escrito se queda aquí sin guardar hasta que vuelvas con «📝 Notas»" class="vwdpdf">📄<span> Ver el PDF</span></button></div></div>`
-    : `<div class="dh"><h2>${esc(D.alias || D.title) || 'Nuevo paper'}</h2><div class="dbtn"><button class="pri" data-onclick="commit()">Guardar paper</button><button data-onclick="$('#dlg').close()">Cancelar</button></div></div><div class="tabs">${Object.entries(T).map(([k, v]) => `<button class="${tab === k ? 'on' : ''}" data-onclick="tabSet('${k}')">${v}</button>`).join('')}</div>`;
+    : `<div class="dh dhp"><h2>${esc(D.alias || D.title) || 'Nuevo paper'}</h2><div class="dbtn"><button class="pri dsave mvs" data-short="Guardar" data-onclick="commit()">Guardar paper</button><button class="dcan mvs" data-short="✕" aria-label="Cancelar" title="Cancelar: cerrar sin guardar" data-onclick="$('#dlg').close()">Cancelar</button></div></div><div class="tabs">${Object.entries(T).map(([k, v]) => `<button class="${tab === k ? 'on' : ''}${TAB_SHORT[k] ? ' mvs' : ''}"${TAB_SHORT[k] ? ` data-short="${TAB_SHORT[k]}"` : ''} data-onclick="tabSet('${k}')">${v}</button>`).join('')}</div>`;   // v40.9: en el móvil (movil.css) los botones y pestañas largos enseñan su nombre corto (data-short)
   if (tab === 'data' || tab === 'all') h += blk('data', 'Datos', dataHTML());
   if (tab === 'notes' || tab === 'all') h += blk('gen', 'Notas generales', edBox('gen', D.general), true);
   
