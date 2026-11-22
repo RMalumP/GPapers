@@ -358,7 +358,7 @@ html.mv .vxmap{width:10px}
 /* 9 · texto adaptado */
 .vxflow{position:absolute;inset:0;z-index:5;display:flex;flex-direction:column;background:var(--bg)}.vxflow[hidden]{display:none}
 #vw.sepia .vxflow{background:#f4ecd8;color:#433422}#vw.night .vxflow{background:#16171b;color:#dcdde1}
-.vxflh{display:flex;align-items:center;gap:6px;padding:6px 10px;border-bottom:1px solid var(--bd);background:var(--card)}.vxflh b{font-size:calc(14px * var(--fz,1))}.vxflh small{flex:1;opacity:.7;white-space:nowrap}
+.vxflh{display:flex;align-items:center;gap:6px;padding:6px 10px;border-bottom:1px solid var(--bd);background:var(--card)}.vxflh b{font-size:calc(14px * var(--fz,1))}.vxflh small{flex:1 1 0;min-width:0;overflow:hidden;text-overflow:ellipsis;opacity:.7;white-space:nowrap}.vxflh b{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.vxflh button{flex-shrink:0}   /* v40.9: en 320 px el título se acorta («…») y los botones no se salen */
 .vxflh button{padding:4px 10px;font-size:calc(13px * var(--fz,1))}
 .vxfls{flex:1;overflow:auto;outline:none;overscroll-behavior:contain}
 .vxfls article{max-width:38em;margin:0 auto;padding:14px 18px 40vh;line-height:1.6;font-family:system-ui,sans-serif;-webkit-user-select:text;user-select:text;overflow-wrap:anywhere}
