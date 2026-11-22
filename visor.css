@@ -374,3 +374,7 @@ html.mv .vxfls article{padding:10px 16px 40vh}
 
 .vxdf{display:flex;align-items:center;gap:6px;padding:4px 8px;border-bottom:1px solid var(--bd);background:color-mix(in srgb,#f03e3e 10%,var(--card));font-size:calc(13px * var(--fz,1))}
 .vxdf span{flex:1}.vxdf button{border:0;background:none;padding:2px 8px;font-size:calc(15px * var(--fz,1))}.vxdf small{opacity:.7}
+/* v40.8: con 🔤 la barra de selección no cabía en un móvil de 412 px: menos hueco y, si aún no cabe (320 px), se desliza dentro de la pantalla */
+html.mv #vwSel{max-width:calc(100vw - 16px);overflow-x:auto;scrollbar-width:none}html.mv #vwSel::-webkit-scrollbar{display:none}html.mv #vwSel>*{flex:none}
+@media(max-width:440px){html.mv #vwSel{gap:4px;padding:6px}html.mv #vwSel>button:not(.vwc){padding-left:6px;padding-right:6px}}
+#vxRl .vxrlg{touch-action:none}   /* html.mv button pone «manipulation» y el navegador se quedaba el gesto: el asa no se podía arrastrar con el dedo */

@@ -15,7 +15,8 @@ Lo más reciente arriba. Hasta la v39.53 estas notas estaban en el README; van d
 - **Reconocer el texto (OCR)** en ⋯: en PDF escaneados, reconoce el texto de la página o de todas en el propio navegador (Tesseract, español e inglés; la primera vez descarga unos 9 MB). Después se puede seleccionar, subrayar y buscar. Se guarda en el dispositivo.
 - **Exportar a Anki**: en Anotaciones, «🃏 Anki» descarga un archivo para importar en Anki (anverso, reverso y etiquetas).
 - **Diferencias PDF 1 / PDF 2**: con dos PDF abiertos, ≠ marca las frases que solo están en uno de ellos y permite ir de una a otra.
-- Pruebas: `python3 pruebas/prueba_visor_v408.py .`
+- **Móvil**: la barra de selección (con 🔤) cabe en 412 px y en 320 px se desliza; la regla se arrastra con el dedo por su asa; «🃏 Anki» va junto a «⬇ PDF anotado» para no quitar sitio a la lista.
+- Pruebas: `python3 pruebas/prueba_visor_v408.py .` y, en el móvil en vertical (Pixel 7 y 320 px), `python3 pruebas/prueba_visor_v408_movil.py .`
 
 ## v40.7: arreglos tras una revisión completa (datos, citas y pantallas)
 - **Fusionar secciones** ya no deja notas sueltas: las notas que estaban en la sección que desaparece pasan a la que queda aunque el paper no tuviera marcada esa sección, y también en los papers de la papelera. El aviso dice ««A» se ha juntado con «B»».

@@ -342,7 +342,7 @@ function vxRlShow() {
   if (!r) {
     body.insertAdjacentHTML('beforeend', '<div id="vxRl" class="vxrl" aria-hidden="true"><i class="vxrlt"></i><i class="vxrlb"></i><button class="vxrlg" title="Arrastra para mover la regla">⇕</button></div>'); r = $('#vxRl');
     const g = r.querySelector('.vxrlg');
-    g.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); g.setPointerCapture(e.pointerId); VX.rlDrag = e.pointerId; });
+    g.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); try { g.setPointerCapture(e.pointerId); } catch (x) {} VX.rlDrag = e.pointerId; });
     g.addEventListener('pointermove', e => { if (VX.rlDrag === e.pointerId) vxRlAt(e.clientY); });
     const up = e => { if (VX.rlDrag === e.pointerId) { VX.rlDrag = null; vxRlSet({y: VX.rlY}); } }; g.addEventListener('pointerup', up); g.addEventListener('pointercancel', up);
     $('#vwScroll').addEventListener('pointermove', e => { if (e.pointerType === 'mouse' && !e.buttons && vxRl().on) vxRlAt(e.clientY); });
