@@ -150,23 +150,23 @@ function epBuild() {
   document.body.insertAdjacentHTML('beforeend', `<dialog id="ep" aria-label="Lector de EPUB">
     <div class="vwh"><button class="vwib" data-onclick="epClose()" title="Volver a la lista (Esc)" aria-label="Volver">←</button><b class="vwt"></b>
       <span id="epWhere" class="epw"></span><span id="epLeft" class="epw lnleft"></span>
-      <span class="vwf"><input id="epQ" type="search" placeholder="Buscar en el libro" aria-label="Buscar en el libro" data-onkeydown="epFindKey(event)" data-oninput="epFindReset()"><span id="epQn"></span><button class="vwib vwqL" id="epQL" hidden data-onclick="epPanel('find')" title="Ver todos los resultados, con su frase" aria-label="Lista de resultados">☰</button></span>
-      <button class="vwib vwfb" data-onclick="epFindToggle()" title="Buscar (Ctrl+F)" aria-label="Buscar">🔍</button>
+      <span class="vwf" data-vf="find"><input id="epQ" type="search" placeholder="Buscar en el libro" aria-label="Buscar en el libro" data-onkeydown="epFindKey(event)" data-oninput="epFindReset()"><span id="epQn"></span><button class="vwib vwqL" id="epQL" data-vf="findL" hidden data-onclick="epPanel('find')" title="Ver todos los resultados, con su frase" aria-label="Lista de resultados">☰</button></span>
+      <button class="vwib vwfb" data-vf="find" data-onclick="epFindToggle()" title="Buscar (Ctrl+F)" aria-label="Buscar">🔍</button>
       <button class="vwib epaa" id="epAaB" data-onclick="epTypoMenu(event)" title="Texto: tamaño, letra, interlineado, ancho y colores" aria-label="Texto">Aa</button>
-      <button class="vwib" data-onclick="epFs(true)" title="Pantalla completa (F)" aria-label="Pantalla completa">⛶</button>
+      <button class="vwib" data-vf="fs" data-onclick="epFs(true)" title="Pantalla completa (F)" aria-label="Pantalla completa">⛶</button>
       <button class="vwib" id="epMoreB" data-onclick="epMore(event)" title="Más: modo de lectura, marcadores, descargar…" aria-label="Más">⋯</button></div>
     <div class="vwtb" role="toolbar" aria-label="Herramientas">
       <button class="vwm vwun" data-onclick="epUndo()" title="Deshacer (Ctrl+Z)" aria-label="Deshacer"><span>↶</span><small>Deshacer</small></button>
       <span class="vwcs" role="group" aria-label="Color al subrayar" title="Selecciona texto y elige un color para subrayarlo">${vwSwBar('epColor')}</span>
       <button class="vwm" data-onclick="epFontBy(-1)" title="Letra más pequeña (−)" aria-label="Letra más pequeña"><span>A−</span></button><button class="vwm" data-onclick="epFontBy(1)" title="Letra más grande (+)" aria-label="Letra más grande"><span>A+</span></button>
-      <button class="vwm" id="epBmB" data-onclick="epBmToggle()" title="Marcar o quitar este punto (B)"><span>🔖</span><small>Marcador</small></button>
-      <button class="vwm eptc" data-onclick="epPanel('toc')" title="Índice del libro (I)"><span>📑</span><small>Índice</small></button>
-      <button class="vwm epnb" data-onclick="epNotes()" title="Notas del paper (E)"><span>📝</span><small>Notas</small></button>
+      <button class="vwm" id="epBmB" data-vf="bm" data-onclick="epBmToggle()" title="Marcar o quitar este punto (B)"><span>🔖</span><small>Marcador</small></button>
+      <button class="vwm eptc" data-vf="toc" data-onclick="epPanel('toc')" title="Índice del libro (I)"><span>📑</span><small>Índice</small></button>
+      <button class="vwm epnb" data-vf="notes" data-onclick="epNotes()" title="Notas del paper (E)"><span>📝</span><small>Notas</small></button>
       <button class="vwm vwsb" data-onclick="epPanel('ann')" title="Subrayados y comentarios (L)"><span>💬</span><small>Anotaciones</small><b id="epAn"></b></button></div>
     <div class="vwbody"><div id="epScroll" tabindex="0" aria-label="Texto del libro"><div id="epDoc"></div></div><p id="epLoad" class="vwload">Abriendo el EPUB…</p><aside id="epSide" hidden></aside>
       <button id="epFsX" class="vwfloat vwib" data-onclick="epFs(false)" title="Salir de pantalla completa (Esc)" aria-label="Salir de pantalla completa">✕</button></div>
     <div class="epfoot"><input id="epBar" type="range" min="0" max="1000" value="0" aria-label="Posición en el libro" data-oninput="epBarTip(this.value)" data-onchange="epBarGo(this.value)"><span id="epPct"></span></div>
-    <div id="epSel" class="vwfloat" hidden data-onmousedown="event.preventDefault()">${sw('epSelColor')}<button class="vwib" data-onclick="epSelNote()" title="Subrayar y comentar" aria-label="Subrayar y comentar">💬</button><button class="vwib" data-onclick="epSelCopy()" title="Copiar el texto" aria-label="Copiar">📋</button><button class="vwib" data-onclick="lnSelMore(true)" title="Más: copiar con la cita, definición, traducir…" aria-label="Más">⋯</button></div>
+    <div id="epSel" class="vwfloat" hidden data-onmousedown="event.preventDefault()">${sw('epSelColor')}<button class="vwib" data-onclick="epSelNote()" title="Subrayar y comentar" aria-label="Subrayar y comentar">💬</button><button class="vwib" data-onclick="epSelCopy()" title="Copiar el texto" aria-label="Copiar">📋</button><button class="vwib vwselm" data-onclick="lnSelMore(true)" title="Más: copiar con la cita, definición, traducir…" aria-label="Más">⋯</button></div>
     <div id="epPop" class="vwfloat vwpop" hidden></div></dialog>`);
   const d = $('#ep'), sc = $('#epScroll');
   d.addEventListener('cancel', e => { e.preventDefault(); epEsc(); });
@@ -253,9 +253,10 @@ function epSet() {
   let o = {}; try { o = JSON.parse(localStorage.getItem(EP_SET_K) || '{}') || {}; } catch (e) {}
   const np = vwNightPref(), fs = Math.round(+o.fs);
   return {fs: fs >= 12 && fs <= 36 ? fs : 19, lh: [1.35, 1.6, 1.9].includes(o.lh) ? o.lh : 1.6, w: EP_W[o.w] ? o.w : 'm', font: o.font === 'sans' ? 'sans' : 'serif', just: !!o.just,
-    th: ['light', 'sepia', 'night', 'auto'].includes(o.th) ? o.th : np === 'on' ? 'night' : np === 'auto' ? 'auto' : 'light', mode: o.mode === 'page' ? 'page' : 'scroll', two: !!o.two, one: !!o.one};
+    th: ['light', 'sepia', 'night', 'auto'].includes(o.th) ? o.th : np === 'on' ? 'night' : np === 'auto' ? 'auto' : 'light', mode: o.mode === 'page' && (o.two ? vfOn('two') || vfOn('flip') : vfOn('flip')) ? 'page' : 'scroll', two: !!o.two && vfOn('two'), one: !!o.one};
 }
-function epSetPut(k, v) { const o = epSet(); o[k] = v; try { localStorage.setItem(EP_SET_K, JSON.stringify(o)); } catch (e) {} epSetApply(true); }
+function epSetPut(k, v) { let o = {}; try { o = JSON.parse(localStorage.getItem(EP_SET_K) || '{}') || {}; } catch (e) {} o[k] = v;   // v40.10: lo demás, tal cual estaba (también lo de una función apagada)
+  try { localStorage.setItem(EP_SET_K, JSON.stringify(o)); } catch (e) {} epSetApply(true); }
 function epSetApply(keep) {
   const s = epSet(), d = $('#ep'); if (!d) return; const loc = keep && EP.secs.length ? epLoc() : null;
   d.style.setProperty('--ep-fs', s.fs + 'px'); d.style.setProperty('--ep-lh', s.lh); d.style.setProperty('--ep-w', EP_W[s.w] + 'em'); d.style.setProperty('--ep-ff', EP_FF[s.font]);
@@ -449,7 +450,7 @@ function epSideShow() {
 }
 function epSideDraw() {
   const s = $('#epSide'), t = EP.tab;
-  const tabs = [['ann', '💬 Anotaciones'], ['toc', '📑 Índice'], ...(EP.find.hits.length || t === 'find' ? [['find', `🔍 ${EP.find.hits.length || ''}`]] : [])];   // v39.50: resultados de la búsqueda
+  const tabs = [['ann', '💬 Anotaciones'], ...(vfOn('toc') ? [['toc', '📑 Índice']] : []), ...((EP.find.hits.length || t === 'find') && vfOn('findL') ? [['find', `🔍 ${EP.find.hits.length || ''}`]] : [])];   // v39.50: resultados de la búsqueda
   const head = `<div class="vwst"><div class="vwstt" role="tablist">${tabs.map(([k, n]) => `<button role="tab" aria-selected="${t === k}" class="${t === k ? 'on' : ''}${k === 'find' ? ' lntab' : ''}" data-onclick="epTab('${k}')">${n}</button>`).join('')}</div><button class="vwib" data-onclick="epSideClose()" aria-label="Cerrar el panel">✕</button></div>`;
   if (t === 'find') return lnEpFindDraw(s, head);
   if (t === 'toc') {
@@ -547,7 +548,7 @@ function epAutoBar() {
     <button class="vwib" data-onclick="epAutoSpeed(-1)" title="Más despacio (toque a la izquierda)" aria-label="Más despacio">🐢</button>
     <input id="epAutoR" type="range" min="1" max="20" step="0.5" aria-label="Velocidad" data-oninput="epAutoSet(this.value)">
     <button class="vwib" data-onclick="epAutoSpeed(1)" title="Más deprisa (toque a la derecha)" aria-label="Más deprisa">🐇</button><span id="epAutoV"></span>
-    <button class="vwib vwcb" data-onclick="epConcSet(!vwConcOn())" title="Modo concentración: oculta las barras mientras baja; un toque las saca (C)" aria-label="Modo concentración">🧘</button>
+    <button class="vwib vwcb" data-vf="conc" data-onclick="epConcSet(!vwConcOn())" title="Modo concentración: oculta las barras mientras baja; un toque las saca (C)" aria-label="Modo concentración">🧘</button>
     <button class="vwib" data-onclick="epAutoStop()" title="Parar el desplazamiento automático" aria-label="Parar">✕</button></div>`);
   return $('#epAuto');
 }
@@ -592,10 +593,10 @@ function epMenu(r, html) {
 function epMore(e) {
   e?.stopPropagation?.(); if (e?.currentTarget) EP.menuR = e.currentTarget.getBoundingClientRect(); const s = epSet(), P = epPaperOf();
   const mode = (EP.auto ? 'Automático' : s.mode === 'page' ? (s.two ? 'Doble página' : 'Página a página') : 'Seguido');
-  epMenu(EP.menuR, `<button data-keep data-onclick="epReadMenu()">📖 Modo de lectura <small class="vwsub">${mode} ›</small></button><button data-keep data-onclick="epTypoMenu()">Aa Texto y colores <small class="vwsub">›</small></button><button data-keep data-onclick="epBmMenu()">🔖 Marcadores <small class="vwsub">${epBms().length || 'ninguno'} ›</small></button><button data-keep data-onclick="epCfgMenu()">⚙ Ajustes del visor <small class="vwsub">›</small></button>
+  epMenu(EP.menuR, `<button data-keep data-onclick="epReadMenu()">📖 Modo de lectura <small class="vwsub">${mode} ›</small></button><button data-keep data-onclick="epTypoMenu()">Aa Texto y colores <small class="vwsub">›</small></button>${vfH('bm', `<button data-keep data-onclick="epBmMenu()">🔖 Marcadores <small class="vwsub">${epBms().length || 'ninguno'} ›</small></button>`)}<button data-keep data-onclick="epCfgMenu()">⚙ Ajustes del visor <small class="vwsub">›</small></button>
     <hr>${epCanShare() ? '<button data-onclick="epShare()">📲 Abrir en otra app…</button>' : ''}<button data-onclick="epDownload()">⬇ Descargar el EPUB</button>
     ${P && !$('#dlg').open ? '<button data-onclick="epFicha()">📝 Ficha del paper</button>' : ''}${EP.src?.kind === 'inbox' ? '<button data-onclick="epCite()">＋ Crear la cita de este EPUB</button>' : ''}
-    <hr><button data-onclick="cmdOpen(true)">🔎 Buscar una orden… <small class="vwsub">${esc(db.settings.shortcuts.palette || '')}</small></button>
+    ${vfH('cmdk', `<hr><button data-onclick="cmdOpen(true)">🔎 Buscar una orden… <small class="vwsub">${esc(db.settings.shortcuts.palette || '')}</small></button>`)}
     ${EP.bk ? `<hr><div class="vwhint">${esc(EP.bk.meta.title || '')}${EP.bk.meta.authors.length ? ' · ' + esc(EP.bk.meta.authors.slice(0, 3).join('; ')) : ''}${EP.bk.meta.year ? ' · ' + esc(EP.bk.meta.year) : ''} · ${EP.secs.length} ${EP.secs.length === 1 ? 'capítulo' : 'capítulos'}</div>` : ''}`);
 }
 function epMoreBack() { epMore(); }
@@ -603,12 +604,12 @@ function epCfgMenu() { epMenu(EP.menuR, vwCfgHtml(true)); }
 function epReadMenu() {
   const s = epSet(), o = (on, fn, t, k) => `<button data-onclick="${fn}">${tick(on)}${t}${k ? ` <small class="vwsub">${k}</small>` : ''}</button>`;
   epMenu(EP.menuR, `<button data-keep data-onclick="epMoreBack()">‹ Volver</button><hr>
-    ${o(!EP.auto && s.mode === 'scroll', "epMode('scroll')", '↕ Seguido (desplazar)', '')}${o(!EP.auto && s.mode === 'page' && !s.two, "epMode('page')", '📄 Página a página, con toques', 'P')}${o(!EP.auto && s.mode === 'page' && s.two, "epMode('two')", '📖 Doble página', 'D')}
+    ${o(!EP.auto && s.mode === 'scroll', "epMode('scroll')", '↕ Seguido (desplazar)', '')}${vfOn('flip') ? o(!EP.auto && s.mode === 'page' && !s.two, "epMode('page')", '📄 Página a página, con toques', 'P') : ''}${vfOn('two') ? o(!EP.auto && s.mode === 'page' && s.two, "epMode('two')", '📖 Doble página', 'D') : ''}
     ${!EP.auto && s.mode === 'page' && s.two ? `${o(!s.one, "epSetPut('one',false)", '⏩ Pasar de dos en dos', '')}${o(s.one, "epSetPut('one',true)", '↪ Pasar de una en una (la derecha pasa a la izquierda)', '')}` : ''}
     ${!EP.auto && s.mode === 'page' ? pzBtn(true) : ''}
-    <div class="vwhint">Página a página: toca la página (👆 Zonas para pasar), desliza o usa ← → para pasar. La doble página necesita una pantalla ancha.</div><hr>
-    <button data-onclick="${EP.auto ? 'epAutoStop()' : 'epAutoStart()'}">${EP.auto ? '⏹ Parar el desplazamiento automático' : '⏬ Desplazamiento automático'} <small class="vwsub">A</small></button>
-    <button data-onclick="epConcSet(${vwConcOn() ? 0 : 1})">${tick(vwConcOn())}🧘 Modo concentración <small class="vwsub">C</small></button>${sayCan() ? '<hr>' + sayMenuBtn(true) : ''}`);
+    ${vfOn('flip') || vfOn('two') ? `<div class="vwhint">Página a página: toca la página${vfOn('zonas') ? ' (👆 Zonas para pasar)' : ''}, desliza o usa ← → para pasar.${vfOn('two') ? ' La doble página necesita una pantalla ancha.' : ''}</div>` : ''}
+    ${vfOn('auto') ? `<hr><button data-onclick="${EP.auto ? 'epAutoStop()' : 'epAutoStart()'}">${EP.auto ? '⏹ Parar el desplazamiento automático' : '⏬ Desplazamiento automático'} <small class="vwsub">A</small></button>
+    ${vfH('conc', `<button data-onclick="epConcSet(${vwConcOn() ? 0 : 1})">${tick(vwConcOn())}🧘 Modo concentración <small class="vwsub">C</small></button>`)}` : ''}${sayCan() && vfOn('say') ? '<hr>' + sayMenuBtn(true) : ''}`);
 }
 function epMode(m) { if (EP.auto) epAutoStop(); const o = epSet(); o.mode = m === 'scroll' ? 'scroll' : 'page'; o.two = m === 'two'; try { localStorage.setItem(EP_SET_K, JSON.stringify(o)); } catch (e) {} epSetApply(true); }
 function epFicha() { const p = epPaperOf(); if (p) openPaper(p.id); }
@@ -645,15 +646,15 @@ const EP_KEYS = {
 };
 function epKey(e) {
   if (!EP.open) return; const inText = /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName) || e.target.isContentEditable, mod = e.ctrlKey || e.metaKey;
-  if (mod && e.key.toLowerCase() === 'f') { e.preventDefault(); return epFindToggle(true); }
+  if (mod && e.key.toLowerCase() === 'f') { e.preventDefault(); return vfOn('find') ? epFindToggle(true) : undefined; }
   if (mod && e.key.toLowerCase() === 'z' && !inText) { e.preventDefault(); return epUndo(); }
   if (e.altKey && e.key === 'ArrowLeft' && LN.ep.length && !inText) { e.preventDefault(); return lnEpBack(); }
   if (inText || mod || e.altKey) return;
-  const k = EP_KEYS[e.key.length === 1 ? e.key.toLowerCase() : e.key]; if (!k) return;
+  const kk = e.key.length === 1 ? e.key.toLowerCase() : e.key, k = EP_KEYS[kk]; if (!k || !vfKey(kk)) return;
   if (k[1]() !== false) e.preventDefault();
 }
 document.addEventListener('keydown', e => { if (EP.open && (e.target === document.body || e.target === document.documentElement)) epKey(e); });
 function epKeysHelp() {
   const nm = {ArrowRight: '→', ArrowLeft: '←', ArrowUp: '↑', ArrowDown: '↓', PageDown: 'AvPág', PageUp: 'RePág', ' ': 'Espacio'};
-  epMenu(EP.menuR, `<button data-keep data-onclick="epMoreBack()">‹ Volver</button><hr><table class="vwkeys">${[...Object.entries(EP_KEYS).map(([k, [t]]) => [`<kbd>${esc(nm[k] || k.toUpperCase())}</kbd>`, t]), ['<kbd>Ctrl</kbd>+<kbd>F</kbd>', 'Buscar'], ['<kbd>Ctrl</kbd>+<kbd>Z</kbd>', 'Deshacer'], ['<kbd>Esc</kbd>', 'Cerrar']].map(([k, t]) => `<tr><td>${k}</td><td>${esc(t)}</td></tr>`).join('')}</table>`);
+  epMenu(EP.menuR, `<button data-keep data-onclick="epMoreBack()">‹ Volver</button><hr><table class="vwkeys">${[...Object.entries(EP_KEYS).filter(([k]) => vfKey(k)).map(([k, [t]]) => [`<kbd>${esc(nm[k] || k.toUpperCase())}</kbd>`, t]), ['<kbd>Ctrl</kbd>+<kbd>F</kbd>', 'Buscar'], ['<kbd>Ctrl</kbd>+<kbd>Z</kbd>', 'Deshacer'], ['<kbd>Esc</kbd>', 'Cerrar']].map(([k, t]) => `<tr><td>${k}</td><td>${esc(t)}</td></tr>`).join('')}</table>`);
 }

@@ -8,8 +8,9 @@
    · Desplazamiento automático: la página baja sola. Barra abajo con pausa, velocidad (🐢 barra 🐇) y ✕. Toques en la página: centro, pausa;
      izquierda, más despacio; derecha, más deprisa. Espera mientras el dedo está en la pantalla. Usa la vista continua. */
 const VW_RD_K = 'gp-vw-read', VW_AUTO_K = 'gp-vw-auto';
-function vwRdGet() { try { const o = JSON.parse(localStorage.getItem(VW_RD_K) || '{}'); return {two: !!o.two, cover: o.cover !== false, flip: !!o.flip, crop: !!o.crop, zPinch: o.zPinch !== false, zDbl: o.zDbl !== false, one: !!o.one, tbPos: o.tab === 'l' || o.tab === 'r' ? o.tab : 'c'}; } catch (e) { return {two: false, cover: true, flip: false, crop: false, zPinch: true, zDbl: true, one: false, tbPos: 'c'}; } }
-function vwRdSave() { try { localStorage.setItem(VW_RD_K, JSON.stringify({two: VW.two, cover: VW.cover, flip: VW.flip, crop: VW.crop, zPinch: VW.zPinch, zDbl: VW.zDbl, one: VW.one, tab: VW.tbPos})); } catch (e) {} }
+function vwRdGet() { try { const o = JSON.parse(localStorage.getItem(VW_RD_K) || '{}'); return {two: !!o.two && vfOn('two'), cover: o.cover !== false, flip: !!o.flip && vfOn('flip'), crop: !!o.crop && vfOn('crop'), zPinch: o.zPinch !== false, zDbl: o.zDbl !== false, one: !!o.one, tbPos: o.tab === 'l' || o.tab === 'r' ? o.tab : 'c'}; } catch (e) { return {two: false, cover: true, flip: false, crop: false, zPinch: true, zDbl: true, one: false, tbPos: 'c'}; } }
+function vwRdSave() { let o = {}; try { o = JSON.parse(localStorage.getItem(VW_RD_K) || '{}') || {}; } catch (e) {} const kp = (k, v) => vfOn(k) ? v : !!o[k];   // lo de una función apagada se queda como estaba (v40.10)
+  try { localStorage.setItem(VW_RD_K, JSON.stringify({two: kp('two', VW.two), cover: VW.cover, flip: kp('flip', VW.flip), crop: kp('crop', VW.crop), zPinch: VW.zPinch, zDbl: VW.zDbl, one: VW.one, tab: VW.tbPos})); } catch (e) {} }
 /* Doble página «de una en una» (v39.43, solo con página a página): al pasar, la de la derecha pasa a la izquierda y entra la siguiente
    (pares 1-2, 2-3, 3-4…; con portada: 1 sola y luego 2-3, 3-4…). Sin ella, de dos en dos como siempre. */
 const vwOne = () => !!(VW.two && VW.flip && VW.one);
@@ -17,7 +18,7 @@ const vwSpread = i => !VW.two ? i : vwOne() ? (VW.cover && i <= 0 ? 0 : Math.max
 const vwSpreadN = i => !VW.two || VW.cover && i === 0 ? 1 : vwOne() ? Math.max(1, Math.min(2, VW.pages.length - i)) : 2;   // páginas del par que empieza en i
 const vwRow = i => VW.flip ? 0 : !VW.two ? i : VW.cover ? (i + 1) >> 1 : i >> 1;   // filas por encima de la página i (huecos de VW_GAP)
 const vwRdSum = () => [VW.two ? 'Doble página' + (vwOne() ? ' de una en una' : '') : 'Una página', VW.flip ? 'con toques' : 'seguido'].join(' · ') + (VW.zLock ? ' · 🔒' : '') + (VW.auto ? ' · automático' : '') + (VW.crop ? ' · sin márgenes' : '');
-function vwRdClass() { const d = $('#vw'); if (!d) return; d.classList.toggle('two', !!VW.two); d.classList.toggle('cover', !!(VW.two && VW.cover)); d.classList.toggle('flip', !!VW.flip); d.classList.toggle('tabl', VW.tbPos === 'l'); d.classList.toggle('tabr', VW.tbPos === 'r'); vwLockShow(); }
+function vwRdClass() { const d = $('#vw'); if (!d) return; d.classList.toggle('two', !!VW.two); d.classList.toggle('cover', !!(VW.two && VW.cover)); d.classList.toggle('flip', !!VW.flip); const tp = vfOn('tbpos') ? VW.tbPos : 'c'; d.classList.toggle('tabl', tp === 'l'); d.classList.toggle('tabr', tp === 'r'); vwLockShow(); }
 function vwFlipShow() {   // página a página: solo se ven la actual y su pareja
   const s = vwSpread(VW.cur), n = vwSpreadN(s);
   for (const p of VW.pages) p.el.classList.toggle('cur', !!VW.flip && p.i >= s && p.i < s + n);
@@ -51,21 +52,24 @@ function vwRdSet(k, v) {
   else if (k === 'flip' && VW.flip) { toast(`Toca la página para pasar (zonas: ${pzName().toLowerCase()}; se cambian en 📖 Modo de lectura → 👆).`, [], 2800); pzShow(false); }
 }
 function vwReadMenu() {
-  vwMenu(VW.menuR, `<button data-keep data-onclick="vwMoreBack()">‹ Volver</button><hr><div class="ctxh">Páginas</div>
+  const rot = Object.keys(VW.rot || {}).length, rd = vxReadBtns(), say = vfOn('say') && sayCan();
+  vwMenu(VW.menuR, `<button data-keep data-onclick="vwMoreBack()">‹ Volver</button>
+    ${vfOn('two') ? `<hr><div class="ctxh">Páginas</div>
     <button data-onclick="vwRdSet('two',0)">${tick(!VW.two)}▯ Una página</button>
     <button data-onclick="vwRdSet('two',1)">${tick(VW.two)}▯▯ Doble página (como un libro)</button>
     ${VW.two ? `<button data-onclick="vwRdSet('cover',${VW.cover ? 0 : 1})">${tick(VW.cover)}La primera página sola (portada)</button>
     <button data-onclick="vwRdSet('one',0)">${tick(!vwOne())}⏩ Pasar de dos en dos</button>
-    <button data-onclick="vwRdSet('one',1)" title="La de la derecha pasa a la izquierda y entra la siguiente (con página a página)">${tick(vwOne())}↪ Pasar de una en una</button>` : ''}
-    <hr><div class="ctxh">Pasar de página</div>
+    ${vfOn('flip') ? `<button data-onclick="vwRdSet('one',1)" title="La de la derecha pasa a la izquierda y entra la siguiente (con página a página)">${tick(vwOne())}↪ Pasar de una en una</button>` : ''}` : ''}` : ''}
+    ${vfOn('flip') ? `<hr><div class="ctxh">Pasar de página</div>
     <button data-onclick="vwRdSet('flip',0)">${tick(!VW.flip)}↕ Desplazando (todo seguido)</button>
     <button data-onclick="vwRdSet('flip',1)">${tick(VW.flip)}👆 Página a página, con toques</button>
-    ${VW.flip ? pzBtn(false) : ''}${VW.flip ? `<button data-onclick="vwLockSet(${VW.zLock ? 0 : 1})" title="No deja cambiar el zoom y, al pasar de página, se queda el mismo tamaño y la misma zona">${tick(VW.zLock)}🔒 Candado del tamaño <small class="vwsub">K</small></button>` : ''}
-    <hr><button data-keep data-onclick="vwAutoMenu()">⏬ Desplazamiento automático <small class="vwsub">${VW.auto ? (VW.autoPaused ? 'en pausa' : 'en marcha') : 'parado'}${vwConcOn() ? ' · concentración' : ''} ›</small></button>
-    <hr><button data-onclick="vwRdSet('crop',${VW.crop ? 0 : 1})" title="Quita los márgenes en blanco de las páginas para que el texto se vea más grande">${tick(VW.crop)}✂ Recortar los márgenes${VW.cropM?.hand ? ' (a mano)' : ' (automático)'}</button>
-    ${VW.crop ? '<button data-keep data-onclick="lnCropMenu()">✂ Ajustar el recorte… <small class="vwsub">›</small></button>' : ''}
-    ${vxReadBtns()}
-    <hr><button data-keep data-onclick="lnRotate(VW.cur);vwReadMenu()">↻ Girar la página ${VW.cur + 1}${vwRot(VW.cur) ? ` <small class="vwsub">${vwRot(VW.cur)}°</small>` : ''}</button><button data-keep data-onclick="lnRotate('*');vwReadMenu()">↻ Girar todas las páginas</button>${Object.keys(VW.rot || {}).length ? '<button data-keep data-onclick="lnRotate(null);vwReadMenu()">↺ Quitar los giros</button>' : ''}${sayCan() ? '<hr>' + sayMenuBtn(false) : ''}
+    ${VW.flip && vfOn('zonas') ? pzBtn(false) : ''}${VW.flip && vfOn('lock') ? `<button data-onclick="vwLockSet(${VW.zLock ? 0 : 1})" title="No deja cambiar el zoom y, al pasar de página, se queda el mismo tamaño y la misma zona">${tick(VW.zLock)}🔒 Candado del tamaño <small class="vwsub">K</small></button>` : ''}` : ''}
+    ${vfH('auto', `<hr><button data-keep data-onclick="vwAutoMenu()">⏬ Desplazamiento automático <small class="vwsub">${VW.auto ? (VW.autoPaused ? 'en pausa' : 'en marcha') : 'parado'}${vfOn('conc') && vwConcOn() ? ' · concentración' : ''} ›</small></button>`)}
+    ${vfH('crop', `<hr><button data-onclick="vwRdSet('crop',${VW.crop ? 0 : 1})" title="Quita los márgenes en blanco de las páginas para que el texto se vea más grande">${tick(VW.crop)}✂ Recortar los márgenes${VW.cropM?.hand ? ' (a mano)' : ' (automático)'}</button>
+    ${VW.crop ? '<button data-keep data-onclick="lnCropMenu()">✂ Ajustar el recorte… <small class="vwsub">›</small></button>' : ''}`)}
+    ${rd}
+    ${vfOn('rot') || rot ? `<hr>${vfH('rot', `<button data-keep data-onclick="lnRotate(VW.cur);vwReadMenu()">↻ Girar la página ${VW.cur + 1}${vwRot(VW.cur) ? ` <small class="vwsub">${vwRot(VW.cur)}°</small>` : ''}</button><button data-keep data-onclick="lnRotate('*');vwReadMenu()">↻ Girar todas las páginas</button>`)}${rot ? '<button data-keep data-onclick="lnRotate(null);vwReadMenu()">↺ Quitar los giros</button>' : ''}` : ''}${say ? '<hr>' + sayMenuBtn(false) : ''}
+    ${vfOn('two') || vfOn('flip') || vfOn('auto') || vfOn('crop') || rd || vfOn('rot') || rot || say ? '' : '<hr><div class="vwhint">En este modo del visor no hay opciones de lectura. Se eligen en ⚙ Ajustes del visor → ☑ Elegir funciones.</div>'}
 `);
 }
 /* ⚙ Ajustes del visor (v39.47, ⋯ → ⚙): lo que se elige una vez y se olvida, fuera de los submenús de lectura. Mismo panel en el PDF y en
@@ -77,12 +81,12 @@ function vwSidePref(on) { try { localStorage.setItem('gp-vw-side', on ? '1' : '0
 function vwCfgHtml(ep) {
   const back = ep ? 'epMoreBack()' : 'vwMoreBack()', me = ep ? 'epCfgMenu()' : 'vwCfgMenu()', b = (on, fn, t, ti) => `<button data-keep data-onclick="${fn};${me}"${ti ? ` title="${ti}"` : ''}>${tick(on)}${t}</button>`;
   const pf = !ep && vwHolders()[0], desk = !vwMv() && !matchMedia('(pointer: coarse)').matches;
-  return `<button data-keep data-onclick="${back}">‹ Volver</button><hr><div class="ctxh">⚙ Ajustes del visor</div>
+  return `<button data-keep data-onclick="${back}">‹ Volver</button><hr><div class="ctxh">⚙ Ajustes del visor</div>${vfMenuHtml(ep)}<hr>
     <div class="ctxh">🖍 Al cambiar el color de un subrayado</div>${b(annColOnly(), 'annColSet(1)', '🎯 Solo cambia ese subrayado')}${b(!annColOnly(), 'annColSet(0)', 'Ese y los siguientes (también el color para subrayar)')}
     ${ep ? '' : `<hr><div class="ctxh">👆 Gestos de zoom</div>${b(VW.zPinch, `vwRdSet('zPinch',${VW.zPinch ? 0 : 1})`, '🤏 Pellizcar con dos dedos')}${b(VW.zDbl, `vwRdSet('zDbl',${VW.zDbl ? 0 : 1})`, '👆 Doble toque: acercar y volver a ajustar', 'En pantalla completa el doble toque sigue sacando los colores')}
-    <hr><div class="ctxh">⛶ Pantalla completa: pestaña ▾ de la barra oculta</div>${[['l', '◧ A la izquierda'], ['c', '▣ En el centro'], ['r', '◨ A la derecha']].map(([v, t]) => b(VW.tbPos === v, `vwTabPos('${v}')`, t)).join('')}
-    <hr>${b(vxMapOn(), `vxMapSet(${vxMapOn() ? 0 : 1})`, '▮ Marcas junto a la barra de desplazamiento', 'Subrayados, marcadores y resultados de la búsqueda, a lo largo del PDF')}
-    <hr><div class="ctxh">🌙 Modo noche y sepia</div>${[['off', '☀ Normal'], ['sepia', '📜 Sepia (más cálido)'], ['on', '🌙 Noche'], ['auto', 'Como el sistema (noche con el modo oscuro)']].map(([v, t]) => b(vwNightPref() === v, `vwNight('${v}')`, t)).join('')}`}
+    ${vfOn('fs') && vfOn('tbpos') ? `<hr><div class="ctxh">⛶ Pantalla completa: pestaña ▾ de la barra oculta</div>${[['l', '◧ A la izquierda'], ['c', '▣ En el centro'], ['r', '◨ A la derecha']].map(([v, t]) => b(VW.tbPos === v, `vwTabPos('${v}')`, t)).join('')}` : ''}
+    ${vfH('map', `<hr>${b(vxMapOn(), `vxMapSet(${vxMapOn() ? 0 : 1})`, '▮ Marcas junto a la barra de desplazamiento', 'Subrayados, marcadores y resultados de la búsqueda, a lo largo del PDF')}`)}
+    ${vfH('night', `<hr><div class="ctxh">🌙 Modo noche y sepia</div>${[['off', '☀ Normal'], ['sepia', '📜 Sepia (más cálido)'], ['on', '🌙 Noche'], ['auto', 'Como el sistema (noche con el modo oscuro)']].map(([v, t]) => b(vwNightPref() === v, `vwNight('${v}')`, t)).join('')}`)}`}
     ${rdCfgHtml(b, ep)}
     <hr><div class="ctxh">Aa Tamaño del texto de la interfaz</div><div class="epmrow">${UI_FZ.map(z => `<button data-keep class="${uiFz() === z ? 'on' : ''}" data-onclick="uiFzSet(${z});${me}">${Math.round(z * 100)} %</button>`).join('')}</div>
     <hr><div class="ctxh">📂 Al abrir</div>${desk ? `${b(db.settings.pdfTab !== 'app', "setCfg('pdfTab','tab')", 'Los PDF, en una pestaña nueva')}${b(db.settings.pdfTab === 'app', "setCfg('pdfTab','app')", 'Los PDF, dentro de la aplicación')}` : ''}${b(vwSideOn(), `vwSidePref(${vwSideOn() ? 0 : 1})`, 'Con el panel de anotaciones abierto (pantallas anchas)')}
@@ -98,7 +102,7 @@ function vwTabPos(v) { VW.tbPos = v === 'l' || v === 'r' ? v : 'c'; vwRdSave(); 
    Dura mientras el PDF está abierto; salir de página a página (o cambiar a una o dos páginas) lo quita.
    v39.46: con el candado la hoja tampoco se mueve (ni con el dedo, ni con dos dedos, ni con la rueda; las teclas solo pasan de página). */
 function vwLockSet(on, quiet) {
-  on = !!on; if (on && !VW.flip) return toast('El candado del tamaño es para página a página (⋯ → 📖 Modo de lectura).', [], 2400);
+  on = !!on; if (on && !vfOn('lock')) return; if (on && !VW.flip) return toast('El candado del tamaño es para página a página (⋯ → 📖 Modo de lectura).', [], 2400);
   if (!!VW.zLock === on) return vwLockShow(); VW.zLock = on; if (on) VW.fit = false;   // se queda la escala exacta, también si cambia la ventana
   vwLockShow(); if (!quiet) toast(on ? '🔒 Hoja fija: no cambia el tamaño ni se mueve; solo se pasa de página (y se queda la misma zona).' : '🔓 Tamaño libre: ya puedes acercar y alejar.', [], 2200);
 }
@@ -113,8 +117,8 @@ function vwAutoMenu() {   // submenú del desplazamiento automático (v39.41): e
     <button data-onclick="${VW.auto ? 'vwAutoStop()' : 'vwAutoStart()'}">${VW.auto ? '⏹ Parar el desplazamiento automático' : '▶ Empezar el desplazamiento automático'}</button>
     <div class="ctxh">Velocidad: ${vwAutoFmt(VW.auto ? VW.autoLv : vwAutoLv())} de 20</div>
     <button data-keep data-onclick="vwAutoSpeed(-1);vwAutoMenu()">🐢 Más despacio</button><button data-keep data-onclick="vwAutoSpeed(1);vwAutoMenu()">🐇 Más deprisa</button>
-    <hr><button data-onclick="vwConcSet(${vwConcOn() ? 0 : 1})" title="Mientras la página baja sola, oculta las barras y los menús; un toque en la página los vuelve a sacar (y pausa)">${tick(vwConcOn())}🧘 Modo concentración</button>
-    <div class="vwhint">Oculta las barras y los menús mientras baja. Un toque en la página (o Esc) los saca y pausa; otro toque en el centro sigue y los vuelve a ocultar. Tecla C.</div>`);
+    ${vfH('conc', `<hr><button data-onclick="vwConcSet(${vwConcOn() ? 0 : 1})" title="Mientras la página baja sola, oculta las barras y los menús; un toque en la página los vuelve a sacar (y pausa)">${tick(vwConcOn())}🧘 Modo concentración</button>
+    <div class="vwhint">Oculta las barras y los menús mientras baja. Un toque en la página (o Esc) los saca y pausa; otro toque en el centro sigue y los vuelve a ocultar. Tecla C.</div>`)}`);
 }
 function vwMoreBack() { vwMore({stopPropagation() {}, currentTarget: {getBoundingClientRect: () => VW.menuR}}); }
 
@@ -131,7 +135,7 @@ function vwAutoBar() {
     <input id="vwAutoR" type="range" min="1" max="20" step="0.5" aria-label="Velocidad" data-oninput="vwAutoSet(this.value)">
     <button class="vwib" data-onclick="vwAutoSpeed(1)" title="Más deprisa (toque a la derecha de la página)" aria-label="Más deprisa">🐇</button>
     <span id="vwAutoV"></span>
-    <button class="vwib vwcb" data-onclick="vwConcSet(!vwConcOn())" title="Modo concentración: oculta las barras mientras baja; un toque las saca (C)" aria-label="Modo concentración">🧘</button>
+    <button class="vwib vwcb" data-vf="conc" data-onclick="vwConcSet(!vwConcOn())" title="Modo concentración: oculta las barras mientras baja; un toque las saca (C)" aria-label="Modo concentración">🧘</button>
     <button class="vwib" data-onclick="vwAutoStop()" title="Parar el desplazamiento automático" aria-label="Parar">✕</button></div>`);
   return $('#vwAuto');
 }
@@ -139,7 +143,7 @@ function vwAutoBar() {
    Un toque en cualquier sitio de la página, Esc o la barra espaciadora pausan y las sacan; seguir (toque en el centro) las vuelve a ocultar.
    Se recuerda en este dispositivo (gp-vw-conc). */
 const VW_CONC_K = 'gp-vw-conc';
-function vwConcOn() { try { return localStorage.getItem(VW_CONC_K) === '1'; } catch (e) { return false; } }
+function vwConcOn() { if (!vfOn('conc')) return false; try { return localStorage.getItem(VW_CONC_K) === '1'; } catch (e) { return false; } }
 function vwConcSet(on) {
   try { localStorage.setItem(VW_CONC_K, on ? '1' : '0'); } catch (e) {}
   if (on && !VW.auto) vwAutoStart(); else if (VW.auto) vwAutoShow(); else vwConcShow();

@@ -2,6 +2,14 @@
 
 Lo más reciente arriba. Hasta la v39.53 estas notas estaban en el README; van de la más nueva a la más antigua (algunas rondas antiguas no tenían número de versión).
 
+## v40.10: visor de PDF y EPUB sencillo o completo, con las funciones a elegir
+- **Visor Sencillo o Completo**, en ⋯ → ⚙ Ajustes del visor (arriba) y en Configuración → Apariencia → «Visor de PDF y EPUB». El **Sencillo** deja lo básico: subrayar y comentar, notas sueltas, 📝 notas del paper, índice y miniaturas, buscar, doble página, página a página, desplazamiento automático, pantalla completa, modo noche y sepia, 🔒 candado del tamaño y ✂ recorte de márgenes. El **Completo**, todo lo de antes.
+- **Funciones a elegir, una a una** (39): en Configuración, una fila por función con dos casillas, **Sencillo** y **Completo**, independientes: quitar algo del sencillo no lo quita del completo, y al revés. Cada columna tiene «↺ de serie». En el visor, **☑ Elegir funciones** cambia las del modo que se está usando.
+- Una función apagada pierde sus botones, menús, atajos de teclado (y su línea en la lista de atajos) y su orden en Ctrl+K. Si estaba en marcha (recorte, regla, columna a columna, texto adaptado, automático, doble página…), se para; la preferencia de este dispositivo se guarda y vuelve al encenderla. No se borra nada de lo hecho: las zonas, los trazos o los subrayados con línea siguen ahí.
+- Siempre están: subrayar en colores, comentar, copiar, el panel de anotaciones, ↩ Volver, ⬇ PDF anotado, recordar dónde ibas, los enlaces del PDF y la pantalla encendida.
+- Mientras no se elige, el visor sigue al modo de la app (Configuración → Apariencia → Modo de la app); los proyectos que ya existían quedan en Completo. Se guarda en el JSON (`settings.vwMode` y `settings.vwFeat`) y llega a los otros dispositivos.
+- Archivo nuevo: `js/visor-funciones.js`. Prueba nueva: `python3 pruebas/prueba_visor_modos.py .` (ordenador, iPad en vertical, Pixel 7 y iPhone SE; `MODOS_SHOTS=carpeta` guarda capturas).
+
 ## v40.9: arreglos en el móvil (ficha del paper, tarjetas y enlaces en la app de Android)
 - **Tarjetas**: tocar (o hacer clic en) el título abre la ficha para editar, como en la tabla. Mantenerlo pulsado en el móvil sigue sirviendo para arrastrar la tarjeta.
 - **Enlaces a otras webs en la app de Android**: el DOI de una tarjeta (y cualquier enlace que se abría en una pestaña nueva) dejaba la pantalla en negro y, al volver atrás, se cerraba la app. Ahora, dentro de la app, se abre en la misma ventana con la barra de Chrome (con ✕), y «Atrás» vuelve a GPapers. Antes se guarda la copia de trabajo. En el navegador y en la PWA instalada se sigue abriendo en una pestaña nueva. No hace falta un APK nuevo.

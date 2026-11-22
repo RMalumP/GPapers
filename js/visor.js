@@ -67,28 +67,28 @@ function vwBuild() {
     <div class="vwh"><button class="vwib" data-onclick="vwClose()" title="Volver a la lista (Esc)" aria-label="Volver">←</button><b class="vwt"></b>
       <span class="vwpg"><input id="vwPg" type="number" min="1" aria-label="Página" data-onchange="vwGoN(this.value)" data-onkeydown="onEnter(event,vwGoN,this.value)"><span id="vwPn"></span></span><small id="vwLeft" class="lnleft" hidden></small>
       <span class="vwz"><button class="vwib" data-onclick="vwZoomBy(0.8333)" title="Alejar (Ctrl + −)" aria-label="Alejar">−</button><button id="vwZl" class="vwzl" data-onclick="vwFitW()" title="Ajustar al ancho">100 %</button><button class="vwib" data-onclick="vwZoomBy(1.2)" title="Acercar (Ctrl + +)" aria-label="Acercar">＋</button></span>
-      <span class="vwf"><input id="vwQ" type="search" placeholder="Buscar en el PDF" aria-label="Buscar en el PDF" data-onkeydown="vwFindKey(event)" data-oninput="vwFindReset()"><span id="vwQn"></span><button class="vwib vwqL" id="vwQL" hidden data-onclick="vwPanel('find')" title="Ver todos los resultados, con su frase" aria-label="Lista de resultados">☰</button></span>
-      <button class="vwib vwfb" data-onclick="vwFindToggle()" title="Buscar (Ctrl+F)" aria-label="Buscar">🔍</button>
-      <button class="vwib vwlk" data-onclick="vwLockToggle()" title="Bloquear el tamaño (K)" aria-label="Bloquear el tamaño" aria-pressed="false">🔓</button>
-      <button class="vwib" data-onclick="vwFs(true)" title="Pantalla completa" aria-label="Pantalla completa">⛶</button>
+      <span class="vwf" data-vf="find"><input id="vwQ" type="search" placeholder="Buscar en el PDF" aria-label="Buscar en el PDF" data-onkeydown="vwFindKey(event)" data-oninput="vwFindReset()"><span id="vwQn"></span><button class="vwib vwqL" id="vwQL" data-vf="findL" hidden data-onclick="vwPanel('find')" title="Ver todos los resultados, con su frase" aria-label="Lista de resultados">☰</button></span>
+      <button class="vwib vwfb" data-vf="find" data-onclick="vwFindToggle()" title="Buscar (Ctrl+F)" aria-label="Buscar">🔍</button>
+      <button class="vwib vwlk" data-vf="lock" data-onclick="vwLockToggle()" title="Bloquear el tamaño (K)" aria-label="Bloquear el tamaño" aria-pressed="false">🔓</button>
+      <button class="vwib" data-vf="fs" data-onclick="vwFs(true)" title="Pantalla completa" aria-label="Pantalla completa">⛶</button>
       <button class="vwib" id="vwMoreB" data-onclick="vwMore(event)" title="Más: descargar con las anotaciones, ficha del paper…" aria-label="Más">⋯</button></div>
     <div class="vwtb" role="toolbar" aria-label="Herramientas">
       <button class="vwm vwun" data-onclick="vwUndo()" title="Deshacer (Ctrl+Z)" aria-label="Deshacer"><span>↶</span><small>Deshacer</small></button>
       <button class="vwm" data-m="sel" data-onclick="vwMode('sel')" title="Seleccionar texto: al soltar, elige un color para subrayarlo"><span>𝙸</span><small>Seleccionar</small></button>
       <button class="vwm" data-m="hl" data-onclick="vwMode('hl')" title="Subrayar: arrastra sobre el texto (con el dedo, el lápiz o el ratón)"><span>🖍</span><small>Subrayar</small></button>
-      <button class="vwm" data-m="area" data-onclick="vwMode('area')" title="Zona: arrastra para marcar un recuadro (PDF escaneados, figuras)"><span>▭</span><small>Zona</small></button>
-      <button class="vwm" data-m="note" data-onclick="vwMode('note')" title="Nota: toca la página donde quieras dejarla"><span>🗒</span><small>Nota</small></button>
+      <button class="vwm" data-m="area" data-vf="area" data-onclick="vwMode('area')" title="Zona: arrastra para marcar un recuadro (PDF escaneados, figuras)"><span>▭</span><small>Zona</small></button>
+      <button class="vwm" data-m="note" data-vf="note" data-onclick="vwMode('note')" title="Nota: toca la página donde quieras dejarla"><span>🗒</span><small>Nota</small></button>
       <span class="vwcs" role="group" aria-label="Color">${vwSwBar('vwColor')}</span>
-      <button class="vwm vwtc" data-onclick="vwPanel('toc')" title="Índice del PDF y miniaturas de las páginas"><span>📑</span><small>Índice</small></button>
-      <button class="vwm vwnb" data-onclick="vwNotes()" title="Notas del paper (generales y por sección) al lado del PDF, con todas las opciones del editor"><span>📝</span><small>Notas</small></button>
+      <button class="vwm vwtc" data-vf="toc" data-onclick="vwPanel('toc')" title="Índice del PDF y miniaturas de las páginas"><span>📑</span><small>Índice</small></button>
+      <button class="vwm vwnb" data-vf="notes" data-onclick="vwNotes()" title="Notas del paper (generales y por sección) al lado del PDF, con todas las opciones del editor"><span>📝</span><small>Notas</small></button>
       <button class="vwm vwfsb" data-onclick="vwTbHide(true)" title="Ocultar esta barra (se vuelve a sacar con la pestaña ▾; su sitio se elige en ⋯ → Modo de lectura)"><span>▴</span><small>Ocultar</small></button>
       <button class="vwm vwfsb" data-onclick="vwFs(false)" title="Salir de pantalla completa (Esc o «atrás»)"><span>⛶</span><small>Salir</small></button>
       <button class="vwm vwsb" data-onclick="vwPanel('ann')" title="Subrayados, notas y comentarios"><span>💬</span><small>Anotaciones</small><b id="vwAn"></b></button></div>
     <div class="vwbody"><div id="vwScroll" tabindex="0" aria-label="Páginas del PDF"><div id="vwPages"></div><p id="vwLoad" class="vwload">Abriendo el PDF…</p></div><aside id="vwSide" hidden></aside></div>
-    <div id="vwSel" class="vwfloat" hidden data-onmousedown="event.preventDefault()">${sw.replace(/vwColor/g, 'vwSelColor')}<button class="vwib" data-onclick="vwSelNote()" title="Subrayar y comentar" aria-label="Subrayar y comentar">💬</button><button class="vwib" data-onclick="vwSelCopy()" title="Copiar el texto" aria-label="Copiar">📋</button><button class="vwib vxacr" hidden data-onclick="vxAcr()" aria-label="¿Qué significa esta sigla?">🔤</button><button class="vwib" data-onclick="lnSelMore(false)" title="Más: copiar con la cita, definición, traducir…" aria-label="Más">⋯</button></div>
+    <div id="vwSel" class="vwfloat" hidden data-onmousedown="event.preventDefault()">${sw.replace(/vwColor/g, 'vwSelColor')}<button class="vwib" data-onclick="vwSelNote()" title="Subrayar y comentar" aria-label="Subrayar y comentar">💬</button><button class="vwib" data-onclick="vwSelCopy()" title="Copiar el texto" aria-label="Copiar">📋</button><button class="vwib vxacr" data-vf="acr" hidden data-onclick="vxAcr()" aria-label="¿Qué significa esta sigla?">🔤</button><button class="vwib vwselm" data-onclick="lnSelMore(false)" title="Más: copiar con la cita, definición, traducir…" aria-label="Más">⋯</button></div>
     <div id="vwPop" class="vwfloat vwpop" hidden></div>
     <button id="vwTbTab" class="vwfloat" data-onclick="vwTbHide(false)" title="Sacar la barra de herramientas" aria-label="Sacar la barra">▾</button>
-    <button id="vwLock" class="vwfloat vwlk" data-onclick="vwLockToggle()" title="Bloquear el tamaño (K)" aria-label="Bloquear el tamaño" aria-pressed="false">🔓</button>
+    <button id="vwLock" class="vwfloat vwlk" data-vf="lock" data-onclick="vwLockToggle()" title="Bloquear el tamaño (K)" aria-label="Bloquear el tamaño" aria-pressed="false">🔓</button>
     <div id="vwPgTip" class="vwfloat" hidden></div>
     <div id="vwCol" class="vwfloat" hidden>${sw.replace(/vwColor\((\d)\)/g, 'vwColPick($1)')}</div></dialog>`);
   const d = $('#vw'), sc = $('#vwScroll');
@@ -257,7 +257,7 @@ function vwEsc() {
 function vwKey(e) {
   if (e.target.closest?.('dialog') !== $('#vw') && !(VW.open && (e.target === document.body || e.target === document.documentElement))) return;
   const inText = /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName) || e.target.isContentEditable, mod = e.ctrlKey || e.metaKey, k = e.key;
-  if (mod && (k === 'f' || k === 'F')) { e.preventDefault(); return vwFindToggle(true); }
+  if (mod && (k === 'f' || k === 'F')) { e.preventDefault(); return vfOn('find') ? vwFindToggle(true) : undefined; }
   if (mod && (k === '+' || k === '=')) { e.preventDefault(); return vwZoomBy(1.2); }
   if (mod && k === '-') { e.preventDefault(); return vwZoomBy(1 / 1.2); }
   if (mod && k === '0') { e.preventDefault(); return vwFitW(); }
@@ -265,7 +265,7 @@ function vwKey(e) {
   if (mod && (k === 'z' || k === 'Z')) { e.preventDefault(); vwSaveComment(); return e.shiftKey ? redo() : undo(); }
   if (mod && (k === 'y')) { e.preventDefault(); return redo(); }
   if (e.altKey && k === 'ArrowLeft' && LN.back.length) { e.preventDefault(); return lnBack(); }   // v39.50: volver después de un enlace
-  if (e.altKey && k === 'ArrowRight' && LN.fwd.length) { e.preventDefault(); return lnFwd(); }   // v40.8: y adelante
+  if (e.altKey && k === 'ArrowRight' && LN.fwd.length && vfOn('fwd')) { e.preventDefault(); return lnFwd(); }   // v40.8: y adelante
   if (mod || e.altKey) return;
   if (vxFlowShown() && k !== 't' && k !== 'T') return;   // en el texto adaptado, las teclas mueven el texto (no el PDF de debajo)
   const sc = $('#vwScroll');
@@ -277,10 +277,10 @@ function vwKey(e) {
   else if (k === 'ArrowLeft' && sc.scrollWidth <= sc.clientWidth) { e.preventDefault(); vwStep(-1); }
   else if (k === 'Home') { e.preventDefault(); vxGoH(0); } else if (k === 'End') { e.preventDefault(); vxGoH(VW.pages.length - 1); }
   else if (k === 'Delete' && VW.pop) { e.preventDefault(); vwPopDel(); }
-  else if (k === 'b' || k === 'B') { e.preventDefault(); vwBmToggle(); }   // marcador en esta página
-  else if (k === ']' || k === '[') { e.preventDefault(); vwBmStep(k === ']' ? 1 : -1); }
+  else if ((k === 'b' || k === 'B') && vfOn('bm')) { e.preventDefault(); vwBmToggle(); }   // marcador en esta página
+  else if ((k === ']' || k === '[') && vfOn('bm')) { e.preventDefault(); vwBmStep(k === ']' ? 1 : -1); }
   else if ((k === 'ArrowUp' || k === 'ArrowDown') && VW.auto) { e.preventDefault(); vwAutoSpeed(k === 'ArrowUp' ? 1 : -1); }   // desplazamiento automático: ↑ ↓ cambian la velocidad
-  else { const f = VW_KEYS[k.length === 1 ? k.toLowerCase() : k]; if (f) { e.preventDefault(); f[1](); } }
+  else { const kk = k.length === 1 ? k.toLowerCase() : k, f = VW_KEYS[kk]; if (f && vfKey(kk)) { e.preventDefault(); f[1](); } }
 }
 /* Más atajos del visor (v39.41). ? (o ⋯ → ⌨ Atajos de teclado) muestra todos. */
 const VW_KEYS = {
@@ -297,9 +297,9 @@ function vwKeysHelp() {
   if (!VW.menuR) VW.menuR = $('#vwMoreB').getBoundingClientRect();
   const kb = s => s.split(' ').map(x => `<kbd>${esc(x)}</kbd>`).join(' '), row = (k, t) => `<tr><td>${kb(k)}</td><td>${esc(t)}</td></tr>`;
   const fixed = [['Ctrl+F', 'Buscar en el PDF'], ['Ctrl++ Ctrl+−', 'Zoom'], ['Ctrl+0', 'Ajustar al ancho'], ['Ctrl+Z', 'Deshacer'], ['← →', 'Página (o par) anterior y siguiente'], ['RePág AvPág', 'Pantalla anterior y siguiente'], ['Inicio Fin', 'Primera y última página'],
-    ['Espacio', 'Bajar una pantalla (con el automático: pausa)'], ['↑ ↓', 'Con el automático: más deprisa o más despacio'], ['B', 'Marcar o quitar el marcador'], ['Alt+← Alt+→', 'Atrás y adelante por los saltos (enlaces, índice, búsqueda, marcadores…)'], ['[ ]', 'Marcador anterior y siguiente'], ['Supr', 'Borrar la anotación abierta'], ['Esc', 'Cerrar (o salir de pantalla completa)']];
+    ['Espacio', 'Bajar una pantalla (con el automático: pausa)'], ['↑ ↓', 'Con el automático: más deprisa o más despacio'], ...(vfOn('bm') ? [['B', 'Marcar o quitar el marcador']] : []), vfOn('fwd') ? ['Alt+← Alt+→', 'Atrás y adelante por los saltos (enlaces, índice, búsqueda, marcadores…)'] : ['Alt+←', 'Volver después de un salto (enlace, índice, búsqueda…)'], ...(vfOn('bm') ? [['[ ]', 'Marcador anterior y siguiente']] : []), ['Supr', 'Borrar la anotación abierta'], ['Esc', 'Cerrar (o salir de pantalla completa)']];
   vwMenu(VW.menuR, `<button data-keep data-onclick="vwMoreBack()">‹ Volver</button><hr><div class="ctxh">⌨ Atajos de teclado del visor</div>
-    <table class="vwkeys">${fixed.map(([k, t]) => row(k, t)).join('')}${Object.entries(VW_KEYS).map(([k, [t]]) => row(k.toUpperCase(), t)).join('')}</table>
+    <table class="vwkeys">${fixed.map(([k, t]) => row(k, t)).join('')}${Object.entries(VW_KEYS).filter(([k]) => vfKey(k)).map(([k, [t]]) => row(k.toUpperCase(), t)).join('')}</table>
     <div class="vwhint">Las letras funcionan fuera de los campos de texto. El tamaño del texto de la interfaz se cambia en Configuración → Apariencia (y con ${esc(db.settings.shortcuts.uiBig || '—')} / ${esc(db.settings.shortcuts.uiSmall || '—')}).</div>`);
 }
 

@@ -99,7 +99,7 @@ function vxRefHave(s) {   // ¿ya está en la biblioteca? Mismo DOI, o su títul
 }
 async function vxRefInfo(t, pp, R) {   // en la vista previa de un enlace: la referencia, con «Abrir» o «➕ Añadir a GPapers»
   const p = VW.pages[t.i]; if (!p) return; let s = ''; try { s = await vxRefText(p, t); } catch (e) { return; }
-  if (LN.t !== t || pp.hidden || !vxIsRef(s)) return;
+  if (LN.t !== t || pp.hidden || !vxIsRef(s) || !vfOn('refadd')) return;
   const have = vxRefHave(s); VX.ref = {s, have: have?.id || null};
   pp.querySelector('.vwpopb')?.insertAdjacentHTML('beforeend', have
     ? `<span class="vxrefok" title="${esc(have.title || '')}">✓ Ya en tu biblioteca</span><button data-onclick="vxRefOpen()" title="Abrir su ficha">📝 Abrir</button>`
@@ -124,7 +124,7 @@ function vxRefLink(ids) {   // tras importar desde una cita: el paper que se lee
 
 /* ===== 2 · ▥ Columna a columna ===== */
 const VX_COL_K = 'gp-vw-col';
-const vxColWant = () => !!vxLs(VX_COL_K, false);
+const vxColWant = () => !!vxLs(VX_COL_K, false) && vfOn('col');
 async function vxSegs(p) {   // los trozos de la página que se enseñan uno tras otro: {x, y, sc} (punto de arriba a la izquierda y escala)
   const sc = $('#vwScroll'), W = Math.max(100, sc.clientWidth - 2 * VW_GAP), H = Math.max(100, sc.clientHeight - 2 * VW_GAP);
   let B = []; try { B = await vxCols(p); } catch (e) {}
@@ -155,7 +155,7 @@ function vxColStep(d) {   // devuelve true si lo ha hecho el modo columna a colu
   return true;
 }
 function vxColSet(on, quiet) {
-  on = !!on; vxLsPut(VX_COL_K, on); if (!VW.open) return; VW.col = on; VX.seg = null;
+  on = !!on; if (on && !vfOn('col')) return; vxLsPut(VX_COL_K, on); if (!VW.open) return; VW.col = on; VX.seg = null;
   if (on) {
     if (VW.auto) vwAutoStop(); VW.zLock = false; VW.flip = true; VW.two = false; vwRdSave(); vwRdClass(); vwFlipShow();
     vxColGo(VW.cur, 0); if (!quiet) toast('Columna a columna: toca a la derecha (o →) para ver la siguiente columna; a la izquierda, la anterior.', [], 3200);
@@ -199,11 +199,11 @@ async function vxAreaCover() {   // la zona como imagen del paper (copia reducid
     logChange(P, 'Imagen del paper desde el PDF'); markDirty(); RENDER_VW = true; toast('Puesta como imagen del paper.', [{t: 'Deshacer', fn: undo}], 4000);
   } catch (e) { toast('No se pudo hacer la imagen: ' + e.message, [], 3500); }
 }
-const vxAreaBtns = a => a.k !== 'area' ? '' : `<button data-onclick="vxAreaCopy()" title="Copiar el recuadro como imagen">📷 Copiar imagen</button><button data-onclick="vxAreaPng()" title="Guardar el recuadro como imagen PNG">⬇ PNG</button>${VW.src?.kind === 'paper' ? '<button data-onclick="vxAreaCover()" title="Usar el recuadro como imagen del paper (la de las tarjetas)">🖼 Imagen del paper</button>' : ''}`;
+const vxAreaBtns = a => a.k !== 'area' || !vfOn('area') ? '' : `<button data-onclick="vxAreaCopy()" title="Copiar el recuadro como imagen">📷 Copiar imagen</button><button data-onclick="vxAreaPng()" title="Guardar el recuadro como imagen PNG">⬇ PNG</button>${VW.src?.kind === 'paper' ? '<button data-onclick="vxAreaCover()" title="Usar el recuadro como imagen del paper (la de las tarjetas)">🖼 Imagen del paper</button>' : ''}`;
 
 /* ===== 4 · Atrás y adelante ===== */
 function lnFwd() {
-  const f = LN.fwd.pop(); if (!f) return lnBackShow(); const a = vwAnchor(); if (a) LN.back.push({i: VW.cur, a, sl: $('#vwScroll').scrollLeft});
+  if (!vfOn('fwd')) return; const f = LN.fwd.pop(); if (!f) return lnBackShow(); const a = vwAnchor(); if (a) LN.back.push({i: VW.cur, a, sl: $('#vwScroll').scrollLeft});
   if (VW.flip) vwGo(f.i, true); vwAnchorSet(f.a); $('#vwScroll').scrollLeft = f.sl; if (!VW.flip) VW.cur = f.i; vwOnScroll(); lnBackShow();
 }
 document.addEventListener('mouseup', e => { if (!VW.open || (e.button !== 3 && e.button !== 4) || !e.target.closest?.('#vw')) return; e.preventDefault(); e.button === 3 ? lnBack() : lnFwd(); }, true);   // botones laterales del ratón
@@ -211,7 +211,7 @@ document.addEventListener('mousedown', e => { if (VW.open && (e.button === 3 || 
 
 /* ===== 5 · Marcas junto a la barra de desplazamiento ===== */
 const VX_MAP_K = 'gp-vw-map';
-const vxMapOn = () => vxLs(VX_MAP_K, true) !== false;
+const vxMapOn = () => vxLs(VX_MAP_K, true) !== false && vfOn('map');
 function vxMapSet(on) { vxLsPut(VX_MAP_K, !!on); vxMapDraw(); }
 function vxMapEl() {
   let m = $('#vxMap'); if (m || !$('#vw .vwbody')) return m;
@@ -332,8 +332,8 @@ document.addEventListener('pointerdown', e => { const pp = $('#vxAcrPop'); if (p
 
 /* ===== 8 · 📏 Regla de lectura ===== */
 const VX_RL_K = 'gp-vw-regla', VX_RL_N = [2, 3, 5];
-const vxRl = () => { const o = vxLs(VX_RL_K, {}) || {}; return {on: !!o.on, n: VX_RL_N.includes(o.n) ? o.n : 3, y: o.y > 0 && o.y < 1 ? o.y : .35}; };
-function vxRlSet(o) { vxLsPut(VX_RL_K, {...vxRl(), ...o}); vxRlShow(); }
+const vxRl = () => { const o = vxLs(VX_RL_K, {}) || {}; return {on: !!o.on && vfOn('rl'), n: VX_RL_N.includes(o.n) ? o.n : 3, y: o.y > 0 && o.y < 1 ? o.y : .35}; };
+function vxRlSet(o) { if (!vfOn('rl')) return; vxLsPut(VX_RL_K, {...vxRl(), ...o}); vxRlShow(); }
 function vxRlN(n) { vxRlSet({n}); }
 function vxRlToggle() { const on = !vxRl().on; vxRlSet({on}); toast(on ? '📏 Regla de lectura: sigue al ratón; con el dedo, arrastra su asa ⇕ (tecla M para quitarla).' : 'Regla de lectura quitada.', [], 2600); }
 function vxRlShow() {
@@ -413,7 +413,7 @@ async function vxFlowPrev() {
 function vxFlowPg() { const s = $('#vxFlS'); if (!s) return; const top = s.getBoundingClientRect().top + 20; let i = VX.fl?.a ?? 0; for (const x of s.querySelectorAll('.vxflp')) { if (x.getBoundingClientRect().top <= top) i = +x.dataset.i; else break; } VX.flCur = i; $('#vxFlPg').textContent = `p. ${i + 1} de ${VW.pages.length}`; }
 function vxFlowClose() { const f = $('#vxFlow'); if (!f || f.hidden) return; f.hidden = true; $('#vw').classList.remove('vxfl'); VX.flIo?.disconnect(); if (VX.flCur != null && VX.flCur !== VW.cur) vwGo(VX.flCur, true); }
 const vxFlowShown = () => { const f = $('#vxFlow'); return !!(f && !f.hidden); };
-function vxFlowToggle() { vxFlowShown() ? vxFlowClose() : vxFlowOpen(); }
+function vxFlowToggle() { vxFlowShown() ? vxFlowClose() : vfOn('flow') && vxFlowOpen(); }
 function vxFlowStyle() { const o = vxFl(), a = $('#vxFlA'); if (!a) return; a.style.fontSize = o.fz + 'px'; a.classList.toggle('serif', o.serif); }
 function vxFlowFz(d) { const o = vxFl(); vxLsPut(VX_FL_K, {...o, fz: Math.max(13, Math.min(34, o.fz + d * 2))}); vxFlowStyle(); }
 function vxFlowSerif() { const o = vxFl(); vxLsPut(VX_FL_K, {...o, serif: !o.serif}); vxFlowStyle(); }
@@ -561,10 +561,10 @@ function vxOnOpen(gen) {
   vxMapDraw(); vxRlShow(); vxOcrLoad(gen); vxFlowClose();
   if (VW.col) setTimeout(() => { if (gen === VW.gen && VW.col) vxColGo(VW.cur, 0); }, 250);
 }
-const vxReadBtns = () => `<hr><div class="ctxh">Leer mejor</div>
-  ${VW.flip || VW.col ? `<button data-onclick="vxColSet(${VW.col ? 0 : 1})" title="En un PDF a dos columnas, cada toque enseña la columna siguiente ampliada (en una sola columna, el bloque de texto sin márgenes)">${tick(VW.col)}▥ Columna a columna</button>` : `<button data-onclick="vxColSet(1)" title="Página a página, enseñando cada columna ampliada">${tick(false)}▥ Columna a columna</button>`}
-  <button data-keep data-onclick="vxRlToggle();vwReadMenu()" title="Oscurece todo menos unas líneas (tecla M)">${tick(vxRl().on)}📏 Regla de lectura <small class="vwsub">M</small></button>
-  ${vxRl().on ? `<div class="epmrow">${VX_RL_N.map((n, k) => `<button data-keep class="${vxRl().n === n ? 'on' : ''}" data-onclick="vxRlN(${n});vwReadMenu()">${['Fina', 'Media', 'Ancha'][k]}</button>`).join('')}</div>` : ''}
-  <button data-onclick="vxFlowToggle()" title="El texto en párrafos que se ajustan a la pantalla, con su tamaño de letra (tecla T)">${tick(vxFlowShown())}📄 Texto adaptado a la pantalla <small class="vwsub">T</small></button>`;
+const vxReadBtns = () => !vfOn('col') && !vfOn('rl') && !vfOn('flow') ? '' : `<hr><div class="ctxh">Leer mejor</div>
+  ${vfH('col', VW.flip || VW.col ? `<button data-onclick="vxColSet(${VW.col ? 0 : 1})" title="En un PDF a dos columnas, cada toque enseña la columna siguiente ampliada (en una sola columna, el bloque de texto sin márgenes)">${tick(VW.col)}▥ Columna a columna</button>` : `<button data-onclick="vxColSet(1)" title="Página a página, enseñando cada columna ampliada">${tick(false)}▥ Columna a columna</button>`)}
+  ${vfH('rl', `<button data-keep data-onclick="vxRlToggle();vwReadMenu()" title="Oscurece todo menos unas líneas (tecla M)">${tick(vxRl().on)}📏 Regla de lectura <small class="vwsub">M</small></button>
+  ${vxRl().on ? `<div class="epmrow">${VX_RL_N.map((n, k) => `<button data-keep class="${vxRl().n === n ? 'on' : ''}" data-onclick="vxRlN(${n});vwReadMenu()">${['Fina', 'Media', 'Ancha'][k]}</button>`).join('')}</div>` : ''}`)}
+  ${vfH('flow', `<button data-onclick="vxFlowToggle()" title="El texto en párrafos que se ajustan a la pantalla, con su tamaño de letra (tecla T)">${tick(vxFlowShown())}📄 Texto adaptado a la pantalla <small class="vwsub">T</small></button>`)}`;
 Object.assign(VW_KEYS, {m: ['Regla de lectura (sí o no)', () => vxRlToggle()], t: ['Texto adaptado a la pantalla (sí o no)', () => vxFlowToggle()]});
 VW_TABS.push(['fig', '🖼 Figuras']);

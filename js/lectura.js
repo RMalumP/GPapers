@@ -19,8 +19,8 @@ const wlPref = () => { try { const v = localStorage.getItem(WL_K); return v === 
 function wlSetPref(v) { try { localStorage.setItem(WL_K, v); } catch (e) {} wlSync(); }
 function rdCfgHtml(b, ep) {   // lo de esta parte en ⚙ Ajustes del visor (PDF y EPUB)
   const lp = lnPref(), wp = wlPref();
-  return `<hr><button data-keep data-onclick="annLblMenu(${ep ? 'true' : 'false'})">🏷 Significado de los colores <small class="vwsub">${Object.keys(annLbls()).length || 'sin nombres'} ›</small></button>
-    ${b(lnLeftOn(), `lnLeftSet(${lnLeftOn() ? 0 : 1})`, '⏱ Ver el tiempo que falta para terminar (≈, a tu ritmo)')}
+  return `${vfOn('lbl') || vfOn('left') ? '<hr>' : ''}${vfH('lbl', `<button data-keep data-onclick="annLblMenu(${ep ? 'true' : 'false'})">🏷 Significado de los colores <small class="vwsub">${Object.keys(annLbls()).length || 'sin nombres'} ›</small></button>`)}
+    ${vfH('left', b(lnLeftOn(), `lnLeftSet(${lnLeftOn() ? 0 : 1})`, '⏱ Ver el tiempo que falta para terminar (≈, a tu ritmo)'))}
     <hr><div class="ctxh">🔗 Al tocar un enlace o una cita</div>${b(lp === 'prev', "lnSet('prev')", '👁 Ver antes una vista previa', 'La referencia, la figura o la nota salen en una ventanita sin moverte de donde lees')}${b(lp === 'go', "lnSet('go')", '➜ Ir directamente (con ↩ Volver)')}
     ${'wakeLock' in navigator ? `<hr><div class="ctxh">🔆 Pantalla encendida</div>${[['read', 'Mientras lees (se apaga tras 5 min sin tocar)'], ['auto', 'Solo mientras la página baja sola (⏬)'], ['off', 'Como el sistema']].map(([v, t]) => b(wp === v, `wlSetPref('${v}')`, t)).join('')}` : ''}`;
 }
@@ -150,10 +150,10 @@ function lnBack() {
 function lnBackClear() { LN.back = []; LN.fwd = []; LN.findQ = null; lnBackShow(); }
 function lnBackShow() {
   const body = $('#vw .vwbody'); if (!body) return; let b = $('#vwBack');
-  if (!LN.back.length && !LN.fwd.length) { if (b) b.hidden = true; return; }
+  if (!LN.back.length && !(LN.fwd.length && vfOn('fwd'))) { if (b) b.hidden = true; return; }
   if (!b) { body.insertAdjacentHTML('beforeend', `<div id="vwBack" class="vwfloat lnback"><button class="lnbk" data-onclick="lnBack()" title="Volver a donde estabas (Alt + ←)"></button><button class="lnfw" data-onclick="lnFwd()" title="Adelante: a donde ibas (Alt + →)"></button><button class="vwib" data-onclick="lnBackClear()" title="Quitar" aria-label="Quitar">✕</button></div>`); b = $('#vwBack'); }
-  const bk = b.querySelector('.lnbk'), fw = b.querySelector('.lnfw'); bk.hidden = !LN.back.length; fw.hidden = !LN.fwd.length;
-  bk.textContent = LN.back.length ? (LN.fwd.length ? `‹ p. ${LN.back.at(-1).i + 1}` : `↩ Volver a la p. ${LN.back.at(-1).i + 1}`) : ''; fw.textContent = LN.fwd.length ? `p. ${LN.fwd.at(-1).i + 1} ›` : ''; b.hidden = false;
+  const bk = b.querySelector('.lnbk'), fw = b.querySelector('.lnfw'); bk.hidden = !LN.back.length; fw.hidden = !LN.fwd.length || !vfOn('fwd');
+  bk.textContent = LN.back.length ? (LN.fwd.length && vfOn('fwd') ? `‹ p. ${LN.back.at(-1).i + 1}` : `↩ Volver a la p. ${LN.back.at(-1).i + 1}`) : ''; fw.textContent = LN.fwd.length ? `p. ${LN.fwd.at(-1).i + 1} ›` : ''; b.hidden = false;
 }
 function lnHover(e) {   // con el ratón, la mano sobre los enlaces
   if (e.pointerType !== 'mouse' || e.buttons || VW.mode !== 'sel') return; const n = Date.now(); if (n - (LN.hv || 0) < 80) return; LN.hv = n;
@@ -269,11 +269,11 @@ function lnSelMore(ep) {
   let pg = 0; if (ep) { const s = r.startContainer.parentElement?.closest('section.epc'); pg = s ? +s.dataset.i : epLoc().i; } else { const L = vwRangeAnn(r); pg = L.length ? L[0].p : VW.cur; }
   LN.sel = {t: t.slice(0, 4000), pg, ep}; const w = t.split(/\s+/).filter(Boolean).length, one = w > 0 && w <= 3;
   const m = ep ? epMenu : vwMenu; if (ep) EP.menuR = bar; else VW.menuR = bar;
-  m(bar, `<button data-onclick="lnSelCite()" title="«…» (autor, año, página): para pegarlo en un trabajo">❝ Copiar con la cita</button>
-    <button data-onmousedown="event.preventDefault()" data-onclick="lnSelStyle('u')" title="Con el color elegido, una línea debajo en vez de resaltar">U̲ Subrayar con una línea</button><button data-onmousedown="event.preventDefault()" data-onclick="lnSelStyle('x')">S̶ Tachar</button>
-    ${one ? `<button data-onclick="lnSelWeb('rae')">📖 Definición (RAE)</button><button data-onclick="lnSelWeb('cam')">📖 Definition (Cambridge)</button>` : ''}
-    ${sayCan() ? `<button data-onclick="saySel(${!!ep})">🔊 Leer en voz alta desde aquí</button>` : ''}<button data-onclick="lnSelWeb('tr')">🌐 Traducir al español</button><button data-onclick="lnSelWeb('sch')">🎓 Buscar en Google Académico</button>
-    <div class="vwhint">Lo de fuera se abre en una pestaña nueva y envía solo el texto elegido.</div>`);
+  m(bar, `${vfH('cite', '<button data-onclick="lnSelCite()" title="«…» (autor, año, página): para pegarlo en un trabajo">❝ Copiar con la cita</button>')}
+    ${vfH('ustyle', `<button data-onmousedown="event.preventDefault()" data-onclick="lnSelStyle('u')" title="Con el color elegido, una línea debajo en vez de resaltar">U̲ Subrayar con una línea</button><button data-onmousedown="event.preventDefault()" data-onclick="lnSelStyle('x')">S̶ Tachar</button>`)}
+    ${one && vfOn('web') ? `<button data-onclick="lnSelWeb('rae')">📖 Definición (RAE)</button><button data-onclick="lnSelWeb('cam')">📖 Definition (Cambridge)</button>` : ''}
+    ${sayCan() && vfOn('say') ? `<button data-onclick="saySel(${!!ep})">🔊 Leer en voz alta desde aquí</button>` : ''}${vfH('web', `<button data-onclick="lnSelWeb('tr')">🌐 Traducir al español</button><button data-onclick="lnSelWeb('sch')">🎓 Buscar en Google Académico</button>
+    <div class="vwhint">Lo de fuera se abre en una pestaña nueva y envía solo el texto elegido.</div>`)}`);
 }
 async function lnSelCite() {
   const s = LN.sel; if (!s?.t) return; const P = s.ep ? epPaperOf() : vwPaper(), ref = P ? annCite(P, s.pg + 1, s.ep) : `(${s.ep ? 'cap.' : 'p.'} ${s.pg + 1})`;
@@ -288,7 +288,7 @@ const vwTheme = () => { const p = vwNightPref(); return p === 'sepia' ? 'sepia' 
 
 /* ---- Tiempo que falta ---- */
 const LN_LEFT_K = 'gp-vw-left';
-const lnLeftOn = () => { try { return localStorage.getItem(LN_LEFT_K) !== '0'; } catch (e) { return true; } };
+const lnLeftOn = () => { if (!vfOn('left')) return false; try { return localStorage.getItem(LN_LEFT_K) !== '0'; } catch (e) { return true; } };
 function lnLeftSet(on) { try { localStorage.setItem(LN_LEFT_K, on ? '1' : '0'); } catch (e) {} lnLeftShow(); }
 const lnNum = (k, d, lo, hi) => { try { const v = +localStorage.getItem(k); return v >= lo && v <= hi ? v : d; } catch (e) { return d; } };
 const lnFmtMin = m => { m = Math.max(1, Math.round(m)); return m < 60 ? `≈ ${m} min` : `≈ ${Math.floor(m / 60)} h${m % 60 ? ' ' + (m % 60) + ' min' : ''}`; };
@@ -354,7 +354,7 @@ addEventListener('pagehide', () => { try { rlFlush(); } catch (e) {} });
 const LN_STY = {u: 'U̲ Línea debajo', x: 'S̶ Tachado'};
 function vwPopStyle(s) { const id = VW.pop; if (!id) return; vwMut(l => { const a = l.find(x => x.id === id); if (!a) return; if (s) a.s = s; else delete a.s; a.up = vwNow(); }); vwPopOpen(id); }
 function epPopStyle(s) { const id = EP.pop; if (!id) return; epMut(l => { const a = l.find(x => x.id === id); if (!a) return; if (s) a.s = s; else delete a.s; a.up = vwNow(); }); epPopOpen(id); }
-const lnStyRow = (a, fn) => `<span class="lnsty" role="group" aria-label="Estilo">${[['', '🖍', 'Resaltado'], ['u', 'U̲', 'Línea debajo'], ['x', 'S̶', 'Tachado']].map(([s, i, t]) => `<button class="${(a.s || '') === s ? 'on' : ''}" title="${t}" aria-label="${t}" data-onclick="${fn}('${s}')">${i}</button>`).join('')}</span>`;
+const lnStyRow = (a, fn) => !vfOn('ustyle') && !a.s ? '' : `<span class="lnsty" role="group" aria-label="Estilo">${[['', '🖍', 'Resaltado'], ['u', 'U̲', 'Línea debajo'], ['x', 'S̶', 'Tachado']].map(([s, i, t]) => `<button class="${(a.s || '') === s ? 'on' : ''}" title="${t}" aria-label="${t}" data-onclick="${fn}('${s}')">${i}</button>`).join('')}</span>`;
 function lnSelStyle(s) { const x = LN.sel; if (!x) return; if (x.ep) epFromSel(EP.color, false, s); else vwFromSel(VW.color, false, s); }
 
 /* ---- Recorte a mano ---- */
@@ -524,7 +524,7 @@ function sayBar() {
   b.innerHTML = `<span class="lnsayi" aria-hidden="true">🔊</span><small>${c ? (SAY.ep ? 'cap. ' : 'p. ') + (c.p + 1) : ''}</small><button data-onclick="sayStep(-1)" title="La frase anterior" aria-label="La frase anterior">⏮</button><button class="lnsayp" data-onclick="sayToggle()" title="${SAY.paused ? 'Seguir' : 'Pausa'}" aria-label="${SAY.paused ? 'Seguir' : 'Pausa'}">${SAY.paused ? '▶' : '⏸'}</button><button data-onclick="sayStep(1)" title="La frase siguiente" aria-label="La frase siguiente">⏭</button><button class="lnsayr" data-onclick="sayRateStep()" title="Velocidad">${String(r).replace('.', ',')}×</button><button data-onclick="sayStop()" title="Parar" aria-label="Parar">✕</button>`;
 }
 function saySel(ep) { const s = LN.sel; if (!s) return; getSelection().removeAllRanges(); $(ep ? '#epSel' : '#vwSel').hidden = true; sayStart(ep, {p: s.pg, t: s.t}); }
-const sayMenuBtn = ep => sayCan() ? `<button data-onclick="${SAY.on && SAY.ep === !!ep ? 'sayStop()' : `sayStart(${!!ep})`}">${SAY.on && SAY.ep === !!ep ? '⏹ Dejar de leer en voz alta' : '🔊 Leer en voz alta desde aquí'}</button>` : '';
+const sayMenuBtn = ep => sayCan() && vfOn('say') ? `<button data-onclick="${SAY.on && SAY.ep === !!ep ? 'sayStop()' : `sayStart(${!!ep})`}">${SAY.on && SAY.ep === !!ep ? '⏹ Dejar de leer en voz alta' : '🔊 Leer en voz alta desde aquí'}</button>` : '';
 
 /* ---- ✏ Lápiz ---- */
 const LN_INK_W = 1.8;   // grosor del trazo, en puntos del PDF
@@ -578,7 +578,7 @@ async function p2Open() {
   if (g !== P2.gen || !VW.open) { doc.destroy(); return; }
   Object.assign(P2, {doc, n, z: 1, name: pf.name, pgs: []});
   const pane = document.createElement('div'); pane.id = 'lnP2'; pane.className = 'lnp2'; pane.setAttribute('role', 'region'); pane.setAttribute('aria-label', 'PDF ' + n);
-  pane.innerHTML = `<div class="lnp2h"><b>📄 PDF ${n}</b><span class="lnp2n" title="${esc(pf.name)}">${esc(pf.name)}</span><small id="lnP2pg"></small><button data-onclick="vxDiff()" title="Marcar las frases que cambian entre los dos PDF" aria-label="Diferencias">≠</button><button data-onclick="p2Zoom(-1)" title="Alejar" aria-label="Alejar">−</button><button data-onclick="p2Zoom(1)" title="Acercar" aria-label="Acercar">＋</button><button data-onclick="p2Close()" title="Cerrar el PDF ${n}" aria-label="Cerrar">✕</button></div><div class="lnp2s" id="lnP2s"></div>`;
+  pane.innerHTML = `<div class="lnp2h"><b>📄 PDF ${n}</b><span class="lnp2n" title="${esc(pf.name)}">${esc(pf.name)}</span><small id="lnP2pg"></small><button data-vf="diff" data-onclick="vxDiff()" title="Marcar las frases que cambian entre los dos PDF" aria-label="Diferencias">≠</button><button data-onclick="p2Zoom(-1)" title="Alejar" aria-label="Alejar">−</button><button data-onclick="p2Zoom(1)" title="Acercar" aria-label="Acercar">＋</button><button data-onclick="p2Close()" title="Cerrar el PDF ${n}" aria-label="Cerrar">✕</button></div><div class="lnp2s" id="lnP2s"></div>`;
   const body = vw$('.vwbody'); body.insertBefore(pane, $('#vwSide')); body.insertBefore(vwSplitEl(), pane); vwSplitSet(vwSplitGet()); $('#vw').classList.add('lnp2on'); vwSplitMode();
   if (VW.side && (vwMv() || innerWidth < 1500)) { VW.side = false; vwSideShow(); }   // como con las notas: sin el panel de anotaciones, cada PDF tiene su mitad
   const p1 = await doc.getPage(1); if (g !== P2.gen) return; const v1 = p1.getViewport({scale: 1}), s = $('#lnP2s');
@@ -655,7 +655,7 @@ const pzNorm = g => Array.isArray(g) && g.length === 9 ? g.map(v => v > 0 ? 1 : 
 function pzGet() {
   let o = {}; try { o = JSON.parse(localStorage.getItem(PZ_K) || '{}') || {}; } catch (e) {}
   const c = [0, 1, 2].map(i => pzNorm(o.c?.[i]) || PZ_PRE.lr[1].slice());
-  return {sel: PZ_PRE[o.sel] || /^c[123]$/.test(o.sel) ? o.sel : 'lr', c};
+  return {sel: (PZ_PRE[o.sel] || /^c[123]$/.test(o.sel)) && vfOn('zonas') ? o.sel : 'lr', c};
 }
 function pzSave(o) { try { localStorage.setItem(PZ_K, JSON.stringify(o)); } catch (e) {} }
 const pzGrid = (o = pzGet()) => PZ_PRE[o.sel] ? PZ_PRE[o.sel][1] : o.c[+o.sel[1] - 1];
@@ -689,4 +689,4 @@ function pzShow(ep) {   // enseña un momento las zonas sobre la página (azul: 
   d.innerHTML = pzGrid().map(v => `<i class="${v < 0 ? 'pv' : v > 0 ? 'nx' : ''}">${v < 0 ? '◀' : v > 0 ? '▶' : ''}</i>`).join('');
   d.classList.add('on'); clearTimeout(pzShow.t); pzShow.t = setTimeout(() => d.classList.remove('on'), 1600);
 }
-const pzBtn = ep => `<button data-keep data-onclick="pzMenu(${ep ? 'true' : 'false'})">👆 Zonas para pasar <small class="vwsub">${esc(pzName())} ›</small></button>`;
+const pzBtn = ep => !vfOn('zonas') ? '' : `<button data-keep data-onclick="pzMenu(${ep ? 'true' : 'false'})">👆 Zonas para pasar <small class="vwsub">${esc(pzName())} ›</small></button>`;

@@ -406,3 +406,10 @@ html.simple #sg-fav,html.simple #fs-adv,html.simple #tbCols,html.simple #sbFoot 
 #sg-search:not(.qon) label.qinc{display:none}#fs-rat .fh2.yrs+.fh2.yrs{margin-top:2px}#fs-rat .fht{font-weight:600;font-size:calc(13px * var(--fz,1))}
 .ctabs[hidden]{display:none}#cfg .cblk>.csb{gap:2px}#cfg .cblk>.csb>.ci>label:not(.cchk){margin:4px 0}
 #cfg .ctabs .cfgn{font-size:calc(11px * var(--fz,1));padding:0 6px;border-radius:9px;background:var(--pri);color:var(--onpri)}#cfg .ctabs .cfg0{opacity:.45}#cfg .ctabs .cfg0 .cfgn{background:var(--bd);color:var(--fg)}
+/* v40.10: Configuración → Apariencia → «Visor de PDF y EPUB»: una fila por función con dos casillas (Sencillo y Completo), independientes */
+#cfg .vffun>.csb{gap:0}#cfg .vfg{margin:6px 0 4px}#cfg .vfrow{display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;gap:0 4px;padding:3px 0;border-bottom:1px solid var(--bd)}
+#cfg .vfrow.vfhd{border-bottom-width:2px;padding-top:8px}#cfg .vfrow.vfhd b{font-size:calc(13px * var(--fz,1))}#cfg .vfrow.vfhd small{min-width:4.6em;text-align:center;opacity:.75;font-size:calc(11.5px * var(--fz,1))}
+#cfg .vfn{min-width:0;overflow-wrap:break-word;hyphens:auto}#cfg .vfn small{display:block;opacity:.65;font-size:calc(11.5px * var(--fz,1))}#cfg .vfc{min-width:4.6em;display:flex;justify-content:center;align-items:center;margin:0;min-height:32px;cursor:pointer}#cfg .vfc input{width:18px;height:18px;margin:0}
+#cfg .vfrs{gap:8px;flex-wrap:wrap;margin:10px 0 2px}
+@media (max-width:420px){#cfg .vfrow.vfhd small,#cfg .vfc{min-width:3.9em}#cfg .vfrow.vfhd small{font-size:calc(10.5px * var(--fz,1))}}
+.vwmenu .vfseg button{flex:1}
